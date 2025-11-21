@@ -1,6 +1,8 @@
 package krispasi.omGames.bedwars.config;
 
 import krispasi.omGames.bedwars.model.BedWarsMap;
+import krispasi.omGames.bedwars.model.BaseGeneratorSettings;
+import krispasi.omGames.bedwars.model.GeneratorSettings;
 import krispasi.omGames.bedwars.model.TeamConfig;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -24,6 +26,9 @@ public class BedWarsConfigService {
     private int respawnDelay;
     private int baseGenRadius;
     private int advancedGenRadius;
+    private BaseGeneratorSettings baseGeneratorSettings;
+    private GeneratorSettings diamondSettings;
+    private GeneratorSettings emeraldSettings;
     private final Map<String, BedWarsMap> maps = new HashMap<>();
 
     public BedWarsConfigService(Plugin plugin) {
@@ -45,6 +50,9 @@ public class BedWarsConfigService {
             respawnDelay = config.getInt("respawn-delay-seconds", 5);
             baseGenRadius = config.getInt("anti-build.base-generator-radius", 14);
             advancedGenRadius = config.getInt("anti-build.advanced-generator-radius", 4);
+            baseGeneratorSettings = parseBaseGeneratorSettings();
+            diamondSettings = parseSimpleGenerator("diamond");
+            emeraldSettings = parseSimpleGenerator("emerald");
 
             ConfigurationSection mapRoot = config.getConfigurationSection("maps");
             if (mapRoot == null) {
@@ -233,11 +241,53 @@ public class BedWarsConfigService {
         return plugin.getLogger();
     }
 
+    public BaseGeneratorSettings getBaseGeneratorSettings() {
+        return baseGeneratorSettings;
+    }
+
+    public GeneratorSettings getDiamondSettings() {
+        return diamondSettings;
+    }
+
+    public GeneratorSettings getEmeraldSettings() {
+        return emeraldSettings;
+    }
+
     public Optional<BedWarsMap> getMap(String name) {
         return Optional.ofNullable(maps.get(name.toLowerCase()));
     }
 
     public Map<String, BedWarsMap> getMaps() {
         return Map.copyOf(maps);
+    }
+
+    private BaseGeneratorSettings parseBaseGeneratorSettings() {
+        ConfigurationSection root = config.getConfigurationSection("generator-settings.base");
+        if (root == null) {
+            return new BaseGeneratorSettings(40, 120, 25, 80, 15, 60, 180, 360);
+        }
+        long tier1Iron = root.getLong("tier1.iron-interval-ticks", 40);
+        long tier1Gold = root.getLong("tier1.gold-interval-ticks", 120);
+        long tier2Iron = root.getLong("tier2.iron-interval-ticks", 25);
+        long tier2Gold = root.getLong("tier2.gold-interval-ticks", 80);
+        long tier3Iron = root.getLong("tier3.iron-interval-ticks", 15);
+        long tier3Gold = root.getLong("tier3.gold-interval-ticks", 60);
+        long upgrade2 = root.getLong("upgrades.tier2-seconds", 180);
+        long upgrade3 = root.getLong("upgrades.tier3-seconds", 360);
+
+        return new BaseGeneratorSettings(tier1Iron, tier1Gold, tier2Iron, tier2Gold, tier3Iron, tier3Gold, upgrade2, upgrade3);
+    }
+
+    private GeneratorSettings parseSimpleGenerator(String key) {
+        ConfigurationSection root = config.getConfigurationSection("generator-settings." + key);
+        if (root == null) {
+            return new GeneratorSettings(30, 20, 10, 300, 600);
+        }
+        long tier1 = root.getLong("tier1-interval-ticks", 30);
+        long tier2 = root.getLong("tier2-interval-ticks", 20);
+        long tier3 = root.getLong("tier3-interval-ticks", 10);
+        long upgrade2 = root.getLong("upgrades.tier2-seconds", 300);
+        long upgrade3 = root.getLong("upgrades.tier3-seconds", 600);
+        return new GeneratorSettings(tier1, tier2, tier3, upgrade2, upgrade3);
     }
 }

@@ -2,6 +2,8 @@ package krispasi.omGames.bedwars;
 
 import krispasi.omGames.bedwars.command.BedWarsCommand;
 import krispasi.omGames.bedwars.config.BedWarsConfigService;
+import krispasi.omGames.bedwars.game.BedWarsGameListener;
+import krispasi.omGames.bedwars.game.BedWarsMatchManager;
 import krispasi.omGames.bedwars.menu.BedWarsMenuFactory;
 import krispasi.omGames.bedwars.menu.BedWarsMenuListener;
 import org.bukkit.Bukkit;
@@ -17,6 +19,7 @@ import java.lang.reflect.Method;
 public class BedWarsModule {
     private final JavaPlugin plugin;
     private BedWarsConfigService configService;
+    private BedWarsMatchManager matchManager;
 
     public BedWarsModule(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -25,14 +28,16 @@ public class BedWarsModule {
     public void enable() {
         configService = new BedWarsConfigService(plugin);
         configService.load();
+        matchManager = new BedWarsMatchManager(plugin, configService);
 
         // command + listeners live here so we can wire everything simply
         BedWarsMenuFactory menuFactory = new BedWarsMenuFactory();
-        BedWarsCommand commandHandler = new BedWarsCommand(menuFactory, configService);
+        BedWarsCommand commandHandler = new BedWarsCommand(menuFactory, configService, matchManager);
         registerCommandSafe(commandHandler);
 
         PluginManager pm = Bukkit.getPluginManager();
-        pm.registerEvents(new BedWarsMenuListener(configService.getMaps(), configService.getDimensionName()), plugin);
+        pm.registerEvents(new BedWarsMenuListener(configService.getMaps(), configService.getDimensionName(), matchManager), plugin);
+        pm.registerEvents(new BedWarsGameListener(matchManager), plugin);
     }
 
     public void disable() {

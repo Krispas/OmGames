@@ -1,6 +1,7 @@
 package krispasi.omGames.bedwars.menu;
 
 import krispasi.omGames.bedwars.model.BedWarsMap;
+import krispasi.omGames.bedwars.game.BedWarsMatchManager;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -13,10 +14,12 @@ import java.util.Optional;
 public class BedWarsMenuListener implements Listener {
     private final Map<String, BedWarsMap> maps;
     private final String dimensionName;
+    private final BedWarsMatchManager matchManager;
 
-    public BedWarsMenuListener(Map<String, BedWarsMap> maps, String dimensionName) {
+    public BedWarsMenuListener(Map<String, BedWarsMap> maps, String dimensionName, BedWarsMatchManager matchManager) {
         this.maps = maps;
         this.dimensionName = dimensionName;
+        this.matchManager = matchManager;
     }
 
     @EventHandler
@@ -39,8 +42,18 @@ public class BedWarsMenuListener implements Listener {
                     .map(String::toLowerCase)
                     .flatMap(name -> Optional.ofNullable(maps.get(name)))
                     .ifPresent(map -> {
-                        // leave the menu open so the admin can keep assigning things after picking the map
-                        player.sendMessage(ChatColor.YELLOW + "Selected map: " + map.getName() + ". Keep the menu open to assign teams.");
+                        player.sendMessage(ChatColor.YELLOW + "Selected map: " + map.getName() + ". Starting BedWars now.");
+                        if (matchManager.isRunning()) {
+                            player.sendMessage(ChatColor.RED + "A match is already live.");
+                            return;
+                        }
+                        BedWarsMatchManager.Mode mode = player.getWorld().getPlayers().size() > map.getTeams().size() ?
+                                BedWarsMatchManager.Mode.DOUBLES : BedWarsMatchManager.Mode.SOLO;
+                        if (matchManager.startMatch(map, mode, player.getWorld().getPlayers())) {
+                            player.sendMessage(ChatColor.GREEN + "BedWars started on " + map.getName() + ".");
+                        } else {
+                            player.sendMessage(ChatColor.RED + "Could not start BedWars. Check console.");
+                        }
                     });
         } catch (Exception ex) {
             player.sendMessage(ChatColor.RED + "Something went wrong while picking a map.");

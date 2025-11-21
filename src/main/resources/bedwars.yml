@@ -6,6 +6,36 @@ anti-build:
   base-generator-radius: 14
   advanced-generator-radius: 4
 
+# Generator timings (ticks for spawn rates, seconds for upgrades)
+generator-settings:
+  base:
+    tier1:
+      iron-interval-ticks: 40
+      gold-interval-ticks: 120
+    tier2:
+      iron-interval-ticks: 25
+      gold-interval-ticks: 80
+    tier3:
+      iron-interval-ticks: 15
+      gold-interval-ticks: 60
+    upgrades:
+      tier2-seconds: 180
+      tier3-seconds: 360
+  diamond:
+    tier1-interval-ticks: 30
+    tier2-interval-ticks: 20
+    tier3-interval-ticks: 10
+    upgrades:
+      tier2-seconds: 300
+      tier3-seconds: 600
+  emerald:
+    tier1-interval-ticks: 50
+    tier2-interval-ticks: 35
+    tier3-interval-ticks: 20
+    upgrades:
+      tier2-seconds: 300
+      tier3-seconds: 600
+
 # Arena list; add more entries to grow the rotation later
 arenas:
   bedwars_1:
