@@ -1,50 +1,54 @@
-# general toggles for the BedWars dimension
+# BedWars core settings (this file lives in plugins/OmGames/bedwars.yml)
 bedwars-dimension: "bedwars"
-# respawn delay in seconds; code uses this to schedule spectator countdowns
 respawn-delay-seconds: 5
 
-# radius for anti-build protections
 anti-build:
   base-generator-radius: 14
   advanced-generator-radius: 4
 
-# map definitions stay in data so adding new arenas is easy later
-maps:
-  lighthouse:
-    world: "bedwars"
+# Arena list; add more entries to grow the rotation later
+arenas:
+  bedwars_1:
+    world: bedwars
+    # lobby sits above the center; tweak height as needed for your lobby island
     lobby-height: 120
-    center: 0, 100, 0
-    teams:
-      red:
-        spawn: -20, 90, 0, 0, 0
-        bed: -18, 90, 0
-        generator: -21, 89, 0
-      blue:
-        spawn: 20, 90, 0, 180, 0
-        bed: 18, 90, 0
-        generator: 21, 89, 0
-    diamonds:
-      - 0, 88, 25
-      - 0, 88, -25
-    emeralds:
-      - 0, 88, 0
+    center: 951 120 1488
 
-  reef:
-    world: "bedwars"
-    lobby-height: 130
-    center: 0, 110, 0
-    teams:
-      green:
-        spawn: -32, 100, 12, 90, 0
-        bed: -30, 100, 12
-        generator: -34, 99, 12
-      yellow:
-        spawn: 32, 100, -12, 270, 0
-        bed: 30, 100, -12
-        generator: 34, 99, -12
-    diamonds:
-      - -10, 98, 0
-      - 10, 98, 0
-    emeralds:
-      - 0, 98, 10
-      - 0, 98, -10
+    beds:
+      red: 836 51 1451
+      blue: 915 51 1372
+      lime: 836 51 1525
+      white: 989 51 1604
+      black: 915 51 1604
+      purple: 1068 51 1525
+      cyan: 1068 51 1451
+      pink: 989 51 1372
+
+    generators:
+      base_red: 815 51 1451
+      base_blue: 915 51 1351
+      base_lime: 815 51 1525
+      base_white: 989 51 1625
+      base_black: 915 51 1625
+      base_purple: 1089 51 1525
+      base_cyan: 1089 51 1451
+      base_pink: 989 51 1351
+      diamond_1: 952 51 1564
+      diamond_2: 1028 51 1488
+      diamond_3: 952 51 1412
+      diamond_4: 876 51 1488
+      emerald_1: 952 51 1488
+      emerald_2: 952 68 1488
+      emerald_3: 941 67 1530
+      emerald_4: 976 65 1454
+
+    # Spawns can be upper/lower case; they map to the matching bed color.
+    Spawns:
+      base_red: 821 51 1451
+      base_blue: 915 51 1357
+      base_lime: 821 51 1525
+      base_white: 989 51 1619
+      base_black: 915 51 1619
+      base_purple: 1083 51 1525
+      base_cyan: 1083 51 1451
+      base_pink: 989 51 1357

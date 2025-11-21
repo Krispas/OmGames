@@ -47,6 +47,10 @@ public class BedWarsConfigService {
             advancedGenRadius = config.getInt("anti-build.advanced-generator-radius", 4);
 
             ConfigurationSection mapRoot = config.getConfigurationSection("maps");
+            if (mapRoot == null) {
+                // allow users to name the section "arenas" like many BedWars setups
+                mapRoot = config.getConfigurationSection("arenas");
+            }
             if (mapRoot != null) {
                 for (String mapName : mapRoot.getKeys(false)) {
                     ConfigurationSection section = mapRoot.getConfigurationSection(mapName);
@@ -67,10 +71,22 @@ public class BedWarsConfigService {
 
     private BedWarsMap parseMap(String name, ConfigurationSection section) {
         String world = section.getString("world", dimensionName);
-        int lobbyHeight = section.getInt("lobby-height", 100);
-        Location center = parseLocation(world, section.getString("center", "0, 100, 0"), false);
+        int lobbyHeight = section.getInt("lobby-height",
+                section.getInt("lobbyHeight",
+                        section.getInt("lobby_height", 120)));
+        Location center = parseLocation(world, section.getString("center", "0 120 0"), false);
 
+        Map<String, TeamConfig> teams = parseTeams(section, world);
+        Set<Location> diamondGens = parseAdvancedGenerators(section, world, "diamond");
+        Set<Location> emeraldGens = parseAdvancedGenerators(section, world, "emerald");
+
+        return new BedWarsMap(name, world, lobbyHeight, center, teams, diamondGens, emeraldGens);
+    }
+
+    private Map<String, TeamConfig> parseTeams(ConfigurationSection section, String world) {
         Map<String, TeamConfig> teams = new HashMap<>();
+
+        // legacy format: teams -> <color> -> spawn/bed/generator
         ConfigurationSection teamSection = section.getConfigurationSection("teams");
         if (teamSection != null) {
             for (String team : teamSection.getKeys(false)) {
@@ -83,35 +99,112 @@ public class BedWarsConfigService {
                     teams.put(team.toLowerCase(), new TeamConfig(team, spawn, bed, generator));
                 }
             }
+            return teams;
         }
 
-        Set<Location> diamondGens = new HashSet<>();
-        for (String raw : section.getStringList("diamonds")) {
+        // new format: beds + generators + spawns (can be spelled Spawns)
+        ConfigurationSection bedsSection = section.getConfigurationSection("beds");
+        ConfigurationSection spawnSection = findSectionIgnoreCase(section, "spawns");
+        ConfigurationSection generatorSection = section.getConfigurationSection("generators");
+
+        if (bedsSection == null) {
+            return teams; // nothing to parse
+        }
+
+        for (String team : bedsSection.getKeys(false)) {
+            String normalized = team.toLowerCase();
+            Location bed = parseLocation(world, bedsSection.getString(team), false);
+
+            Location spawn = null;
+            if (spawnSection != null) {
+                String spawnKey = "base_" + normalized;
+                String raw = getStringIgnoreCase(spawnSection, spawnKey);
+                if (raw == null) raw = getStringIgnoreCase(spawnSection, normalized);
+                spawn = parseLocation(world, raw, true);
+            }
+
+            Location generator = null;
+            if (generatorSection != null) {
+                String generatorKey = "base_" + normalized;
+                String raw = getStringIgnoreCase(generatorSection, generatorKey);
+                if (raw == null) raw = getStringIgnoreCase(generatorSection, normalized);
+                generator = parseLocation(world, raw, false);
+            }
+
+            if (spawn == null || bed == null || generator == null) {
+                plugin.getLogger().log(Level.WARNING, "Missing spawn/bed/generator for team " + normalized + " in map " + section.getName());
+                continue;
+            }
+
+            teams.put(normalized, new TeamConfig(normalized, spawn, bed, generator));
+        }
+
+        return teams;
+    }
+
+    private Set<Location> parseAdvancedGenerators(ConfigurationSection section, String world, String prefix) {
+        Set<Location> result = new HashSet<>();
+
+        ConfigurationSection generatorSection = section.getConfigurationSection("generators");
+        if (generatorSection != null) {
+            for (String key : generatorSection.getKeys(false)) {
+                if (!key.toLowerCase().startsWith(prefix)) continue;
+                Location loc = parseLocation(world, generatorSection.getString(key), false);
+                if (loc != null) result.add(loc);
+            }
+        }
+
+        if (!result.isEmpty()) {
+            return result;
+        }
+
+        // fall back to legacy lists if present
+        String listKey = prefix.equalsIgnoreCase("diamond") ? "diamonds" : "emeralds";
+        for (String raw : section.getStringList(listKey)) {
             Location loc = parseLocation(world, raw, false);
-            if (loc != null) diamondGens.add(loc);
+            if (loc != null) result.add(loc);
         }
 
-        Set<Location> emeraldGens = new HashSet<>();
-        for (String raw : section.getStringList("emeralds")) {
-            Location loc = parseLocation(world, raw, false);
-            if (loc != null) emeraldGens.add(loc);
-        }
+        return result;
+    }
 
-        return new BedWarsMap(name, world, lobbyHeight, center, teams, diamondGens, emeraldGens);
+    private ConfigurationSection findSectionIgnoreCase(ConfigurationSection parent, String key) {
+        if (parent == null) return null;
+        for (String child : parent.getKeys(false)) {
+            if (child.equalsIgnoreCase(key)) {
+                return parent.getConfigurationSection(child);
+            }
+        }
+        return null;
+    }
+
+    private String getStringIgnoreCase(ConfigurationSection section, String key) {
+        if (section == null) return null;
+        for (String child : section.getKeys(false)) {
+            if (child.equalsIgnoreCase(key)) {
+                return section.getString(child);
+            }
+        }
+        return null;
     }
 
     private Location parseLocation(String world, String raw, boolean hasDirection) {
         if (raw == null) return null;
-        String[] parts = raw.split(",");
         try {
-            double x = Double.parseDouble(parts[0].trim());
-            double y = Double.parseDouble(parts[1].trim());
-            double z = Double.parseDouble(parts[2].trim());
+            String normalized = raw.trim().replaceAll(",", " ").replaceAll("\\s+", " ");
+            String[] parts = normalized.split(" ");
+            if (parts.length < 3) throw new IllegalArgumentException("Need at least x y z");
+
+            double x = Double.parseDouble(parts[0]);
+            double y = Double.parseDouble(parts[1]);
+            double z = Double.parseDouble(parts[2]);
+
             if (hasDirection && parts.length >= 5) {
-                float yaw = Float.parseFloat(parts[3].trim());
-                float pitch = Float.parseFloat(parts[4].trim());
+                float yaw = Float.parseFloat(parts[3]);
+                float pitch = Float.parseFloat(parts[4]);
                 return new Location(Bukkit.getWorld(world), x, y, z, yaw, pitch);
             }
+
             return new Location(Bukkit.getWorld(world), x, y, z);
         } catch (Exception ex) {
             plugin.getLogger().log(Level.WARNING, "Bad location string: " + raw, ex);
