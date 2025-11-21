@@ -6,8 +6,8 @@ import krispasi.omGames.bedwars.menu.BedWarsMenuFactory;
 import krispasi.omGames.bedwars.menu.BedWarsMenuListener;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandMap;
-import org.bukkit.command.Plugin;
 import org.bukkit.command.PluginCommand;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
