@@ -39,8 +39,8 @@ public class BedWarsMenuListener implements Listener {
                     .map(String::toLowerCase)
                     .flatMap(name -> Optional.ofNullable(maps.get(name)))
                     .ifPresent(map -> {
-                        player.closeInventory();
-                        player.sendMessage(ChatColor.YELLOW + "Selected map: " + map.getName() + ". Assign teams next.");
+                        // leave the menu open so the admin can keep assigning things after picking the map
+                        player.sendMessage(ChatColor.YELLOW + "Selected map: " + map.getName() + ". Keep the menu open to assign teams.");
                     });
         } catch (Exception ex) {
             player.sendMessage(ChatColor.RED + "Something went wrong while picking a map.");
