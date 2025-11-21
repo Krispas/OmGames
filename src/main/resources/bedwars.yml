@@ -1,0 +1,50 @@
+# general toggles for the BedWars dimension
+bedwars-dimension: "bedwars"
+# respawn delay in seconds; code uses this to schedule spectator countdowns
+respawn-delay-seconds: 5
+
+# radius for anti-build protections
+anti-build:
+  base-generator-radius: 14
+  advanced-generator-radius: 4
+
+# map definitions stay in data so adding new arenas is easy later
+maps:
+  lighthouse:
+    world: "bedwars"
+    lobby-height: 120
+    center: 0, 100, 0
+    teams:
+      red:
+        spawn: -20, 90, 0, 0, 0
+        bed: -18, 90, 0
+        generator: -21, 89, 0
+      blue:
+        spawn: 20, 90, 0, 180, 0
+        bed: 18, 90, 0
+        generator: 21, 89, 0
+    diamonds:
+      - 0, 88, 25
+      - 0, 88, -25
+    emeralds:
+      - 0, 88, 0
+
+  reef:
+    world: "bedwars"
+    lobby-height: 130
+    center: 0, 110, 0
+    teams:
+      green:
+        spawn: -32, 100, 12, 90, 0
+        bed: -30, 100, 12
+        generator: -34, 99, 12
+      yellow:
+        spawn: 32, 100, -12, 270, 0
+        bed: 30, 100, -12
+        generator: 34, 99, -12
+    diamonds:
+      - -10, 98, 0
+      - 10, 98, 0
+    emeralds:
+      - 0, 98, 10
+      - 0, 98, -10
