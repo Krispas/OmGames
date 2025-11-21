@@ -6,6 +6,7 @@ import krispasi.omGames.bedwars.menu.BedWarsMenuFactory;
 import krispasi.omGames.bedwars.menu.BedWarsMenuListener;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandMap;
+import org.bukkit.command.Plugin;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -45,7 +46,7 @@ public class BedWarsModule {
     private void registerCommandSafe(BedWarsCommand commandHandler) {
         // Paper wants commands registered in code; fall back to Bukkit-style wiring if reflection fails
         try {
-            Constructor<PluginCommand> constructor = PluginCommand.class.getDeclaredConstructor(String.class, JavaPlugin.class);
+            Constructor<PluginCommand> constructor = PluginCommand.class.getDeclaredConstructor(String.class, Plugin.class);
             constructor.setAccessible(true);
             PluginCommand command = constructor.newInstance("bw", plugin);
 
