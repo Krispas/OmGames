@@ -103,8 +103,8 @@ public class BedWarsMenuListener implements Listener {
                 return;
             }
 
-            // player heads row
-            if (slot >= 0 && slot < 9 && event.getCurrentItem() != null && event.getCurrentItem().getType() == org.bukkit.Material.PLAYER_HEAD) {
+            // player heads anywhere in the pool row(s)
+            if (event.getCurrentItem() != null && event.getCurrentItem().getType() == org.bukkit.Material.PLAYER_HEAD) {
                 UUID picked = Optional.ofNullable(event.getCurrentItem().getItemMeta())
                         .filter(meta -> meta instanceof org.bukkit.inventory.meta.SkullMeta)
                         .map(meta -> ((org.bukkit.inventory.meta.SkullMeta) meta).getOwningPlayer())

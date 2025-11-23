@@ -109,6 +109,13 @@ public class BedWarsMatchManager {
         public void begin() {
             plugin.getLogger().info("Starting BedWars on map " + map.getName() + " with mode " + mode);
 
+            World world = Bukkit.getWorld(map.getWorldName());
+            if (world == null) {
+                throw new IllegalStateException("BedWars world not loaded: " + map.getWorldName());
+            }
+
+            retargetWorld(world);
+
             equipPlayers();
             setupBeds();
             startGenerators();
@@ -149,6 +156,30 @@ public class BedWarsMatchManager {
             bedSnapshots.clear();
             teams.clear();
             playerTeams.clear();
+        }
+
+        private void retargetWorld(World world) {
+            try {
+                if (map.getCenter().getWorld() == null) {
+                    map.getCenter().setWorld(world);
+                }
+            } catch (Exception ignored) {
+            }
+
+            for (TeamState team : teams.values()) {
+                try {
+                    if (team.getSpawn().getWorld() == null) team.getSpawn().setWorld(world);
+                    if (team.getBed().getWorld() == null) team.getBed().setWorld(world);
+                    if (team.getGenerator().getWorld() == null) team.getGenerator().setWorld(world);
+                } catch (Exception ignored) {
+                }
+            }
+
+            try {
+                map.getDiamondGens().forEach(loc -> { if (loc.getWorld() == null) loc.setWorld(world); });
+                map.getEmeraldGens().forEach(loc -> { if (loc.getWorld() == null) loc.setWorld(world); });
+            } catch (Exception ignored) {
+            }
         }
 
         private void prepareTeams(List<Player> players, Map<UUID, String> manualAssignments) {

@@ -92,7 +92,7 @@ public class BedWarsConfigService {
     }
 
     private Map<String, TeamConfig> parseTeams(ConfigurationSection section, String world) {
-        Map<String, TeamConfig> teams = new HashMap<>();
+        Map<String, TeamConfig> teams = new java.util.LinkedHashMap<>();
 
         // legacy format: teams -> <color> -> spawn/bed/generator
         ConfigurationSection teamSection = section.getConfigurationSection("teams");
