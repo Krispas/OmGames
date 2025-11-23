@@ -22,16 +22,16 @@ generator-settings:
       tier2-seconds: 180
       tier3-seconds: 360
   diamond:
-    tier1-interval-ticks: 30
-    tier2-interval-ticks: 20
-    tier3-interval-ticks: 10
+    tier1-interval-ticks: 600
+    tier2-interval-ticks: 400
+    tier3-interval-ticks: 200
     upgrades:
       tier2-seconds: 300
       tier3-seconds: 600
   emerald:
-    tier1-interval-ticks: 50
-    tier2-interval-ticks: 35
-    tier3-interval-ticks: 20
+    tier1-interval-ticks: 700
+    tier2-interval-ticks: 500
+    tier3-interval-ticks: 300
     upgrades:
       tier2-seconds: 300
       tier3-seconds: 600

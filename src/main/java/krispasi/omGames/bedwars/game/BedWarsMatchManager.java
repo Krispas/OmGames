@@ -34,6 +34,10 @@ public class BedWarsMatchManager {
     }
 
     public synchronized boolean startMatch(BedWarsMap map, Mode mode, Collection<Player> pool) {
+        return startMatch(map, mode, pool, null);
+    }
+
+    public synchronized boolean startMatch(BedWarsMap map, Mode mode, Collection<Player> pool, Map<UUID, String> manualTeams) {
         if (map == null || pool == null) return false;
         if (activeMatch != null) {
             plugin.getLogger().warning("A BedWars match is already running. Stop it first.");
@@ -49,7 +53,7 @@ public class BedWarsMatchManager {
         }
 
         try {
-            activeMatch = new BedWarsMatch(map, mode, players);
+            activeMatch = new BedWarsMatch(map, mode, players, manualTeams);
             activeMatch.begin();
             return true;
         } catch (Exception ex) {
@@ -96,10 +100,10 @@ public class BedWarsMatchManager {
         private BukkitTask diamondTask;
         private BukkitTask emeraldTask;
 
-        public BedWarsMatch(BedWarsMap map, Mode mode, List<Player> players) {
+        public BedWarsMatch(BedWarsMap map, Mode mode, List<Player> players, Map<UUID, String> manualAssignments) {
             this.map = map;
             this.mode = mode;
-            prepareTeams(players);
+            prepareTeams(players, manualAssignments);
         }
 
         public void begin() {
@@ -147,23 +151,37 @@ public class BedWarsMatchManager {
             playerTeams.clear();
         }
 
-        private void prepareTeams(List<Player> players) {
+        private void prepareTeams(List<Player> players, Map<UUID, String> manualAssignments) {
             List<TeamConfig> configs = new ArrayList<>(map.getTeams().values());
             if (configs.isEmpty()) throw new IllegalStateException("Map has no team setups");
-
-            Collections.shuffle(players);
-            int perTeam = mode == Mode.DOUBLES ? 2 : 1;
-            int capacity = perTeam * teams.size();
 
             for (TeamConfig cfg : configs) {
                 teams.put(cfg.getName().toLowerCase(), new TeamState(cfg));
             }
 
+            int perTeam = mode == Mode.DOUBLES ? 2 : 1;
+            int capacity = perTeam * teams.size();
+
+            // apply manual assignments first so admins get the exact teams they picked
+            if (manualAssignments != null && !manualAssignments.isEmpty()) {
+                for (Map.Entry<UUID, String> entry : manualAssignments.entrySet()) {
+                    if (playerTeams.containsKey(entry.getKey())) continue;
+                    TeamState team = teams.get(entry.getValue());
+                    Player player = Bukkit.getPlayer(entry.getKey());
+                    if (team == null || player == null) continue;
+                    if (team.getMembers().size() >= perTeam) continue; // don't overfill
+                    team.addMember(entry.getKey());
+                    playerTeams.put(entry.getKey(), team.getName());
+                }
+            }
+
+            Collections.shuffle(players);
             int teamIndex = 0;
             List<TeamState> roster = new ArrayList<>(teams.values());
             int assigned = 0;
             for (Player player : players) {
                 if (assigned >= capacity) break; // too many players for this mode
+                if (playerTeams.containsKey(player.getUniqueId())) continue;
                 if (roster.isEmpty()) break;
                 TeamState team = roster.get(teamIndex % roster.size());
                 if (team.getMembers().size() >= perTeam) {
