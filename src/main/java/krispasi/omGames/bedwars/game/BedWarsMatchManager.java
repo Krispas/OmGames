@@ -335,6 +335,23 @@ public class BedWarsMatchManager {
             return holder[0];
         }
 
+        private void cancelTasks() {
+            try {
+                baseGenerators.values().forEach(task -> { if (task != null) task.cancel(); });
+            } catch (Exception ignored) {
+            }
+            baseGenerators.clear();
+
+            try { if (diamondTask != null) diamondTask.cancel(); } catch (Exception ignored) {}
+            try { if (emeraldTask != null) emeraldTask.cancel(); } catch (Exception ignored) {}
+
+            try {
+                runningTasks.forEach(task -> { if (task != null) task.cancel(); });
+            } catch (Exception ignored) {
+            }
+            runningTasks.clear();
+        }
+
         public void recordPlacement(Location location) {
             placedBlocks.add(location);
         }
