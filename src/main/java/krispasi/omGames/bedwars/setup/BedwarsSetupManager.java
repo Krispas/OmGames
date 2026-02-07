@@ -254,7 +254,7 @@ public class BedwarsSetupManager {
         ConfigurationSection shops = getOrCreateSection(arena, KEY_SHOPS);
         ConfigurationSection teamSection = getOrCreateSection(shops, team.key());
         String key = shopType == ShopType.MAIN ? "main" : "upgrades";
-        teamSection.set(key, formatPoint(location));
+        teamSection.set(key, formatPointWithYaw(location));
     }
 
     private YamlConfiguration loadConfig() {
@@ -316,6 +316,14 @@ public class BedwarsSetupManager {
 
     private String formatPoint(BlockPoint point) {
         return point.x() + " " + point.y() + " " + point.z();
+    }
+
+    private String formatPointWithYaw(Location location) {
+        return String.format(Locale.ROOT, "%d %d %d %.1f",
+                location.getBlockX(),
+                location.getBlockY(),
+                location.getBlockZ(),
+                location.getYaw());
     }
 
     private String findBaseGeneratorValue(ConfigurationSection baseGenerators, ConfigurationSection generators, TeamColor team) {
