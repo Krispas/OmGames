@@ -1,28 +1,21 @@
-# BedWars core settings (this file lives in plugins/OmGames/bedwars.yml)
-bedwars-dimension: "bedwars"
-respawn-delay-seconds: 5
-
-anti-build:
-  base-generator-radius: 14
-  advanced-generator-radius: 4
-
-# Arena list; add more entries to grow the rotation later
+# BedWars core settings (this file lives in plugins/OmGames/bedwars.yaml)
 arenas:
   bedwars_1:
+    anti-build:
+      base-generator-radius: 14
+      advanced-generator-radius: 4
     world: bedwars
-    # lobby sits above the center; tweak height as needed for your lobby island
-    lobby-height: 120
     center: 951 120 1488
 
     beds:
-      red: 836 51 1451
-      blue: 915 51 1372
-      lime: 836 51 1525
-      white: 989 51 1604
-      black: 915 51 1604
-      purple: 1068 51 1525
-      cyan: 1068 51 1451
-      pink: 989 51 1372
+      red: 836 51 1451, 837 51 1451
+      blue: 915 51 1372, 915 51 1373
+      lime: 836 51 1525, 837 51 1525
+      white: 989 51 1604, 989 51 1603
+      black: 915 51 1604, 915 51 1603
+      purple: 1068 51 1525, 1067 51 1525
+      cyan: 1068 51 1451, 1067 51 1451
+      pink: 989 51 1372, 989 51 1373
 
     generators:
       base_red: 815 51 1451
@@ -42,7 +35,6 @@ arenas:
       emerald_3: 941 67 1530
       emerald_4: 976 65 1454
 
-    # Spawns can be upper/lower case; they map to the matching bed color.
     Spawns:
       base_red: 821 51 1451
       base_blue: 915 51 1357
@@ -52,3 +44,39 @@ arenas:
       base_purple: 1083 51 1525
       base_cyan: 1083 51 1451
       base_pink: 989 51 1357
+
+    Base_Generators:
+      base_gen_red: 815 51 1451
+      base_gen_blue: 915 51 1351
+      base_gen_lime: 815 51 1525
+      base_gen_white: 989 51 1625
+      base_gen_black: 915 51 1619
+      base_gem_purple: 1089 51 1525
+      base_gen_cyan: 1089 51 1451
+      base_gen_pink: 989 51 1351
+
+    Shops:
+      red:
+        main:
+        upgrades:
+      blue:
+        main:
+        upgrades:
+      lime:
+        main:
+        upgrades:
+      white:
+        main:
+        upgrades:
+      black:
+        main:
+        upgrades:
+      purple:
+        main:
+        upgrades:
+      cyan:
+        main:
+        upgrades:
+      pink:
+        main:
+        upgrades:
