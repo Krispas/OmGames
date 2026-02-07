@@ -319,11 +319,25 @@ public class BedwarsSetupManager {
     }
 
     private String formatPointWithYaw(Location location) {
-        return String.format(Locale.ROOT, "%d %d %d %.1f",
+        return String.format(Locale.ROOT, "%d %d %d %s",
                 location.getBlockX(),
                 location.getBlockY(),
                 location.getBlockZ(),
-                location.getYaw());
+                yawToCardinal(location.getYaw()));
+    }
+
+    private String yawToCardinal(float yaw) {
+        float normalized = yaw % 360.0f;
+        if (normalized < 0.0f) {
+            normalized += 360.0f;
+        }
+        int index = Math.round(normalized / 90.0f) % 4;
+        return switch (index) {
+            case 0 -> "SOUTH";
+            case 1 -> "WEST";
+            case 2 -> "NORTH";
+            default -> "EAST";
+        };
     }
 
     private String findBaseGeneratorValue(ConfigurationSection baseGenerators, ConfigurationSection generators, TeamColor team) {
