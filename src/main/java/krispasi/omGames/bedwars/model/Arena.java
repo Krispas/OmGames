@@ -16,6 +16,9 @@ public class Arena {
     private final String worldName;
     private final int lobbyHeight;
     private final BlockPoint center;
+    private final int baseRadius;
+    private final BlockPoint corner1;
+    private final BlockPoint corner2;
     private final int baseGeneratorRadius;
     private final int advancedGeneratorRadius;
     private final Map<TeamColor, BedLocation> beds;
@@ -28,6 +31,9 @@ public class Arena {
                  String worldName,
                  int lobbyHeight,
                  BlockPoint center,
+                 int baseRadius,
+                 BlockPoint corner1,
+                 BlockPoint corner2,
                  int baseGeneratorRadius,
                  int advancedGeneratorRadius,
                  Map<TeamColor, BedLocation> beds,
@@ -39,6 +45,9 @@ public class Arena {
         this.worldName = Objects.requireNonNull(worldName, "worldName");
         this.lobbyHeight = lobbyHeight;
         this.center = center;
+        this.baseRadius = baseRadius;
+        this.corner1 = corner1;
+        this.corner2 = corner2;
         this.baseGeneratorRadius = baseGeneratorRadius;
         this.advancedGeneratorRadius = advancedGeneratorRadius;
         this.beds = Collections.unmodifiableMap(new EnumMap<>(beds));
@@ -62,6 +71,18 @@ public class Arena {
 
     public BlockPoint getCenter() {
         return center;
+    }
+
+    public int getBaseRadius() {
+        return baseRadius;
+    }
+
+    public BlockPoint getCorner1() {
+        return corner1;
+    }
+
+    public BlockPoint getCorner2() {
+        return corner2;
     }
 
     public int getBaseGeneratorRadius() {

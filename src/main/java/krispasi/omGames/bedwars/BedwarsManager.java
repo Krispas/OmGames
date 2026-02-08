@@ -6,6 +6,9 @@ import java.util.Map;
 import java.util.UUID;
 import krispasi.omGames.bedwars.config.BedwarsConfigLoader;
 import krispasi.omGames.bedwars.game.GameSession;
+import krispasi.omGames.bedwars.item.CustomItemConfig;
+import krispasi.omGames.bedwars.item.CustomItemConfigLoader;
+import krispasi.omGames.bedwars.shop.QuickBuyService;
 import krispasi.omGames.bedwars.shop.ShopConfig;
 import krispasi.omGames.bedwars.shop.ShopConfigLoader;
 import net.kyori.adventure.text.Component;
@@ -25,12 +28,15 @@ import krispasi.omGames.bedwars.model.TeamColor;
 
 public class BedwarsManager {
     private final JavaPlugin plugin;
+    private final QuickBuyService quickBuyService;
     private Map<String, Arena> arenas = Map.of();
     private GameSession activeSession;
     private ShopConfig shopConfig = ShopConfig.empty();
+    private CustomItemConfig customItemConfig = CustomItemConfig.empty();
 
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.quickBuyService = new QuickBuyService(plugin);
     }
 
     public void loadArenas() {
@@ -47,6 +53,17 @@ public class BedwarsManager {
         plugin.getLogger().info("Loaded BedWars shop config.");
     }
 
+    public void loadCustomItems() {
+        File configFile = new File(plugin.getDataFolder(), "custom-items.yml");
+        CustomItemConfigLoader loader = new CustomItemConfigLoader(configFile, plugin.getLogger());
+        customItemConfig = loader.load();
+        plugin.getLogger().info("Loaded BedWars custom items.");
+    }
+
+    public void loadQuickBuy() {
+        quickBuyService.load();
+    }
+
     public Collection<Arena> getArenas() {
         return arenas.values();
     }
@@ -55,12 +72,24 @@ public class BedwarsManager {
         return arenas.get(id);
     }
 
+    public JavaPlugin getPlugin() {
+        return plugin;
+    }
+
     public GameSession getActiveSession() {
         return activeSession;
     }
 
     public ShopConfig getShopConfig() {
         return shopConfig;
+    }
+
+    public CustomItemConfig getCustomItemConfig() {
+        return customItemConfig;
+    }
+
+    public QuickBuyService getQuickBuyService() {
+        return quickBuyService;
     }
 
     public boolean isBedwarsWorld(String worldName) {
@@ -146,6 +175,7 @@ public class BedwarsManager {
             activeSession.stop();
             activeSession = null;
         }
+        quickBuyService.shutdown();
         clearDroppedItems();
     }
 

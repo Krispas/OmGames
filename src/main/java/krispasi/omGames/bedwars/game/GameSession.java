@@ -30,6 +30,9 @@ import krispasi.omGames.bedwars.shop.ShopCost;
 import krispasi.omGames.bedwars.shop.ShopCategoryType;
 import krispasi.omGames.bedwars.shop.ShopItemBehavior;
 import krispasi.omGames.bedwars.shop.ShopItemDefinition;
+import krispasi.omGames.bedwars.upgrade.TeamUpgradeState;
+import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
+import krispasi.omGames.bedwars.upgrade.TrapType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -38,16 +41,22 @@ import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.type.Bed;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.entity.Item;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.DisplaySlot;
@@ -88,6 +97,15 @@ public class GameSession {
     private static final int BED_DESTRUCTION_DELAY = 1440;
     private static final int SUDDEN_DEATH_DELAY = 1800;
     private static final int GAME_END_DELAY = 3000;
+    private static final int DEFAULT_BASE_RADIUS = 8;
+    private static final int HEAL_POOL_INTERVAL_TICKS = 20;
+    private static final int HEAL_POOL_DURATION_TICKS = 60;
+    private static final int TRAP_CHECK_INTERVAL_TICKS = 20;
+    private static final int TRAP_MAX_COUNT = 3;
+    private static final int TRAP_BLINDNESS_SECONDS = 8;
+    private static final int TRAP_SLOW_SECONDS = 8;
+    private static final int TRAP_COUNTER_SECONDS = 15;
+    private static final int TRAP_FATIGUE_SECONDS = 10;
 
     private final BedwarsManager bedwarsManager;
     private final Arena arena;
@@ -95,6 +113,7 @@ public class GameSession {
     private final Map<TeamColor, BedState> bedStates = new EnumMap<>(TeamColor.class);
     private final Map<BlockPoint, TeamColor> bedBlocks = new HashMap<>();
     private final Set<BlockPoint> placedBlocks = new HashSet<>();
+    private final Set<Long> forcedChunks = new HashSet<>();
     private final Set<UUID> frozenPlayers = new HashSet<>();
     private final Set<UUID> eliminatedPlayers = new HashSet<>();
     private final Set<TeamColor> eliminatedTeams = new HashSet<>();
@@ -109,6 +128,9 @@ public class GameSession {
     private final Map<UUID, List<String>> sidebarLines = new HashMap<>();
     private final Set<TeamColor> teamsInMatch = EnumSet.noneOf(TeamColor.class);
     private final Set<UUID> shopNpcIds = new HashSet<>();
+    private final Map<TeamColor, TeamUpgradeState> teamUpgrades = new EnumMap<>(TeamColor.class);
+    private final Map<TeamColor, BlockPoint> baseGeneratorLocations = new EnumMap<>(TeamColor.class);
+    private final Map<TeamColor, Set<UUID>> baseOccupants = new EnumMap<>(TeamColor.class);
     private final Map<UUID, Integer> armorTiers = new HashMap<>();
     private final Map<UUID, Integer> pickaxeTiers = new HashMap<>();
     private final Map<UUID, Integer> axeTiers = new HashMap<>();
@@ -129,6 +151,10 @@ public class GameSession {
 
     public Arena getArena() {
         return arena;
+    }
+
+    public BedwarsManager getBedwarsManager() {
+        return bedwarsManager;
     }
 
     public GameState getState() {
@@ -171,6 +197,14 @@ public class GameSession {
         return assignments.containsKey(playerId);
     }
 
+    public int getPickaxeTier(UUID playerId) {
+        return pickaxeTiers.getOrDefault(playerId, 0);
+    }
+
+    public int getAxeTier(UUID playerId) {
+        return axeTiers.getOrDefault(playerId, 0);
+    }
+
     public boolean isFrozen(UUID playerId) {
         return frozenPlayers.contains(playerId);
     }
@@ -209,6 +243,20 @@ public class GameSession {
         return false;
     }
 
+    public boolean isInsideMap(BlockPoint point) {
+        BlockPoint corner1 = arena.getCorner1();
+        BlockPoint corner2 = arena.getCorner2();
+        if (corner1 == null || corner2 == null) {
+            return true;
+        }
+        int minX = Math.min(corner1.x(), corner2.x());
+        int maxX = Math.max(corner1.x(), corner2.x());
+        int minZ = Math.min(corner1.z(), corner2.z());
+        int maxZ = Math.max(corner1.z(), corner2.z());
+        return point.x() >= minX && point.x() <= maxX
+                && point.z() >= minZ && point.z() <= maxZ;
+    }
+
     public void recordPlacedBlock(BlockPoint point) {
         placedBlocks.add(point);
     }
@@ -236,7 +284,7 @@ public class GameSession {
             return;
         }
         if (type == ShopType.UPGRADES) {
-            new UpgradeShopMenu().open(player);
+            new UpgradeShopMenu(this, player).open(player);
             return;
         }
         ShopConfig config = bedwarsManager.getShopConfig();
@@ -264,6 +312,92 @@ public class GameSession {
         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
     }
 
+    public boolean handleUpgradePurchase(Player player, TeamUpgradeType type) {
+        if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
+            return false;
+        }
+        TeamColor team = getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        TeamUpgradeState state = getUpgradeState(team);
+        int currentTier = state.getTier(type);
+        int cost = type.nextCost(currentTier);
+        if (cost < 0) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        ShopCost shopCost = new ShopCost(Material.DIAMOND, cost);
+        if (!hasResources(player, shopCost)) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        int nextTier = currentTier + 1;
+        state.setTier(type, nextTier);
+        removeResources(player, shopCost);
+        if (type == TeamUpgradeType.FORGE && generatorManager != null) {
+            generatorManager.setBaseForgeTier(team, nextTier);
+        }
+        applyTeamUpgradeEffects(team);
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
+        return true;
+    }
+
+    public boolean handleTrapPurchase(Player player, TrapType trap) {
+        if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
+            return false;
+        }
+        TeamColor team = getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        TeamUpgradeState state = getUpgradeState(team);
+        int cost = getTrapCost(team);
+        if (cost < 0) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        ShopCost shopCost = new ShopCost(Material.DIAMOND, cost);
+        if (!hasResources(player, shopCost)) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        state.addTrap(trap);
+        removeResources(player, shopCost);
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
+        return true;
+    }
+
+    public int getUpgradeTier(TeamColor team, TeamUpgradeType type) {
+        if (team == null) {
+            return 0;
+        }
+        return getUpgradeState(team).getTier(type);
+    }
+
+    public int getTrapCost(TeamColor team) {
+        if (team == null) {
+            return -1;
+        }
+        TeamUpgradeState state = getUpgradeState(team);
+        int count = state.getTrapCount();
+        if (count >= TRAP_MAX_COUNT) {
+            return -1;
+        }
+        return switch (count) {
+            case 0 -> 1;
+            case 1 -> 2;
+            default -> 4;
+        };
+    }
+
+    public List<TrapType> getActiveTraps(TeamColor team) {
+        if (team == null) {
+            return List.of();
+        }
+        return getUpgradeState(team).getTraps();
+    }
+
     private boolean applyPurchase(Player player, ShopItemDefinition item) {
         TeamColor team = getTeam(player.getUniqueId());
         ShopItemBehavior behavior = item.getBehavior();
@@ -277,6 +411,9 @@ public class GameSession {
                     removeSwords(player);
                 }
                 giveItem(player, item.createPurchaseItem(team));
+                if (team != null && hasTeamUpgrade(team, TeamUpgradeType.SHARPNESS)) {
+                    applySharpness(player);
+                }
                 yield true;
             }
             case BOW -> applyTierUpgrade(player, item, bowTiers, ShopItemBehavior.BOW);
@@ -292,7 +429,10 @@ public class GameSession {
         stopInternal();
         resetState();
         state = GameState.STARTING;
+        prepareWorld();
         updateTeamsInMatch();
+        initializeTeamUpgrades();
+        initializeBaseGenerators();
         initializeBeds();
         applyBedLayout();
         spawnShops();
@@ -337,6 +477,8 @@ public class GameSession {
         }
         removeRespawnProtection(player.getUniqueId());
         downgradeTools(player.getUniqueId());
+        removeItems(player, PICKAXE_MATERIALS);
+        removeItems(player, AXE_MATERIALS);
         TeamColor team = getTeam(player.getUniqueId());
         if (team == null) {
             return;
@@ -441,7 +583,9 @@ public class GameSession {
         matchStartMillis = System.currentTimeMillis();
         startCountdownRemaining = 0;
         generatorManager = new GeneratorManager(plugin, arena);
+        syncForgeTiers();
         generatorManager.start();
+        startUpgradeTasks();
         scheduleGameEvents();
     }
 
@@ -549,12 +693,12 @@ public class GameSession {
                 return;
             }
             player.teleport(spawn);
-            player.getInventory().clear();
-            giveStarterKit(player, team);
-            applyPermanentItems(player, team);
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
+            player.getInventory().clear();
+            giveStarterKit(player, team);
+            applyPermanentItems(player, team);
             grantRespawnProtection(player);
             cancelRespawnCountdown(player.getUniqueId());
             respawnTasks.remove(player.getUniqueId());
@@ -638,6 +782,7 @@ public class GameSession {
 
     private void destroyBed(TeamColor team) {
         bedStates.put(team, BedState.DESTROYED);
+        removeHealPoolEffects(team);
         BedLocation location = arena.getBeds().get(team);
         if (location == null) {
             return;
@@ -695,6 +840,7 @@ public class GameSession {
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
+            clearUpgradeEffects(player);
             if (lobby != null) {
                 player.teleport(lobby);
             }
@@ -723,6 +869,59 @@ public class GameSession {
                 removeBedBlocks(entry.getValue());
             }
         }
+    }
+
+    private void prepareWorld() {
+        World world = arena.getWorld();
+        if (world == null) {
+            return;
+        }
+        forceLoadMap(world);
+        clearDroppedItems(world);
+    }
+
+    private void forceLoadMap(World world) {
+        BlockPoint corner1 = arena.getCorner1();
+        BlockPoint corner2 = arena.getCorner2();
+        if (corner1 == null || corner2 == null) {
+            return;
+        }
+        int minX = Math.min(corner1.x(), corner2.x());
+        int maxX = Math.max(corner1.x(), corner2.x());
+        int minZ = Math.min(corner1.z(), corner2.z());
+        int maxZ = Math.max(corner1.z(), corner2.z());
+        int minChunkX = Math.floorDiv(minX, 16);
+        int maxChunkX = Math.floorDiv(maxX, 16);
+        int minChunkZ = Math.floorDiv(minZ, 16);
+        int maxChunkZ = Math.floorDiv(maxZ, 16);
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                world.setChunkForceLoaded(chunkX, chunkZ, true);
+                world.getChunkAt(chunkX, chunkZ);
+                forcedChunks.add(chunkKey(chunkX, chunkZ));
+            }
+        }
+    }
+
+    private void releaseForcedChunks() {
+        if (forcedChunks.isEmpty()) {
+            return;
+        }
+        World world = arena.getWorld();
+        if (world == null) {
+            forcedChunks.clear();
+            return;
+        }
+        for (long key : forcedChunks) {
+            int chunkX = (int) (key >> 32);
+            int chunkZ = (int) key;
+            world.setChunkForceLoaded(chunkX, chunkZ, false);
+        }
+        forcedChunks.clear();
+    }
+
+    private long chunkKey(int chunkX, int chunkZ) {
+        return (((long) chunkX) << 32) ^ (chunkZ & 0xffffffffL);
     }
 
     private void clearDroppedItems(World world) {
@@ -761,6 +960,7 @@ public class GameSession {
 
     private void stopInternal() {
         state = GameState.ENDING;
+        releaseForcedChunks();
         despawnShops();
         closeFakeEnderChests();
         clearSidebars();
@@ -796,6 +996,7 @@ public class GameSession {
         eliminatedPlayers.clear();
         eliminatedTeams.clear();
         placedBlocks.clear();
+        forcedChunks.clear();
         bedStates.clear();
         bedBlocks.clear();
         fakeEnderChests.clear();
@@ -806,6 +1007,9 @@ public class GameSession {
         respawnProtectionTasks.clear();
         teamsInMatch.clear();
         shopNpcIds.clear();
+        teamUpgrades.clear();
+        baseGeneratorLocations.clear();
+        baseOccupants.clear();
         armorTiers.clear();
         pickaxeTiers.clear();
         axeTiers.clear();
@@ -857,6 +1061,7 @@ public class GameSession {
         player.setGameMode(GameMode.SPECTATOR);
         player.setAllowFlight(true);
         player.setFlying(true);
+        clearUpgradeEffects(player);
     }
 
     public boolean hasRespawnProtection(UUID playerId) {
@@ -933,6 +1138,7 @@ public class GameSession {
         if (shearsUnlocked.contains(playerId)) {
             giveShears(player, team);
         }
+        applyTeamUpgrades(player, team);
     }
 
     private boolean applyTierUpgrade(Player player,
@@ -945,7 +1151,11 @@ public class GameSession {
         }
         UUID playerId = player.getUniqueId();
         int current = tierMap.getOrDefault(playerId, 0);
-        if (tier <= current) {
+        if (behavior == ShopItemBehavior.PICKAXE || behavior == ShopItemBehavior.AXE) {
+            if (tier != current + 1) {
+                return false;
+            }
+        } else if (tier <= current) {
             return false;
         }
         tierMap.put(playerId, tier);
@@ -983,25 +1193,21 @@ public class GameSession {
             return;
         }
         String base = armorBase(definition.getMaterial());
-        Material helmet = Material.matchMaterial(base + "_HELMET");
-        Material chestplate = Material.matchMaterial(base + "_CHESTPLATE");
         Material leggings = Material.matchMaterial(base + "_LEGGINGS");
         Material boots = Material.matchMaterial(base + "_BOOTS");
-        if (helmet == null || chestplate == null || leggings == null || boots == null) {
+        if (leggings == null || boots == null) {
             return;
         }
+        org.bukkit.Color color = team.dyeColor().getColor();
+        player.getInventory().setHelmet(colorLeatherArmor(Material.LEATHER_HELMET, color));
+        player.getInventory().setChestplate(colorLeatherArmor(Material.LEATHER_CHESTPLATE, color));
         if ("LEATHER".equals(base)) {
-            org.bukkit.Color color = team.dyeColor().getColor();
-            player.getInventory().setHelmet(colorLeatherArmor(helmet, color));
-            player.getInventory().setChestplate(colorLeatherArmor(chestplate, color));
             player.getInventory().setLeggings(colorLeatherArmor(leggings, color));
             player.getInventory().setBoots(colorLeatherArmor(boots, color));
-            return;
+        } else {
+            player.getInventory().setLeggings(new ItemStack(leggings));
+            player.getInventory().setBoots(new ItemStack(boots));
         }
-        player.getInventory().setHelmet(new ItemStack(helmet));
-        player.getInventory().setChestplate(new ItemStack(chestplate));
-        player.getInventory().setLeggings(new ItemStack(leggings));
-        player.getInventory().setBoots(new ItemStack(boots));
     }
 
     private String armorBase(Material material) {
@@ -1134,6 +1340,11 @@ public class GameSession {
     }
 
     public void handleWorldChange(Player player) {
+        if (!isInArenaWorld(player.getWorld())) {
+            clearUpgradeEffects(player);
+        } else if (isParticipant(player.getUniqueId())) {
+            applyTeamUpgrades(player, getTeam(player.getUniqueId()));
+        }
         updateSidebarForPlayer(player);
     }
 
@@ -1489,6 +1700,402 @@ public class GameSession {
                 teamsInMatch.add(team);
             }
         }
+    }
+
+    private void initializeTeamUpgrades() {
+        teamUpgrades.clear();
+        for (TeamColor team : teamsInMatch) {
+            teamUpgrades.put(team, new TeamUpgradeState());
+        }
+    }
+
+    private void initializeBaseGenerators() {
+        baseGeneratorLocations.clear();
+        baseOccupants.clear();
+        for (GeneratorInfo generator : arena.getGenerators()) {
+            if (generator.type() != GeneratorType.BASE || generator.team() == null) {
+                continue;
+            }
+            if (!teamsInMatch.contains(generator.team())) {
+                continue;
+            }
+            baseGeneratorLocations.put(generator.team(), generator.location());
+            baseOccupants.put(generator.team(), new HashSet<>());
+        }
+    }
+
+    private TeamUpgradeState getUpgradeState(TeamColor team) {
+        if (team == null) {
+            return new TeamUpgradeState();
+        }
+        return teamUpgrades.computeIfAbsent(team, key -> new TeamUpgradeState());
+    }
+
+    private boolean hasTeamUpgrade(TeamColor team, TeamUpgradeType type) {
+        return team != null && getUpgradeState(team).getTier(type) > 0;
+    }
+
+    private void syncForgeTiers() {
+        if (generatorManager == null) {
+            return;
+        }
+        Map<TeamColor, Integer> tiers = new EnumMap<>(TeamColor.class);
+        for (TeamColor team : teamsInMatch) {
+            tiers.put(team, getUpgradeState(team).getTier(TeamUpgradeType.FORGE));
+        }
+        generatorManager.setBaseForgeTiers(tiers);
+    }
+
+    private int getBaseEffectRadius() {
+        int radius = arena.getBaseRadius();
+        if (radius > 0) {
+            return radius;
+        }
+        int fallback = arena.getBaseGeneratorRadius();
+        return fallback > 0 ? fallback : DEFAULT_BASE_RADIUS;
+    }
+
+    private void startUpgradeTasks() {
+        BukkitTask healTask = plugin.getServer().getScheduler().runTaskTimer(plugin,
+                () -> safeRun("healPool", this::applyHealPoolTick),
+                0L,
+                HEAL_POOL_INTERVAL_TICKS);
+        tasks.add(healTask);
+        BukkitTask trapTask = plugin.getServer().getScheduler().runTaskTimer(plugin,
+                () -> safeRun("trapCheck", this::checkTrapTriggers),
+                0L,
+                TRAP_CHECK_INTERVAL_TICKS);
+        tasks.add(trapTask);
+    }
+
+    private void applyHealPoolTick() {
+        if (state != GameState.RUNNING) {
+            return;
+        }
+        World world = arena.getWorld();
+        if (world == null) {
+            return;
+        }
+        int radius = getBaseEffectRadius();
+        int radiusSquared = radius * radius;
+        for (TeamColor team : teamsInMatch) {
+            TeamUpgradeState upgrades = teamUpgrades.get(team);
+            if (upgrades == null || upgrades.getTier(TeamUpgradeType.HEAL_POOL) <= 0) {
+                continue;
+            }
+            if (getBedState(team) != BedState.ALIVE) {
+                continue;
+            }
+            BlockPoint base = baseGeneratorLocations.get(team);
+            if (base == null) {
+                continue;
+            }
+            for (UUID playerId : assignments.keySet()) {
+                if (assignments.get(playerId) != team) {
+                    continue;
+                }
+                Player player = Bukkit.getPlayer(playerId);
+                if (player == null || !player.isOnline()) {
+                    continue;
+                }
+                if (!isInArenaWorld(player.getWorld()) || player.getGameMode() == GameMode.SPECTATOR) {
+                    continue;
+                }
+                Location location = player.getLocation();
+                int dx = location.getBlockX() - base.x();
+                int dz = location.getBlockZ() - base.z();
+                if (dx * dx + dz * dz <= radiusSquared) {
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,
+                            HEAL_POOL_DURATION_TICKS,
+                            0,
+                            true,
+                            false,
+                            true));
+                }
+            }
+        }
+    }
+
+    private void checkTrapTriggers() {
+        if (state != GameState.RUNNING) {
+            return;
+        }
+        World world = arena.getWorld();
+        if (world == null) {
+            return;
+        }
+        int radius = getBaseEffectRadius();
+        int radiusSquared = radius * radius;
+        for (TeamColor team : teamsInMatch) {
+            TeamUpgradeState upgrades = teamUpgrades.get(team);
+            if (upgrades == null) {
+                continue;
+            }
+            BlockPoint base = baseGeneratorLocations.get(team);
+            if (base == null) {
+                continue;
+            }
+            Set<UUID> previous = baseOccupants.computeIfAbsent(team, key -> new HashSet<>());
+            Set<UUID> current = new HashSet<>();
+            for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
+                if (entry.getValue() == null || entry.getValue() == team) {
+                    continue;
+                }
+                Player player = Bukkit.getPlayer(entry.getKey());
+                if (player == null || !player.isOnline()) {
+                    continue;
+                }
+                if (!isInArenaWorld(player.getWorld()) || player.getGameMode() == GameMode.SPECTATOR) {
+                    continue;
+                }
+                Location location = player.getLocation();
+                int dx = location.getBlockX() - base.x();
+                int dz = location.getBlockZ() - base.z();
+                if (dx * dx + dz * dz <= radiusSquared) {
+                    current.add(entry.getKey());
+                }
+            }
+            TrapType triggeredTrap = null;
+            Player intruder = null;
+            if (!current.isEmpty() && upgrades.getTrapCount() > 0) {
+                for (UUID playerId : current) {
+                    if (!previous.contains(playerId)) {
+                        intruder = Bukkit.getPlayer(playerId);
+                        triggeredTrap = upgrades.pollTrap();
+                        break;
+                    }
+                }
+            }
+            if (triggeredTrap != null && intruder != null) {
+                triggerTrap(team, triggeredTrap, intruder);
+            }
+            previous.clear();
+            previous.addAll(current);
+        }
+    }
+
+    private void triggerTrap(TeamColor team, TrapType trap, Player intruder) {
+        intruder.removePotionEffect(PotionEffectType.INVISIBILITY);
+        switch (trap) {
+            case ITS_A_TRAP -> {
+                intruder.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS,
+                        TRAP_BLINDNESS_SECONDS * 20,
+                        0,
+                        true,
+                        false,
+                        true));
+                intruder.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                        TRAP_SLOW_SECONDS * 20,
+                        1,
+                        true,
+                        false,
+                        true));
+            }
+            case COUNTER_OFFENSIVE -> applyCounterOffensive(team);
+            case ALARM -> showTrapTitle(team, "Alarm Trap!");
+            case MINER_FATIGUE -> intruder.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE,
+                    TRAP_FATIGUE_SECONDS * 20,
+                    0,
+                    true,
+                    false,
+                    true));
+            default -> {
+            }
+        }
+        announceTrap(team, trap.displayName());
+    }
+
+    private void applyCounterOffensive(TeamColor team) {
+        for (UUID playerId : assignments.keySet()) {
+            if (assignments.get(playerId) != team) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+            if (!isInArenaWorld(player.getWorld()) || player.getGameMode() == GameMode.SPECTATOR) {
+                continue;
+            }
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
+                    TRAP_COUNTER_SECONDS * 20,
+                    0,
+                    true,
+                    false,
+                    true));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST,
+                    TRAP_COUNTER_SECONDS * 20,
+                    0,
+                    true,
+                    false,
+                    true));
+        }
+    }
+
+    private void announceTrap(TeamColor team, String name) {
+        Component message = Component.text("Trap triggered: " + name, NamedTextColor.RED);
+        for (UUID playerId : assignments.keySet()) {
+            if (assignments.get(playerId) != team) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+            player.sendMessage(message);
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+        }
+    }
+
+    private void showTrapTitle(TeamColor team, String name) {
+        Title title = Title.title(
+                Component.text(name, NamedTextColor.RED),
+                Component.text("Enemy detected", NamedTextColor.GRAY),
+                Title.Times.times(Duration.ZERO, Duration.ofSeconds(2), Duration.ofSeconds(1))
+        );
+        for (UUID playerId : assignments.keySet()) {
+            if (assignments.get(playerId) != team) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                player.showTitle(title);
+            }
+        }
+    }
+
+    private void applyTeamUpgradeEffects(TeamColor team) {
+        if (team == null) {
+            return;
+        }
+        for (UUID playerId : assignments.keySet()) {
+            if (assignments.get(playerId) != team) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                applyTeamUpgrades(player, team);
+            }
+        }
+    }
+
+    private void applyTeamUpgrades(Player player, TeamColor team) {
+        if (team == null || player == null) {
+            return;
+        }
+        if (!isInArenaWorld(player.getWorld())) {
+            return;
+        }
+        if (player.getGameMode() == GameMode.SPECTATOR) {
+            return;
+        }
+        TeamUpgradeState upgrades = getUpgradeState(team);
+        int protectionTier = upgrades.getTier(TeamUpgradeType.PROTECTION);
+        if (protectionTier > 0) {
+            applyProtection(player, protectionTier);
+        }
+        if (upgrades.getTier(TeamUpgradeType.SHARPNESS) > 0) {
+            applySharpness(player);
+        }
+        int hasteTier = upgrades.getTier(TeamUpgradeType.HASTE);
+        if (hasteTier > 0) {
+            applyHaste(player, hasteTier);
+        }
+    }
+
+    private void applyProtection(Player player, int level) {
+        if (level <= 0) {
+            return;
+        }
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        boolean changed = false;
+        for (int i = 0; i < armor.length; i++) {
+            ItemStack piece = armor[i];
+            if (piece == null) {
+                continue;
+            }
+            ItemMeta meta = piece.getItemMeta();
+            if (meta.getEnchantLevel(Enchantment.PROTECTION) >= level) {
+                continue;
+            }
+            meta.addEnchant(Enchantment.PROTECTION, level, true);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            piece.setItemMeta(meta);
+            armor[i] = piece;
+            changed = true;
+        }
+        if (changed) {
+            player.getInventory().setArmorContents(armor);
+        }
+    }
+
+    private void applySharpness(Player player) {
+        applyEnchantment(player, SWORD_MATERIALS, Enchantment.SHARPNESS, 1);
+    }
+
+    private void applyHaste(Player player, int tier) {
+        int amplifier = Math.max(0, tier - 1);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.HASTE,
+                Integer.MAX_VALUE,
+                amplifier,
+                true,
+                false,
+                true));
+    }
+
+    private void applyEnchantment(Player player, Set<Material> materials, Enchantment enchantment, int level) {
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        boolean changed = false;
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (item == null || !materials.contains(item.getType())) {
+                continue;
+            }
+            ItemMeta meta = item.getItemMeta();
+            if (meta.getEnchantLevel(enchantment) >= level) {
+                continue;
+            }
+            meta.addEnchant(enchantment, level, true);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            item.setItemMeta(meta);
+            contents[i] = item;
+            changed = true;
+        }
+        if (changed) {
+            player.getInventory().setStorageContents(contents);
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && materials.contains(offhand.getType())) {
+            ItemMeta meta = offhand.getItemMeta();
+            if (meta.getEnchantLevel(enchantment) < level) {
+                meta.addEnchant(enchantment, level, true);
+                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                offhand.setItemMeta(meta);
+                player.getInventory().setItemInOffHand(offhand);
+            }
+        }
+    }
+
+    private void removeHealPoolEffects(TeamColor team) {
+        for (UUID playerId : assignments.keySet()) {
+            if (assignments.get(playerId) != team) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                player.removePotionEffect(PotionEffectType.REGENERATION);
+            }
+        }
+    }
+
+    private void clearUpgradeEffects(Player player) {
+        player.removePotionEffect(PotionEffectType.HASTE);
+        player.removePotionEffect(PotionEffectType.REGENERATION);
+        player.removePotionEffect(PotionEffectType.SPEED);
+        player.removePotionEffect(PotionEffectType.JUMP_BOOST);
+        player.removePotionEffect(PotionEffectType.BLINDNESS);
+        player.removePotionEffect(PotionEffectType.SLOWNESS);
+        player.removePotionEffect(PotionEffectType.MINING_FATIGUE);
     }
 
     private void spawnShops() {

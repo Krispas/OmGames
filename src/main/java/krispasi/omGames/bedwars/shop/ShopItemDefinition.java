@@ -3,6 +3,7 @@ package krispasi.omGames.bedwars.shop;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import krispasi.omGames.bedwars.item.CustomItemData;
 import krispasi.omGames.bedwars.model.TeamColor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -26,6 +27,7 @@ public class ShopItemDefinition {
     private final List<PotionEffect> potionEffects;
     private final String displayName;
     private final List<String> lore;
+    private final String customItemId;
 
     public ShopItemDefinition(String id,
                               Material material,
@@ -37,7 +39,8 @@ public class ShopItemDefinition {
                               Map<Enchantment, Integer> enchantments,
                               List<PotionEffect> potionEffects,
                               String displayName,
-                              List<String> lore) {
+                              List<String> lore,
+                              String customItemId) {
         this.id = id;
         this.material = material;
         this.amount = amount;
@@ -49,6 +52,7 @@ public class ShopItemDefinition {
         this.potionEffects = potionEffects;
         this.displayName = displayName;
         this.lore = lore;
+        this.customItemId = customItemId;
     }
 
     public String getId() {
@@ -77,6 +81,10 @@ public class ShopItemDefinition {
 
     public int getTier() {
         return tier;
+    }
+
+    public String getCustomItemId() {
+        return customItemId;
     }
 
     public ItemStack createDisplayItem(TeamColor team) {
@@ -123,6 +131,7 @@ public class ShopItemDefinition {
             meta.lore(lines);
         }
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        CustomItemData.apply(meta, customItemId);
         stack.setItemMeta(meta);
         return stack;
     }

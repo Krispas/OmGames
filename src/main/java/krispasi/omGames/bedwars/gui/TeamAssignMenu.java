@@ -65,7 +65,13 @@ public class TeamAssignMenu implements InventoryHolder {
         if (playerId == null) {
             return;
         }
-        cycleTeam(playerId);
+        if (event.isLeftClick()) {
+            cycleTeam(playerId, 1);
+        } else if (event.isRightClick()) {
+            cycleTeam(playerId, -1);
+        } else {
+            return;
+        }
         refresh();
     }
 
@@ -107,7 +113,8 @@ public class TeamAssignMenu implements InventoryHolder {
                 : Component.text("Team: ", NamedTextColor.GRAY).append(team.displayComponent());
         meta.lore(List.of(
                 teamLine,
-                Component.text("Click to cycle team", NamedTextColor.DARK_GRAY)
+                Component.text("Left click: next team", NamedTextColor.DARK_GRAY),
+                Component.text("Right click: previous team", NamedTextColor.DARK_GRAY)
         ));
 
         item.setItemMeta(meta);
@@ -139,7 +146,7 @@ public class TeamAssignMenu implements InventoryHolder {
         return item;
     }
 
-    private void cycleTeam(UUID playerId) {
+    private void cycleTeam(UUID playerId, int direction) {
         List<TeamColor> teams = session.getArena().getTeams();
         if (teams.isEmpty()) {
             session.assignTeam(playerId, null);
@@ -147,14 +154,20 @@ public class TeamAssignMenu implements InventoryHolder {
         }
         TeamColor current = session.getTeam(playerId);
         if (current == null) {
-            session.assignTeam(playerId, teams.get(0));
+            int index = direction >= 0 ? 0 : teams.size() - 1;
+            session.assignTeam(playerId, teams.get(index));
             return;
         }
         int index = teams.indexOf(current);
-        if (index == -1 || index + 1 >= teams.size()) {
+        if (index == -1) {
             session.assignTeam(playerId, null);
             return;
         }
-        session.assignTeam(playerId, teams.get(index + 1));
+        int next = index + (direction >= 0 ? 1 : -1);
+        if (next < 0 || next >= teams.size()) {
+            session.assignTeam(playerId, null);
+            return;
+        }
+        session.assignTeam(playerId, teams.get(next));
     }
 }

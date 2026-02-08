@@ -1,6 +1,9 @@
 # BedWars core settings (this file lives in plugins/OmGames/bedwars.yaml)
 arenas:
   bedwars_1:
+    corner_1:
+    corner_2:
+    base-radius: 21
     anti-build:
       base-generator-radius: 14
       advanced-generator-radius: 4

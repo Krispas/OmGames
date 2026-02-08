@@ -80,9 +80,18 @@ public class ShopConfigLoader {
         List<PotionEffect> potionEffects = parsePotionEffects(section.getStringList("potion-effects"));
         String displayName = section.getString("display-name");
         List<String> lore = section.getStringList("lore");
+        String customItemId = section.getString("custom-item");
+        if (customItemId != null) {
+            customItemId = customItemId.trim();
+            if (customItemId.isBlank()) {
+                customItemId = null;
+            } else {
+                customItemId = customItemId.toLowerCase(Locale.ROOT);
+            }
+        }
 
         return new ShopItemDefinition(id, material, amount, cost, behavior, teamColor, tier,
-                enchants, potionEffects, displayName, lore);
+                enchants, potionEffects, displayName, lore, customItemId);
     }
 
     private ShopCost parseCost(ConfigurationSection section) {

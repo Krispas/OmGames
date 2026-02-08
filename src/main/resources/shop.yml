@@ -77,6 +77,7 @@ shop:
         jump_potion: 20
         speed_potion: 21
         magic_milk: 22
+        bridge_egg: 23
   items:
     wool:
       material: WHITE_WOOL
@@ -88,13 +89,13 @@ shop:
       team-color: true
       display-name: "Wool"
     hardened_clay:
-      material: TERRACOTTA
+      material: SMOOTH_BASALT
       amount: 16
       cost:
         material: IRON_INGOT
         amount: 12
       behavior: BLOCK
-      display-name: "Hardened Clay"
+      display-name: "Smooth Basalt"
     end_stone:
       material: END_STONE
       amount: 12
@@ -323,6 +324,7 @@ shop:
         amount: 40
       behavior: UTILITY
       display-name: "Fireball"
+      custom-item: fireball
     tnt:
       material: TNT
       amount: 1
@@ -377,3 +379,12 @@ shop:
         amount: 4
       behavior: UTILITY
       display-name: "Magic Milk"
+    bridge_egg:
+      material: EGG
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 1
+      behavior: UTILITY
+      display-name: "Bridge Egg"
+      custom-item: bridge_egg

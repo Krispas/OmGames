@@ -54,6 +54,9 @@ public class BedwarsConfigLoader {
             }
 
             BlockPoint center = parsePoint(arenaSection.getString("center"), "center", arenaId);
+            BlockPoint corner1 = parseOptionalPoint(arenaSection.getString("corner_1"));
+            BlockPoint corner2 = parseOptionalPoint(arenaSection.getString("corner_2"));
+            int baseRadius = arenaSection.getInt("base-radius", 0);
             int lobbyHeight = arenaSection.getInt("lobby-height", 0);
             int baseGeneratorRadius = arenaSection.getInt("anti-build.base-generator-radius", 0);
             int advancedGeneratorRadius = arenaSection.getInt("anti-build.advanced-generator-radius", 0);
@@ -184,6 +187,9 @@ public class BedwarsConfigLoader {
                     worldName,
                     lobbyHeight,
                     center,
+                    baseRadius,
+                    corner1,
+                    corner2,
                     baseGeneratorRadius,
                     advancedGeneratorRadius,
                     beds,
@@ -229,6 +235,17 @@ public class BedwarsConfigLoader {
         }
         logger.warning("Unknown generator key in " + arenaId + ": " + key);
         return null;
+    }
+
+    private BlockPoint parseOptionalPoint(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return BlockPoint.parse(value);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private GeneratorInfo parseBaseGenerator(String key, BlockPoint location, String arenaId) {

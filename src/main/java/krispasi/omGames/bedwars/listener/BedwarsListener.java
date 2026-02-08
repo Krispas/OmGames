@@ -2,6 +2,10 @@ package krispasi.omGames.bedwars.listener;
 
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.game.GameSession;
+import krispasi.omGames.bedwars.item.CustomItemConfig;
+import krispasi.omGames.bedwars.item.CustomItemData;
+import krispasi.omGames.bedwars.item.CustomItemDefinition;
+import krispasi.omGames.bedwars.item.CustomItemType;
 import krispasi.omGames.bedwars.model.BlockPoint;
 import krispasi.omGames.bedwars.model.ShopType;
 import krispasi.omGames.bedwars.model.TeamColor;
@@ -14,14 +18,19 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Egg;
+import org.bukkit.entity.Fireball;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -39,13 +48,20 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.event.block.Action;
 import org.bukkit.Material;
 import org.bukkit.entity.Projectile;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.Vector;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.UUID;
 import java.util.logging.Level;
+import org.bukkit.potion.PotionEffectType;
+import java.util.EnumMap;
 
 public class BedwarsListener implements Listener {
     private final BedwarsManager bedwarsManager;
@@ -75,8 +91,8 @@ public class BedwarsListener implements Listener {
                 menu.handleClick(event);
                 return;
             }
-            if (topInventory.getHolder() instanceof UpgradeShopMenu) {
-                event.setCancelled(true);
+            if (topInventory.getHolder() instanceof UpgradeShopMenu menu) {
+                menu.handleClick(event);
                 return;
             }
 
@@ -177,6 +193,41 @@ public class BedwarsListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onPlayerUseCustomItem(PlayerInteractEvent event) {
+        safeHandle("onPlayerUseCustomItem", () -> {
+            if (!isUseAction(event.getAction())) {
+                return;
+            }
+            ItemStack item = event.getItem();
+            if (item == null) {
+                return;
+            }
+            Player player = event.getPlayer();
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            CustomItemDefinition custom = resolveCustomItem(item);
+            if (custom == null) {
+                return;
+            }
+            if (event.getHand() == EquipmentSlot.OFF_HAND && isSameCustomItemInMainHand(player, item)) {
+                return;
+            }
+            event.setCancelled(true);
+            if (custom.getType() == CustomItemType.FIREBALL) {
+                launchFireball(player, custom);
+            } else if (custom.getType() == CustomItemType.BRIDGE_EGG) {
+                launchBridgeEgg(player, session, custom);
+            }
+            consumeHeldItem(player, event.getHand(), item);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
         safeHandle("onPlayerInteractEntity", () -> {
             if (!(event.getRightClicked() instanceof Villager villager)) {
@@ -199,6 +250,34 @@ public class BedwarsListener implements Listener {
                     ? ShopType.UPGRADES
                     : ShopType.ITEM;
             session.openShop(player, type);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityExplode(EntityExplodeEvent event) {
+        safeHandle("onEntityExplode", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            if (!session.isInArenaWorld(event.getEntity().getWorld())) {
+                return;
+            }
+            filterExplosionBlocks(session, event.blockList());
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockExplode(BlockExplodeEvent event) {
+        safeHandle("onBlockExplode", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            if (!session.isInArenaWorld(event.getBlock().getWorld())) {
+                return;
+            }
+            filterExplosionBlocks(session, event.blockList());
         });
     }
 
@@ -253,8 +332,14 @@ public class BedwarsListener implements Listener {
             }
             Block block = event.getBlockPlaced();
             BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
+            if (!session.isInsideMap(point)) {
+                event.setCancelled(true);
+                player.sendMessage(Component.text("You cannot place blocks outside the map.", NamedTextColor.RED));
+                return;
+            }
             if (session.isPlacementBlocked(point)) {
                 event.setCancelled(true);
+                player.sendMessage(Component.text("You cannot place blocks here.", NamedTextColor.RED));
                 return;
             }
             session.recordPlacedBlock(point);
@@ -296,8 +381,14 @@ public class BedwarsListener implements Listener {
                 session.handleBedDestroyed(bedOwner, player);
                 return;
             }
+            if (!session.isInsideMap(point)) {
+                event.setCancelled(true);
+                player.sendMessage(Component.text("You cannot break blocks outside the map.", NamedTextColor.RED));
+                return;
+            }
             if (!session.isPlacedBlock(point)) {
                 event.setCancelled(true);
+                player.sendMessage(Component.text("You can only break blocks placed in this game.", NamedTextColor.RED));
                 return;
             }
             dropPlacedBlock(block);
@@ -339,6 +430,12 @@ public class BedwarsListener implements Listener {
             }
             if (session.hasRespawnProtection(victim.getUniqueId())) {
                 event.setCancelled(true);
+                return;
+            }
+            if (!event.isCancelled()
+                    && attacker != null
+                    && victim.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
+                victim.removePotionEffect(PotionEffectType.INVISIBILITY);
             }
         });
     }
@@ -425,6 +522,7 @@ public class BedwarsListener implements Listener {
                 }
             }
             session.handleRespawn(player);
+            refreshInvisibility(player, session);
         });
     }
 
@@ -436,6 +534,8 @@ public class BedwarsListener implements Listener {
                 return;
             }
             session.handleWorldChange(event.getPlayer());
+            refreshInvisibility(event.getPlayer(), session);
+            syncInvisibilityForViewer(event.getPlayer(), session);
         });
     }
 
@@ -447,6 +547,8 @@ public class BedwarsListener implements Listener {
                 return;
             }
             session.handlePlayerJoin(event.getPlayer());
+            refreshInvisibility(event.getPlayer(), session);
+            syncInvisibilityForViewer(event.getPlayer(), session);
         });
     }
 
@@ -458,6 +560,35 @@ public class BedwarsListener implements Listener {
                 return;
             }
             session.handlePlayerQuit(event.getPlayer().getUniqueId());
+            showArmorForPlayer(event.getPlayer(), session);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPotionEffectChange(EntityPotionEffectEvent event) {
+        safeHandle("onPotionEffectChange", () -> {
+            if (!(event.getEntity() instanceof Player player)) {
+                return;
+            }
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            PotionEffectType type = event.getModifiedType();
+            if (type != PotionEffectType.INVISIBILITY) {
+                return;
+            }
+            if (!session.isInArenaWorld(player.getWorld())) {
+                showArmorForPlayer(player, session);
+                return;
+            }
+            if (event.getAction() == EntityPotionEffectEvent.Action.REMOVED
+                    || event.getAction() == EntityPotionEffectEvent.Action.CLEARED
+                    || event.getNewEffect() == null) {
+                showArmorForPlayer(player, session);
+                return;
+            }
+            hideArmorForPlayer(player, session);
         });
     }
 
@@ -491,6 +622,261 @@ public class BedwarsListener implements Listener {
                 return;
             }
             event.setCancelled(true);
+        });
+    }
+
+    private boolean isUseAction(Action action) {
+        return action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK;
+    }
+
+    private CustomItemDefinition resolveCustomItem(ItemStack item) {
+        CustomItemConfig config = bedwarsManager.getCustomItemConfig();
+        if (config == null) {
+            return null;
+        }
+        String customId = CustomItemData.getId(item);
+        if (customId != null) {
+            return config.getItem(customId);
+        }
+        return config.findByMaterial(item.getType());
+    }
+
+    private boolean isSameCustomItemInMainHand(Player player, ItemStack usedItem) {
+        ItemStack main = player.getInventory().getItemInMainHand();
+        return matchesCustomItem(main, usedItem);
+    }
+
+    private void launchFireball(Player player, CustomItemDefinition custom) {
+        Fireball fireball = player.launchProjectile(Fireball.class);
+        fireball.setIsIncendiary(custom.isIncendiary());
+        fireball.setYield(custom.getYield());
+        fireball.setVelocity(player.getLocation().getDirection().normalize().multiply(custom.getVelocity()));
+    }
+
+    private void launchBridgeEgg(Player player, GameSession session, CustomItemDefinition custom) {
+        TeamColor team = session.getTeam(player.getUniqueId());
+        if (team == null) {
+            return;
+        }
+        int maxBlocks = Math.max(1, custom.getMaxBlocks());
+        int width = Math.max(1, custom.getBridgeWidth());
+        Egg egg = player.launchProjectile(Egg.class);
+        egg.setVelocity(player.getLocation().getDirection().normalize().multiply(custom.getVelocity()));
+        new BukkitRunnable() {
+            private int placed;
+
+            @Override
+            public void run() {
+                if (!egg.isValid() || egg.isDead()) {
+                    cancel();
+                    return;
+                }
+                if (!session.isRunning() || !session.isInArenaWorld(egg.getWorld())) {
+                    egg.remove();
+                    cancel();
+                    return;
+                }
+                int remaining = maxBlocks - placed;
+                if (remaining <= 0) {
+                    egg.remove();
+                    cancel();
+                    return;
+                }
+                placed += placeBridgeBlocks(session, team, egg.getLocation(), egg.getVelocity(), width, remaining);
+            }
+        }.runTaskTimer(bedwarsManager.getPlugin(), 0L, 1L);
+    }
+
+    private void consumeHeldItem(Player player, EquipmentSlot hand, ItemStack usedItem) {
+        EquipmentSlot slot = hand != null ? hand : EquipmentSlot.HAND;
+        ItemStack stack = slot == EquipmentSlot.OFF_HAND
+                ? player.getInventory().getItemInOffHand()
+                : player.getInventory().getItemInMainHand();
+        if (!matchesCustomItem(stack, usedItem)) {
+            return;
+        }
+        int amount = stack.getAmount();
+        if (amount <= 1) {
+            if (slot == EquipmentSlot.OFF_HAND) {
+                player.getInventory().setItemInOffHand(null);
+            } else {
+                player.getInventory().setItemInMainHand(null);
+            }
+            return;
+        }
+        stack.setAmount(amount - 1);
+        if (slot == EquipmentSlot.OFF_HAND) {
+            player.getInventory().setItemInOffHand(stack);
+        } else {
+            player.getInventory().setItemInMainHand(stack);
+        }
+    }
+
+    private boolean matchesCustomItem(ItemStack stack, ItemStack usedItem) {
+        if (stack == null || usedItem == null) {
+            return false;
+        }
+        if (stack.getType() != usedItem.getType()) {
+            return false;
+        }
+        String usedId = CustomItemData.getId(usedItem);
+        String stackId = CustomItemData.getId(stack);
+        if (usedId != null) {
+            return usedId.equals(stackId);
+        }
+        return stackId == null;
+    }
+
+    private void refreshInvisibility(Player player, GameSession session) {
+        if (!session.isParticipant(player.getUniqueId())) {
+            return;
+        }
+        if (!session.isInArenaWorld(player.getWorld())) {
+            showArmorForPlayer(player, session);
+            return;
+        }
+        if (player.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
+            hideArmorForPlayer(player, session);
+        } else {
+            showArmorForPlayer(player, session);
+        }
+    }
+
+    private void syncInvisibilityForViewer(Player viewer, GameSession session) {
+        if (!session.isParticipant(viewer.getUniqueId())) {
+            return;
+        }
+        if (!session.isInArenaWorld(viewer.getWorld())) {
+            return;
+        }
+        Map<EquipmentSlot, ItemStack> hidden = new EnumMap<>(EquipmentSlot.class);
+        hidden.put(EquipmentSlot.HEAD, new ItemStack(Material.AIR));
+        hidden.put(EquipmentSlot.CHEST, new ItemStack(Material.AIR));
+        hidden.put(EquipmentSlot.LEGS, new ItemStack(Material.AIR));
+        hidden.put(EquipmentSlot.FEET, new ItemStack(Material.AIR));
+        for (UUID targetId : session.getAssignments().keySet()) {
+            Player target = Bukkit.getPlayer(targetId);
+            if (target == null || target.equals(viewer)) {
+                continue;
+            }
+            if (!session.isInArenaWorld(target.getWorld())) {
+                continue;
+            }
+            if (target.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
+                viewer.sendEquipmentChange(target, hidden);
+            } else {
+                ItemStack[] armor = target.getInventory().getArmorContents();
+                Map<EquipmentSlot, ItemStack> visible = new EnumMap<>(EquipmentSlot.class);
+                visible.put(EquipmentSlot.FEET, cloneOrAir(armor, 0));
+                visible.put(EquipmentSlot.LEGS, cloneOrAir(armor, 1));
+                visible.put(EquipmentSlot.CHEST, cloneOrAir(armor, 2));
+                visible.put(EquipmentSlot.HEAD, cloneOrAir(armor, 3));
+                viewer.sendEquipmentChange(target, visible);
+            }
+        }
+    }
+
+    private void hideArmorForPlayer(Player target, GameSession session) {
+        Map<EquipmentSlot, ItemStack> hidden = new EnumMap<>(EquipmentSlot.class);
+        hidden.put(EquipmentSlot.HEAD, new ItemStack(Material.AIR));
+        hidden.put(EquipmentSlot.CHEST, new ItemStack(Material.AIR));
+        hidden.put(EquipmentSlot.LEGS, new ItemStack(Material.AIR));
+        hidden.put(EquipmentSlot.FEET, new ItemStack(Material.AIR));
+        sendArmorUpdate(target, session, hidden);
+    }
+
+    private void showArmorForPlayer(Player target, GameSession session) {
+        ItemStack[] armor = target.getInventory().getArmorContents();
+        Map<EquipmentSlot, ItemStack> visible = new EnumMap<>(EquipmentSlot.class);
+        visible.put(EquipmentSlot.FEET, cloneOrAir(armor, 0));
+        visible.put(EquipmentSlot.LEGS, cloneOrAir(armor, 1));
+        visible.put(EquipmentSlot.CHEST, cloneOrAir(armor, 2));
+        visible.put(EquipmentSlot.HEAD, cloneOrAir(armor, 3));
+        sendArmorUpdate(target, session, visible);
+    }
+
+    private ItemStack cloneOrAir(ItemStack[] armor, int index) {
+        if (armor == null || index < 0 || index >= armor.length) {
+            return new ItemStack(Material.AIR);
+        }
+        ItemStack item = armor[index];
+        if (item == null || item.getType() == Material.AIR) {
+            return new ItemStack(Material.AIR);
+        }
+        return item.clone();
+    }
+
+    private void sendArmorUpdate(Player target, GameSession session, Map<EquipmentSlot, ItemStack> equipment) {
+        for (UUID viewerId : session.getAssignments().keySet()) {
+            Player viewer = Bukkit.getPlayer(viewerId);
+            if (viewer == null || viewer.equals(target)) {
+                continue;
+            }
+            if (!session.isInArenaWorld(viewer.getWorld())) {
+                continue;
+            }
+            viewer.sendEquipmentChange(target, equipment);
+        }
+    }
+
+    private int placeBridgeBlocks(GameSession session,
+                                  TeamColor team,
+                                  Location location,
+                                  Vector velocity,
+                                  int width,
+                                  int maxCount) {
+        if (team == null || maxCount <= 0) {
+            return 0;
+        }
+        Block base = location.getBlock().getRelative(0, -1, 0);
+        if (base.getY() < base.getWorld().getMinHeight()) {
+            return 0;
+        }
+        Vector direction = velocity.clone();
+        direction.setY(0);
+        if (direction.lengthSquared() < 0.001) {
+            direction = new Vector(0, 0, 1);
+        } else {
+            direction.normalize();
+        }
+        Vector right = new Vector(-direction.getZ(), 0, direction.getX());
+        int half = width / 2;
+        int placed = 0;
+        int baseX = base.getX();
+        int baseY = base.getY();
+        int baseZ = base.getZ();
+        for (int offset = -half; offset <= half && placed < maxCount; offset++) {
+            int dx = (int) Math.round(right.getX() * offset);
+            int dz = (int) Math.round(right.getZ() * offset);
+            Block target = base.getWorld().getBlockAt(baseX + dx, baseY, baseZ + dz);
+            if (!target.getType().isAir()) {
+                continue;
+            }
+            BlockPoint point = new BlockPoint(target.getX(), target.getY(), target.getZ());
+            if (!session.isInsideMap(point)) {
+                continue;
+            }
+            if (session.isPlacementBlocked(point)) {
+                continue;
+            }
+            target.setType(team.wool(), false);
+            session.recordPlacedBlock(point);
+            placed++;
+        }
+        return placed;
+    }
+
+    private void filterExplosionBlocks(GameSession session, List<Block> blocks) {
+        if (blocks == null || blocks.isEmpty()) {
+            return;
+        }
+        blocks.removeIf(block -> {
+            BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
+            if (session.isPlacedBlock(point)) {
+                session.removePlacedBlock(point);
+                return false;
+            }
+            return true;
         });
     }
 

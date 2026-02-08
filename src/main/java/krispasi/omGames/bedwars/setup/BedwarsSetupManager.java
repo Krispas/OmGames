@@ -28,12 +28,16 @@ public class BedwarsSetupManager {
     private static final String ARENAS_PATH = "arenas";
     private static final String KEY_WORLD = "world";
     private static final String KEY_CENTER = "center";
+    private static final String KEY_CORNER_1 = "corner_1";
+    private static final String KEY_CORNER_2 = "corner_2";
+    private static final String KEY_BASE_RADIUS = "base-radius";
     private static final String KEY_LOBBY_HEIGHT = "lobby-height";
     private static final String KEY_BEDS = "beds";
     private static final String KEY_GENERATORS = "generators";
     private static final String KEY_BASE_GENERATORS = "Base_Generators";
     private static final String KEY_SPAWNS = "Spawns";
     private static final String KEY_SHOPS = "Shops";
+    private static final String KEY_ANTI_BUILD = "anti-build";
 
     private final JavaPlugin plugin;
     private final BedwarsManager bedwarsManager;
@@ -55,8 +59,21 @@ public class BedwarsSetupManager {
         player.sendMessage(Component.text("Setup for " + arenaId + ":", NamedTextColor.GOLD));
         sendStatusLine(player, "world", arena.getString(KEY_WORLD));
         sendStatusLine(player, "center", arena.getString(KEY_CENTER));
+        sendStatusLine(player, KEY_CORNER_1, arena.getString(KEY_CORNER_1));
+        sendStatusLine(player, KEY_CORNER_2, arena.getString(KEY_CORNER_2));
+        sendStatusLine(player, KEY_BASE_RADIUS, arena.contains(KEY_BASE_RADIUS)
+                ? String.valueOf(arena.getInt(KEY_BASE_RADIUS)) : null);
         sendStatusLine(player, "lobby-height", arena.contains(KEY_LOBBY_HEIGHT)
                 ? String.valueOf(arena.getInt(KEY_LOBBY_HEIGHT)) : null);
+        ConfigurationSection antiBuild = getSectionAnyCase(arena, KEY_ANTI_BUILD);
+        sendStatusLine(player, "anti-build.base-generator-radius",
+                antiBuild != null && antiBuild.contains("base-generator-radius")
+                        ? String.valueOf(antiBuild.getInt("base-generator-radius"))
+                        : null);
+        sendStatusLine(player, "anti-build.advanced-generator-radius",
+                antiBuild != null && antiBuild.contains("advanced-generator-radius")
+                        ? String.valueOf(antiBuild.getInt("advanced-generator-radius"))
+                        : null);
 
         ConfigurationSection beds = arena.getConfigurationSection(KEY_BEDS);
         for (TeamColor team : TeamColor.ordered()) {
@@ -118,8 +135,11 @@ public class BedwarsSetupManager {
         Location location = player.getLocation();
         arena.set(KEY_WORLD, location.getWorld().getName());
         arena.set(KEY_CENTER, formatPoint(location));
+        arena.set(KEY_CORNER_1, "");
+        arena.set(KEY_CORNER_2, "");
+        arena.set(KEY_BASE_RADIUS, 0);
         arena.set(KEY_LOBBY_HEIGHT, location.getBlockY());
-        ConfigurationSection antiBuild = arena.createSection("anti-build");
+        ConfigurationSection antiBuild = arena.createSection(KEY_ANTI_BUILD);
         antiBuild.set("base-generator-radius", 0);
         antiBuild.set("advanced-generator-radius", 0);
         arena.createSection(KEY_BEDS);
@@ -133,7 +153,25 @@ public class BedwarsSetupManager {
     }
 
     public void applySetup(Player player, String arenaId, String rawTarget) {
-        Optional<SetupTarget> targetOptional = SetupTarget.parse(rawTarget);
+        String trimmed = rawTarget == null ? "" : rawTarget.trim();
+        if (trimmed.isBlank()) {
+            player.sendMessage(Component.text("Unknown setup key: " + rawTarget, NamedTextColor.RED));
+            return;
+        }
+        Optional<SetupTarget> targetOptional = SetupTarget.parse(trimmed);
+        Integer numericValue = null;
+        if (targetOptional.isEmpty()) {
+            String[] tokens = trimmed.split("\\s+");
+            String keyPart = trimmed;
+            if (tokens.length > 1) {
+                Integer parsed = parseInteger(tokens[tokens.length - 1]);
+                if (parsed != null) {
+                    numericValue = parsed;
+                    keyPart = String.join(" ", java.util.Arrays.copyOf(tokens, tokens.length - 1));
+                }
+            }
+            targetOptional = SetupTarget.parse(keyPart);
+        }
         if (targetOptional.isEmpty()) {
             player.sendMessage(Component.text("Unknown setup key: " + rawTarget, NamedTextColor.RED));
             return;
@@ -177,6 +215,22 @@ public class BedwarsSetupManager {
         switch (target.kind()) {
             case WORLD -> arena.set(KEY_WORLD, location.getWorld().getName());
             case CENTER -> arena.set(KEY_CENTER, formatPoint(location));
+            case CORNER -> setCorner(arena, target.cornerIndex(), location);
+            case BASE_RADIUS -> {
+                if (!applyNumeric(arena, KEY_BASE_RADIUS, numericValue, player)) {
+                    return;
+                }
+            }
+            case ANTI_BUILD_BASE -> {
+                if (!applyAntiBuildRadius(arena, "base-generator-radius", numericValue, player)) {
+                    return;
+                }
+            }
+            case ANTI_BUILD_ADVANCED -> {
+                if (!applyAntiBuildRadius(arena, "advanced-generator-radius", numericValue, player)) {
+                    return;
+                }
+            }
             case LOBBY_HEIGHT -> arena.set(KEY_LOBBY_HEIGHT, location.getBlockY());
             case SPAWN -> setSpawn(arena, target.team(), location);
             case BASE_GEN -> setBaseGenerator(arena, target.team(), location);
@@ -194,6 +248,11 @@ public class BedwarsSetupManager {
         List<String> keys = new ArrayList<>();
         keys.add("world");
         keys.add("center");
+        keys.add(KEY_CORNER_1);
+        keys.add(KEY_CORNER_2);
+        keys.add(KEY_BASE_RADIUS);
+        keys.add("anti-build.base-generator-radius");
+        keys.add("anti-build.advanced-generator-radius");
         keys.add("lobby-height");
         for (TeamColor team : TeamColor.ordered()) {
             keys.add("bed." + team.key());
@@ -255,6 +314,36 @@ public class BedwarsSetupManager {
         ConfigurationSection shops = getOrCreateSection(arena, KEY_SHOPS);
         ConfigurationSection teamSection = getOrCreateSection(shops, team.key());
         teamSection.set(shopType.configKey(), formatPointWithYaw(location));
+    }
+
+    private void setCorner(ConfigurationSection arena, Integer cornerIndex, Location location) {
+        if (cornerIndex == null) {
+            return;
+        }
+        if (cornerIndex == 1) {
+            arena.set(KEY_CORNER_1, formatPoint(location));
+        } else if (cornerIndex == 2) {
+            arena.set(KEY_CORNER_2, formatPoint(location));
+        }
+    }
+
+    private boolean applyNumeric(ConfigurationSection arena, String key, Integer value, Player player) {
+        if (value == null) {
+            player.sendMessage(Component.text("Provide a numeric value for " + key + ".", NamedTextColor.RED));
+            return false;
+        }
+        arena.set(key, value);
+        return true;
+    }
+
+    private boolean applyAntiBuildRadius(ConfigurationSection arena, String key, Integer value, Player player) {
+        if (value == null) {
+            player.sendMessage(Component.text("Provide a numeric value for anti-build.", NamedTextColor.RED));
+            return false;
+        }
+        ConfigurationSection antiBuild = getOrCreateSection(arena, KEY_ANTI_BUILD);
+        antiBuild.set(key, value);
+        return true;
     }
 
     private YamlConfiguration loadConfig() {
@@ -371,6 +460,17 @@ public class BedwarsSetupManager {
         return null;
     }
 
+    private Integer parseInteger(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
     private List<String> findGeneratorKeys(ConfigurationSection generators, String prefix) {
         List<String> keys = new ArrayList<>();
         for (String key : generators.getKeys(false)) {
@@ -415,6 +515,10 @@ public class BedwarsSetupManager {
     private enum SetupKind {
         WORLD,
         CENTER,
+        CORNER,
+        BASE_RADIUS,
+        ANTI_BUILD_BASE,
+        ANTI_BUILD_ADVANCED,
         LOBBY_HEIGHT,
         BED,
         SPAWN,
@@ -423,8 +527,13 @@ public class BedwarsSetupManager {
         SHOP
     }
 
-    private record SetupTarget(SetupKind kind, TeamColor team, GeneratorType generatorType, Integer generatorIndex,
-                               ShopType shopType, String label) {
+    private record SetupTarget(SetupKind kind,
+                               TeamColor team,
+                               GeneratorType generatorType,
+                               Integer generatorIndex,
+                               ShopType shopType,
+                               Integer cornerIndex,
+                               String label) {
         static Optional<SetupTarget> parse(String raw) {
             if (raw == null || raw.isBlank()) {
                 return Optional.empty();
@@ -433,31 +542,49 @@ public class BedwarsSetupManager {
                     .replace('_', '.')
                     .replace(' ', '.');
             if (normalized.equals(KEY_WORLD)) {
-                return Optional.of(new SetupTarget(SetupKind.WORLD, null, null, null, null, "world"));
+                return Optional.of(new SetupTarget(SetupKind.WORLD, null, null, null, null, null, "world"));
             }
             if (normalized.equals(KEY_CENTER)) {
-                return Optional.of(new SetupTarget(SetupKind.CENTER, null, null, null, null, "center"));
+                return Optional.of(new SetupTarget(SetupKind.CENTER, null, null, null, null, null, "center"));
+            }
+            if (normalized.equals("corner.1") || normalized.equals("corner1") || normalized.equals("corner_1")) {
+                return Optional.of(new SetupTarget(SetupKind.CORNER, null, null, null, null, 1, KEY_CORNER_1));
+            }
+            if (normalized.equals("corner.2") || normalized.equals("corner2") || normalized.equals("corner_2")) {
+                return Optional.of(new SetupTarget(SetupKind.CORNER, null, null, null, null, 2, KEY_CORNER_2));
+            }
+            if (normalized.equals("base-radius") || normalized.equals("base.radius") || normalized.equals("baseradius")) {
+                return Optional.of(new SetupTarget(SetupKind.BASE_RADIUS, null, null, null, null, null, KEY_BASE_RADIUS));
+            }
+            if (isAntiBuildKey(normalized)) {
+                SetupKind kind = isAdvancedAntiBuildKey(normalized)
+                        ? SetupKind.ANTI_BUILD_ADVANCED
+                        : SetupKind.ANTI_BUILD_BASE;
+                String label = kind == SetupKind.ANTI_BUILD_ADVANCED
+                        ? "anti-build.advanced-generator-radius"
+                        : "anti-build.base-generator-radius";
+                return Optional.of(new SetupTarget(kind, null, null, null, null, null, label));
             }
             if (normalized.equals("lobby-height") || normalized.equals("lobbyheight")) {
-                return Optional.of(new SetupTarget(SetupKind.LOBBY_HEIGHT, null, null, null, null, "lobby-height"));
+                return Optional.of(new SetupTarget(SetupKind.LOBBY_HEIGHT, null, null, null, null, null, "lobby-height"));
             }
             if (normalized.startsWith("bed.")) {
                 TeamColor team = TeamColor.fromKey(normalized.substring("bed.".length()));
                 if (team != null) {
-                    return Optional.of(new SetupTarget(SetupKind.BED, team, null, null, null, "bed." + team.key()));
+                    return Optional.of(new SetupTarget(SetupKind.BED, team, null, null, null, null, "bed." + team.key()));
                 }
             }
             if (normalized.startsWith("spawn.")) {
                 TeamColor team = TeamColor.fromKey(normalized.substring("spawn.".length()));
                 if (team != null) {
-                    return Optional.of(new SetupTarget(SetupKind.SPAWN, team, null, null, null, "spawn." + team.key()));
+                    return Optional.of(new SetupTarget(SetupKind.SPAWN, team, null, null, null, null, "spawn." + team.key()));
                 }
             }
             if (normalized.startsWith("base-gen.") || normalized.startsWith("basegen.") || normalized.startsWith("base.gen.")) {
                 String key = normalized.substring(normalized.indexOf('.') + 1);
                 TeamColor team = TeamColor.fromKey(key);
                 if (team != null) {
-                    return Optional.of(new SetupTarget(SetupKind.BASE_GEN, team, null, null, null, "base-gen." + team.key()));
+                    return Optional.of(new SetupTarget(SetupKind.BASE_GEN, team, null, null, null, null, "base-gen." + team.key()));
                 }
             }
             if (normalized.startsWith("generator.") || normalized.startsWith("diamond.") || normalized.startsWith("emerald.")) {
@@ -467,7 +594,7 @@ public class BedwarsSetupManager {
                     GeneratorType type = parseGeneratorType(parts[0]);
                     Integer index = parseIndex(parts[1]);
                     if (type != null && index != null) {
-                        return Optional.of(new SetupTarget(SetupKind.GENERATOR, null, type, index, null,
+                        return Optional.of(new SetupTarget(SetupKind.GENERATOR, null, type, index, null, null,
                                 "generator." + parts[0] + "." + index));
                     }
                 }
@@ -479,11 +606,28 @@ public class BedwarsSetupManager {
                     ShopType shop = parseShopType(parts[2]);
                     if (team != null && shop != null) {
                         String label = "shop." + team.key() + "." + parts[2];
-                        return Optional.of(new SetupTarget(SetupKind.SHOP, team, null, null, shop, label));
+                        return Optional.of(new SetupTarget(SetupKind.SHOP, team, null, null, shop, null, label));
                     }
                 }
             }
             return Optional.empty();
+        }
+
+        private static boolean isAntiBuildKey(String normalized) {
+            return (normalized.startsWith("anti-build")
+                    || normalized.startsWith("anti.build")
+                    || normalized.startsWith("antibuild"))
+                    && (normalized.contains("generator")
+                    || normalized.contains("base-generator-radius")
+                    || normalized.contains("advanced-generator-radius")
+                    || normalized.contains("base.generator.radius")
+                    || normalized.contains("advanced.generator.radius"));
+        }
+
+        private static boolean isAdvancedAntiBuildKey(String normalized) {
+            return normalized.contains("advanced")
+                    || normalized.contains("advanced-generator-radius")
+                    || normalized.contains("advanced.generator.radius");
         }
 
         private static GeneratorType parseGeneratorType(String value) {
