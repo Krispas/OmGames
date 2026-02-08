@@ -1,0 +1,13 @@
+custom-items:
+  fireball:
+    type: FIREBALL
+    material: FIRE_CHARGE
+    velocity: 1.15
+    yield: 2.2
+    incendiary: false
+  bridge_egg:
+    type: BRIDGE_EGG
+    material: EGG
+    velocity: 1.2
+    max-blocks: 64
+    bridge-width: 1

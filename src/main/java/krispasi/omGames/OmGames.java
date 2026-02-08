@@ -1,31 +1,43 @@
 package krispasi.omGames;
 
-import krispasi.omGames.bedwars.BedWarsModule;
+import krispasi.omGames.bedwars.BedwarsManager;
+import krispasi.omGames.bedwars.command.BedwarsCommand;
+import krispasi.omGames.bedwars.listener.BedwarsListener;
+import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class OmGames extends JavaPlugin {
-
-    private BedWarsModule bedWarsModule;
+    private BedwarsManager bedwarsManager;
+    private BedwarsSetupManager setupManager;
 
     @Override
     public void onEnable() {
-        // boot BedWars systems with safety nets so we don't crash the server
-        try {
-            bedWarsModule = new BedWarsModule(this);
-            bedWarsModule.enable();
-        } catch (Exception ex) {
-            getLogger().severe("Failed to start BedWars module: " + ex.getMessage());
+        saveResource("bedwars.yml", false);
+        saveResource("shop.yml", false);
+        saveResource("custom-items.yml", false);
+
+        bedwarsManager = new BedwarsManager(this);
+        bedwarsManager.loadArenas();
+        bedwarsManager.loadCustomItems();
+        bedwarsManager.loadShopConfig();
+        bedwarsManager.loadQuickBuy();
+        setupManager = new BedwarsSetupManager(this, bedwarsManager);
+
+        PluginCommand command = getCommand("bw");
+        if (command != null) {
+            BedwarsCommand executor = new BedwarsCommand(bedwarsManager, setupManager);
+            command.setExecutor(executor);
+            command.setTabCompleter(executor);
         }
+
+        getServer().getPluginManager().registerEvents(new BedwarsListener(bedwarsManager), this);
     }
 
     @Override
     public void onDisable() {
-        if (bedWarsModule != null) {
-            try {
-                bedWarsModule.disable();
-            } catch (Exception ex) {
-                getLogger().warning("Issue while shutting down BedWars: " + ex.getMessage());
-            }
+        if (bedwarsManager != null) {
+            bedwarsManager.shutdown();
         }
     }
 }
