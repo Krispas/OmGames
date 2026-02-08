@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Logger;
 import krispasi.omGames.bedwars.generator.GeneratorInfo;
@@ -12,6 +13,7 @@ import krispasi.omGames.bedwars.generator.GeneratorType;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.BedLocation;
 import krispasi.omGames.bedwars.model.BlockPoint;
+import krispasi.omGames.bedwars.model.ShopLocation;
 import krispasi.omGames.bedwars.model.TeamColor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -144,6 +146,34 @@ public class BedwarsConfigLoader {
                 }
             }
 
+            Map<TeamColor, ShopLocation> mainShops = new EnumMap<>(TeamColor.class);
+            Map<TeamColor, ShopLocation> upgradeShops = new EnumMap<>(TeamColor.class);
+            ConfigurationSection shopsSection = arenaSection.getConfigurationSection("Shops");
+            if (shopsSection == null) {
+                shopsSection = arenaSection.getConfigurationSection("shops");
+            }
+            if (shopsSection != null) {
+                for (String teamKey : shopsSection.getKeys(false)) {
+                    TeamColor team = TeamColor.fromKey(teamKey);
+                    if (team == null) {
+                        logger.warning("Unknown shop team in " + arenaId + ": " + teamKey);
+                        continue;
+                    }
+                    ConfigurationSection teamSection = shopsSection.getConfigurationSection(teamKey);
+                    if (teamSection == null) {
+                        continue;
+                    }
+                    ShopLocation main = parseShopLocation(teamSection.getString("main"), "shop main", arenaId);
+                    if (main != null) {
+                        mainShops.put(team, main);
+                    }
+                    ShopLocation upgrades = parseShopLocation(teamSection.getString("upgrades"), "shop upgrades", arenaId);
+                    if (upgrades != null) {
+                        upgradeShops.put(team, upgrades);
+                    }
+                }
+            }
+
             if (center == null) {
                 logger.warning("Arena " + arenaId + " missing center location.");
                 continue;
@@ -158,7 +188,9 @@ public class BedwarsConfigLoader {
                     advancedGeneratorRadius,
                     beds,
                     generators,
-                    spawns
+                    spawns,
+                    mainShops,
+                    upgradeShops
             );
             arenas.put(arenaId, arena);
         }
@@ -218,5 +250,50 @@ public class BedwarsConfigLoader {
             return null;
         }
         return new GeneratorInfo(GeneratorType.BASE, team, location, key);
+    }
+
+    private ShopLocation parseShopLocation(String value, String label, String arenaId) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String[] parts = value.trim().split("\\s+");
+        if (parts.length < 3) {
+            logger.warning("Invalid " + label + " location in " + arenaId + ": " + value);
+            return null;
+        }
+        try {
+            int x = Integer.parseInt(parts[0]);
+            int y = Integer.parseInt(parts[1]);
+            int z = Integer.parseInt(parts[2]);
+            float yaw = 0.0f;
+            if (parts.length >= 4) {
+                yaw = parseYaw(parts[3], label, arenaId);
+            }
+            return new ShopLocation(new BlockPoint(x, y, z), yaw);
+        } catch (NumberFormatException ex) {
+            logger.warning("Invalid " + label + " location in " + arenaId + ": " + value);
+            return null;
+        }
+    }
+
+    private float parseYaw(String value, String label, String arenaId) {
+        if (value == null || value.isBlank()) {
+            return 0.0f;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "SOUTH", "S" -> 0.0f;
+            case "WEST", "W" -> 90.0f;
+            case "NORTH", "N" -> 180.0f;
+            case "EAST", "E" -> 270.0f;
+            default -> {
+                try {
+                    yield Float.parseFloat(value);
+                } catch (NumberFormatException ex) {
+                    logger.warning("Invalid " + label + " yaw in " + arenaId + ": " + value);
+                    yield 0.0f;
+                }
+            }
+        };
     }
 }

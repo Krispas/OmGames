@@ -6,6 +6,8 @@ import java.util.Map;
 import java.util.UUID;
 import krispasi.omGames.bedwars.config.BedwarsConfigLoader;
 import krispasi.omGames.bedwars.game.GameSession;
+import krispasi.omGames.bedwars.shop.ShopConfig;
+import krispasi.omGames.bedwars.shop.ShopConfigLoader;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -25,6 +27,7 @@ public class BedwarsManager {
     private final JavaPlugin plugin;
     private Map<String, Arena> arenas = Map.of();
     private GameSession activeSession;
+    private ShopConfig shopConfig = ShopConfig.empty();
 
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -37,6 +40,13 @@ public class BedwarsManager {
         plugin.getLogger().info("Loaded " + arenas.size() + " BedWars arenas.");
     }
 
+    public void loadShopConfig() {
+        File configFile = new File(plugin.getDataFolder(), "shop.yml");
+        ShopConfigLoader loader = new ShopConfigLoader(configFile, plugin.getLogger());
+        shopConfig = loader.load();
+        plugin.getLogger().info("Loaded BedWars shop config.");
+    }
+
     public Collection<Arena> getArenas() {
         return arenas.values();
     }
@@ -47,6 +57,10 @@ public class BedwarsManager {
 
     public GameSession getActiveSession() {
         return activeSession;
+    }
+
+    public ShopConfig getShopConfig() {
+        return shopConfig;
     }
 
     public boolean isBedwarsWorld(String worldName) {

@@ -1,0 +1,379 @@
+shop:
+  categories:
+    quick_buy:
+      title: "Quick Buy"
+      icon: NETHER_STAR
+      size: 54
+      entries:
+        wool: 10
+        stone_sword: 11
+        iron_sword: 12
+        bow: 13
+        arrows: 14
+        golden_apple: 15
+        tnt: 16
+        fireball: 24
+        ender_pearl: 25
+    blocks:
+      title: "Blocks"
+      icon: BRICKS
+      size: 54
+      entries:
+        wool: 10
+        hardened_clay: 11
+        end_stone: 12
+        wood_planks: 13
+        blast_glass: 14
+    melee:
+      title: "Melee"
+      icon: IRON_SWORD
+      size: 54
+      entries:
+        stone_sword: 10
+        iron_sword: 11
+        diamond_sword: 12
+        knockback_stick: 13
+    ranged:
+      title: "Ranged"
+      icon: BOW
+      size: 54
+      entries:
+        bow: 10
+        bow_power: 11
+        bow_power_punch: 12
+        arrows: 13
+    armor:
+      title: "Armor"
+      icon: IRON_CHESTPLATE
+      size: 54
+      entries:
+        chainmail_armor: 10
+        iron_armor: 11
+        diamond_armor: 12
+    tools:
+      title: "Tools"
+      icon: IRON_PICKAXE
+      size: 54
+      entries:
+        pickaxe_wood: 10
+        pickaxe_iron: 11
+        pickaxe_gold: 12
+        pickaxe_diamond: 13
+        axe_wood: 19
+        axe_stone: 20
+        axe_iron: 21
+        axe_diamond: 22
+        shears: 28
+    utility:
+      title: "Utilities"
+      icon: TNT
+      size: 54
+      entries:
+        golden_apple: 10
+        fireball: 11
+        tnt: 12
+        ender_pearl: 13
+        invis_potion: 19
+        jump_potion: 20
+        speed_potion: 21
+        magic_milk: 22
+  items:
+    wool:
+      material: WHITE_WOOL
+      amount: 16
+      cost:
+        material: IRON_INGOT
+        amount: 4
+      behavior: BLOCK
+      team-color: true
+      display-name: "Wool"
+    hardened_clay:
+      material: TERRACOTTA
+      amount: 16
+      cost:
+        material: IRON_INGOT
+        amount: 12
+      behavior: BLOCK
+      display-name: "Hardened Clay"
+    end_stone:
+      material: END_STONE
+      amount: 12
+      cost:
+        material: IRON_INGOT
+        amount: 24
+      behavior: BLOCK
+      display-name: "End Stone"
+    wood_planks:
+      material: OAK_PLANKS
+      amount: 16
+      cost:
+        material: GOLD_INGOT
+        amount: 4
+      behavior: BLOCK
+      display-name: "Wood Planks"
+    blast_glass:
+      material: GLASS
+      amount: 4
+      cost:
+        material: IRON_INGOT
+        amount: 12
+      behavior: BLOCK
+      display-name: "Blast-Proof Glass"
+
+    stone_sword:
+      material: STONE_SWORD
+      amount: 1
+      cost:
+        material: IRON_INGOT
+        amount: 10
+      behavior: SWORD
+      display-name: "Stone Sword"
+    iron_sword:
+      material: IRON_SWORD
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 7
+      behavior: SWORD
+      display-name: "Iron Sword"
+    diamond_sword:
+      material: DIAMOND_SWORD
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 4
+      behavior: SWORD
+      display-name: "Diamond Sword"
+    knockback_stick:
+      material: STICK
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 5
+      behavior: SWORD
+      display-name: "Knockback Stick"
+      enchants:
+        KNOCKBACK: 1
+
+    bow:
+      material: BOW
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 12
+      behavior: BOW
+      tier: 1
+      display-name: "Bow"
+    bow_power:
+      material: BOW
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 6
+      behavior: BOW
+      tier: 2
+      display-name: "Bow (Power I)"
+      enchants:
+        POWER: 1
+    bow_power_punch:
+      material: BOW
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 6
+      behavior: BOW
+      tier: 3
+      display-name: "Bow (Power I, Punch I)"
+      enchants:
+        POWER: 1
+        PUNCH: 1
+    arrows:
+      material: ARROW
+      amount: 8
+      cost:
+        material: GOLD_INGOT
+        amount: 2
+      behavior: UTILITY
+      display-name: "Arrows"
+
+    chainmail_armor:
+      material: CHAINMAIL_CHESTPLATE
+      amount: 1
+      cost:
+        material: IRON_INGOT
+        amount: 40
+      behavior: ARMOR
+      tier: 1
+      display-name: "Chainmail Armor"
+    iron_armor:
+      material: IRON_CHESTPLATE
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 12
+      behavior: ARMOR
+      tier: 2
+      display-name: "Iron Armor"
+    diamond_armor:
+      material: DIAMOND_CHESTPLATE
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 6
+      behavior: ARMOR
+      tier: 3
+      display-name: "Diamond Armor"
+
+    pickaxe_wood:
+      material: WOODEN_PICKAXE
+      amount: 1
+      cost:
+        material: IRON_INGOT
+        amount: 10
+      behavior: PICKAXE
+      tier: 1
+      display-name: "Wooden Pickaxe"
+    pickaxe_iron:
+      material: IRON_PICKAXE
+      amount: 1
+      cost:
+        material: IRON_INGOT
+        amount: 10
+      behavior: PICKAXE
+      tier: 2
+      display-name: "Iron Pickaxe"
+    pickaxe_gold:
+      material: GOLDEN_PICKAXE
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 3
+      behavior: PICKAXE
+      tier: 3
+      display-name: "Gold Pickaxe"
+    pickaxe_diamond:
+      material: DIAMOND_PICKAXE
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 6
+      behavior: PICKAXE
+      tier: 4
+      display-name: "Diamond Pickaxe"
+
+    axe_wood:
+      material: WOODEN_AXE
+      amount: 1
+      cost:
+        material: IRON_INGOT
+        amount: 10
+      behavior: AXE
+      tier: 1
+      display-name: "Wooden Axe"
+    axe_stone:
+      material: STONE_AXE
+      amount: 1
+      cost:
+        material: IRON_INGOT
+        amount: 10
+      behavior: AXE
+      tier: 2
+      display-name: "Stone Axe"
+    axe_iron:
+      material: IRON_AXE
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 3
+      behavior: AXE
+      tier: 3
+      display-name: "Iron Axe"
+    axe_diamond:
+      material: DIAMOND_AXE
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 6
+      behavior: AXE
+      tier: 4
+      display-name: "Diamond Axe"
+
+    shears:
+      material: SHEARS
+      amount: 1
+      cost:
+        material: IRON_INGOT
+        amount: 20
+      behavior: SHEARS
+      display-name: "Shears"
+
+    golden_apple:
+      material: GOLDEN_APPLE
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 3
+      behavior: UTILITY
+      display-name: "Golden Apple"
+    fireball:
+      material: FIRE_CHARGE
+      amount: 1
+      cost:
+        material: IRON_INGOT
+        amount: 40
+      behavior: UTILITY
+      display-name: "Fireball"
+    tnt:
+      material: TNT
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 4
+      behavior: UTILITY
+      display-name: "TNT"
+    ender_pearl:
+      material: ENDER_PEARL
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 4
+      behavior: UTILITY
+      display-name: "Ender Pearl"
+    invis_potion:
+      material: POTION
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 2
+      behavior: POTION
+      display-name: "Invisibility Potion"
+      potion-effects:
+        - "INVISIBILITY:1:30"
+    jump_potion:
+      material: POTION
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 1
+      behavior: POTION
+      display-name: "Jump Potion"
+      potion-effects:
+        - "JUMP:5:45"
+    speed_potion:
+      material: POTION
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 1
+      behavior: POTION
+      display-name: "Speed Potion"
+      potion-effects:
+        - "SPEED:2:45"
+    magic_milk:
+      material: MILK_BUCKET
+      amount: 1
+      cost:
+        material: GOLD_INGOT
+        amount: 4
+      behavior: UTILITY
+      display-name: "Magic Milk"

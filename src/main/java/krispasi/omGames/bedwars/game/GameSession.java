@@ -16,11 +16,20 @@ import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.generator.GeneratorInfo;
 import krispasi.omGames.bedwars.generator.GeneratorManager;
 import krispasi.omGames.bedwars.generator.GeneratorType;
+import krispasi.omGames.bedwars.gui.ShopMenu;
+import krispasi.omGames.bedwars.gui.UpgradeShopMenu;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.BedLocation;
 import krispasi.omGames.bedwars.model.BedState;
 import krispasi.omGames.bedwars.model.BlockPoint;
+import krispasi.omGames.bedwars.model.ShopLocation;
+import krispasi.omGames.bedwars.model.ShopType;
 import krispasi.omGames.bedwars.model.TeamColor;
+import krispasi.omGames.bedwars.shop.ShopConfig;
+import krispasi.omGames.bedwars.shop.ShopCost;
+import krispasi.omGames.bedwars.shop.ShopCategoryType;
+import krispasi.omGames.bedwars.shop.ShopItemBehavior;
+import krispasi.omGames.bedwars.shop.ShopItemDefinition;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
@@ -33,6 +42,7 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.type.Bed;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.entity.Item;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -46,6 +56,29 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
 public class GameSession {
+    public static final String ITEM_SHOP_TAG = "bw_item_shop";
+    public static final String UPGRADES_SHOP_TAG = "bw_upgrades_shop";
+    private static final Set<Material> SWORD_MATERIALS = EnumSet.of(
+            Material.WOODEN_SWORD,
+            Material.STONE_SWORD,
+            Material.IRON_SWORD,
+            Material.DIAMOND_SWORD
+    );
+    private static final Set<Material> BOW_MATERIALS = EnumSet.of(Material.BOW);
+    private static final Set<Material> PICKAXE_MATERIALS = EnumSet.of(
+            Material.WOODEN_PICKAXE,
+            Material.STONE_PICKAXE,
+            Material.IRON_PICKAXE,
+            Material.GOLDEN_PICKAXE,
+            Material.DIAMOND_PICKAXE
+    );
+    private static final Set<Material> AXE_MATERIALS = EnumSet.of(
+            Material.WOODEN_AXE,
+            Material.STONE_AXE,
+            Material.IRON_AXE,
+            Material.GOLDEN_AXE,
+            Material.DIAMOND_AXE
+    );
     private static final int START_COUNTDOWN_SECONDS = 5;
     private static final int RESPAWN_DELAY_SECONDS = 5;
     private static final int RESPAWN_PROTECTION_SECONDS = 5;
@@ -75,6 +108,12 @@ public class GameSession {
     private final Map<UUID, Scoreboard> activeScoreboards = new HashMap<>();
     private final Map<UUID, List<String>> sidebarLines = new HashMap<>();
     private final Set<TeamColor> teamsInMatch = EnumSet.noneOf(TeamColor.class);
+    private final Set<UUID> shopNpcIds = new HashSet<>();
+    private final Map<UUID, Integer> armorTiers = new HashMap<>();
+    private final Map<UUID, Integer> pickaxeTiers = new HashMap<>();
+    private final Map<UUID, Integer> axeTiers = new HashMap<>();
+    private final Map<UUID, Integer> bowTiers = new HashMap<>();
+    private final Set<UUID> shearsUnlocked = new HashSet<>();
     private final List<BukkitTask> tasks = new ArrayList<>();
     private GeneratorManager generatorManager;
     private GameState state = GameState.IDLE;
@@ -192,6 +231,62 @@ public class GameSession {
         player.openInventory(inventory);
     }
 
+    public void openShop(Player player, ShopType type) {
+        if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
+            return;
+        }
+        if (type == ShopType.UPGRADES) {
+            new UpgradeShopMenu().open(player);
+            return;
+        }
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            player.sendMessage(Component.text("Shop config is not loaded.", NamedTextColor.RED));
+            return;
+        }
+        new ShopMenu(this, config, ShopCategoryType.QUICK_BUY, player).open(player);
+    }
+
+    public void handleShopPurchase(Player player, ShopItemDefinition item) {
+        if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
+            return;
+        }
+        ShopCost cost = item.getCost();
+        if (cost == null || !cost.isValid() || !hasResources(player, cost)) {
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+        if (!applyPurchase(player, item)) {
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return;
+        }
+        removeResources(player, cost);
+        player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
+    }
+
+    private boolean applyPurchase(Player player, ShopItemDefinition item) {
+        TeamColor team = getTeam(player.getUniqueId());
+        ShopItemBehavior behavior = item.getBehavior();
+        return switch (behavior) {
+            case BLOCK, UTILITY, POTION -> {
+                giveItem(player, item.createPurchaseItem(team));
+                yield true;
+            }
+            case SWORD -> {
+                if (SWORD_MATERIALS.contains(item.getMaterial())) {
+                    removeSwords(player);
+                }
+                giveItem(player, item.createPurchaseItem(team));
+                yield true;
+            }
+            case BOW -> applyTierUpgrade(player, item, bowTiers, ShopItemBehavior.BOW);
+            case ARMOR -> applyTierUpgrade(player, item, armorTiers, ShopItemBehavior.ARMOR);
+            case PICKAXE -> applyTierUpgrade(player, item, pickaxeTiers, ShopItemBehavior.PICKAXE);
+            case AXE -> applyTierUpgrade(player, item, axeTiers, ShopItemBehavior.AXE);
+            case SHEARS -> applyShears(player, item, team);
+        };
+    }
+
     public void start(JavaPlugin plugin, Player initiator) {
         this.plugin = plugin;
         stopInternal();
@@ -200,6 +295,7 @@ public class GameSession {
         updateTeamsInMatch();
         initializeBeds();
         applyBedLayout();
+        spawnShops();
         startCountdownRemaining = START_COUNTDOWN_SECONDS;
 
         for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
@@ -216,6 +312,7 @@ public class GameSession {
             player.teleport(spawn);
             player.getInventory().clear();
             giveStarterKit(player, team);
+            applyPermanentItems(player, team);
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
@@ -239,6 +336,7 @@ public class GameSession {
             return;
         }
         removeRespawnProtection(player.getUniqueId());
+        downgradeTools(player.getUniqueId());
         TeamColor team = getTeam(player.getUniqueId());
         if (team == null) {
             return;
@@ -453,6 +551,7 @@ public class GameSession {
             player.teleport(spawn);
             player.getInventory().clear();
             giveStarterKit(player, team);
+            applyPermanentItems(player, team);
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
@@ -582,6 +681,7 @@ public class GameSession {
             return;
         }
         clearDroppedItems(world);
+        despawnShops();
         for (BlockPoint point : placedBlocks) {
             world.getBlockAt(point.x(), point.y(), point.z()).setType(Material.AIR, false);
         }
@@ -661,6 +761,7 @@ public class GameSession {
 
     private void stopInternal() {
         state = GameState.ENDING;
+        despawnShops();
         closeFakeEnderChests();
         clearSidebars();
         for (BukkitTask task : tasks) {
@@ -704,6 +805,12 @@ public class GameSession {
         respawnProtectionEnds.clear();
         respawnProtectionTasks.clear();
         teamsInMatch.clear();
+        shopNpcIds.clear();
+        armorTiers.clear();
+        pickaxeTiers.clear();
+        axeTiers.clear();
+        bowTiers.clear();
+        shearsUnlocked.clear();
     }
 
     private void closeFakeEnderChests() {
@@ -801,6 +908,231 @@ public class GameSession {
         return item;
     }
 
+    private void applyPermanentItems(Player player, TeamColor team) {
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null || team == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        int armorTier = armorTiers.getOrDefault(playerId, 0);
+        if (armorTier > 0) {
+            equipArmor(player, team, config, armorTier);
+        }
+        int bowTier = bowTiers.getOrDefault(playerId, 0);
+        if (bowTier > 0) {
+            equipTieredItem(player, team, config, ShopItemBehavior.BOW, bowTier, BOW_MATERIALS);
+        }
+        int pickaxeTier = pickaxeTiers.getOrDefault(playerId, 0);
+        if (pickaxeTier > 0) {
+            equipTieredItem(player, team, config, ShopItemBehavior.PICKAXE, pickaxeTier, PICKAXE_MATERIALS);
+        }
+        int axeTier = axeTiers.getOrDefault(playerId, 0);
+        if (axeTier > 0) {
+            equipTieredItem(player, team, config, ShopItemBehavior.AXE, axeTier, AXE_MATERIALS);
+        }
+        if (shearsUnlocked.contains(playerId)) {
+            giveShears(player, team);
+        }
+    }
+
+    private boolean applyTierUpgrade(Player player,
+                                     ShopItemDefinition item,
+                                     Map<UUID, Integer> tierMap,
+                                     ShopItemBehavior behavior) {
+        int tier = item.getTier();
+        if (tier <= 0) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        int current = tierMap.getOrDefault(playerId, 0);
+        if (tier <= current) {
+            return false;
+        }
+        tierMap.put(playerId, tier);
+        applyPermanentItems(player, getTeam(playerId));
+        return true;
+    }
+
+    private boolean applyShears(Player player, ShopItemDefinition item, TeamColor team) {
+        UUID playerId = player.getUniqueId();
+        if (shearsUnlocked.contains(playerId)) {
+            return false;
+        }
+        shearsUnlocked.add(playerId);
+        giveItem(player, item.createPurchaseItem(team));
+        return true;
+    }
+
+    private void equipTieredItem(Player player,
+                                 TeamColor team,
+                                 ShopConfig config,
+                                 ShopItemBehavior behavior,
+                                 int tier,
+                                 Set<Material> removeSet) {
+        ShopItemDefinition definition = config.getTieredItem(behavior, tier).orElse(null);
+        if (definition == null) {
+            return;
+        }
+        removeItems(player, removeSet);
+        giveItem(player, definition.createPurchaseItem(team));
+    }
+
+    private void equipArmor(Player player, TeamColor team, ShopConfig config, int tier) {
+        ShopItemDefinition definition = config.getTieredItem(ShopItemBehavior.ARMOR, tier).orElse(null);
+        if (definition == null) {
+            return;
+        }
+        String base = armorBase(definition.getMaterial());
+        Material helmet = Material.matchMaterial(base + "_HELMET");
+        Material chestplate = Material.matchMaterial(base + "_CHESTPLATE");
+        Material leggings = Material.matchMaterial(base + "_LEGGINGS");
+        Material boots = Material.matchMaterial(base + "_BOOTS");
+        if (helmet == null || chestplate == null || leggings == null || boots == null) {
+            return;
+        }
+        if ("LEATHER".equals(base)) {
+            org.bukkit.Color color = team.dyeColor().getColor();
+            player.getInventory().setHelmet(colorLeatherArmor(helmet, color));
+            player.getInventory().setChestplate(colorLeatherArmor(chestplate, color));
+            player.getInventory().setLeggings(colorLeatherArmor(leggings, color));
+            player.getInventory().setBoots(colorLeatherArmor(boots, color));
+            return;
+        }
+        player.getInventory().setHelmet(new ItemStack(helmet));
+        player.getInventory().setChestplate(new ItemStack(chestplate));
+        player.getInventory().setLeggings(new ItemStack(leggings));
+        player.getInventory().setBoots(new ItemStack(boots));
+    }
+
+    private String armorBase(Material material) {
+        String name = material.name();
+        if (name.endsWith("_HELMET")) {
+            return name.substring(0, name.length() - "_HELMET".length());
+        }
+        if (name.endsWith("_CHESTPLATE")) {
+            return name.substring(0, name.length() - "_CHESTPLATE".length());
+        }
+        if (name.endsWith("_LEGGINGS")) {
+            return name.substring(0, name.length() - "_LEGGINGS".length());
+        }
+        if (name.endsWith("_BOOTS")) {
+            return name.substring(0, name.length() - "_BOOTS".length());
+        }
+        return name;
+    }
+
+    private void giveShears(Player player, TeamColor team) {
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return;
+        }
+        if (player.getInventory().contains(Material.SHEARS)) {
+            return;
+        }
+        ShopItemDefinition definition = config.getFirstByBehavior(ShopItemBehavior.SHEARS);
+        if (definition != null) {
+            giveItem(player, definition.createPurchaseItem(team));
+        } else {
+            giveItem(player, new ItemStack(Material.SHEARS));
+        }
+    }
+
+    private void downgradeTools(UUID playerId) {
+        downgradeTier(pickaxeTiers, playerId);
+        downgradeTier(axeTiers, playerId);
+    }
+
+    private void downgradeTier(Map<UUID, Integer> map, UUID playerId) {
+        int tier = map.getOrDefault(playerId, 0);
+        if (tier > 1) {
+            map.put(playerId, tier - 1);
+        }
+    }
+
+    private boolean hasResources(Player player, ShopCost cost) {
+        if (cost == null || !cost.isValid()) {
+            return true;
+        }
+        int remaining = cost.amount();
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item == null || item.getType() != cost.material()) {
+                continue;
+            }
+            remaining -= item.getAmount();
+            if (remaining <= 0) {
+                return true;
+            }
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && offhand.getType() == cost.material()) {
+            remaining -= offhand.getAmount();
+        }
+        return remaining <= 0;
+    }
+
+    private void removeResources(Player player, ShopCost cost) {
+        if (cost == null || !cost.isValid()) {
+            return;
+        }
+        int remaining = cost.amount();
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (item == null || item.getType() != cost.material()) {
+                continue;
+            }
+            int amount = item.getAmount();
+            if (amount <= remaining) {
+                remaining -= amount;
+                contents[i] = null;
+            } else {
+                item.setAmount(amount - remaining);
+                remaining = 0;
+            }
+            if (remaining <= 0) {
+                break;
+            }
+        }
+        player.getInventory().setStorageContents(contents);
+        if (remaining > 0) {
+            ItemStack offhand = player.getInventory().getItemInOffHand();
+            if (offhand != null && offhand.getType() == cost.material()) {
+                int amount = offhand.getAmount();
+                if (amount <= remaining) {
+                    player.getInventory().setItemInOffHand(null);
+                } else {
+                    offhand.setAmount(amount - remaining);
+                }
+            }
+        }
+    }
+
+    private void giveItem(Player player, ItemStack item) {
+        Map<Integer, ItemStack> leftovers = player.getInventory().addItem(item);
+        for (ItemStack leftover : leftovers.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
+    }
+
+    private void removeSwords(Player player) {
+        removeItems(player, SWORD_MATERIALS);
+    }
+
+    private void removeItems(Player player, Set<Material> materials) {
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (item != null && materials.contains(item.getType())) {
+                contents[i] = null;
+            }
+        }
+        player.getInventory().setStorageContents(contents);
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && materials.contains(offhand.getType())) {
+            player.getInventory().setItemInOffHand(null);
+        }
+    }
+
     public void handleWorldChange(Player player) {
         updateSidebarForPlayer(player);
     }
@@ -835,6 +1167,7 @@ public class GameSession {
             }
             player.getInventory().clear();
             giveStarterKit(player, team);
+            applyPermanentItems(player, team);
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
@@ -876,6 +1209,7 @@ public class GameSession {
         player.setAllowFlight(false);
         player.setFlying(false);
         grantRespawnProtection(player);
+        applyPermanentItems(player, team);
         updateSidebarForPlayer(player);
     }
 
@@ -1155,6 +1489,50 @@ public class GameSession {
                 teamsInMatch.add(team);
             }
         }
+    }
+
+    private void spawnShops() {
+        despawnShops();
+        World world = arena.getWorld();
+        if (world == null) {
+            return;
+        }
+        for (TeamColor team : teamsInMatch) {
+            ShopLocation main = arena.getShop(team, ShopType.ITEM);
+            if (main != null) {
+                spawnShopNpc(world, main, ShopType.ITEM);
+            }
+            ShopLocation upgrades = arena.getShop(team, ShopType.UPGRADES);
+            if (upgrades != null) {
+                spawnShopNpc(world, upgrades, ShopType.UPGRADES);
+            }
+        }
+    }
+
+    private void despawnShops() {
+        for (UUID id : shopNpcIds) {
+            org.bukkit.entity.Entity entity = Bukkit.getEntity(id);
+            if (entity != null) {
+                entity.remove();
+            }
+        }
+        shopNpcIds.clear();
+    }
+
+    private void spawnShopNpc(World world, ShopLocation location, ShopType type) {
+        Location spawn = location.toLocation(world);
+        Villager villager = world.spawn(spawn, Villager.class, entity -> {
+            entity.setAI(false);
+            entity.setInvulnerable(true);
+            entity.setCollidable(false);
+            entity.setSilent(true);
+            entity.setRemoveWhenFarAway(false);
+            entity.setPersistent(true);
+            entity.customName(Component.text(type.displayName(), NamedTextColor.YELLOW));
+            entity.setCustomNameVisible(true);
+            entity.addScoreboardTag(type == ShopType.ITEM ? ITEM_SHOP_TAG : UPGRADES_SHOP_TAG);
+        });
+        shopNpcIds.add(villager.getUniqueId());
     }
 
     private boolean isWithinRadius(BlockPoint a, BlockPoint b, int radius) {

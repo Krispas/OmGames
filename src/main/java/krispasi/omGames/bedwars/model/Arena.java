@@ -21,6 +21,8 @@ public class Arena {
     private final Map<TeamColor, BedLocation> beds;
     private final List<GeneratorInfo> generators;
     private final Map<TeamColor, BlockPoint> spawns;
+    private final Map<TeamColor, ShopLocation> mainShops;
+    private final Map<TeamColor, ShopLocation> upgradeShops;
 
     public Arena(String id,
                  String worldName,
@@ -30,7 +32,9 @@ public class Arena {
                  int advancedGeneratorRadius,
                  Map<TeamColor, BedLocation> beds,
                  List<GeneratorInfo> generators,
-                 Map<TeamColor, BlockPoint> spawns) {
+                 Map<TeamColor, BlockPoint> spawns,
+                 Map<TeamColor, ShopLocation> mainShops,
+                 Map<TeamColor, ShopLocation> upgradeShops) {
         this.id = Objects.requireNonNull(id, "id");
         this.worldName = Objects.requireNonNull(worldName, "worldName");
         this.lobbyHeight = lobbyHeight;
@@ -40,6 +44,8 @@ public class Arena {
         this.beds = Collections.unmodifiableMap(new EnumMap<>(beds));
         this.generators = List.copyOf(generators);
         this.spawns = Collections.unmodifiableMap(new EnumMap<>(spawns));
+        this.mainShops = Collections.unmodifiableMap(new EnumMap<>(mainShops));
+        this.upgradeShops = Collections.unmodifiableMap(new EnumMap<>(upgradeShops));
     }
 
     public String getId() {
@@ -76,6 +82,21 @@ public class Arena {
 
     public Map<TeamColor, BlockPoint> getSpawns() {
         return spawns;
+    }
+
+    public Map<TeamColor, ShopLocation> getMainShops() {
+        return mainShops;
+    }
+
+    public Map<TeamColor, ShopLocation> getUpgradeShops() {
+        return upgradeShops;
+    }
+
+    public ShopLocation getShop(TeamColor team, ShopType type) {
+        if (type == ShopType.UPGRADES) {
+            return upgradeShops.get(team);
+        }
+        return mainShops.get(team);
     }
 
     public World getWorld() {

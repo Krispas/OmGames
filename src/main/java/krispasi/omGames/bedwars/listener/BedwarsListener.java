@@ -3,15 +3,19 @@ package krispasi.omGames.bedwars.listener;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.model.BlockPoint;
+import krispasi.omGames.bedwars.model.ShopType;
 import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.gui.MapSelectMenu;
+import krispasi.omGames.bedwars.gui.ShopMenu;
 import krispasi.omGames.bedwars.gui.TeamAssignMenu;
+import krispasi.omGames.bedwars.gui.UpgradeShopMenu;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -26,6 +30,7 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -66,6 +71,14 @@ public class BedwarsListener implements Listener {
             if (topInventory.getHolder() instanceof TeamAssignMenu menu) {
                 menu.handleClick(event);
             }
+            if (topInventory.getHolder() instanceof ShopMenu menu) {
+                menu.handleClick(event);
+                return;
+            }
+            if (topInventory.getHolder() instanceof UpgradeShopMenu) {
+                event.setCancelled(true);
+                return;
+            }
 
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null || !session.isActive()) {
@@ -92,7 +105,9 @@ public class BedwarsListener implements Listener {
         safeHandle("onInventoryDrag", () -> {
             Inventory topInventory = event.getView().getTopInventory();
             if (topInventory.getHolder() instanceof MapSelectMenu
-                    || topInventory.getHolder() instanceof TeamAssignMenu) {
+                    || topInventory.getHolder() instanceof TeamAssignMenu
+                    || topInventory.getHolder() instanceof ShopMenu
+                    || topInventory.getHolder() instanceof UpgradeShopMenu) {
                 event.setCancelled(true);
                 return;
             }
@@ -158,6 +173,32 @@ public class BedwarsListener implements Listener {
                 return;
             }
             session.openFakeEnderChest(player);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
+        safeHandle("onPlayerInteractEntity", () -> {
+            if (!(event.getRightClicked() instanceof Villager villager)) {
+                return;
+            }
+            if (!villager.getScoreboardTags().contains(GameSession.ITEM_SHOP_TAG)
+                    && !villager.getScoreboardTags().contains(GameSession.UPGRADES_SHOP_TAG)) {
+                return;
+            }
+            Player player = event.getPlayer();
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isActive()) {
+                return;
+            }
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            event.setCancelled(true);
+            ShopType type = villager.getScoreboardTags().contains(GameSession.UPGRADES_SHOP_TAG)
+                    ? ShopType.UPGRADES
+                    : ShopType.ITEM;
+            session.openShop(player, type);
         });
     }
 

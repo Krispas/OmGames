@@ -12,6 +12,7 @@ import java.util.UUID;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.generator.GeneratorType;
 import krispasi.omGames.bedwars.model.BlockPoint;
+import krispasi.omGames.bedwars.model.ShopType;
 import krispasi.omGames.bedwars.model.TeamColor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -253,8 +254,7 @@ public class BedwarsSetupManager {
     private void setShop(ConfigurationSection arena, TeamColor team, ShopType shopType, Location location) {
         ConfigurationSection shops = getOrCreateSection(arena, KEY_SHOPS);
         ConfigurationSection teamSection = getOrCreateSection(shops, team.key());
-        String key = shopType == ShopType.MAIN ? "main" : "upgrades";
-        teamSection.set(key, formatPointWithYaw(location));
+        teamSection.set(shopType.configKey(), formatPointWithYaw(location));
     }
 
     private YamlConfiguration loadConfig() {
@@ -423,11 +423,6 @@ public class BedwarsSetupManager {
         SHOP
     }
 
-    private enum ShopType {
-        MAIN,
-        UPGRADES
-    }
-
     private record SetupTarget(SetupKind kind, TeamColor team, GeneratorType generatorType, Integer generatorIndex,
                                ShopType shopType, String label) {
         static Optional<SetupTarget> parse(String raw) {
@@ -509,11 +504,7 @@ public class BedwarsSetupManager {
         }
 
         private static ShopType parseShopType(String value) {
-            return switch (value) {
-                case "main" -> ShopType.MAIN;
-                case "upgrades" -> ShopType.UPGRADES;
-                default -> null;
-            };
+            return ShopType.fromKey(value);
         }
     }
 
