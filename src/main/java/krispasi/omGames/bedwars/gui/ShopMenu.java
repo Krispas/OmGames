@@ -82,7 +82,13 @@ public class ShopMenu implements InventoryHolder {
         }
         ShopItemDefinition item = itemSlots.get(event.getRawSlot());
         if (item != null) {
-            session.handleShopPurchase(player, item);
+            boolean purchased = session.handleShopPurchase(player, item);
+            if (purchased && categoryType == ShopCategoryType.TOOLS) {
+                ShopItemBehavior behavior = item.getBehavior();
+                if (behavior == ShopItemBehavior.PICKAXE || behavior == ShopItemBehavior.AXE) {
+                    new ShopMenu(session, config, categoryType, player).open(player);
+                }
+            }
         }
     }
 

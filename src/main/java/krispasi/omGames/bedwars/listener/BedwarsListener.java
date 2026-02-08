@@ -71,6 +71,19 @@ public class BedwarsListener implements Listener {
             Material.DIAMOND,
             Material.EMERALD
     );
+    private static final EnumSet<Material> TOOL_MATERIALS = EnumSet.of(
+            Material.WOODEN_PICKAXE,
+            Material.STONE_PICKAXE,
+            Material.IRON_PICKAXE,
+            Material.GOLDEN_PICKAXE,
+            Material.DIAMOND_PICKAXE,
+            Material.WOODEN_AXE,
+            Material.STONE_AXE,
+            Material.IRON_AXE,
+            Material.GOLDEN_AXE,
+            Material.DIAMOND_AXE,
+            Material.SHEARS
+    );
 
     public BedwarsListener(BedwarsManager bedwarsManager) {
         this.bedwarsManager = bedwarsManager;
@@ -198,11 +211,11 @@ public class BedwarsListener implements Listener {
             if (!isUseAction(event.getAction())) {
                 return;
             }
-            ItemStack item = event.getItem();
+            Player player = event.getPlayer();
+            ItemStack item = resolveInteractItem(event, player);
             if (item == null) {
                 return;
             }
-            Player player = event.getPlayer();
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null || !session.isRunning()) {
                 return;
@@ -475,14 +488,22 @@ public class BedwarsListener implements Listener {
     public void onPlayerDropItem(PlayerDropItemEvent event) {
         safeHandle("onPlayerDropItem", () -> {
             GameSession session = bedwarsManager.getActiveSession();
-            if (session == null || !session.isStarting()) {
+            if (session == null || !session.isActive()) {
                 return;
             }
             Player player = event.getPlayer();
             if (!session.isParticipant(player.getUniqueId()) || !session.isInArenaWorld(player.getWorld())) {
                 return;
             }
-            event.setCancelled(true);
+            if (session.isStarting()) {
+                event.setCancelled(true);
+                return;
+            }
+            ItemStack dropped = event.getItemDrop().getItemStack();
+            if (dropped != null && TOOL_MATERIALS.contains(dropped.getType())) {
+                event.setCancelled(true);
+                player.sendMessage(Component.text("You cannot drop tools in BedWars.", NamedTextColor.RED));
+            }
         });
     }
 
@@ -725,6 +746,20 @@ public class BedwarsListener implements Listener {
             return usedId.equals(stackId);
         }
         return stackId == null;
+    }
+
+    private ItemStack resolveInteractItem(PlayerInteractEvent event, Player player) {
+        ItemStack item = event.getItem();
+        if (item != null && item.getType() != Material.AIR) {
+            return item;
+        }
+        EquipmentSlot hand = event.getHand();
+        if (hand == EquipmentSlot.OFF_HAND) {
+            ItemStack offhand = player.getInventory().getItemInOffHand();
+            return offhand != null && offhand.getType() != Material.AIR ? offhand : null;
+        }
+        ItemStack main = player.getInventory().getItemInMainHand();
+        return main != null && main.getType() != Material.AIR ? main : null;
     }
 
     private void refreshInvisibility(Player player, GameSession session) {

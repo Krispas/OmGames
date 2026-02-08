@@ -129,7 +129,7 @@ public class GameSession {
     private final Set<TeamColor> teamsInMatch = EnumSet.noneOf(TeamColor.class);
     private final Set<UUID> shopNpcIds = new HashSet<>();
     private final Map<TeamColor, TeamUpgradeState> teamUpgrades = new EnumMap<>(TeamColor.class);
-    private final Map<TeamColor, BlockPoint> baseGeneratorLocations = new EnumMap<>(TeamColor.class);
+    private final Map<TeamColor, BlockPoint> baseCenters = new EnumMap<>(TeamColor.class);
     private final Map<TeamColor, Set<UUID>> baseOccupants = new EnumMap<>(TeamColor.class);
     private final Map<UUID, Integer> armorTiers = new HashMap<>();
     private final Map<UUID, Integer> pickaxeTiers = new HashMap<>();
@@ -295,21 +295,22 @@ public class GameSession {
         new ShopMenu(this, config, ShopCategoryType.QUICK_BUY, player).open(player);
     }
 
-    public void handleShopPurchase(Player player, ShopItemDefinition item) {
+    public boolean handleShopPurchase(Player player, ShopItemDefinition item) {
         if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
-            return;
+            return false;
         }
         ShopCost cost = item.getCost();
         if (cost == null || !cost.isValid() || !hasResources(player, cost)) {
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-            return;
+            return false;
         }
         if (!applyPurchase(player, item)) {
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-            return;
+            return false;
         }
         removeResources(player, cost);
         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
+        return true;
     }
 
     public boolean handleUpgradePurchase(Player player, TeamUpgradeType type) {
@@ -432,7 +433,7 @@ public class GameSession {
         prepareWorld();
         updateTeamsInMatch();
         initializeTeamUpgrades();
-        initializeBaseGenerators();
+        initializeBaseCenters();
         initializeBeds();
         applyBedLayout();
         spawnShops();
@@ -702,6 +703,9 @@ public class GameSession {
             grantRespawnProtection(player);
             cancelRespawnCountdown(player.getUniqueId());
             respawnTasks.remove(player.getUniqueId());
+            plugin.getServer().getScheduler().runTaskLater(plugin,
+                    () -> applyPermanentItems(player, team),
+                    1L);
         }), RESPAWN_DELAY_SECONDS * 20L);
         respawnTasks.put(player.getUniqueId(), task);
         showTitle(player, Component.text("Respawning in " + RESPAWN_DELAY_SECONDS, NamedTextColor.YELLOW), Component.empty());
@@ -1008,7 +1012,7 @@ public class GameSession {
         teamsInMatch.clear();
         shopNpcIds.clear();
         teamUpgrades.clear();
-        baseGeneratorLocations.clear();
+        baseCenters.clear();
         baseOccupants.clear();
         armorTiers.clear();
         pickaxeTiers.clear();
@@ -1098,11 +1102,7 @@ public class GameSession {
     private void giveStarterKit(Player player, TeamColor team) {
         ItemStack sword = new ItemStack(Material.WOODEN_SWORD);
         player.getInventory().addItem(sword);
-        org.bukkit.Color color = team.dyeColor().getColor();
-        player.getInventory().setHelmet(colorLeatherArmor(Material.LEATHER_HELMET, color));
-        player.getInventory().setChestplate(colorLeatherArmor(Material.LEATHER_CHESTPLATE, color));
-        player.getInventory().setLeggings(colorLeatherArmor(Material.LEATHER_LEGGINGS, color));
-        player.getInventory().setBoots(colorLeatherArmor(Material.LEATHER_BOOTS, color));
+        equipBaseArmor(player, team);
     }
 
     private ItemStack colorLeatherArmor(Material material, org.bukkit.Color color) {
@@ -1120,6 +1120,7 @@ public class GameSession {
         }
         UUID playerId = player.getUniqueId();
         int armorTier = armorTiers.getOrDefault(playerId, 0);
+        equipBaseArmor(player, team);
         if (armorTier > 0) {
             equipArmor(player, team, config, armorTier);
         }
@@ -1139,6 +1140,17 @@ public class GameSession {
             giveShears(player, team);
         }
         applyTeamUpgrades(player, team);
+    }
+
+    private void equipBaseArmor(Player player, TeamColor team) {
+        if (team == null) {
+            return;
+        }
+        org.bukkit.Color color = team.dyeColor().getColor();
+        player.getInventory().setHelmet(colorLeatherArmor(Material.LEATHER_HELMET, color));
+        player.getInventory().setChestplate(colorLeatherArmor(Material.LEATHER_CHESTPLATE, color));
+        player.getInventory().setLeggings(colorLeatherArmor(Material.LEATHER_LEGGINGS, color));
+        player.getInventory().setBoots(colorLeatherArmor(Material.LEATHER_BOOTS, color));
     }
 
     private boolean applyTierUpgrade(Player player,
@@ -1709,9 +1721,17 @@ public class GameSession {
         }
     }
 
-    private void initializeBaseGenerators() {
-        baseGeneratorLocations.clear();
+    private void initializeBaseCenters() {
+        baseCenters.clear();
         baseOccupants.clear();
+        Map<TeamColor, BlockPoint> spawns = arena.getSpawns();
+        for (TeamColor team : teamsInMatch) {
+            BlockPoint spawn = spawns.get(team);
+            if (spawn != null) {
+                baseCenters.put(team, spawn);
+                baseOccupants.put(team, new HashSet<>());
+            }
+        }
         for (GeneratorInfo generator : arena.getGenerators()) {
             if (generator.type() != GeneratorType.BASE || generator.team() == null) {
                 continue;
@@ -1719,7 +1739,10 @@ public class GameSession {
             if (!teamsInMatch.contains(generator.team())) {
                 continue;
             }
-            baseGeneratorLocations.put(generator.team(), generator.location());
+            if (baseCenters.containsKey(generator.team())) {
+                continue;
+            }
+            baseCenters.put(generator.team(), generator.location());
             baseOccupants.put(generator.team(), new HashSet<>());
         }
     }
@@ -1786,7 +1809,7 @@ public class GameSession {
             if (getBedState(team) != BedState.ALIVE) {
                 continue;
             }
-            BlockPoint base = baseGeneratorLocations.get(team);
+            BlockPoint base = baseCenters.get(team);
             if (base == null) {
                 continue;
             }
@@ -1831,7 +1854,7 @@ public class GameSession {
             if (upgrades == null) {
                 continue;
             }
-            BlockPoint base = baseGeneratorLocations.get(team);
+            BlockPoint base = baseCenters.get(team);
             if (base == null) {
                 continue;
             }

@@ -48,6 +48,7 @@ public class BedwarsManager {
 
     public void loadShopConfig() {
         File configFile = new File(plugin.getDataFolder(), "shop.yml");
+        migrateShopConfig(configFile);
         ShopConfigLoader loader = new ShopConfigLoader(configFile, plugin.getLogger());
         shopConfig = loader.load();
         plugin.getLogger().info("Loaded BedWars shop config.");
@@ -204,5 +205,37 @@ public class BedwarsManager {
             meta.setPower(1);
             firework.setFireworkMeta(meta);
         });
+    }
+
+    private void migrateShopConfig(File configFile) {
+        if (!configFile.exists()) {
+            return;
+        }
+        org.bukkit.configuration.file.YamlConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
+        org.bukkit.configuration.ConfigurationSection item =
+                config.getConfigurationSection("shop.items.hardened_clay");
+        if (item == null) {
+            return;
+        }
+        boolean changed = false;
+        String material = item.getString("material");
+        if (material == null || material.equalsIgnoreCase("TERRACOTTA")) {
+            item.set("material", "SMOOTH_BASALT");
+            changed = true;
+        }
+        String displayName = item.getString("display-name");
+        if (displayName == null || displayName.equalsIgnoreCase("Hardened Clay")) {
+            item.set("display-name", "Smooth Basalt");
+            changed = true;
+        }
+        if (!changed) {
+            return;
+        }
+        try {
+            config.save(configFile);
+        } catch (java.io.IOException ex) {
+            plugin.getLogger().warning("Failed to update shop.yml: " + ex.getMessage());
+        }
     }
 }
