@@ -56,28 +56,61 @@ public class ShopConfigLoader {
             if (section == null) {
                 continue;
             }
-            ShopItemDefinition item = parseItem(key, section);
-            if (item != null) {
-                items.put(key, item);
+            if (isItemSection(section)) {
+                addItem(items, key, section, null);
+                continue;
+            }
+            String categoryKey = key;
+            for (String nestedKey : section.getKeys(false)) {
+                ConfigurationSection nestedSection = section.getConfigurationSection(nestedKey);
+                if (nestedSection == null || !isItemSection(nestedSection)) {
+                    continue;
+                }
+                addItem(items, nestedKey, nestedSection, categoryKey);
             }
         }
         return items;
     }
 
-    private ShopItemDefinition parseItem(String id, ConfigurationSection section) {
+    private boolean isItemSection(ConfigurationSection section) {
+        return section.isSet("material");
+    }
+
+    private void addItem(Map<String, ShopItemDefinition> items,
+                         String id,
+                         ConfigurationSection section,
+                         String categoryKey) {
+        ShopItemDefinition item = parseItem(id, section, categoryKey);
+        if (item == null) {
+            return;
+        }
+        if (items.containsKey(item.getId())) {
+            logger.warning("Duplicate shop item id: " + item.getId());
+            return;
+        }
+        items.put(item.getId(), item);
+    }
+
+    private ShopItemDefinition parseItem(String id, ConfigurationSection section, String categoryKey) {
         String materialName = section.getString("material");
-        Material material = materialName != null ? Material.matchMaterial(materialName) : null;
+        Material material = parseMaterial(materialName);
         if (material == null) {
             logger.warning("Unknown material for shop item " + id + ": " + materialName);
             return null;
         }
         int amount = Math.max(1, section.getInt("amount", 1));
         ShopCost cost = parseCost(section.getConfigurationSection("cost"));
-        ShopItemBehavior behavior = parseBehavior(section.getString("behavior"));
         boolean teamColor = section.getBoolean("team-color", false);
         int tier = section.getInt("tier", 0);
         Map<Enchantment, Integer> enchants = parseEnchants(section.getConfigurationSection("enchants"));
         List<PotionEffect> potionEffects = parsePotionEffects(section.getStringList("potion-effects"));
+        ShopItemBehavior behavior = parseBehavior(section.getString("behavior"));
+        if (behavior == null) {
+            behavior = inferBehavior(categoryKey, material, potionEffects);
+        }
+        if (behavior == null) {
+            behavior = ShopItemBehavior.UTILITY;
+        }
         String displayName = section.getString("display-name");
         List<String> lore = section.getStringList("lore");
         String customItemId = section.getString("custom-item");
@@ -99,22 +132,83 @@ public class ShopConfigLoader {
             return new ShopCost(null, 0);
         }
         String materialName = section.getString("material");
-        Material material = materialName != null ? Material.matchMaterial(materialName) : null;
+        Material material = parseMaterial(materialName);
         int amount = section.getInt("amount", 0);
         return new ShopCost(material, amount);
     }
 
+    private Material parseMaterial(String materialName) {
+        if (materialName == null || materialName.isBlank()) {
+            return null;
+        }
+        String normalized = materialName.trim().toUpperCase(Locale.ROOT);
+        if ("GOLD".equals(normalized)) {
+            normalized = "GOLD_INGOT";
+        } else if ("IRON".equals(normalized)) {
+            normalized = "IRON_INGOT";
+        }
+        return Material.matchMaterial(normalized);
+    }
+
     private ShopItemBehavior parseBehavior(String value) {
-        if (value == null) {
-            return ShopItemBehavior.UTILITY;
+        if (value == null || value.isBlank()) {
+            return null;
         }
         String normalized = value.trim().toUpperCase(Locale.ROOT);
         try {
             return ShopItemBehavior.valueOf(normalized);
         } catch (IllegalArgumentException ex) {
             logger.warning("Unknown shop item behavior: " + value);
-            return ShopItemBehavior.UTILITY;
+            return null;
         }
+    }
+
+    private ShopItemBehavior inferBehavior(String categoryKey,
+                                           Material material,
+                                           List<PotionEffect> potionEffects) {
+        if (material == null) {
+            return null;
+        }
+        if (potionEffects != null && !potionEffects.isEmpty()) {
+            return ShopItemBehavior.POTION;
+        }
+        if (material == Material.POTION
+                || material == Material.SPLASH_POTION
+                || material == Material.LINGERING_POTION) {
+            return ShopItemBehavior.POTION;
+        }
+        if (material == Material.SHEARS) {
+            return ShopItemBehavior.SHEARS;
+        }
+        String name = material.name();
+        if (name.endsWith("_PICKAXE")) {
+            return ShopItemBehavior.PICKAXE;
+        }
+        if (name.endsWith("_AXE")) {
+            return ShopItemBehavior.AXE;
+        }
+        if (name.endsWith("_HELMET")
+                || name.endsWith("_CHESTPLATE")
+                || name.endsWith("_LEGGINGS")
+                || name.endsWith("_BOOTS")) {
+            return ShopItemBehavior.ARMOR;
+        }
+        if ("BOW".equals(name) || "CROSSBOW".equals(name)) {
+            return ShopItemBehavior.BOW;
+        }
+        if (categoryKey == null) {
+            return null;
+        }
+        String normalized = categoryKey.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "blocks" -> ShopItemBehavior.BLOCK;
+            case "melee" -> ShopItemBehavior.SWORD;
+            case "ranged" -> ShopItemBehavior.UTILITY;
+            case "armor" -> ShopItemBehavior.ARMOR;
+            case "tools" -> ShopItemBehavior.UTILITY;
+            case "utility", "miscellaneous" -> ShopItemBehavior.UTILITY;
+            default -> null;
+        };
     }
 
     private Map<Enchantment, Integer> parseEnchants(ConfigurationSection section) {

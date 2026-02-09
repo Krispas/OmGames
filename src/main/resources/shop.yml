@@ -33,6 +33,8 @@ shop:
         iron_sword: 11
         diamond_sword: 12
         knockback_stick: 13
+        mace: 14
+        netherite_spear: 15
     ranged:
       title: "Ranged"
       icon: BOW
@@ -78,313 +80,307 @@ shop:
         speed_potion: 21
         magic_milk: 22
         bridge_egg: 23
+        wind_charge: 24
+    miscellaneous:
+      title: "Miscellaneous"
+      icon: BREWING_STAND
+      size: 54
+      entries: {}
   items:
-    wool:
-      material: WHITE_WOOL
-      amount: 16
-      cost:
-        material: IRON_INGOT
-        amount: 4
-      behavior: BLOCK
-      team-color: true
-      display-name: "Wool"
-    hardened_clay:
-      material: SMOOTH_BASALT
-      amount: 16
-      cost:
-        material: IRON_INGOT
+    blocks:
+      wool:
+        material: WHITE_WOOL
+        amount: 16
+        cost:
+          material: IRON
+          amount: 4
+        team-color: true
+        display-name: "Wool"
+      hardened_clay:
+        material: SMOOTH_BASALT
+        amount: 16
+        cost:
+          material: IRON
+          amount: 12
+        display-name: "Smooth Basalt"
+      end_stone:
+        material: END_STONE
         amount: 12
-      behavior: BLOCK
-      display-name: "Smooth Basalt"
-    end_stone:
-      material: END_STONE
-      amount: 12
-      cost:
-        material: IRON_INGOT
-        amount: 24
-      behavior: BLOCK
-      display-name: "End Stone"
-    wood_planks:
-      material: OAK_PLANKS
-      amount: 16
-      cost:
-        material: GOLD_INGOT
+        cost:
+          material: IRON
+          amount: 24
+        display-name: "End Stone"
+      wood_planks:
+        material: OAK_PLANKS
+        amount: 16
+        cost:
+          material: GOLD
+          amount: 4
+        display-name: "Wood Planks"
+      blast_glass:
+        material: GLASS
         amount: 4
-      behavior: BLOCK
-      display-name: "Wood Planks"
-    blast_glass:
-      material: GLASS
-      amount: 4
-      cost:
-        material: IRON_INGOT
-        amount: 12
-      behavior: BLOCK
-      display-name: "Blast-Proof Glass"
-
-    stone_sword:
-      material: STONE_SWORD
-      amount: 1
-      cost:
-        material: IRON_INGOT
-        amount: 10
-      behavior: SWORD
-      display-name: "Stone Sword"
-    iron_sword:
-      material: IRON_SWORD
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 7
-      behavior: SWORD
-      display-name: "Iron Sword"
-    diamond_sword:
-      material: DIAMOND_SWORD
-      amount: 1
-      cost:
-        material: EMERALD
-        amount: 4
-      behavior: SWORD
-      display-name: "Diamond Sword"
-    knockback_stick:
-      material: STICK
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 5
-      behavior: SWORD
-      display-name: "Knockback Stick"
-      enchants:
-        KNOCKBACK: 1
-
-    bow:
-      material: BOW
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 12
-      behavior: BOW
-      tier: 1
-      display-name: "Bow"
-    bow_power:
-      material: BOW
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 6
-      behavior: BOW
-      tier: 2
-      display-name: "Bow (Power I)"
-      enchants:
-        POWER: 1
-    bow_power_punch:
-      material: BOW
-      amount: 1
-      cost:
-        material: EMERALD
-        amount: 6
-      behavior: BOW
-      tier: 3
-      display-name: "Bow (Power I, Punch I)"
-      enchants:
-        POWER: 1
-        PUNCH: 1
-    arrows:
-      material: ARROW
-      amount: 8
-      cost:
-        material: GOLD_INGOT
-        amount: 2
-      behavior: UTILITY
-      display-name: "Arrows"
-
-    chainmail_armor:
-      material: CHAINMAIL_CHESTPLATE
-      amount: 1
-      cost:
-        material: IRON_INGOT
-        amount: 40
-      behavior: ARMOR
-      tier: 1
-      display-name: "Chainmail Armor"
-    iron_armor:
-      material: IRON_CHESTPLATE
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 12
-      behavior: ARMOR
-      tier: 2
-      display-name: "Iron Armor"
-    diamond_armor:
-      material: DIAMOND_CHESTPLATE
-      amount: 1
-      cost:
-        material: EMERALD
-        amount: 6
-      behavior: ARMOR
-      tier: 3
-      display-name: "Diamond Armor"
-
-    pickaxe_wood:
-      material: WOODEN_PICKAXE
-      amount: 1
-      cost:
-        material: IRON_INGOT
-        amount: 10
-      behavior: PICKAXE
-      tier: 1
-      display-name: "Wooden Pickaxe"
-    pickaxe_iron:
-      material: IRON_PICKAXE
-      amount: 1
-      cost:
-        material: IRON_INGOT
-        amount: 10
-      behavior: PICKAXE
-      tier: 2
-      display-name: "Iron Pickaxe"
-    pickaxe_gold:
-      material: GOLDEN_PICKAXE
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 3
-      behavior: PICKAXE
-      tier: 3
-      display-name: "Gold Pickaxe"
-    pickaxe_diamond:
-      material: DIAMOND_PICKAXE
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 6
-      behavior: PICKAXE
-      tier: 4
-      display-name: "Diamond Pickaxe"
-
-    axe_wood:
-      material: WOODEN_AXE
-      amount: 1
-      cost:
-        material: IRON_INGOT
-        amount: 10
-      behavior: AXE
-      tier: 1
-      display-name: "Wooden Axe"
-    axe_stone:
-      material: STONE_AXE
-      amount: 1
-      cost:
-        material: IRON_INGOT
-        amount: 10
-      behavior: AXE
-      tier: 2
-      display-name: "Stone Axe"
-    axe_iron:
-      material: IRON_AXE
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 3
-      behavior: AXE
-      tier: 3
-      display-name: "Iron Axe"
-    axe_diamond:
-      material: DIAMOND_AXE
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 6
-      behavior: AXE
-      tier: 4
-      display-name: "Diamond Axe"
-
-    shears:
-      material: SHEARS
-      amount: 1
-      cost:
-        material: IRON_INGOT
-        amount: 20
-      behavior: SHEARS
-      display-name: "Shears"
-
-    golden_apple:
-      material: GOLDEN_APPLE
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 3
-      behavior: UTILITY
-      display-name: "Golden Apple"
-    fireball:
-      material: FIRE_CHARGE
-      amount: 1
-      cost:
-        material: IRON_INGOT
-        amount: 40
-      behavior: UTILITY
-      display-name: "Fireball"
-      custom-item: fireball
-    tnt:
-      material: TNT
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 4
-      behavior: UTILITY
-      display-name: "TNT"
-    ender_pearl:
-      material: ENDER_PEARL
-      amount: 1
-      cost:
-        material: EMERALD
-        amount: 4
-      behavior: UTILITY
-      display-name: "Ender Pearl"
-    invis_potion:
-      material: POTION
-      amount: 1
-      cost:
-        material: EMERALD
-        amount: 2
-      behavior: POTION
-      display-name: "Invisibility Potion"
-      potion-effects:
-        - "INVISIBILITY:1:30"
-    jump_potion:
-      material: POTION
-      amount: 1
-      cost:
-        material: EMERALD
+        cost:
+          material: IRON
+          amount: 12
+        display-name: "Blast-Proof Glass"
+    melee:
+      stone_sword:
+        material: STONE_SWORD
         amount: 1
-      behavior: POTION
-      display-name: "Jump Potion"
-      potion-effects:
-        - "JUMP:5:45"
-    speed_potion:
-      material: POTION
-      amount: 1
-      cost:
-        material: EMERALD
+        cost:
+          material: IRON
+          amount: 10
+        display-name: "Stone Sword"
+      iron_sword:
+        material: IRON_SWORD
         amount: 1
-      behavior: POTION
-      display-name: "Speed Potion"
-      potion-effects:
-        - "SPEED:2:45"
-    magic_milk:
-      material: MILK_BUCKET
-      amount: 1
-      cost:
-        material: GOLD_INGOT
-        amount: 4
-      behavior: UTILITY
-      display-name: "Magic Milk"
-    bridge_egg:
-      material: EGG
-      amount: 1
-      cost:
-        material: EMERALD
+        cost:
+          material: GOLD
+          amount: 7
+        display-name: "Iron Sword"
+      diamond_sword:
+        material: DIAMOND_SWORD
         amount: 1
-      behavior: UTILITY
-      display-name: "Bridge Egg"
-      custom-item: bridge_egg
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Diamond Sword"
+      knockback_stick:
+        material: STICK
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 5
+        display-name: "Knockback Stick"
+        enchants:
+          KNOCKBACK: 1
+      mace:
+        material: MACE
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 8
+        display-name: "Mace"
+      netherite_spear:
+        material: NETHERITE_SPEAR
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Netherite Spear"
+    ranged:
+      bow:
+        material: BOW
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 12
+        tier: 1
+        display-name: "Bow"
+      bow_power:
+        material: BOW
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 6
+        tier: 2
+        display-name: "Bow (Power I)"
+        enchants:
+          POWER: 1
+      bow_power_punch:
+        material: BOW
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 6
+        tier: 3
+        display-name: "Bow (Power I, Punch I)"
+        enchants:
+          POWER: 1
+          PUNCH: 1
+      arrows:
+        material: ARROW
+        amount: 8
+        cost:
+          material: GOLD
+          amount: 2
+        display-name: "Arrows"
+    armor:
+      chainmail_armor:
+        material: CHAINMAIL_CHESTPLATE
+        amount: 1
+        cost:
+          material: IRON
+          amount: 40
+        tier: 1
+        display-name: "Chainmail Armor"
+      iron_armor:
+        material: IRON_CHESTPLATE
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 12
+        tier: 2
+        display-name: "Iron Armor"
+      diamond_armor:
+        material: DIAMOND_CHESTPLATE
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 6
+        tier: 3
+        display-name: "Diamond Armor"
+    tools:
+      pickaxe_wood:
+        material: WOODEN_PICKAXE
+        amount: 1
+        cost:
+          material: IRON
+          amount: 10
+        tier: 1
+        display-name: "Wooden Pickaxe"
+      pickaxe_iron:
+        material: IRON_PICKAXE
+        amount: 1
+        cost:
+          material: IRON
+          amount: 10
+        tier: 2
+        display-name: "Iron Pickaxe"
+      pickaxe_gold:
+        material: GOLDEN_PICKAXE
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 3
+        tier: 3
+        display-name: "Gold Pickaxe"
+      pickaxe_diamond:
+        material: DIAMOND_PICKAXE
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 6
+        tier: 4
+        display-name: "Diamond Pickaxe"
+      axe_wood:
+        material: WOODEN_AXE
+        amount: 1
+        cost:
+          material: IRON
+          amount: 10
+        tier: 1
+        display-name: "Wooden Axe"
+      axe_stone:
+        material: STONE_AXE
+        amount: 1
+        cost:
+          material: IRON
+          amount: 10
+        tier: 2
+        display-name: "Stone Axe"
+      axe_iron:
+        material: IRON_AXE
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 3
+        tier: 3
+        display-name: "Iron Axe"
+      axe_diamond:
+        material: DIAMOND_AXE
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 6
+        tier: 4
+        display-name: "Diamond Axe"
+      shears:
+        material: SHEARS
+        amount: 1
+        cost:
+          material: IRON
+          amount: 20
+        display-name: "Shears"
+    utility:
+      golden_apple:
+        material: GOLDEN_APPLE
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 3
+        display-name: "Golden Apple"
+      fireball:
+        material: FIRE_CHARGE
+        amount: 1
+        cost:
+          material: IRON
+          amount: 40
+        display-name: "Fireball"
+        custom-item: fireball
+      tnt:
+        material: TNT
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 4
+        display-name: "TNT"
+      ender_pearl:
+        material: ENDER_PEARL
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Ender Pearl"
+      invis_potion:
+        material: POTION
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 2
+        display-name: "Invisibility Potion"
+        potion-effects:
+          - "INVISIBILITY:1:30"
+      jump_potion:
+        material: POTION
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 1
+        display-name: "Jump Potion"
+        potion-effects:
+          - "JUMP:5:45"
+      speed_potion:
+        material: POTION
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 1
+        display-name: "Speed Potion"
+        potion-effects:
+          - "SPEED:2:45"
+      magic_milk:
+        material: MILK_BUCKET
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 4
+        display-name: "Magic Milk"
+      bridge_egg:
+        material: EGG
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 1
+        display-name: "Bridge Egg"
+        custom-item: bridge_egg
+      wind_charge:
+        material: WIND_CHARGE
+        amount: 3
+        cost:
+          material: GOLD
+          amount: 6
+        display-name: "Wind Charge"
+    miscellaneous: {}
+

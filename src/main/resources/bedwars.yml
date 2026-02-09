@@ -1,14 +1,13 @@
-# BedWars core settings (this file lives in plugins/OmGames/bedwars.yaml)
 arenas:
   bedwars_1:
-    corner_1:
-    corner_2:
-    base-radius: 21
     anti-build:
       base-generator-radius: 14
       advanced-generator-radius: 4
     world: bedwars
+    lobby-height: 120
     center: 951 120 1488
+    corner_1: 787 22 1324
+    corner_2: 1126 100 1624
 
     beds:
       red: 836 51 1451, 837 51 1451
@@ -47,7 +46,6 @@ arenas:
       base_purple: 1083 51 1525
       base_cyan: 1083 51 1451
       base_pink: 989 51 1357
-
     Base_Generators:
       base_gen_red: 815 51 1451
       base_gen_blue: 915 51 1351
@@ -57,29 +55,28 @@ arenas:
       base_gem_purple: 1089 51 1525
       base_gen_cyan: 1089 51 1451
       base_gen_pink: 989 51 1351
-
     Shops:
       red:
-        main:
-        upgrades:
-      blue:
-        main:
-        upgrades:
+        main: 821 51 1442 1.8
+        upgrades: 821 51 1460 -179.8
       lime:
-        main:
-        upgrades:
-      white:
-        main:
-        upgrades:
+        main: 821 51 1516 1.1
+        upgrades: 821 51 1534 -179.4
       black:
-        main:
-        upgrades:
+        main: 906 51 1619 -89.7
+        upgrades: 924 51 1619 90.3
+      white:
+        main: 980 51 1619 -89.6
+        upgrades: 998 51 1619 89.4
       purple:
-        main:
-        upgrades:
+        main: 1083 51 1534 -179.5
+        upgrades: 1083 51 1516 1.4
       cyan:
-        main:
-        upgrades:
+        main: 1083 51 1460 -177.3
+        upgrades: 1083 51 1442 0.7
       pink:
-        main:
-        upgrades:
+        main: 998 51 1357 91.8
+        upgrades: 980 51 1357 -89.0
+      blue:
+        main: 924 51 1357 90.7
+        upgrades: 906 51 1357 -88.7

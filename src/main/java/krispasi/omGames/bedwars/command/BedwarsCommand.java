@@ -29,7 +29,9 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Only players can use this command.", NamedTextColor.RED));
             return true;
         }
-        if (!sender.hasPermission("omgames.bw.start") && !sender.hasPermission("omgames.bw.setup")) {
+        if (!sender.hasPermission("omgames.bw.start")
+                && !sender.hasPermission("omgames.bw.setup")
+                && !sender.hasPermission("omgames.bw.reload")) {
             sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
             return true;
         }
@@ -48,6 +50,21 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             bedwarsManager.stopSession(player);
+            return true;
+        }
+        if (args[0].equalsIgnoreCase("reload")) {
+            if (!sender.hasPermission("omgames.bw.reload")) {
+                sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                return true;
+            }
+            bedwarsManager.loadArenas();
+            bedwarsManager.loadCustomItems();
+            bedwarsManager.loadShopConfig();
+            bedwarsManager.loadQuickBuy();
+            sender.sendMessage(Component.text("BedWars configs reloaded.", NamedTextColor.GREEN));
+            if (bedwarsManager.getActiveSession() != null && bedwarsManager.getActiveSession().isActive()) {
+                sender.sendMessage(Component.text("Running match keeps its current arena state.", NamedTextColor.YELLOW));
+            }
             return true;
         }
         if (args[0].equalsIgnoreCase("setup")) {
@@ -79,7 +96,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw stop | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw stop | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -87,7 +104,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "stop", "setup")
+            return Stream.of("start", "stop", "reload", "setup")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }

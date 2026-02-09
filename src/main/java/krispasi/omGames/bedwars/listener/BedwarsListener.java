@@ -21,8 +21,10 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Egg;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.TNTPrimed;
 import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
@@ -30,6 +32,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -51,7 +54,10 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.event.block.Action;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Projectile;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 import java.util.EnumSet;
@@ -65,11 +71,18 @@ import java.util.EnumMap;
 
 public class BedwarsListener implements Listener {
     private final BedwarsManager bedwarsManager;
+    private static final double TNT_DAMAGE_MULTIPLIER = 0.6;
     private static final EnumSet<Material> RESOURCE_MATERIALS = EnumSet.of(
             Material.IRON_INGOT,
             Material.GOLD_INGOT,
             Material.DIAMOND,
             Material.EMERALD
+    );
+    private static final EnumSet<Material> SWORD_MATERIALS = EnumSet.of(
+            Material.WOODEN_SWORD,
+            Material.STONE_SWORD,
+            Material.IRON_SWORD,
+            Material.DIAMOND_SWORD
     );
     private static final EnumSet<Material> TOOL_MATERIALS = EnumSet.of(
             Material.WOODEN_PICKAXE,
@@ -84,9 +97,11 @@ public class BedwarsListener implements Listener {
             Material.DIAMOND_AXE,
             Material.SHEARS
     );
+    private final NamespacedKey customProjectileKey;
 
     public BedwarsListener(BedwarsManager bedwarsManager) {
         this.bedwarsManager = bedwarsManager;
+        this.customProjectileKey = new NamespacedKey(bedwarsManager.getPlugin(), "bw_custom_projectile");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -178,6 +193,24 @@ public class BedwarsListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onBarrelOpen(InventoryOpenEvent event) {
+        safeHandle("onBarrelOpen", () -> {
+            if (!(event.getPlayer() instanceof Player player)) {
+                return;
+            }
+            if (event.getInventory().getType() != InventoryType.BARREL) {
+                return;
+            }
+            String worldName = player.getWorld().getName();
+            if (!bedwarsManager.isBedwarsWorld(worldName)) {
+                return;
+            }
+            event.setCancelled(true);
+            player.sendMessage(Component.text("Barrels are disabled in BedWars.", NamedTextColor.RED));
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onEnderChestInteract(PlayerInteractEvent event) {
         safeHandle("onEnderChestInteract", () -> {
             if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
@@ -205,7 +238,7 @@ public class BedwarsListener implements Listener {
         });
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(ignoreCancelled = false, priority = EventPriority.HIGHEST)
     public void onPlayerUseCustomItem(PlayerInteractEvent event) {
         safeHandle("onPlayerUseCustomItem", () -> {
             if (!isUseAction(event.getAction())) {
@@ -355,6 +388,18 @@ public class BedwarsListener implements Listener {
                 player.sendMessage(Component.text("You cannot place blocks here.", NamedTextColor.RED));
                 return;
             }
+            if (block.getType() == Material.TNT) {
+                event.setCancelled(true);
+                block.setType(Material.AIR, false);
+                Location spawn = block.getLocation().add(0.5, 0.0, 0.5);
+                block.getWorld().spawn(spawn, TNTPrimed.class, tnt -> {
+                    tnt.setFuseTicks(80);
+                    tnt.setSource(player);
+                });
+                player.getWorld().playSound(spawn, org.bukkit.Sound.ENTITY_TNT_PRIMED, 1.0f, 1.0f);
+                consumeSingleItem(player, event.getHand());
+                return;
+            }
             session.recordPlacedBlock(point);
         });
     }
@@ -420,6 +465,18 @@ public class BedwarsListener implements Listener {
             if (session == null || !session.isInArenaWorld(victim.getWorld())) {
                 return;
             }
+            boolean sameTeamTnt = false;
+            if (event.getDamager() instanceof TNTPrimed tnt
+                    && tnt.getSource() instanceof Player source
+                    && session.isParticipant(source.getUniqueId())
+                    && session.isParticipant(victim.getUniqueId())) {
+                TeamColor sourceTeam = session.getTeam(source.getUniqueId());
+                TeamColor victimTeam = session.getTeam(victim.getUniqueId());
+                if (sourceTeam != null && sourceTeam == victimTeam) {
+                    event.setDamage(0.0);
+                    sameTeamTnt = true;
+                }
+            }
             Player attacker = resolveAttacker(event);
             if (attacker != null
                     && session.isParticipant(attacker.getUniqueId())
@@ -427,14 +484,20 @@ public class BedwarsListener implements Listener {
                     && session.hasRespawnProtection(attacker.getUniqueId())) {
                 session.removeRespawnProtection(attacker.getUniqueId());
             }
+            boolean sameTeamFireball = false;
             if (attacker != null
                     && session.isParticipant(attacker.getUniqueId())
                     && session.isParticipant(victim.getUniqueId())) {
                 TeamColor attackerTeam = session.getTeam(attacker.getUniqueId());
                 TeamColor victimTeam = session.getTeam(victim.getUniqueId());
                 if (attackerTeam != null && attackerTeam == victimTeam) {
-                    event.setCancelled(true);
-                    return;
+                    if (event.getDamager() instanceof Fireball) {
+                        sameTeamFireball = true;
+                        event.setDamage(0.0);
+                    } else {
+                        event.setCancelled(true);
+                        return;
+                    }
                 }
             }
             if (!session.isRunning()) {
@@ -444,6 +507,21 @@ public class BedwarsListener implements Listener {
             if (session.hasRespawnProtection(victim.getUniqueId())) {
                 event.setCancelled(true);
                 return;
+            }
+            if (!sameTeamFireball && event.getDamager() instanceof Fireball fireball) {
+                CustomItemDefinition definition = resolveCustomProjectile(fireball);
+                if (definition != null && definition.getType() == CustomItemType.FIREBALL) {
+                    event.setDamage(Math.max(0.0, definition.getDamage()));
+                }
+            }
+            if (!sameTeamTnt && event.getDamager() instanceof TNTPrimed) {
+                event.setDamage(event.getDamage() * TNT_DAMAGE_MULTIPLIER);
+            }
+            if (event.getDamager() instanceof Fireball fireball) {
+                CustomItemDefinition definition = resolveCustomProjectile(fireball);
+                if (definition != null && definition.getType() == CustomItemType.FIREBALL) {
+                    applyFireballKnockback(victim, fireball, definition);
+                }
             }
             if (!event.isCancelled()
                     && attacker != null
@@ -500,10 +578,82 @@ public class BedwarsListener implements Listener {
                 return;
             }
             ItemStack dropped = event.getItemDrop().getItemStack();
+            if (dropped != null && dropped.getType() == Material.WOODEN_SWORD) {
+                event.setCancelled(true);
+                player.sendMessage(Component.text("You cannot drop your wooden sword.", NamedTextColor.RED));
+                return;
+            }
             if (dropped != null && TOOL_MATERIALS.contains(dropped.getType())) {
                 event.setCancelled(true);
                 player.sendMessage(Component.text("You cannot drop tools in BedWars.", NamedTextColor.RED));
+                return;
             }
+            if (dropped != null && SWORD_MATERIALS.contains(dropped.getType())) {
+                new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        if (!player.isOnline()) {
+                            return;
+                        }
+                        if (!session.isActive() || !session.isParticipant(player.getUniqueId())) {
+                            return;
+                        }
+                        if (!session.isInArenaWorld(player.getWorld())) {
+                            return;
+                        }
+                        if (hasAnySword(player)) {
+                            return;
+                        }
+                        ItemStack wooden = new ItemStack(Material.WOODEN_SWORD);
+                        if (player.getInventory().getItemInMainHand().getType() == Material.AIR) {
+                            player.getInventory().setItemInMainHand(wooden);
+                        } else {
+                            player.getInventory().addItem(wooden);
+                        }
+                        session.applyUpgradesTo(player);
+                        player.updateInventory();
+                    }
+                }.runTask(bedwarsManager.getPlugin());
+            }
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityPickupItem(EntityPickupItemEvent event) {
+        safeHandle("onEntityPickupItem", () -> {
+            if (!(event.getEntity() instanceof Player player)) {
+                return;
+            }
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isActive()) {
+                return;
+            }
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            ItemStack stack = event.getItem().getItemStack();
+            if (stack == null || !SWORD_MATERIALS.contains(stack.getType())) {
+                return;
+            }
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    if (!player.isOnline()) {
+                        return;
+                    }
+                    if (!session.isActive() || !session.isParticipant(player.getUniqueId())) {
+                        return;
+                    }
+                    if (!session.isInArenaWorld(player.getWorld())) {
+                        return;
+                    }
+                    if (hasBetterSword(player)) {
+                        removeWoodenSword(player);
+                    }
+                    session.applyUpgradesTo(player);
+                    player.updateInventory();
+                }
+            }.runTask(bedwarsManager.getPlugin());
         });
     }
 
@@ -662,6 +812,50 @@ public class BedwarsListener implements Listener {
         return config.findByMaterial(item.getType());
     }
 
+    private CustomItemDefinition resolveCustomProjectile(Fireball fireball) {
+        if (fireball == null) {
+            return null;
+        }
+        CustomItemConfig config = bedwarsManager.getCustomItemConfig();
+        if (config == null) {
+            return null;
+        }
+        PersistentDataContainer container = fireball.getPersistentDataContainer();
+        String customId = container.get(customProjectileKey, PersistentDataType.STRING);
+        if (customId != null) {
+            return config.getItem(customId);
+        }
+        return null;
+    }
+
+    private void applyFireballKnockback(Player victim, Fireball fireball, CustomItemDefinition definition) {
+        double strength = definition.getKnockback();
+        if (strength <= 0.0) {
+            return;
+        }
+        Vector direction = victim.getLocation().toVector().subtract(fireball.getLocation().toVector());
+        if (direction.lengthSquared() < 0.01) {
+            direction = victim.getLocation().getDirection();
+        }
+        direction.setY(0);
+        if (direction.lengthSquared() < 0.01) {
+            direction = new Vector(0, 0, 1);
+        } else {
+            direction.normalize();
+        }
+        Vector knockback = direction.multiply(strength).setY(0.35 + strength * 0.15);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!victim.isOnline()) {
+                    return;
+                }
+                Vector current = victim.getVelocity();
+                victim.setVelocity(current.add(knockback));
+            }
+        }.runTask(bedwarsManager.getPlugin());
+    }
+
     private boolean isSameCustomItemInMainHand(Player player, ItemStack usedItem) {
         ItemStack main = player.getInventory().getItemInMainHand();
         return matchesCustomItem(main, usedItem);
@@ -672,6 +866,7 @@ public class BedwarsListener implements Listener {
         fireball.setIsIncendiary(custom.isIncendiary());
         fireball.setYield(custom.getYield());
         fireball.setVelocity(player.getLocation().getDirection().normalize().multiply(custom.getVelocity()));
+        fireball.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
     }
 
     private void launchBridgeEgg(Player player, GameSession session, CustomItemDefinition custom) {
@@ -863,16 +1058,17 @@ public class BedwarsListener implements Listener {
         if (team == null || maxCount <= 0) {
             return 0;
         }
-        Block base = location.getBlock().getRelative(0, -1, 0);
-        if (base.getY() < base.getWorld().getMinHeight()) {
-            return 0;
-        }
         Vector direction = velocity.clone();
         direction.setY(0);
         if (direction.lengthSquared() < 0.001) {
             direction = new Vector(0, 0, 1);
         } else {
             direction.normalize();
+        }
+        Location anchor = location.clone().subtract(direction.clone().multiply(1.2));
+        Block base = anchor.getBlock().getRelative(0, -1, 0);
+        if (base.getY() < base.getWorld().getMinHeight()) {
+            return 0;
         }
         Vector right = new Vector(-direction.getZ(), 0, direction.getX());
         int half = width / 2;
@@ -978,5 +1174,77 @@ public class BedwarsListener implements Listener {
                 player.getWorld().dropItemNaturally(player.getLocation(), new ItemStack(material, amount));
             }
         });
+    }
+
+    private void consumeSingleItem(Player player, EquipmentSlot hand) {
+        EquipmentSlot slot = hand != null ? hand : EquipmentSlot.HAND;
+        ItemStack stack = slot == EquipmentSlot.OFF_HAND
+                ? player.getInventory().getItemInOffHand()
+                : player.getInventory().getItemInMainHand();
+        if (stack == null || stack.getType() == Material.AIR) {
+            return;
+        }
+        int amount = stack.getAmount();
+        if (amount <= 1) {
+            if (slot == EquipmentSlot.OFF_HAND) {
+                player.getInventory().setItemInOffHand(null);
+            } else {
+                player.getInventory().setItemInMainHand(null);
+            }
+        } else {
+            stack.setAmount(amount - 1);
+            if (slot == EquipmentSlot.OFF_HAND) {
+                player.getInventory().setItemInOffHand(stack);
+            } else {
+                player.getInventory().setItemInMainHand(stack);
+            }
+        }
+    }
+
+    private boolean hasAnySword(Player player) {
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item != null && SWORD_MATERIALS.contains(item.getType())) {
+                return true;
+            }
+        }
+        ItemStack main = player.getInventory().getItemInMainHand();
+        if (main != null && SWORD_MATERIALS.contains(main.getType())) {
+            return true;
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        return offhand != null && SWORD_MATERIALS.contains(offhand.getType());
+    }
+
+    private boolean hasBetterSword(Player player) {
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item != null && item.getType() != Material.WOODEN_SWORD && SWORD_MATERIALS.contains(item.getType())) {
+                return true;
+            }
+        }
+        ItemStack main = player.getInventory().getItemInMainHand();
+        if (main != null && main.getType() != Material.WOODEN_SWORD && SWORD_MATERIALS.contains(main.getType())) {
+            return true;
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        return offhand != null && offhand.getType() != Material.WOODEN_SWORD && SWORD_MATERIALS.contains(offhand.getType());
+    }
+
+    private void removeWoodenSword(Player player) {
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        boolean changed = false;
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (item != null && item.getType() == Material.WOODEN_SWORD) {
+                contents[i] = null;
+                changed = true;
+            }
+        }
+        if (changed) {
+            player.getInventory().setStorageContents(contents);
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && offhand.getType() == Material.WOODEN_SWORD) {
+            player.getInventory().setItemInOffHand(null);
+        }
     }
 }

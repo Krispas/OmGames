@@ -10,10 +10,11 @@ public enum ShopCategoryType {
     RANGED("ranged", "Ranged"),
     ARMOR("armor", "Armor"),
     TOOLS("tools", "Tools"),
-    UTILITY("utility", "Utility");
+    UTILITY("utility", "Utility"),
+    MISCELLANEOUS("miscellaneous", "Miscellaneous");
 
     private static final List<ShopCategoryType> ORDERED = List.of(
-            QUICK_BUY, BLOCKS, MELEE, RANGED, ARMOR, TOOLS, UTILITY
+            QUICK_BUY, BLOCKS, MELEE, RANGED, ARMOR, TOOLS, UTILITY, MISCELLANEOUS
     );
 
     private final String key;

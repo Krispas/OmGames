@@ -173,6 +173,17 @@ public class GameSession {
         return state == GameState.STARTING || state == GameState.RUNNING;
     }
 
+    public void applyUpgradesTo(Player player) {
+        if (player == null) {
+            return;
+        }
+        TeamColor team = getTeam(player.getUniqueId());
+        if (team == null) {
+            return;
+        }
+        applyTeamUpgrades(player, team);
+    }
+
     public void assignTeam(UUID playerId, TeamColor team) {
         if (team == null) {
             assignments.remove(playerId);
@@ -251,9 +262,12 @@ public class GameSession {
         }
         int minX = Math.min(corner1.x(), corner2.x());
         int maxX = Math.max(corner1.x(), corner2.x());
+        int minY = Math.min(corner1.y(), corner2.y());
+        int maxY = Math.max(corner1.y(), corner2.y());
         int minZ = Math.min(corner1.z(), corner2.z());
         int maxZ = Math.max(corner1.z(), corner2.z());
         return point.x() >= minX && point.x() <= maxX
+                && point.y() >= minY && point.y() <= maxY
                 && point.z() >= minZ && point.z() <= maxZ;
     }
 
@@ -1140,6 +1154,7 @@ public class GameSession {
             giveShears(player, team);
         }
         applyTeamUpgrades(player, team);
+        player.updateInventory();
     }
 
     private void equipBaseArmor(Player player, TeamColor team) {
@@ -2127,12 +2142,12 @@ public class GameSession {
         if (world == null) {
             return;
         }
-        for (TeamColor team : teamsInMatch) {
-            ShopLocation main = arena.getShop(team, ShopType.ITEM);
+        for (ShopLocation main : arena.getMainShops().values()) {
             if (main != null) {
                 spawnShopNpc(world, main, ShopType.ITEM);
             }
-            ShopLocation upgrades = arena.getShop(team, ShopType.UPGRADES);
+        }
+        for (ShopLocation upgrades : arena.getUpgradeShops().values()) {
             if (upgrades != null) {
                 spawnShopNpc(world, upgrades, ShopType.UPGRADES);
             }

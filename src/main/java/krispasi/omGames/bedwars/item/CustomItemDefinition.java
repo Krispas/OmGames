@@ -11,6 +11,8 @@ public class CustomItemDefinition {
     private final boolean incendiary;
     private final int maxBlocks;
     private final int bridgeWidth;
+    private final double damage;
+    private final double knockback;
 
     public CustomItemDefinition(String id,
                                 CustomItemType type,
@@ -19,7 +21,9 @@ public class CustomItemDefinition {
                                 float yield,
                                 boolean incendiary,
                                 int maxBlocks,
-                                int bridgeWidth) {
+                                int bridgeWidth,
+                                double damage,
+                                double knockback) {
         this.id = id;
         this.type = type;
         this.material = material;
@@ -28,6 +32,8 @@ public class CustomItemDefinition {
         this.incendiary = incendiary;
         this.maxBlocks = maxBlocks;
         this.bridgeWidth = bridgeWidth;
+        this.damage = damage;
+        this.knockback = knockback;
     }
 
     public String getId() {
@@ -60,5 +66,13 @@ public class CustomItemDefinition {
 
     public int getBridgeWidth() {
         return bridgeWidth;
+    }
+
+    public double getDamage() {
+        return damage;
+    }
+
+    public double getKnockback() {
+        return knockback;
     }
 }

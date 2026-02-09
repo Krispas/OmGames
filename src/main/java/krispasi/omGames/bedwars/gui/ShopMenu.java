@@ -27,7 +27,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 public class ShopMenu implements InventoryHolder {
     private static final int CATEGORY_ROW_SIZE = 9;
-    private static final int CUSTOMIZE_SLOT = 8;
     private final GameSession session;
     private final ShopConfig config;
     private final ShopCategoryType categoryType;
@@ -35,6 +34,7 @@ public class ShopMenu implements InventoryHolder {
     private final UUID viewerId;
     private final QuickBuyService quickBuyService;
     private final Inventory inventory;
+    private final int customizeSlot;
     private final Map<Integer, ShopItemDefinition> itemSlots = new HashMap<>();
     private final Map<Integer, ShopCategoryType> categorySlots = new HashMap<>();
 
@@ -49,6 +49,7 @@ public class ShopMenu implements InventoryHolder {
         int size = category != null ? category.getSize() : 54;
         String title = category != null ? category.getTitle() : categoryType.defaultTitle();
         this.inventory = Bukkit.createInventory(this, size, Component.text(title, NamedTextColor.GOLD));
+        this.customizeSlot = Math.max(0, size - 1);
         build(category);
     }
 
@@ -67,7 +68,7 @@ public class ShopMenu implements InventoryHolder {
         if (!player.getUniqueId().equals(viewerId)) {
             return;
         }
-        if (event.getRawSlot() == CUSTOMIZE_SLOT) {
+        if (event.getRawSlot() == customizeSlot) {
             toggleCustomize(player);
             return;
         }
@@ -187,7 +188,7 @@ public class ShopMenu implements InventoryHolder {
             if (category == null) {
                 continue;
             }
-            if (slot == CUSTOMIZE_SLOT) {
+            if (customizeSlot < CATEGORY_ROW_SIZE && slot == customizeSlot) {
                 slot++;
             }
             ItemStack icon = new ItemStack(category.getIcon() != null ? category.getIcon() : Material.CHEST);
@@ -207,7 +208,7 @@ public class ShopMenu implements InventoryHolder {
                 break;
             }
         }
-        inventory.setItem(CUSTOMIZE_SLOT, buildCustomizeButton());
+        inventory.setItem(customizeSlot, buildCustomizeButton());
     }
 
     private ItemStack buildCustomizeButton() {
