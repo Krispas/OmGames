@@ -9,10 +9,13 @@ import java.util.UUID;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.BlockPoint;
 import krispasi.omGames.bedwars.model.TeamColor;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
 import org.bukkit.inventory.ItemStack;
@@ -35,15 +38,19 @@ public class GeneratorManager {
     private static final long CLEANUP_INTERVAL_TICKS = 20L * 20L;
 
     private static final int BASE_IRON_CAP = 64;
-    private static final int BASE_GOLD_CAP = 32;
-    private static final int DIAMOND_CAP = 8;
-    private static final int EMERALD_CAP = 6;
+    private static final int BASE_GOLD_CAP = 12;
+    private static final int DIAMOND_CAP = 4;
+    private static final int EMERALD_CAP = 2;
+    private static final String HOLOGRAM_TAG = "bw_generator_holo";
+    private static final double HOLOGRAM_TITLE_OFFSET = 1.8;
+    private static final double HOLOGRAM_TIER_OFFSET = 1.5;
 
     private final JavaPlugin plugin;
     private final Arena arena;
     private final List<BukkitTask> tasks = new ArrayList<>();
     private final Map<UUID, Long> trackedDrops = new HashMap<>();
     private final Map<TeamColor, Integer> baseForgeTiers = new EnumMap<>(TeamColor.class);
+    private final Map<String, GeneratorHologram> holograms = new HashMap<>();
     private int diamondTier = 1;
     private int emeraldTier = 1;
     private BukkitTask cleanupTask;
@@ -54,7 +61,7 @@ public class GeneratorManager {
     }
 
     public void start() {
-        stop();
+        stopTasks(false);
         for (GeneratorInfo generator : arena.getGenerators()) {
             if (generator.type() == GeneratorType.BASE) {
                 int tier = generator.team() != null ? baseForgeTiers.getOrDefault(generator.team(), 0) : 0;
@@ -69,6 +76,7 @@ public class GeneratorManager {
                 scheduleDrop(generator.location(), Material.EMERALD, getEmeraldInterval(), EMERALD_CAP, 1);
             }
         }
+        ensureHolograms();
         startCleanup();
     }
 
@@ -77,23 +85,18 @@ public class GeneratorManager {
     }
 
     public void stop() {
-        for (BukkitTask task : tasks) {
-            task.cancel();
-        }
-        tasks.clear();
-        if (cleanupTask != null) {
-            cleanupTask.cancel();
-            cleanupTask = null;
-        }
-        trackedDrops.clear();
+        stopTasks(true);
+        removeHolograms();
     }
 
     public void setDiamondTier(int tier) {
         diamondTier = Math.max(1, Math.min(3, tier));
+        updateHologramTiers();
     }
 
     public void setEmeraldTier(int tier) {
         emeraldTier = Math.max(1, Math.min(3, tier));
+        updateHologramTiers();
     }
 
     public void setBaseForgeTiers(Map<TeamColor, Integer> tiers) {
@@ -144,6 +147,20 @@ public class GeneratorManager {
         tasks.add(task);
     }
 
+    private void stopTasks(boolean clearDrops) {
+        for (BukkitTask task : tasks) {
+            task.cancel();
+        }
+        tasks.clear();
+        if (cleanupTask != null) {
+            cleanupTask.cancel();
+            cleanupTask = null;
+        }
+        if (clearDrops) {
+            trackedDrops.clear();
+        }
+    }
+
     private ForgeSettings getForgeSettings(int tier) {
         int index = Math.max(0, Math.min(4, tier));
         return new ForgeSettings(
@@ -192,5 +209,104 @@ public class GeneratorManager {
             }
         }
         return amount;
+    }
+
+    private void ensureHolograms() {
+        World world = arena.getWorld();
+        if (world == null) {
+            return;
+        }
+        if (holograms.isEmpty()) {
+            removeWorldHolograms(world);
+            for (GeneratorInfo generator : arena.getGenerators()) {
+                if (generator.type() != GeneratorType.DIAMOND && generator.type() != GeneratorType.EMERALD) {
+                    continue;
+                }
+                spawnHologram(generator, world);
+            }
+        }
+        updateHologramTiers();
+    }
+
+    private void spawnHologram(GeneratorInfo generator, World world) {
+        Location base = generator.location().toLocation(world);
+        Location titleLocation = base.clone().add(0, HOLOGRAM_TITLE_OFFSET, 0);
+        Location tierLocation = base.clone().add(0, HOLOGRAM_TIER_OFFSET, 0);
+        Component title = generator.type() == GeneratorType.DIAMOND
+                ? Component.text("Diamond Generator", NamedTextColor.AQUA)
+                : Component.text("Emerald Generator", NamedTextColor.GREEN);
+        Component tier = Component.text("Tier " + toRoman(getTier(generator.type())), NamedTextColor.GRAY);
+        ArmorStand titleStand = world.spawn(titleLocation, ArmorStand.class, stand -> configureHologram(stand, title));
+        ArmorStand tierStand = world.spawn(tierLocation, ArmorStand.class, stand -> configureHologram(stand, tier));
+        holograms.put(generator.key(), new GeneratorHologram(generator.type(), titleStand.getUniqueId(), tierStand.getUniqueId()));
+    }
+
+    private void configureHologram(ArmorStand stand, Component text) {
+        stand.setMarker(true);
+        stand.setVisible(false);
+        stand.setGravity(false);
+        stand.setPersistent(true);
+        stand.setRemoveWhenFarAway(false);
+        stand.setSilent(true);
+        stand.setCanPickupItems(false);
+        stand.customName(text);
+        stand.setCustomNameVisible(true);
+        stand.addScoreboardTag(HOLOGRAM_TAG);
+    }
+
+    private void updateHologramTiers() {
+        if (holograms.isEmpty()) {
+            return;
+        }
+        var iterator = holograms.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, GeneratorHologram> entry = iterator.next();
+            GeneratorHologram hologram = entry.getValue();
+            Entity entity = Bukkit.getEntity(hologram.tierId());
+            if (!(entity instanceof ArmorStand stand)) {
+                iterator.remove();
+                continue;
+            }
+            int tier = getTier(hologram.type());
+            stand.customName(Component.text("Tier " + toRoman(tier), NamedTextColor.GRAY));
+        }
+    }
+
+    private void removeHolograms() {
+        for (GeneratorHologram hologram : holograms.values()) {
+            removeEntity(hologram.titleId());
+            removeEntity(hologram.tierId());
+        }
+        holograms.clear();
+    }
+
+    private void removeWorldHolograms(World world) {
+        for (Entity entity : world.getEntitiesByClass(ArmorStand.class)) {
+            if (entity.getScoreboardTags().contains(HOLOGRAM_TAG)) {
+                entity.remove();
+            }
+        }
+    }
+
+    private void removeEntity(UUID entityId) {
+        Entity entity = Bukkit.getEntity(entityId);
+        if (entity != null) {
+            entity.remove();
+        }
+    }
+
+    private int getTier(GeneratorType type) {
+        return type == GeneratorType.DIAMOND ? diamondTier : emeraldTier;
+    }
+
+    private String toRoman(int tier) {
+        return switch (tier) {
+            case 2 -> "II";
+            case 3 -> "III";
+            default -> "I";
+        };
+    }
+
+    private record GeneratorHologram(GeneratorType type, UUID titleId, UUID tierId) {
     }
 }

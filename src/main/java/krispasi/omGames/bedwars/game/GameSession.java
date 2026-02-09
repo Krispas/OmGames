@@ -605,7 +605,7 @@ public class GameSession {
     }
 
     private void scheduleGameEvents() {
-        scheduleAnnouncement(Component.text("Generator I", NamedTextColor.AQUA), TIER_1_DELAY);
+        scheduleAnnouncement(Component.text("Generators I", NamedTextColor.AQUA), TIER_1_DELAY);
         scheduleTierUpgrade(2, TIER_2_DELAY);
         scheduleTierUpgrade(3, TIER_3_DELAY);
         scheduleBedDestruction(BED_DESTRUCTION_DELAY);
@@ -622,7 +622,7 @@ public class GameSession {
                 generatorManager.setDiamondTier(tier);
                 generatorManager.setEmeraldTier(tier);
                 generatorManager.refresh();
-                broadcast(Component.text("Generator " + toRoman(tier) + "!", NamedTextColor.GOLD));
+                broadcast(Component.text("Generators " + toRoman(tier) + "!", NamedTextColor.GOLD));
             });
         }, delaySeconds * 20L);
         tasks.add(task);
@@ -1649,13 +1649,13 @@ public class GameSession {
                 ? (System.currentTimeMillis() - matchStartMillis) / 1000L
                 : 0L;
         if (elapsedSeconds < TIER_1_DELAY) {
-            return new EventInfo("Generator I", (int) (TIER_1_DELAY - elapsedSeconds));
+            return new EventInfo("Generators I", (int) (TIER_1_DELAY - elapsedSeconds));
         }
         if (elapsedSeconds < TIER_2_DELAY) {
-            return new EventInfo("Generator II", (int) (TIER_2_DELAY - elapsedSeconds));
+            return new EventInfo("Generators II", (int) (TIER_2_DELAY - elapsedSeconds));
         }
         if (elapsedSeconds < TIER_3_DELAY) {
-            return new EventInfo("Generator III", (int) (TIER_3_DELAY - elapsedSeconds));
+            return new EventInfo("Generators III", (int) (TIER_3_DELAY - elapsedSeconds));
         }
         if (elapsedSeconds < BED_DESTRUCTION_DELAY) {
             return new EventInfo("Beds Destroyed", (int) (BED_DESTRUCTION_DELAY - elapsedSeconds));
