@@ -13,6 +13,7 @@ public class CustomItemDefinition {
     private final int bridgeWidth;
     private final double damage;
     private final double knockback;
+    private final int lifetimeSeconds;
 
     public CustomItemDefinition(String id,
                                 CustomItemType type,
@@ -23,7 +24,8 @@ public class CustomItemDefinition {
                                 int maxBlocks,
                                 int bridgeWidth,
                                 double damage,
-                                double knockback) {
+                                double knockback,
+                                int lifetimeSeconds) {
         this.id = id;
         this.type = type;
         this.material = material;
@@ -34,6 +36,7 @@ public class CustomItemDefinition {
         this.bridgeWidth = bridgeWidth;
         this.damage = damage;
         this.knockback = knockback;
+        this.lifetimeSeconds = lifetimeSeconds;
     }
 
     public String getId() {
@@ -74,5 +77,9 @@ public class CustomItemDefinition {
 
     public double getKnockback() {
         return knockback;
+    }
+
+    public int getLifetimeSeconds() {
+        return lifetimeSeconds;
     }
 }

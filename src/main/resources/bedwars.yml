@@ -3,6 +3,33 @@ arenas:
     anti-build:
       base-generator-radius: 14
       advanced-generator-radius: 4
+    generator-settings:
+      base-forge:
+        iron:
+          intervals-seconds: [1, 0.8, 0.7, 0.6, 0.4]
+          amounts: [1, 1, 1, 1, 2]
+          caps: [32, 64, 96, 112, 128]
+        gold:
+          intervals-seconds: [8, 6, 5, 4.5, 3.5]
+          amounts: [1, 1, 1, 1, 2]
+          caps: [4, 8, 12, 20, 30]
+        emerald:
+          intervals-seconds: [0, 0, 0, 80, 40]
+          amounts: [0, 0, 0, 0, 1]
+          caps: [0, 0, 0, 1, 2]
+      diamond:
+        intervals-seconds: [30, 23, 12]
+        cap: 4
+      emerald:
+        intervals-seconds: [50, 30, 12]
+        cap: 2
+      resource-despawn-seconds: 300
+    event-times:
+      tier-2: 360
+      tier-3: 720
+      bed-destruction: 1440
+      sudden-death: 1800
+      game-end: 3000
     world: bedwars
     lobby-height: 120
     center: 951 120 1488

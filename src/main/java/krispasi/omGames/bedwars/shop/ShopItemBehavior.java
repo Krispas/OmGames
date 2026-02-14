@@ -4,6 +4,7 @@ public enum ShopItemBehavior {
     BLOCK,
     SWORD,
     BOW,
+    CROSSBOW,
     ARMOR,
     PICKAXE,
     AXE,

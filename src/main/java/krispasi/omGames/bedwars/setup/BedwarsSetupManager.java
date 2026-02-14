@@ -11,7 +11,9 @@ import java.util.Optional;
 import java.util.UUID;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.generator.GeneratorType;
+import krispasi.omGames.bedwars.generator.GeneratorSettings;
 import krispasi.omGames.bedwars.model.BlockPoint;
+import krispasi.omGames.bedwars.model.EventSettings;
 import krispasi.omGames.bedwars.model.ShopType;
 import krispasi.omGames.bedwars.model.TeamColor;
 import net.kyori.adventure.text.Component;
@@ -38,6 +40,8 @@ public class BedwarsSetupManager {
     private static final String KEY_SPAWNS = "Spawns";
     private static final String KEY_SHOPS = "Shops";
     private static final String KEY_ANTI_BUILD = "anti-build";
+    private static final String KEY_GENERATOR_SETTINGS = "generator-settings";
+    private static final String KEY_EVENT_TIMES = "event-times";
 
     private final JavaPlugin plugin;
     private final BedwarsManager bedwarsManager;
@@ -142,11 +146,25 @@ public class BedwarsSetupManager {
         ConfigurationSection antiBuild = arena.createSection(KEY_ANTI_BUILD);
         antiBuild.set("base-generator-radius", 0);
         antiBuild.set("advanced-generator-radius", 0);
-        arena.createSection(KEY_BEDS);
-        arena.createSection(KEY_GENERATORS);
-        arena.createSection(KEY_SPAWNS);
-        arena.createSection(KEY_BASE_GENERATORS);
-        arena.createSection(KEY_SHOPS);
+        ConfigurationSection beds = arena.createSection(KEY_BEDS);
+        ConfigurationSection generators = arena.createSection(KEY_GENERATORS);
+        ConfigurationSection spawns = arena.createSection(KEY_SPAWNS);
+        ConfigurationSection baseGenerators = arena.createSection(KEY_BASE_GENERATORS);
+        ConfigurationSection shops = arena.createSection(KEY_SHOPS);
+        for (TeamColor team : TeamColor.ordered()) {
+            beds.set(team.key(), "");
+            spawns.set("base_" + team.key(), "");
+            baseGenerators.set("base_gen_" + team.key(), "");
+            ConfigurationSection teamShop = shops.createSection(team.key());
+            teamShop.set("main", "");
+            teamShop.set("upgrades", "");
+        }
+        for (int i = 1; i <= 4; i++) {
+            generators.set("diamond_" + i, "");
+            generators.set("emerald_" + i, "");
+        }
+        populateGeneratorSettings(arena);
+        populateEventTimes(arena);
         saveAndReload(player, config);
         player.sendMessage(Component.text("Arena created: " + arenaId, NamedTextColor.GREEN));
         showSetupList(player, arenaId);
@@ -344,6 +362,61 @@ public class BedwarsSetupManager {
         ConfigurationSection antiBuild = getOrCreateSection(arena, KEY_ANTI_BUILD);
         antiBuild.set(key, value);
         return true;
+    }
+
+    private void populateGeneratorSettings(ConfigurationSection arena) {
+        GeneratorSettings defaults = GeneratorSettings.defaults();
+        ConfigurationSection settings = arena.createSection(KEY_GENERATOR_SETTINGS);
+        ConfigurationSection baseForge = settings.createSection("base-forge");
+        ConfigurationSection iron = baseForge.createSection("iron");
+        iron.set("intervals-seconds", toSecondsList(defaults.getBaseIronIntervals()));
+        iron.set("amounts", toIntList(defaults.getBaseIronAmounts()));
+        iron.set("caps", toIntList(defaults.getBaseIronCaps()));
+        ConfigurationSection gold = baseForge.createSection("gold");
+        gold.set("intervals-seconds", toSecondsList(defaults.getBaseGoldIntervals()));
+        gold.set("amounts", toIntList(defaults.getBaseGoldAmounts()));
+        gold.set("caps", toIntList(defaults.getBaseGoldCaps()));
+        ConfigurationSection emerald = baseForge.createSection("emerald");
+        emerald.set("intervals-seconds", toSecondsList(defaults.getBaseEmeraldIntervals()));
+        emerald.set("amounts", toIntList(defaults.getBaseEmeraldAmounts()));
+        emerald.set("caps", toIntList(defaults.getBaseEmeraldCaps()));
+
+        ConfigurationSection diamond = settings.createSection("diamond");
+        diamond.set("intervals-seconds", toSecondsList(defaults.getDiamondIntervals()));
+        diamond.set("cap", defaults.getDiamondCap());
+
+        ConfigurationSection advancedEmerald = settings.createSection("emerald");
+        advancedEmerald.set("intervals-seconds", toSecondsList(defaults.getEmeraldIntervals()));
+        advancedEmerald.set("cap", defaults.getEmeraldCap());
+
+        long resourceDespawnSeconds = Math.round(defaults.getResourceDespawnMillis() / 1000.0);
+        settings.set("resource-despawn-seconds", resourceDespawnSeconds);
+    }
+
+    private void populateEventTimes(ConfigurationSection arena) {
+        EventSettings defaults = EventSettings.defaults();
+        ConfigurationSection eventTimes = arena.createSection(KEY_EVENT_TIMES);
+        eventTimes.set("tier-2", defaults.getTier2Delay());
+        eventTimes.set("tier-3", defaults.getTier3Delay());
+        eventTimes.set("bed-destruction", defaults.getBedDestructionDelay());
+        eventTimes.set("sudden-death", defaults.getSuddenDeathDelay());
+        eventTimes.set("game-end", defaults.getGameEndDelay());
+    }
+
+    private List<Double> toSecondsList(long[] ticks) {
+        List<Double> values = new ArrayList<>(ticks.length);
+        for (long tick : ticks) {
+            values.add(tick / 20.0);
+        }
+        return values;
+    }
+
+    private List<Integer> toIntList(int[] values) {
+        List<Integer> list = new ArrayList<>(values.length);
+        for (int value : values) {
+            list.add(value);
+        }
+        return list;
     }
 
     private YamlConfiguration loadConfig() {

@@ -38,14 +38,17 @@ public class ShopConfigLoader {
             return ShopConfig.empty();
         }
 
-        Map<String, ShopItemDefinition> items = loadItems(shopSection.getConfigurationSection("items"));
-        Map<ShopCategoryType, ShopCategory> categories = loadCategories(shopSection.getConfigurationSection("categories"));
+        Map<String, Map<Integer, String>> positionedEntries = new HashMap<>();
+        Map<String, ShopItemDefinition> items = loadItems(shopSection.getConfigurationSection("items"), positionedEntries);
+        Map<ShopCategoryType, ShopCategory> categories =
+                loadCategories(shopSection.getConfigurationSection("categories"), positionedEntries);
         Map<ShopItemBehavior, Map<Integer, ShopItemDefinition>> tiered = buildTieredItems(items);
 
         return new ShopConfig(items, categories, tiered);
     }
 
-    private Map<String, ShopItemDefinition> loadItems(ConfigurationSection itemsSection) {
+    private Map<String, ShopItemDefinition> loadItems(ConfigurationSection itemsSection,
+                                                      Map<String, Map<Integer, String>> positionedEntries) {
         Map<String, ShopItemDefinition> items = new HashMap<>();
         if (itemsSection == null) {
             logger.warning("Missing shop items section.");
@@ -57,7 +60,7 @@ public class ShopConfigLoader {
                 continue;
             }
             if (isItemSection(section)) {
-                addItem(items, key, section, null);
+                addItem(items, key, section, null, positionedEntries);
                 continue;
             }
             String categoryKey = key;
@@ -66,7 +69,7 @@ public class ShopConfigLoader {
                 if (nestedSection == null || !isItemSection(nestedSection)) {
                     continue;
                 }
-                addItem(items, nestedKey, nestedSection, categoryKey);
+                addItem(items, nestedKey, nestedSection, categoryKey, positionedEntries);
             }
         }
         return items;
@@ -79,7 +82,8 @@ public class ShopConfigLoader {
     private void addItem(Map<String, ShopItemDefinition> items,
                          String id,
                          ConfigurationSection section,
-                         String categoryKey) {
+                         String categoryKey,
+                         Map<String, Map<Integer, String>> positionedEntries) {
         ShopItemDefinition item = parseItem(id, section, categoryKey);
         if (item == null) {
             return;
@@ -89,6 +93,7 @@ public class ShopConfigLoader {
             return;
         }
         items.put(item.getId(), item);
+        recordPosition(positionedEntries, item.getId(), section, categoryKey);
     }
 
     private ShopItemDefinition parseItem(String id, ConfigurationSection section, String categoryKey) {
@@ -193,8 +198,11 @@ public class ShopConfigLoader {
                 || name.endsWith("_BOOTS")) {
             return ShopItemBehavior.ARMOR;
         }
-        if ("BOW".equals(name) || "CROSSBOW".equals(name)) {
+        if ("BOW".equals(name)) {
             return ShopItemBehavior.BOW;
+        }
+        if ("CROSSBOW".equals(name)) {
+            return ShopItemBehavior.CROSSBOW;
         }
         if (categoryKey == null) {
             return null;
@@ -262,7 +270,8 @@ public class ShopConfigLoader {
         }
     }
 
-    private Map<ShopCategoryType, ShopCategory> loadCategories(ConfigurationSection categoriesSection) {
+    private Map<ShopCategoryType, ShopCategory> loadCategories(ConfigurationSection categoriesSection,
+                                                               Map<String, Map<Integer, String>> positionedEntries) {
         Map<ShopCategoryType, ShopCategory> categories = new EnumMap<>(ShopCategoryType.class);
         if (categoriesSection == null) {
             logger.warning("Missing shop categories section.");
@@ -287,9 +296,75 @@ public class ShopConfigLoader {
             }
             int size = normalizeSize(section.getInt("size", 54));
             Map<Integer, String> entries = parseEntries(section.getConfigurationSection("entries"));
+            applyPositionOverrides(entries, key, size, positionedEntries);
             categories.put(type, new ShopCategory(type, title, icon, size, entries));
         }
         return categories;
+    }
+
+    private void recordPosition(Map<String, Map<Integer, String>> positionedEntries,
+                                String itemId,
+                                ConfigurationSection section,
+                                String categoryKey) {
+        Integer slot = parsePositionSlot(section, itemId);
+        if (slot == null) {
+            return;
+        }
+        if (categoryKey == null || categoryKey.isBlank()) {
+            logger.warning("Shop item " + itemId + " has a position but no category.");
+            return;
+        }
+        String normalized = categoryKey.trim().toLowerCase(Locale.ROOT);
+        Map<Integer, String> categoryMap = positionedEntries.computeIfAbsent(normalized, key -> new HashMap<>());
+        String existing = categoryMap.put(slot, itemId);
+        if (existing != null && !existing.equals(itemId)) {
+            logger.warning("Duplicate shop position in " + normalized + " slot " + slot
+                    + ": " + existing + " replaced by " + itemId);
+        }
+    }
+
+    private Integer parsePositionSlot(ConfigurationSection section, String itemId) {
+        ConfigurationSection pos = section.getConfigurationSection("position");
+        if (pos == null) {
+            return null;
+        }
+        int line = pos.getInt("line", 0);
+        int column = pos.getInt("column", pos.getInt("collum", 0));
+        if (line <= 0 || column <= 0) {
+            logger.warning("Invalid shop position for " + itemId + ": line/column must be >= 1.");
+            return null;
+        }
+        if (column > 9) {
+            logger.warning("Invalid shop position for " + itemId + ": column must be 1-9.");
+            return null;
+        }
+        return (line * 9) + (column - 1);
+    }
+
+    private void applyPositionOverrides(Map<Integer, String> entries,
+                                        String categoryKey,
+                                        int size,
+                                        Map<String, Map<Integer, String>> positionedEntries) {
+        if (entries == null || positionedEntries == null || categoryKey == null) {
+            return;
+        }
+        Map<Integer, String> overrides = positionedEntries.get(categoryKey.trim().toLowerCase(Locale.ROOT));
+        if (overrides == null || overrides.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<Integer, String> entry : overrides.entrySet()) {
+            int slot = entry.getKey();
+            if (slot < 0 || slot >= size) {
+                logger.warning("Shop position out of range in " + categoryKey + " for item "
+                        + entry.getValue() + ": slot " + slot + " (size " + size + ")");
+                continue;
+            }
+            String existing = entries.put(slot, entry.getValue());
+            if (existing != null && !existing.equals(entry.getValue())) {
+                logger.warning("Shop position conflict in " + categoryKey + " slot " + slot
+                        + ": " + existing + " replaced by " + entry.getValue());
+            }
+        }
     }
 
     private Map<Integer, String> parseEntries(ConfigurationSection entriesSection) {
@@ -326,7 +401,8 @@ public class ShopConfigLoader {
             if (behavior != ShopItemBehavior.ARMOR
                     && behavior != ShopItemBehavior.PICKAXE
                     && behavior != ShopItemBehavior.AXE
-                    && behavior != ShopItemBehavior.BOW) {
+                    && behavior != ShopItemBehavior.BOW
+                    && behavior != ShopItemBehavior.CROSSBOW) {
                 continue;
             }
             tiered.computeIfAbsent(behavior, key -> new HashMap<>())

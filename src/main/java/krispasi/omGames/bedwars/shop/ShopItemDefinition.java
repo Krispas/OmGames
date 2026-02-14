@@ -108,7 +108,9 @@ public class ShopItemDefinition {
             for (Map.Entry<Enchantment, Integer> entry : enchantments.entrySet()) {
                 meta.addEnchant(entry.getKey(), entry.getValue(), true);
             }
-            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            if (includeCost) {
+                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            }
         }
 
         if (!potionEffects.isEmpty() && meta instanceof PotionMeta potionMeta) {
@@ -125,7 +127,10 @@ public class ShopItemDefinition {
             }
         }
         if (includeCost && cost != null && cost.isValid()) {
-            lines.add(Component.text(formatCost(), NamedTextColor.GRAY));
+            Component costLine = formatCost();
+            if (costLine != null) {
+                lines.add(costLine);
+            }
         }
         if (!lines.isEmpty()) {
             meta.lore(lines);
@@ -146,10 +151,17 @@ public class ShopItemDefinition {
         return material;
     }
 
-    private String formatCost() {
+    private Component formatCost() {
         if (cost == null || !cost.isValid()) {
-            return "";
+            return null;
         }
+        NamedTextColor color = switch (cost.material()) {
+            case IRON_INGOT -> NamedTextColor.GRAY;
+            case GOLD_INGOT -> NamedTextColor.GOLD;
+            case DIAMOND -> NamedTextColor.AQUA;
+            case EMERALD -> NamedTextColor.GREEN;
+            default -> NamedTextColor.GRAY;
+        };
         String name = switch (cost.material()) {
             case IRON_INGOT -> "Iron";
             case GOLD_INGOT -> "Gold";
@@ -157,6 +169,6 @@ public class ShopItemDefinition {
             case EMERALD -> "Emerald";
             default -> cost.material().name();
         };
-        return "Cost: " + cost.amount() + " " + name;
+        return Component.text("Cost: " + cost.amount() + " " + name, color);
     }
 }

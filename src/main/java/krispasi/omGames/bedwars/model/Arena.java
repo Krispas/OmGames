@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import krispasi.omGames.bedwars.generator.GeneratorInfo;
+import krispasi.omGames.bedwars.generator.GeneratorSettings;
+import krispasi.omGames.bedwars.model.EventSettings;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -21,6 +23,8 @@ public class Arena {
     private final BlockPoint corner2;
     private final int baseGeneratorRadius;
     private final int advancedGeneratorRadius;
+    private final GeneratorSettings generatorSettings;
+    private final EventSettings eventSettings;
     private final Map<TeamColor, BedLocation> beds;
     private final List<GeneratorInfo> generators;
     private final Map<TeamColor, BlockPoint> spawns;
@@ -36,6 +40,8 @@ public class Arena {
                  BlockPoint corner2,
                  int baseGeneratorRadius,
                  int advancedGeneratorRadius,
+                 GeneratorSettings generatorSettings,
+                 EventSettings eventSettings,
                  Map<TeamColor, BedLocation> beds,
                  List<GeneratorInfo> generators,
                  Map<TeamColor, BlockPoint> spawns,
@@ -50,6 +56,8 @@ public class Arena {
         this.corner2 = corner2;
         this.baseGeneratorRadius = baseGeneratorRadius;
         this.advancedGeneratorRadius = advancedGeneratorRadius;
+        this.generatorSettings = generatorSettings;
+        this.eventSettings = eventSettings;
         this.beds = Collections.unmodifiableMap(new EnumMap<>(beds));
         this.generators = List.copyOf(generators);
         this.spawns = Collections.unmodifiableMap(new EnumMap<>(spawns));
@@ -91,6 +99,14 @@ public class Arena {
 
     public int getAdvancedGeneratorRadius() {
         return advancedGeneratorRadius;
+    }
+
+    public GeneratorSettings getGeneratorSettings() {
+        return generatorSettings;
+    }
+
+    public EventSettings getEventSettings() {
+        return eventSettings;
     }
 
     public Map<TeamColor, BedLocation> getBeds() {

@@ -44,6 +44,9 @@ shop:
         bow_power: 11
         bow_power_punch: 12
         arrows: 13
+        crossbow: 14
+        crossbow_quickcharge: 15
+        crossbow_multishot: 16
     armor:
       title: "Armor"
       icon: IRON_CHESTPLATE
@@ -81,6 +84,8 @@ shop:
         magic_milk: 22
         bridge_egg: 23
         wind_charge: 24
+        bed_bug: 25
+        dream_defender: 26
     miscellaneous:
       title: "Miscellaneous"
       icon: BREWING_STAND
@@ -95,7 +100,6 @@ shop:
           material: IRON
           amount: 4
         team-color: true
-        display-name: "Wool"
       hardened_clay:
         material: SMOOTH_BASALT
         amount: 16
@@ -124,6 +128,13 @@ shop:
           material: IRON
           amount: 12
         display-name: "Blast-Proof Glass"
+      creaking_heart:
+        material: creaking_heart
+        amount: 4
+        cost:
+          material: GOLD
+          amount: 16
+        display-name: "Creaking Heart"
     melee:
       stone_sword:
         material: STONE_SWORD
@@ -183,7 +194,7 @@ shop:
         amount: 1
         cost:
           material: GOLD
-          amount: 6
+          amount: 12
         tier: 2
         display-name: "Bow (Power I)"
         enchants:
@@ -192,13 +203,42 @@ shop:
         material: BOW
         amount: 1
         cost:
-          material: EMERALD
-          amount: 6
+          material: GOLD
+          amount: 24
         tier: 3
         display-name: "Bow (Power I, Punch I)"
         enchants:
           POWER: 1
           PUNCH: 1
+      crossbow:
+        material: CROSSBOW
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 10
+        tier: 1
+        display-name: "Crossbow"
+      crossbow_quickcharge:
+        material: CROSSBOW
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 30
+        tier: 2
+        display-name: "Crossbow (Quick Charge II)"
+        enchants:
+          QUICK_CHARGE: 2
+      crossbow_multishot:
+        material: CROSSBOW
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 8
+        tier: 3
+        display-name: "Crossbow (Multishot, Quick Charge II)"
+        enchants:
+          MULTISHOT: 1
+          QUICK_CHARGE: 2
       arrows:
         material: ARROW
         amount: 8
@@ -380,7 +420,29 @@ shop:
         amount: 3
         cost:
           material: GOLD
-          amount: 6
+          amount: 4
         display-name: "Wind Charge"
+      bed_bug:
+        material: SNOWBALL
+        amount: 1
+        cost:
+          material: IRON
+          amount: 40
+        display-name: "Bed Bug"
+        lore:
+          - "Spawns a silverfish"
+          - "to hunt enemy players."
+        custom-item: bed_bug
+      dream_defender:
+        material: IRON_GOLEM_SPAWN_EGG
+        amount: 1
+        cost:
+          material: IRON
+          amount: 120
+        display-name: "Dream Defender"
+        lore:
+          - "Summons an iron golem"
+          - "to defend your base."
+        custom-item: dream_defender
     miscellaneous: {}
 

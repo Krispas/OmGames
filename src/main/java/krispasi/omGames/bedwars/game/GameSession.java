@@ -43,7 +43,10 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.Chunk;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
+import org.bukkit.block.Container;
 import org.bukkit.block.data.type.Bed;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
@@ -67,6 +70,8 @@ import org.bukkit.scoreboard.Team;
 public class GameSession {
     public static final String ITEM_SHOP_TAG = "bw_item_shop";
     public static final String UPGRADES_SHOP_TAG = "bw_upgrades_shop";
+    public static final String BED_BUG_TAG = "bw_bed_bug";
+    public static final String DREAM_DEFENDER_TAG = "bw_dream_defender";
     private static final Set<Material> SWORD_MATERIALS = EnumSet.of(
             Material.WOODEN_SWORD,
             Material.STONE_SWORD,
@@ -74,6 +79,7 @@ public class GameSession {
             Material.DIAMOND_SWORD
     );
     private static final Set<Material> BOW_MATERIALS = EnumSet.of(Material.BOW);
+    private static final Set<Material> CROSSBOW_MATERIALS = EnumSet.of(Material.CROSSBOW);
     private static final Set<Material> PICKAXE_MATERIALS = EnumSet.of(
             Material.WOODEN_PICKAXE,
             Material.STONE_PICKAXE,
@@ -91,12 +97,6 @@ public class GameSession {
     private static final int START_COUNTDOWN_SECONDS = 5;
     private static final int RESPAWN_DELAY_SECONDS = 5;
     private static final int RESPAWN_PROTECTION_SECONDS = 5;
-    private static final int TIER_1_DELAY = 360;
-    private static final int TIER_2_DELAY = 720;
-    private static final int TIER_3_DELAY = 1080;
-    private static final int BED_DESTRUCTION_DELAY = 1440;
-    private static final int SUDDEN_DEATH_DELAY = 1800;
-    private static final int GAME_END_DELAY = 3000;
     private static final int DEFAULT_BASE_RADIUS = 8;
     private static final int HEAL_POOL_INTERVAL_TICKS = 20;
     private static final int HEAL_POOL_DURATION_TICKS = 60;
@@ -106,6 +106,8 @@ public class GameSession {
     private static final int TRAP_SLOW_SECONDS = 8;
     private static final int TRAP_COUNTER_SECONDS = 15;
     private static final int TRAP_FATIGUE_SECONDS = 10;
+    private static final long REGEN_DELAY_MILLIS = 4000L;
+    private static final long REGEN_INTERVAL_MILLIS = 3000L;
 
     private final BedwarsManager bedwarsManager;
     private final Arena arena;
@@ -134,8 +136,12 @@ public class GameSession {
     private final Map<UUID, Integer> armorTiers = new HashMap<>();
     private final Map<UUID, Integer> pickaxeTiers = new HashMap<>();
     private final Map<UUID, Integer> axeTiers = new HashMap<>();
-    private final Map<UUID, Integer> bowTiers = new HashMap<>();
     private final Set<UUID> shearsUnlocked = new HashSet<>();
+    private final Map<UUID, Long> lastCombatTimes = new HashMap<>();
+    private final Map<UUID, UUID> lastDamagers = new HashMap<>();
+    private final Map<UUID, Long> lastDamagerTimes = new HashMap<>();
+    private final Map<UUID, Long> lastDamageTimes = new HashMap<>();
+    private final Map<UUID, Long> lastRegenTimes = new HashMap<>();
     private final List<BukkitTask> tasks = new ArrayList<>();
     private GeneratorManager generatorManager;
     private GameState state = GameState.IDLE;
@@ -206,6 +212,60 @@ public class GameSession {
 
     public boolean isParticipant(UUID playerId) {
         return assignments.containsKey(playerId);
+    }
+
+    public boolean isInCombat(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
+        Long last = lastCombatTimes.get(playerId);
+        if (last == null) {
+            return false;
+        }
+        return System.currentTimeMillis() - last <= 15000L;
+    }
+
+    public UUID getRecentDamager(UUID victimId) {
+        if (victimId == null) {
+            return null;
+        }
+        Long last = lastDamagerTimes.get(victimId);
+        if (last == null || System.currentTimeMillis() - last > 15000L) {
+            return null;
+        }
+        return lastDamagers.get(victimId);
+    }
+
+    public void recordCombat(UUID attackerId, UUID victimId) {
+        long now = System.currentTimeMillis();
+        if (attackerId != null) {
+            lastCombatTimes.put(attackerId, now);
+        }
+        if (victimId != null) {
+            lastCombatTimes.put(victimId, now);
+            if (attackerId != null) {
+                lastDamagers.put(victimId, attackerId);
+                lastDamagerTimes.put(victimId, now);
+            }
+        }
+    }
+
+    public void recordDamage(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        lastDamageTimes.put(playerId, now);
+        lastRegenTimes.remove(playerId);
+    }
+
+    public void clearCombat(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        lastCombatTimes.remove(playerId);
+        lastDamagers.remove(playerId);
+        lastDamagerTimes.remove(playerId);
     }
 
     public int getPickaxeTier(UUID playerId) {
@@ -288,9 +348,13 @@ public class GameSession {
     }
 
     public void openFakeEnderChest(Player player) {
-        Inventory inventory = fakeEnderChests.computeIfAbsent(player.getUniqueId(),
-                id -> Bukkit.createInventory(player, 27, Component.text("Ender Chest")));
+        Inventory inventory = getFakeEnderChest(player);
         player.openInventory(inventory);
+    }
+
+    public Inventory getFakeEnderChest(Player player) {
+        return fakeEnderChests.computeIfAbsent(player.getUniqueId(),
+                id -> Bukkit.createInventory(player, 27, Component.text("Ender Chest")));
     }
 
     public void openShop(Player player, ShopType type) {
@@ -422,16 +486,24 @@ public class GameSession {
                 yield true;
             }
             case SWORD -> {
-                if (SWORD_MATERIALS.contains(item.getMaterial())) {
-                    removeSwords(player);
-                }
                 giveItem(player, item.createPurchaseItem(team));
                 if (team != null && hasTeamUpgrade(team, TeamUpgradeType.SHARPNESS)) {
                     applySharpness(player);
                 }
                 yield true;
             }
-            case BOW -> applyTierUpgrade(player, item, bowTiers, ShopItemBehavior.BOW);
+            case BOW -> {
+                removeItems(player, BOW_MATERIALS);
+                giveItem(player, item.createPurchaseItem(team));
+                yield true;
+            }
+            case CROSSBOW -> {
+                if (countItem(player, Material.CROSSBOW) >= 3) {
+                    yield false;
+                }
+                giveItem(player, item.createPurchaseItem(team));
+                yield true;
+            }
             case ARMOR -> applyTierUpgrade(player, item, armorTiers, ShopItemBehavior.ARMOR);
             case PICKAXE -> applyTierUpgrade(player, item, pickaxeTiers, ShopItemBehavior.PICKAXE);
             case AXE -> applyTierUpgrade(player, item, axeTiers, ShopItemBehavior.AXE);
@@ -466,6 +538,10 @@ public class GameSession {
             }
             player.teleport(spawn);
             player.getInventory().clear();
+            player.setFoodLevel(20);
+            player.setSaturation(20.0f);
+            double maxHealth = player.getMaxHealth();
+            player.setHealth(Math.max(1.0, maxHealth));
             giveStarterKit(player, team);
             applyPermanentItems(player, team);
             player.setGameMode(GameMode.SURVIVAL);
@@ -490,6 +566,7 @@ public class GameSession {
         if (!isRunning() || !isParticipant(player.getUniqueId())) {
             return;
         }
+        clearCombat(player.getUniqueId());
         removeRespawnProtection(player.getUniqueId());
         downgradeTools(player.getUniqueId());
         removeItems(player, PICKAXE_MATERIALS);
@@ -541,6 +618,7 @@ public class GameSession {
         broadcast(Component.text("The ", NamedTextColor.RED)
                 .append(team.displayComponent())
                 .append(Component.text(" bed was destroyed!", NamedTextColor.RED)));
+        playSoundToParticipants(Sound.ENTITY_ENDER_DRAGON_GROWL, 1.0f, 1.0f);
 
         Title title = Title.title(
                 Component.text("Your Bed was destroyed!", NamedTextColor.RED),
@@ -556,6 +634,15 @@ public class GameSession {
             }
         }
         checkTeamEliminated(team);
+    }
+
+    private void playSoundToParticipants(Sound sound, float volume, float pitch) {
+        for (UUID playerId : assignments.keySet()) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                player.playSound(player.getLocation(), sound, volume, pitch);
+            }
+        }
     }
 
     public void handlePlayerEliminated(Player player) {
@@ -597,20 +684,21 @@ public class GameSession {
         frozenPlayers.clear();
         matchStartMillis = System.currentTimeMillis();
         startCountdownRemaining = 0;
-        generatorManager = new GeneratorManager(plugin, arena);
+        generatorManager = new GeneratorManager(plugin, arena, this);
         syncForgeTiers();
         generatorManager.start();
         startUpgradeTasks();
+        startRegenTask();
         scheduleGameEvents();
     }
 
     private void scheduleGameEvents() {
-        scheduleAnnouncement(Component.text("Generators I", NamedTextColor.AQUA), TIER_1_DELAY);
-        scheduleTierUpgrade(2, TIER_2_DELAY);
-        scheduleTierUpgrade(3, TIER_3_DELAY);
-        scheduleBedDestruction(BED_DESTRUCTION_DELAY);
-        scheduleSuddenDeath(SUDDEN_DEATH_DELAY);
-        scheduleGameEnd(GAME_END_DELAY);
+        krispasi.omGames.bedwars.model.EventSettings events = arena.getEventSettings();
+        scheduleTierUpgrade(2, events.getTier2Delay());
+        scheduleTierUpgrade(3, events.getTier3Delay());
+        scheduleBedDestruction(events.getBedDestructionDelay());
+        scheduleSuddenDeath(events.getSuddenDeathDelay());
+        scheduleGameEnd(events.getGameEndDelay());
     }
 
     private void scheduleTierUpgrade(int tier, int delaySeconds) {
@@ -844,6 +932,7 @@ public class GameSession {
             return;
         }
         clearDroppedItems(world);
+        clearContainerInventories(world);
         despawnShops();
         for (BlockPoint point : placedBlocks) {
             world.getBlockAt(point.x(), point.y(), point.z()).setType(Material.AIR, false);
@@ -980,6 +1069,7 @@ public class GameSession {
         state = GameState.ENDING;
         releaseForcedChunks();
         despawnShops();
+        despawnSummons();
         closeFakeEnderChests();
         clearSidebars();
         for (BukkitTask task : tasks) {
@@ -1010,6 +1100,55 @@ public class GameSession {
         startCountdownRemaining = 0;
     }
 
+    private void despawnSummons() {
+        World world = arena.getWorld();
+        if (world == null) {
+            return;
+        }
+        for (org.bukkit.entity.Entity entity : world.getEntities()) {
+            if (entity.getScoreboardTags().contains(BED_BUG_TAG)
+                    || entity.getScoreboardTags().contains(DREAM_DEFENDER_TAG)) {
+                entity.remove();
+            }
+        }
+    }
+
+    private void clearContainerInventories(World world) {
+        BlockPoint corner1 = arena.getCorner1();
+        BlockPoint corner2 = arena.getCorner2();
+        if (corner1 == null || corner2 == null) {
+            for (Chunk chunk : world.getLoadedChunks()) {
+                clearChunkContainers(chunk);
+            }
+            return;
+        }
+        int minX = Math.min(corner1.x(), corner2.x());
+        int maxX = Math.max(corner1.x(), corner2.x());
+        int minZ = Math.min(corner1.z(), corner2.z());
+        int maxZ = Math.max(corner1.z(), corner2.z());
+        int minChunkX = minX >> 4;
+        int maxChunkX = maxX >> 4;
+        int minChunkZ = minZ >> 4;
+        int maxChunkZ = maxZ >> 4;
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                Chunk chunk = world.getChunkAt(chunkX, chunkZ);
+                clearChunkContainers(chunk);
+            }
+        }
+    }
+
+    private void clearChunkContainers(Chunk chunk) {
+        if (chunk == null) {
+            return;
+        }
+        for (BlockState state : chunk.getTileEntities()) {
+            if (state instanceof Container container) {
+                container.getInventory().clear();
+            }
+        }
+    }
+
     private void resetState() {
         eliminatedPlayers.clear();
         eliminatedTeams.clear();
@@ -1031,8 +1170,12 @@ public class GameSession {
         armorTiers.clear();
         pickaxeTiers.clear();
         axeTiers.clear();
-        bowTiers.clear();
         shearsUnlocked.clear();
+        lastCombatTimes.clear();
+        lastDamagers.clear();
+        lastDamagerTimes.clear();
+        lastDamageTimes.clear();
+        lastRegenTimes.clear();
     }
 
     private void closeFakeEnderChests() {
@@ -1137,10 +1280,6 @@ public class GameSession {
         equipBaseArmor(player, team);
         if (armorTier > 0) {
             equipArmor(player, team, config, armorTier);
-        }
-        int bowTier = bowTiers.getOrDefault(playerId, 0);
-        if (bowTier > 0) {
-            equipTieredItem(player, team, config, ShopItemBehavior.BOW, bowTier, BOW_MATERIALS);
         }
         int pickaxeTier = pickaxeTiers.getOrDefault(playerId, 0);
         if (pickaxeTier > 0) {
@@ -1301,6 +1440,20 @@ public class GameSession {
             remaining -= offhand.getAmount();
         }
         return remaining <= 0;
+    }
+
+    private int countItem(Player player, Material material) {
+        int count = 0;
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item != null && item.getType() == material) {
+                count += item.getAmount();
+            }
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && offhand.getType() == material) {
+            count += offhand.getAmount();
+        }
+        return count;
     }
 
     private void removeResources(Player player, ShopCost cost) {
@@ -1648,23 +1801,21 @@ public class GameSession {
         long elapsedSeconds = matchStartMillis > 0
                 ? (System.currentTimeMillis() - matchStartMillis) / 1000L
                 : 0L;
-        if (elapsedSeconds < TIER_1_DELAY) {
-            return new EventInfo("Generators I", (int) (TIER_1_DELAY - elapsedSeconds));
+        krispasi.omGames.bedwars.model.EventSettings events = arena.getEventSettings();
+        if (elapsedSeconds < events.getTier2Delay()) {
+            return new EventInfo("Generators II", (int) (events.getTier2Delay() - elapsedSeconds));
         }
-        if (elapsedSeconds < TIER_2_DELAY) {
-            return new EventInfo("Generators II", (int) (TIER_2_DELAY - elapsedSeconds));
+        if (elapsedSeconds < events.getTier3Delay()) {
+            return new EventInfo("Generators III", (int) (events.getTier3Delay() - elapsedSeconds));
         }
-        if (elapsedSeconds < TIER_3_DELAY) {
-            return new EventInfo("Generators III", (int) (TIER_3_DELAY - elapsedSeconds));
+        if (elapsedSeconds < events.getBedDestructionDelay()) {
+            return new EventInfo("Beds Destroyed", (int) (events.getBedDestructionDelay() - elapsedSeconds));
         }
-        if (elapsedSeconds < BED_DESTRUCTION_DELAY) {
-            return new EventInfo("Beds Destroyed", (int) (BED_DESTRUCTION_DELAY - elapsedSeconds));
+        if (elapsedSeconds < events.getSuddenDeathDelay()) {
+            return new EventInfo("Sudden Death", (int) (events.getSuddenDeathDelay() - elapsedSeconds));
         }
-        if (elapsedSeconds < SUDDEN_DEATH_DELAY) {
-            return new EventInfo("Sudden Death", (int) (SUDDEN_DEATH_DELAY - elapsedSeconds));
-        }
-        if (elapsedSeconds < GAME_END_DELAY) {
-            return new EventInfo("Game End", (int) (GAME_END_DELAY - elapsedSeconds));
+        if (elapsedSeconds < events.getGameEndDelay()) {
+            return new EventInfo("Game End", (int) (events.getGameEndDelay() - elapsedSeconds));
         }
         return new EventInfo("Game End", 0);
     }
@@ -1804,6 +1955,45 @@ public class GameSession {
                 0L,
                 TRAP_CHECK_INTERVAL_TICKS);
         tasks.add(trapTask);
+    }
+
+    private void startRegenTask() {
+        BukkitTask task = plugin.getServer().getScheduler().runTaskTimer(plugin,
+                () -> safeRun("customRegen", this::applyRegenTick),
+                20L,
+                20L);
+        tasks.add(task);
+    }
+
+    private void applyRegenTick() {
+        if (state != GameState.RUNNING) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        for (UUID playerId : assignments.keySet()) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+            if (!isInArenaWorld(player.getWorld()) || player.getGameMode() == GameMode.SPECTATOR) {
+                continue;
+            }
+            double maxHealth = player.getMaxHealth();
+            if (player.getHealth() >= maxHealth) {
+                continue;
+            }
+            long lastDamage = lastDamageTimes.getOrDefault(playerId, 0L);
+            if (now - lastDamage < REGEN_DELAY_MILLIS) {
+                continue;
+            }
+            long lastRegen = lastRegenTimes.getOrDefault(playerId, 0L);
+            if (now - lastRegen < REGEN_INTERVAL_MILLIS) {
+                continue;
+            }
+            double newHealth = Math.min(maxHealth, player.getHealth() + 2.0);
+            player.setHealth(newHealth);
+            lastRegenTimes.put(playerId, now);
+        }
     }
 
     private void applyHealPoolTick() {
@@ -2057,7 +2247,6 @@ public class GameSession {
                 continue;
             }
             meta.addEnchant(Enchantment.PROTECTION, level, true);
-            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             piece.setItemMeta(meta);
             armor[i] = piece;
             changed = true;
@@ -2094,7 +2283,6 @@ public class GameSession {
                 continue;
             }
             meta.addEnchant(enchantment, level, true);
-            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             item.setItemMeta(meta);
             contents[i] = item;
             changed = true;
@@ -2107,7 +2295,6 @@ public class GameSession {
             ItemMeta meta = offhand.getItemMeta();
             if (meta.getEnchantLevel(enchantment) < level) {
                 meta.addEnchant(enchantment, level, true);
-                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
                 offhand.setItemMeta(meta);
                 player.getInventory().setItemInOffHand(offhand);
             }

@@ -12,4 +12,13 @@ custom-items:
     material: EGG
     velocity: 1.2
     max-blocks: 64
-    bridge-width: 1
+    bridge-width: 2
+  bed_bug:
+    type: BED_BUG
+    material: SNOWBALL
+    velocity: 1.2
+    lifetime-seconds: 15
+  dream_defender:
+    type: DREAM_DEFENDER
+    material: IRON_GOLEM_SPAWN_EGG
+    lifetime-seconds: 180

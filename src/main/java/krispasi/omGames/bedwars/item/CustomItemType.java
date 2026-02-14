@@ -1,8 +1,10 @@
 package krispasi.omGames.bedwars.item;
 
 public enum CustomItemType {
-    FIREBALL(1.15, 3.2f, false, 0, 1, 4.0, 1.6),
-    BRIDGE_EGG(1.2, 0.0f, false, 64, 1, 0.0, 0.0);
+    FIREBALL(1.15, 3.2f, false, 0, 1, 4.0, 1.6, 0),
+    BRIDGE_EGG(1.2, 0.0f, false, 64, 1, 0.0, 0.0, 0),
+    BED_BUG(1.2, 0.0f, false, 0, 1, 0.0, 0.0, 15),
+    DREAM_DEFENDER(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 180);
 
     private final double defaultVelocity;
     private final float defaultYield;
@@ -11,6 +13,7 @@ public enum CustomItemType {
     private final int defaultBridgeWidth;
     private final double defaultDamage;
     private final double defaultKnockback;
+    private final int defaultLifetimeSeconds;
 
     CustomItemType(double defaultVelocity,
                    float defaultYield,
@@ -18,7 +21,8 @@ public enum CustomItemType {
                    int defaultMaxBlocks,
                    int defaultBridgeWidth,
                    double defaultDamage,
-                   double defaultKnockback) {
+                   double defaultKnockback,
+                   int defaultLifetimeSeconds) {
         this.defaultVelocity = defaultVelocity;
         this.defaultYield = defaultYield;
         this.defaultIncendiary = defaultIncendiary;
@@ -26,6 +30,7 @@ public enum CustomItemType {
         this.defaultBridgeWidth = defaultBridgeWidth;
         this.defaultDamage = defaultDamage;
         this.defaultKnockback = defaultKnockback;
+        this.defaultLifetimeSeconds = defaultLifetimeSeconds;
     }
 
     public double getDefaultVelocity() {
@@ -54,5 +59,9 @@ public enum CustomItemType {
 
     public double getDefaultKnockback() {
         return defaultKnockback;
+    }
+
+    public int getDefaultLifetimeSeconds() {
+        return defaultLifetimeSeconds;
     }
 }

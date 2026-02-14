@@ -9,10 +9,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Logger;
 import krispasi.omGames.bedwars.generator.GeneratorInfo;
+import krispasi.omGames.bedwars.generator.GeneratorSettings;
 import krispasi.omGames.bedwars.generator.GeneratorType;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.BedLocation;
 import krispasi.omGames.bedwars.model.BlockPoint;
+import krispasi.omGames.bedwars.model.EventSettings;
 import krispasi.omGames.bedwars.model.ShopLocation;
 import krispasi.omGames.bedwars.model.TeamColor;
 import org.bukkit.configuration.ConfigurationSection;
@@ -60,6 +62,8 @@ public class BedwarsConfigLoader {
             int lobbyHeight = arenaSection.getInt("lobby-height", 0);
             int baseGeneratorRadius = arenaSection.getInt("anti-build.base-generator-radius", 0);
             int advancedGeneratorRadius = arenaSection.getInt("anti-build.advanced-generator-radius", 0);
+            GeneratorSettings generatorSettings = parseGeneratorSettings(arenaSection, arenaId);
+            EventSettings eventSettings = parseEventSettings(arenaSection);
 
             Map<TeamColor, BedLocation> beds = new EnumMap<>(TeamColor.class);
             ConfigurationSection bedSection = arenaSection.getConfigurationSection("beds");
@@ -71,7 +75,7 @@ public class BedwarsConfigLoader {
                         continue;
                     }
                     String value = bedSection.getString(teamKey);
-                    if (value == null) {
+                    if (value == null || value.isBlank()) {
                         continue;
                     }
                     String[] parts = value.split(",");
@@ -102,6 +106,9 @@ public class BedwarsConfigLoader {
                         continue;
                     }
                     String value = generatorSection.getString(key);
+                    if (value == null || value.isBlank()) {
+                        continue;
+                    }
                     BlockPoint location = parsePoint(value, "generator", arenaId);
                     if (location == null) {
                         continue;
@@ -115,6 +122,9 @@ public class BedwarsConfigLoader {
             if (baseGeneratorSection != null) {
                 for (String key : baseGeneratorSection.getKeys(false)) {
                     String value = baseGeneratorSection.getString(key);
+                    if (value == null || value.isBlank()) {
+                        continue;
+                    }
                     BlockPoint location = parsePoint(value, "base generator", arenaId);
                     if (location == null) {
                         continue;
@@ -142,7 +152,11 @@ public class BedwarsConfigLoader {
                         logger.warning("Unknown spawn team in " + arenaId + ": " + key);
                         continue;
                     }
-                    BlockPoint point = parsePoint(spawnSection.getString(key), "spawn", arenaId);
+                    String raw = spawnSection.getString(key);
+                    if (raw == null || raw.isBlank()) {
+                        continue;
+                    }
+                    BlockPoint point = parsePoint(raw, "spawn", arenaId);
                     if (point != null) {
                         spawns.put(team, point);
                     }
@@ -166,11 +180,17 @@ public class BedwarsConfigLoader {
                     if (teamSection == null) {
                         continue;
                     }
-                    ShopLocation main = parseShopLocation(teamSection.getString("main"), "shop main", arenaId);
+                    String mainRaw = teamSection.getString("main");
+                    ShopLocation main = mainRaw == null || mainRaw.isBlank()
+                            ? null
+                            : parseShopLocation(mainRaw, "shop main", arenaId);
                     if (main != null) {
                         mainShops.put(team, main);
                     }
-                    ShopLocation upgrades = parseShopLocation(teamSection.getString("upgrades"), "shop upgrades", arenaId);
+                    String upgradesRaw = teamSection.getString("upgrades");
+                    ShopLocation upgrades = upgradesRaw == null || upgradesRaw.isBlank()
+                            ? null
+                            : parseShopLocation(upgradesRaw, "shop upgrades", arenaId);
                     if (upgrades != null) {
                         upgradeShops.put(team, upgrades);
                     }
@@ -192,6 +212,8 @@ public class BedwarsConfigLoader {
                     corner2,
                     baseGeneratorRadius,
                     advancedGeneratorRadius,
+                    generatorSettings,
+                    eventSettings,
                     beds,
                     generators,
                     spawns,
@@ -202,6 +224,188 @@ public class BedwarsConfigLoader {
         }
 
         return arenas;
+    }
+
+    private GeneratorSettings parseGeneratorSettings(ConfigurationSection arenaSection, String arenaId) {
+        ConfigurationSection section = arenaSection.getConfigurationSection("generator-settings");
+        GeneratorSettings defaults = GeneratorSettings.defaults();
+        if (section == null) {
+            return defaults;
+        }
+
+        long[] baseIronIntervals = parseSecondsList(section,
+                "base-forge.iron.intervals-seconds",
+                "base-forge.iron.intervals",
+                defaults.getBaseIronIntervals(),
+                5,
+                arenaId);
+        int[] baseIronAmounts = parseIntList(section,
+                "base-forge.iron.amounts",
+                defaults.getBaseIronAmounts(),
+                5,
+                arenaId);
+        int[] baseIronCaps = parseIntList(section,
+                "base-forge.iron.caps",
+                defaults.getBaseIronCaps(),
+                5,
+                arenaId);
+
+        long[] baseGoldIntervals = parseSecondsList(section,
+                "base-forge.gold.intervals-seconds",
+                "base-forge.gold.intervals",
+                defaults.getBaseGoldIntervals(),
+                5,
+                arenaId);
+        int[] baseGoldAmounts = parseIntList(section,
+                "base-forge.gold.amounts",
+                defaults.getBaseGoldAmounts(),
+                5,
+                arenaId);
+        int[] baseGoldCaps = parseIntList(section,
+                "base-forge.gold.caps",
+                defaults.getBaseGoldCaps(),
+                5,
+                arenaId);
+
+        long[] baseEmeraldIntervals = parseSecondsList(section,
+                "base-forge.emerald.intervals-seconds",
+                "base-forge.emerald.intervals",
+                defaults.getBaseEmeraldIntervals(),
+                5,
+                arenaId);
+        int[] baseEmeraldAmounts = parseIntList(section,
+                "base-forge.emerald.amounts",
+                defaults.getBaseEmeraldAmounts(),
+                5,
+                arenaId);
+        int[] baseEmeraldCaps = parseIntList(section,
+                "base-forge.emerald.caps",
+                defaults.getBaseEmeraldCaps(),
+                5,
+                arenaId);
+
+        long[] diamondIntervals = parseSecondsList(section,
+                "diamond.intervals-seconds",
+                "diamond.intervals",
+                defaults.getDiamondIntervals(),
+                3,
+                arenaId);
+        int diamondCap = section.getInt("diamond.cap", defaults.getDiamondCap());
+
+        long[] emeraldIntervals = parseSecondsList(section,
+                "emerald.intervals-seconds",
+                "emerald.intervals",
+                defaults.getEmeraldIntervals(),
+                3,
+                arenaId);
+        int emeraldCap = section.getInt("emerald.cap", defaults.getEmeraldCap());
+
+        double despawnSeconds = section.getDouble("resource-despawn-seconds",
+                defaults.getResourceDespawnMillis() / 1000.0);
+        long resourceDespawnMillis = Math.max(0L, Math.round(despawnSeconds * 1000.0));
+
+        return new GeneratorSettings(
+                baseIronIntervals,
+                baseGoldIntervals,
+                baseIronAmounts,
+                baseGoldAmounts,
+                baseIronCaps,
+                baseGoldCaps,
+                baseEmeraldIntervals,
+                baseEmeraldAmounts,
+                baseEmeraldCaps,
+                diamondIntervals,
+                emeraldIntervals,
+                diamondCap,
+                emeraldCap,
+                resourceDespawnMillis
+        );
+    }
+
+    private long[] parseSecondsList(ConfigurationSection section,
+                                    String path,
+                                    String legacyPath,
+                                    long[] fallback,
+                                    int expectedSize,
+                                    String arenaId) {
+        List<Double> values = readNumberList(section, path);
+        if (values == null && legacyPath != null) {
+            values = readNumberList(section, legacyPath);
+        }
+        if (values == null) {
+            return fallback;
+        }
+        if (values.size() != expectedSize) {
+            logger.warning("Invalid list size for " + path + " in " + arenaId + ": expected "
+                    + expectedSize + ", got " + values.size());
+            return fallback;
+        }
+        long[] result = new long[expectedSize];
+        for (int i = 0; i < expectedSize; i++) {
+            double seconds = values.get(i);
+            result[i] = Math.max(0L, Math.round(seconds * 20.0));
+        }
+        return result;
+    }
+
+    private int[] parseIntList(ConfigurationSection section,
+                               String path,
+                               int[] fallback,
+                               int expectedSize,
+                               String arenaId) {
+        List<Double> values = readNumberList(section, path);
+        if (values == null) {
+            return fallback;
+        }
+        if (values.size() != expectedSize) {
+            logger.warning("Invalid list size for " + path + " in " + arenaId + ": expected "
+                    + expectedSize + ", got " + values.size());
+            return fallback;
+        }
+        int[] result = new int[expectedSize];
+        for (int i = 0; i < expectedSize; i++) {
+            result[i] = Math.max(0, (int) Math.round(values.get(i)));
+        }
+        return result;
+    }
+
+    private List<Double> readNumberList(ConfigurationSection section, String path) {
+        if (section == null || path == null) {
+            return null;
+        }
+        List<?> raw = section.getList(path);
+        if (raw == null) {
+            return null;
+        }
+        List<Double> values = new ArrayList<>();
+        for (Object value : raw) {
+            if (value instanceof Number number) {
+                values.add(number.doubleValue());
+                continue;
+            }
+            if (value instanceof String text) {
+                try {
+                    values.add(Double.parseDouble(text));
+                } catch (NumberFormatException ex) {
+                    return null;
+                }
+            }
+        }
+        return values;
+    }
+
+    private EventSettings parseEventSettings(ConfigurationSection arenaSection) {
+        ConfigurationSection section = arenaSection.getConfigurationSection("event-times");
+        EventSettings defaults = EventSettings.defaults();
+        if (section == null) {
+            return defaults;
+        }
+        int tier2 = section.getInt("tier-2", defaults.getTier2Delay());
+        int tier3 = section.getInt("tier-3", defaults.getTier3Delay());
+        int bedBreak = section.getInt("bed-destruction", defaults.getBedDestructionDelay());
+        int suddenDeath = section.getInt("sudden-death", defaults.getSuddenDeathDelay());
+        int gameEnd = section.getInt("game-end", defaults.getGameEndDelay());
+        return new EventSettings(tier2, tier3, bedBreak, suddenDeath, gameEnd);
     }
 
     private BlockPoint parsePoint(String value, String label, String arenaId) {
