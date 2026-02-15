@@ -22,6 +22,9 @@ import org.bukkit.block.Container;
 import org.bukkit.entity.Egg;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.IronGolem;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.EnderCrystal;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Silverfish;
 import org.bukkit.entity.Snowball;
@@ -60,17 +63,24 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.event.block.Action;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Projectile;
+import org.bukkit.entity.EntityType;
+import org.bukkit.Tag;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -110,6 +120,9 @@ public class BedwarsListener implements Listener {
     );
     private static final double DEFENDER_SPAWN_Y_OFFSET = 1.0;
     private static final double BED_BUG_SPAWN_Y_OFFSET = 1.0;
+    private static final double CRYSTAL_SPAWN_Y_OFFSET = 1.0;
+    private static final double HAPPY_GHAST_SPAWN_Y_OFFSET = 1.5;
+    private static final double BASALT_BREAK_CHANCE = 0.35;
     private static final double DEFENDER_TARGET_RANGE = 16.0;
     private final NamespacedKey customProjectileKey;
     private final NamespacedKey summonTeamKey;
@@ -158,6 +171,7 @@ public class BedwarsListener implements Listener {
             if (event.getClick().isShiftClick() && isArmor(event.getCurrentItem())) {
                 event.setCancelled(true);
             }
+            scheduleArmorUnbreakable(player, session);
         });
     }
 
@@ -188,6 +202,7 @@ public class BedwarsListener implements Listener {
                     return;
                 }
             }
+            scheduleArmorUnbreakable(player, session);
         });
     }
 
@@ -296,6 +311,12 @@ public class BedwarsListener implements Listener {
                 case DREAM_DEFENDER -> {
                     yield spawnDreamDefender(player, session, custom, event);
                 }
+                case CRYSTAL -> {
+                    yield spawnCrystal(player, session, custom, event);
+                }
+                case HAPPY_GHAST -> {
+                    yield spawnHappyGhast(player, session, custom, event);
+                }
             };
             if (used) {
                 consumeHeldItem(player, event.getHand(), item);
@@ -375,7 +396,26 @@ public class BedwarsListener implements Listener {
             if (!session.isInArenaWorld(event.getEntity().getWorld())) {
                 return;
             }
-            filterExplosionBlocks(session, event.blockList());
+            if (event.getEntity() instanceof EnderCrystal crystal) {
+                CustomItemDefinition custom = getCustomEntity(crystal);
+                if (custom != null && custom.getYield() > 0.0f
+                        && !crystal.getScoreboardTags().contains(GameSession.CRYSTAL_EXPLOSION_TAG)) {
+                    crystal.addScoreboardTag(GameSession.CRYSTAL_EXPLOSION_TAG);
+                    Location location = crystal.getLocation();
+                    event.setCancelled(true);
+                    if (location.getWorld() != null) {
+                        location.getWorld().createExplosion(location, (float) custom.getYield(), false, true, crystal);
+                    }
+                    crystal.remove();
+                    return;
+                }
+            }
+            if (isWindChargeExplosion(event.getEntity())) {
+                event.blockList().clear();
+                return;
+            }
+            boolean limited = event.getEntity() instanceof Fireball;
+            filterExplosionBlocks(session, event.blockList(), limited);
         });
     }
 
@@ -406,7 +446,7 @@ public class BedwarsListener implements Listener {
             if (!session.isInArenaWorld(event.getBlock().getWorld())) {
                 return;
             }
-            filterExplosionBlocks(session, event.blockList());
+            filterExplosionBlocks(session, event.blockList(), false);
         });
     }
 
@@ -483,7 +523,7 @@ public class BedwarsListener implements Listener {
                 consumeSingleItem(player, event.getHand());
                 return;
             }
-            session.recordPlacedBlock(point);
+            session.recordPlacedBlock(point, event.getItemInHand());
         });
     }
 
@@ -522,9 +562,10 @@ public class BedwarsListener implements Listener {
                     return;
                 }
             }
+            ItemStack placedItem = event.getItemInHand();
             for (org.bukkit.block.BlockState state : event.getReplacedBlockStates()) {
                 Block block = state.getBlock();
-                session.recordPlacedBlock(new BlockPoint(block.getX(), block.getY(), block.getZ()));
+                session.recordPlacedBlock(new BlockPoint(block.getX(), block.getY(), block.getZ()), placedItem);
             }
         });
     }
@@ -574,8 +615,8 @@ public class BedwarsListener implements Listener {
                 player.sendMessage(Component.text("You can only break blocks placed in this game.", NamedTextColor.RED));
                 return;
             }
-            dropPlacedBlock(block);
-            session.removePlacedBlock(point);
+            ItemStack drop = session.removePlacedBlockItem(point);
+            dropPlacedBlock(block, drop);
             event.setCancelled(true);
         });
     }
@@ -618,6 +659,22 @@ public class BedwarsListener implements Listener {
                 if (ownerTeam != null && victimTeam != null && ownerTeam == victimTeam) {
                     event.setCancelled(true);
                     return;
+                }
+                CustomItemDefinition summon = getSummonDefinition(event.getDamager());
+                if (summon != null && summon.getDamage() > 0.0) {
+                    event.setDamage(summon.getDamage());
+                }
+            }
+            if (event.getDamager() instanceof EnderCrystal crystal) {
+                TeamColor ownerTeam = getSummonTeam(crystal);
+                TeamColor victimTeam = session.getTeam(victim.getUniqueId());
+                if (ownerTeam != null && victimTeam != null && ownerTeam == victimTeam) {
+                    event.setCancelled(true);
+                    return;
+                }
+                CustomItemDefinition custom = getCustomEntity(crystal);
+                if (custom != null && custom.getDamage() > 0.0) {
+                    event.setDamage(custom.getDamage());
                 }
             }
             boolean sameTeamTnt = false;
@@ -907,6 +964,10 @@ public class BedwarsListener implements Listener {
             ItemStack stack = event.getItem().getItemStack();
             if (stack == null) {
                 return;
+            }
+            if (isArmor(stack)) {
+                ItemStack updated = makeUnbreakable(stack);
+                event.getItem().setItemStack(updated);
             }
             if (RESOURCE_MATERIALS.contains(stack.getType())) {
                 player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.2f);
@@ -1218,11 +1279,101 @@ public class BedwarsListener implements Listener {
             entity.addScoreboardTag(GameSession.DREAM_DEFENDER_TAG);
             setSummonTeam(entity, team);
         });
+        applySummonStats(golem, custom);
         int lifetimeSeconds = custom != null && custom.getLifetimeSeconds() > 0
                 ? custom.getLifetimeSeconds()
                 : 180;
         scheduleSummonDespawn(golem, lifetimeSeconds);
         startDefenderTargeting(golem, team, session);
+        return true;
+    }
+
+    private boolean spawnCrystal(Player player,
+                                 GameSession session,
+                                 CustomItemDefinition custom,
+                                 PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return false;
+        }
+        Block clicked = event.getClickedBlock();
+        if (clicked == null) {
+            return false;
+        }
+        TeamColor team = session.getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        Block above = clicked.getRelative(org.bukkit.block.BlockFace.UP);
+        if (!above.getType().isAir()) {
+            return false;
+        }
+        BlockPoint point = new BlockPoint(above.getX(), above.getY(), above.getZ());
+        if (!session.isInsideMap(point)) {
+            player.sendMessage(Component.text("You cannot place crystals outside the map.", NamedTextColor.RED));
+            return false;
+        }
+        if (session.isPlacementBlocked(point)) {
+            player.sendMessage(Component.text("You cannot place crystals here.", NamedTextColor.RED));
+            return false;
+        }
+        Location spawn = clicked.getLocation().add(0.5, CRYSTAL_SPAWN_Y_OFFSET, 0.5);
+        EnderCrystal crystal = clicked.getWorld().spawn(spawn, EnderCrystal.class, entity -> {
+            entity.setShowingBottom(false);
+            entity.setPersistent(false);
+            entity.addScoreboardTag(GameSession.CRYSTAL_TAG);
+            setSummonTeam(entity, team);
+            entity.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
+        });
+        return crystal != null;
+    }
+
+    private boolean spawnHappyGhast(Player player,
+                                    GameSession session,
+                                    CustomItemDefinition custom,
+                                    PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return false;
+        }
+        Block clicked = event.getClickedBlock();
+        if (clicked == null) {
+            return false;
+        }
+        TeamColor team = session.getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        Block above = clicked.getRelative(org.bukkit.block.BlockFace.UP);
+        if (!above.getType().isAir()) {
+            return false;
+        }
+        BlockPoint point = new BlockPoint(above.getX(), above.getY(), above.getZ());
+        if (!session.isInsideMap(point)) {
+            player.sendMessage(Component.text("You cannot place a happy ghast outside the map.", NamedTextColor.RED));
+            return false;
+        }
+        if (session.isPlacementBlocked(point)) {
+            player.sendMessage(Component.text("You cannot place a happy ghast here.", NamedTextColor.RED));
+            return false;
+        }
+        Location spawn = clicked.getLocation().add(0.5, HAPPY_GHAST_SPAWN_Y_OFFSET, 0.5);
+        EntityType type = resolveHappyGhastType();
+        org.bukkit.entity.Entity raw = clicked.getWorld().spawnEntity(spawn, type);
+        if (!(raw instanceof LivingEntity entity)) {
+            raw.remove();
+            return false;
+        }
+        if (entity instanceof Mob mob) {
+            mob.setRemoveWhenFarAway(true);
+        }
+        entity.setPersistent(false);
+        entity.addScoreboardTag(GameSession.HAPPY_GHAST_TAG);
+        setSummonTeam(entity, team);
+        entity.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
+        applySummonStats(entity, custom);
+        int lifetimeSeconds = custom != null && custom.getLifetimeSeconds() > 0
+                ? custom.getLifetimeSeconds()
+                : 180;
+        scheduleSummonDespawn(entity, lifetimeSeconds);
         return true;
     }
 
@@ -1237,6 +1388,7 @@ public class BedwarsListener implements Listener {
             entity.addScoreboardTag(GameSession.BED_BUG_TAG);
             setSummonTeam(entity, team);
         });
+        applySummonStats(silverfish, custom);
         Player target = findNearestEnemy(location, team, session, DEFENDER_TARGET_RANGE);
         if (target != null) {
             silverfish.setTarget(target);
@@ -1339,7 +1491,54 @@ public class BedwarsListener implements Listener {
     private boolean isSummon(org.bukkit.entity.Entity entity) {
         return entity != null
                 && (entity.getScoreboardTags().contains(GameSession.BED_BUG_TAG)
-                || entity.getScoreboardTags().contains(GameSession.DREAM_DEFENDER_TAG));
+                || entity.getScoreboardTags().contains(GameSession.DREAM_DEFENDER_TAG)
+                || entity.getScoreboardTags().contains(GameSession.HAPPY_GHAST_TAG));
+    }
+
+    private CustomItemDefinition getSummonDefinition(org.bukkit.entity.Entity entity) {
+        if (entity == null) {
+            return null;
+        }
+        if (entity.getScoreboardTags().contains(GameSession.BED_BUG_TAG)) {
+            return getCustomItem("bed_bug");
+        }
+        if (entity.getScoreboardTags().contains(GameSession.DREAM_DEFENDER_TAG)) {
+            return getCustomItem("dream_defender");
+        }
+        if (entity.getScoreboardTags().contains(GameSession.HAPPY_GHAST_TAG)) {
+            return getCustomItem("happy_ghast");
+        }
+        return null;
+    }
+
+    private void applySummonStats(LivingEntity entity, CustomItemDefinition custom) {
+        if (entity == null || custom == null) {
+            return;
+        }
+        double health = custom.getHealth();
+        if (health > 0.0) {
+            entity.setMaxHealth(health);
+            entity.setHealth(Math.min(health, entity.getMaxHealth()));
+        }
+        double speed = custom.getSpeed();
+        if (speed > 0.0) {
+            AttributeInstance move = entity.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
+            if (move != null) {
+                move.setBaseValue(speed);
+            }
+            AttributeInstance fly = entity.getAttribute(Attribute.GENERIC_FLYING_SPEED);
+            if (fly != null) {
+                fly.setBaseValue(speed);
+            }
+        }
+    }
+
+    private EntityType resolveHappyGhastType() {
+        try {
+            return EntityType.valueOf("HAPPY_GHAST");
+        } catch (IllegalArgumentException ex) {
+            return EntityType.GHAST;
+        }
     }
 
     private CustomItemDefinition getCustomItem(String id) {
@@ -1348,6 +1547,18 @@ public class BedwarsListener implements Listener {
             return null;
         }
         return config.getItem(id);
+    }
+
+    private CustomItemDefinition getCustomEntity(org.bukkit.entity.Entity entity) {
+        if (entity == null) {
+            return null;
+        }
+        PersistentDataContainer container = entity.getPersistentDataContainer();
+        String customId = container.get(customProjectileKey, PersistentDataType.STRING);
+        if (customId != null) {
+            return getCustomItem(customId);
+        }
+        return getSummonDefinition(entity);
     }
 
     private void consumeHeldItem(Player player, EquipmentSlot hand, ItemStack usedItem) {
@@ -1538,24 +1749,57 @@ public class BedwarsListener implements Listener {
                 continue;
             }
             target.setType(team.wool(), false);
-            session.recordPlacedBlock(point);
+            session.recordPlacedBlock(point, new ItemStack(team.wool()));
             placed++;
         }
         return placed;
     }
 
-    private void filterExplosionBlocks(GameSession session, List<Block> blocks) {
+    private void filterExplosionBlocks(GameSession session, List<Block> blocks, boolean limitedTypes) {
         if (blocks == null || blocks.isEmpty()) {
             return;
         }
-        blocks.removeIf(block -> {
+        java.util.Iterator<Block> iterator = blocks.iterator();
+        while (iterator.hasNext()) {
+            Block block = iterator.next();
             BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
-            if (session.isPlacedBlock(point)) {
-                session.removePlacedBlock(point);
-                return false;
+            if (!session.isPlacedBlock(point)) {
+                iterator.remove();
+                continue;
             }
+            if (limitedTypes && !isFireballBreakable(block)) {
+                iterator.remove();
+                continue;
+            }
+            ItemStack drop = session.removePlacedBlockItem(point);
+            dropPlacedBlock(block, drop);
+            iterator.remove();
+        }
+    }
+
+    private boolean isFireballBreakable(Block block) {
+        if (block == null) {
+            return false;
+        }
+        Material type = block.getType();
+        if (Tag.WOOL.isTagged(type)) {
             return true;
-        });
+        }
+        if (Tag.PLANKS.isTagged(type) || Tag.LOGS.isTagged(type)) {
+            return true;
+        }
+        if (type == Material.SMOOTH_BASALT) {
+            return ThreadLocalRandom.current().nextDouble() < BASALT_BREAK_CHANCE;
+        }
+        return false;
+    }
+
+    private boolean isWindChargeExplosion(org.bukkit.entity.Entity entity) {
+        if (entity == null) {
+            return false;
+        }
+        String type = entity.getType().name();
+        return "WIND_CHARGE".equals(type) || "BREEZE_WIND_CHARGE".equals(type);
     }
 
     private boolean isArmor(ItemStack item) {
@@ -1567,6 +1811,80 @@ public class BedwarsListener implements Listener {
                 || name.endsWith("_CHESTPLATE")
                 || name.endsWith("_LEGGINGS")
                 || name.endsWith("_BOOTS");
+    }
+
+    private void scheduleArmorUnbreakable(Player player, GameSession session) {
+        if (player == null || session == null) {
+            return;
+        }
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!player.isOnline()) {
+                    return;
+                }
+                if (!session.isActive() || !session.isParticipant(player.getUniqueId())) {
+                    return;
+                }
+                if (!session.isInArenaWorld(player.getWorld())) {
+                    return;
+                }
+                enforceArmorUnbreakable(player);
+            }
+        }.runTask(bedwarsManager.getPlugin());
+    }
+
+    private void enforceArmorUnbreakable(Player player) {
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        boolean armorChanged = false;
+        for (int i = 0; i < armor.length; i++) {
+            ItemStack piece = armor[i];
+            if (piece == null || !isArmor(piece)) {
+                continue;
+            }
+            ItemStack updated = makeUnbreakable(piece);
+            if (updated != piece) {
+                armor[i] = updated;
+                armorChanged = true;
+            }
+        }
+        if (armorChanged) {
+            player.getInventory().setArmorContents(armor);
+        }
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        boolean changed = false;
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (item == null || !isArmor(item)) {
+                continue;
+            }
+            ItemStack updated = makeUnbreakable(item);
+            if (updated != item) {
+                contents[i] = updated;
+                changed = true;
+            }
+        }
+        if (changed) {
+            player.getInventory().setStorageContents(contents);
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && isArmor(offhand)) {
+            player.getInventory().setItemInOffHand(makeUnbreakable(offhand));
+        }
+    }
+
+    private ItemStack makeUnbreakable(ItemStack item) {
+        if (item == null) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || meta.isUnbreakable()) {
+            return item;
+        }
+        meta.setUnbreakable(true);
+        meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE);
+        item.setItemMeta(meta);
+        return item;
     }
 
     private Player resolveAttacker(EntityDamageByEntityEvent event) {
@@ -1588,13 +1906,15 @@ public class BedwarsListener implements Listener {
         }
     }
 
-    private void dropPlacedBlock(Block block) {
+    private void dropPlacedBlock(Block block, ItemStack override) {
         Material type = block.getType();
         if (type == Material.AIR) {
             return;
         }
         block.setType(Material.AIR, false);
-        block.getWorld().dropItemNaturally(block.getLocation(), new ItemStack(type));
+        ItemStack drop = override != null ? override.clone() : new ItemStack(type);
+        drop.setAmount(1);
+        block.getWorld().dropItemNaturally(block.getLocation(), drop);
     }
 
     private void dropResourceItems(PlayerDeathEvent event, GameSession session) {
@@ -1614,6 +1934,35 @@ public class BedwarsListener implements Listener {
             contents[i] = null;
         }
         player.getInventory().setContents(contents);
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && RESOURCE_MATERIALS.contains(offhand.getType())) {
+            totals.merge(offhand.getType(), offhand.getAmount(), Integer::sum);
+            player.getInventory().setItemInOffHand(null);
+        }
+        ItemStack cursor = player.getItemOnCursor();
+        if (cursor != null && RESOURCE_MATERIALS.contains(cursor.getType())) {
+            totals.merge(cursor.getType(), cursor.getAmount(), Integer::sum);
+            player.setItemOnCursor(null);
+        }
+        if (player.getOpenInventory() != null) {
+            Inventory top = player.getOpenInventory().getTopInventory();
+            if (top instanceof CraftingInventory crafting) {
+                ItemStack[] matrix = crafting.getMatrix();
+                boolean changed = false;
+                for (int i = 0; i < matrix.length; i++) {
+                    ItemStack item = matrix[i];
+                    if (item == null || !RESOURCE_MATERIALS.contains(item.getType())) {
+                        continue;
+                    }
+                    totals.merge(item.getType(), item.getAmount(), Integer::sum);
+                    matrix[i] = null;
+                    changed = true;
+                }
+                if (changed) {
+                    crafting.setMatrix(matrix);
+                }
+            }
+        }
         event.getDrops().clear();
         event.setKeepInventory(true);
         Player recipient = null;

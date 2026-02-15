@@ -23,7 +23,10 @@ shop:
         hardened_clay: 11
         end_stone: 12
         wood_planks: 13
-        blast_glass: 14
+        blast_glass: 15
+        creaking_heart: 14
+        ancient_debris: 16
+        obsidian: 17
     melee:
       title: "Melee"
       icon: IRON_SWORD
@@ -47,6 +50,7 @@ shop:
         crossbow: 14
         crossbow_quickcharge: 15
         crossbow_multishot: 16
+        explosive_firework: 17
     armor:
       title: "Armor"
       icon: IRON_CHESTPLATE
@@ -86,6 +90,9 @@ shop:
         wind_charge: 24
         bed_bug: 25
         dream_defender: 26
+        water_bucket: 27
+        crystal: 28
+        happy_ghast: 29
     miscellaneous:
       title: "Miscellaneous"
       icon: BREWING_STAND
@@ -130,11 +137,30 @@ shop:
         display-name: "Blast-Proof Glass"
       creaking_heart:
         material: creaking_heart
-        amount: 4
+        amount: 10
         cost:
           material: GOLD
           amount: 16
         display-name: "Creaking Heart"
+      ancient_debris:
+        material: ANCIENT_DEBRIS
+        amount: 4
+        cost:
+          material: EMERALD
+          amount: 2
+        display-name: "Ancient Debris"
+      obsidian:
+        material: OBSIDIAN
+        amount: 4
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Obsidian"
+      water_bucket:
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 1
     melee:
       stone_sword:
         material: STONE_SWORD
@@ -246,6 +272,18 @@ shop:
           material: GOLD
           amount: 2
         display-name: "Arrows"
+      explosive_firework:
+        material: FIREWORK_ROCKET
+        amount: 3
+        cost:
+          material: GOLD
+          amount: 4
+        display-name: "Firework"
+        firework:
+          power: 1
+          effect:
+            type: BURST
+            colors: [RED, ORANGE]
     armor:
       chainmail_armor:
         material: CHAINMAIL_CHESTPLATE
@@ -444,5 +482,26 @@ shop:
           - "Summons an iron golem"
           - "to defend your base."
         custom-item: dream_defender
+      crystal:
+        material: END_CRYSTAL
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Explosive Crystal"
+        lore:
+          - "Place on any block."
+          - "Explodes when destroyed."
+        custom-item: crystal
+      happy_ghast:
+        material: GHAST_SPAWN_EGG
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 6
+        display-name: "Happy Ghast"
+        lore:
+          - "Summons a happy ghast."
+        custom-item: happy_ghast
     miscellaneous: {}
 

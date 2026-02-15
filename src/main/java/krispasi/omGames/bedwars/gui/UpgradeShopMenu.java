@@ -29,6 +29,7 @@ public class UpgradeShopMenu implements InventoryHolder {
     private static final int HASTE_SLOT = 12;
     private static final int FORGE_SLOT = 13;
     private static final int HEAL_POOL_SLOT = 14;
+    private static final int FEATHER_FALLING_SLOT = 15;
     private static final int TRAP_SLOT_START = 28;
 
     private final GameSession session;
@@ -90,6 +91,7 @@ public class UpgradeShopMenu implements InventoryHolder {
         setUpgrade(HASTE_SLOT, TeamUpgradeType.HASTE);
         setUpgrade(FORGE_SLOT, TeamUpgradeType.FORGE);
         setUpgrade(HEAL_POOL_SLOT, TeamUpgradeType.HEAL_POOL);
+        setUpgrade(FEATHER_FALLING_SLOT, TeamUpgradeType.FEATHER_FALLING);
 
         int slot = TRAP_SLOT_START;
         for (TrapType trap : TrapType.values()) {

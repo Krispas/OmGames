@@ -8,6 +8,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Logger;
+import org.bukkit.Color;
+import org.bukkit.DyeColor;
+import org.bukkit.FireworkEffect;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.configuration.ConfigurationSection;
@@ -119,6 +122,15 @@ public class ShopConfigLoader {
         String displayName = section.getString("display-name");
         List<String> lore = section.getStringList("lore");
         String customItemId = section.getString("custom-item");
+        Integer fireworkPower = null;
+        FireworkEffect fireworkEffect = null;
+        if (material == Material.FIREWORK_ROCKET) {
+            ConfigurationSection fireworkSection = section.getConfigurationSection("firework");
+            if (fireworkSection != null) {
+                fireworkPower = fireworkSection.getInt("power");
+                fireworkEffect = parseFireworkEffect(fireworkSection.getConfigurationSection("effect"));
+            }
+        }
         if (customItemId != null) {
             customItemId = customItemId.trim();
             if (customItemId.isBlank()) {
@@ -129,7 +141,7 @@ public class ShopConfigLoader {
         }
 
         return new ShopItemDefinition(id, material, amount, cost, behavior, teamColor, tier,
-                enchants, potionEffects, displayName, lore, customItemId);
+                enchants, potionEffects, displayName, lore, customItemId, fireworkPower, fireworkEffect);
     }
 
     private ShopCost parseCost(ConfigurationSection section) {
@@ -217,6 +229,83 @@ public class ShopConfigLoader {
             case "utility", "miscellaneous" -> ShopItemBehavior.UTILITY;
             default -> null;
         };
+    }
+
+    private FireworkEffect parseFireworkEffect(ConfigurationSection section) {
+        if (section == null) {
+            return null;
+        }
+        String typeRaw = section.getString("type", "BURST");
+        FireworkEffect.Type type;
+        try {
+            type = FireworkEffect.Type.valueOf(typeRaw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            type = FireworkEffect.Type.BURST;
+        }
+        boolean flicker = section.getBoolean("flicker", false);
+        boolean trail = section.getBoolean("trail", false);
+        List<Color> colors = parseColors(section.getStringList("colors"));
+        if (colors.isEmpty()) {
+            colors = List.of(Color.RED);
+        }
+        List<Color> fadeColors = parseColors(section.getStringList("fade-colors"));
+        FireworkEffect.Builder builder = FireworkEffect.builder().with(type).withColor(colors);
+        if (!fadeColors.isEmpty()) {
+            builder.withFade(fadeColors);
+        }
+        if (flicker) {
+            builder.flicker(true);
+        }
+        if (trail) {
+            builder.trail(true);
+        }
+        return builder.build();
+    }
+
+    private List<Color> parseColors(List<String> values) {
+        List<Color> colors = new ArrayList<>();
+        if (values == null) {
+            return colors;
+        }
+        for (String raw : values) {
+            Color color = parseColor(raw);
+            if (color != null) {
+                colors.add(color);
+            }
+        }
+        return colors;
+    }
+
+    private Color parseColor(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String normalized = raw.trim().toUpperCase(Locale.ROOT);
+        if (normalized.startsWith("#")) {
+            String hex = normalized.substring(1);
+            return parseHexColor(hex);
+        }
+        if (normalized.startsWith("0X")) {
+            return parseHexColor(normalized.substring(2));
+        }
+        try {
+            DyeColor dye = DyeColor.valueOf(normalized);
+            return dye.getColor();
+        } catch (IllegalArgumentException ex) {
+            return parseHexColor(normalized);
+        }
+    }
+
+    private Color parseHexColor(String hex) {
+        if (hex == null || hex.isBlank()) {
+            return null;
+        }
+        try {
+            int rgb = Integer.parseInt(hex, 16);
+            return Color.fromRGB(rgb & 0xFFFFFF);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private Map<Enchantment, Integer> parseEnchants(ConfigurationSection section) {

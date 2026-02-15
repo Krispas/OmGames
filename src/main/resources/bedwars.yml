@@ -8,14 +8,14 @@ arenas:
         iron:
           intervals-seconds: [1, 0.8, 0.7, 0.6, 0.4]
           amounts: [1, 1, 1, 1, 2]
-          caps: [32, 64, 96, 112, 128]
+          caps: [46, 64, 96, 112, 128]
         gold:
           intervals-seconds: [8, 6, 5, 4.5, 3.5]
           amounts: [1, 1, 1, 1, 2]
           caps: [4, 8, 12, 20, 30]
         emerald:
           intervals-seconds: [0, 0, 0, 80, 40]
-          amounts: [0, 0, 0, 0, 1]
+          amounts: [0, 0, 0, 1, 1]
           caps: [0, 0, 0, 1, 2]
       diamond:
         intervals-seconds: [30, 23, 12]
@@ -78,7 +78,7 @@ arenas:
       base_gen_blue: 915 51 1351
       base_gen_lime: 815 51 1525
       base_gen_white: 989 51 1625
-      base_gen_black: 915 51 1619
+      base_gen_black: 915 51 1625
       base_gem_purple: 1089 51 1525
       base_gen_cyan: 1089 51 1451
       base_gen_pink: 989 51 1351

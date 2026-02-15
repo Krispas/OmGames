@@ -7,11 +7,13 @@ import krispasi.omGames.bedwars.item.CustomItemData;
 import krispasi.omGames.bedwars.model.TeamColor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.FireworkEffect;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.potion.PotionEffect;
 
@@ -28,6 +30,8 @@ public class ShopItemDefinition {
     private final String displayName;
     private final List<String> lore;
     private final String customItemId;
+    private final Integer fireworkPower;
+    private final FireworkEffect fireworkEffect;
 
     public ShopItemDefinition(String id,
                               Material material,
@@ -40,7 +44,9 @@ public class ShopItemDefinition {
                               List<PotionEffect> potionEffects,
                               String displayName,
                               List<String> lore,
-                              String customItemId) {
+                              String customItemId,
+                              Integer fireworkPower,
+                              FireworkEffect fireworkEffect) {
         this.id = id;
         this.material = material;
         this.amount = amount;
@@ -53,6 +59,8 @@ public class ShopItemDefinition {
         this.displayName = displayName;
         this.lore = lore;
         this.customItemId = customItemId;
+        this.fireworkPower = fireworkPower;
+        this.fireworkEffect = fireworkEffect;
     }
 
     public String getId() {
@@ -87,6 +95,10 @@ public class ShopItemDefinition {
         return customItemId;
     }
 
+    public String getDisplayName() {
+        return displayName;
+    }
+
     public ItemStack createDisplayItem(TeamColor team) {
         return createItem(team, true);
     }
@@ -118,6 +130,16 @@ public class ShopItemDefinition {
                 potionMeta.addCustomEffect(effect, true);
             }
             meta = potionMeta;
+        }
+        if (meta instanceof FireworkMeta fireworkMeta) {
+            if (fireworkPower != null) {
+                fireworkMeta.setPower(Math.max(0, fireworkPower));
+            }
+            if (fireworkEffect != null) {
+                fireworkMeta.clearEffects();
+                fireworkMeta.addEffect(fireworkEffect);
+            }
+            meta = fireworkMeta;
         }
 
         List<Component> lines = new ArrayList<>();

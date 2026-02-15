@@ -1,10 +1,12 @@
 package krispasi.omGames.bedwars.item;
 
 public enum CustomItemType {
-    FIREBALL(1.15, 3.2f, false, 0, 1, 4.0, 1.6, 0),
-    BRIDGE_EGG(1.2, 0.0f, false, 64, 1, 0.0, 0.0, 0),
-    BED_BUG(1.2, 0.0f, false, 0, 1, 0.0, 0.0, 15),
-    DREAM_DEFENDER(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 180);
+    FIREBALL(1.15, 3.2f, false, 0, 1, 4.0, 1.6, 0, -1.0, -1.0),
+    BRIDGE_EGG(1.2, 0.0f, false, 64, 1, 0.0, 0.0, 0, -1.0, -1.0),
+    BED_BUG(1.2, 0.0f, false, 0, 1, 0.0, 0.0, 15, -1.0, -1.0),
+    DREAM_DEFENDER(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 180, -1.0, -1.0),
+    CRYSTAL(0.0, 6.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0),
+    HAPPY_GHAST(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 180, -1.0, -1.0);
 
     private final double defaultVelocity;
     private final float defaultYield;
@@ -14,6 +16,8 @@ public enum CustomItemType {
     private final double defaultDamage;
     private final double defaultKnockback;
     private final int defaultLifetimeSeconds;
+    private final double defaultHealth;
+    private final double defaultSpeed;
 
     CustomItemType(double defaultVelocity,
                    float defaultYield,
@@ -22,7 +26,9 @@ public enum CustomItemType {
                    int defaultBridgeWidth,
                    double defaultDamage,
                    double defaultKnockback,
-                   int defaultLifetimeSeconds) {
+                   int defaultLifetimeSeconds,
+                   double defaultHealth,
+                   double defaultSpeed) {
         this.defaultVelocity = defaultVelocity;
         this.defaultYield = defaultYield;
         this.defaultIncendiary = defaultIncendiary;
@@ -31,6 +37,8 @@ public enum CustomItemType {
         this.defaultDamage = defaultDamage;
         this.defaultKnockback = defaultKnockback;
         this.defaultLifetimeSeconds = defaultLifetimeSeconds;
+        this.defaultHealth = defaultHealth;
+        this.defaultSpeed = defaultSpeed;
     }
 
     public double getDefaultVelocity() {
@@ -63,5 +71,13 @@ public enum CustomItemType {
 
     public int getDefaultLifetimeSeconds() {
         return defaultLifetimeSeconds;
+    }
+
+    public double getDefaultHealth() {
+        return defaultHealth;
+    }
+
+    public double getDefaultSpeed() {
+        return defaultSpeed;
     }
 }

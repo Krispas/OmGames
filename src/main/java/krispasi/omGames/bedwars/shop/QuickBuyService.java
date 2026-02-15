@@ -31,6 +31,7 @@ public class QuickBuyService {
             ON CONFLICT(player_uuid, slot)
             DO UPDATE SET item_id = excluded.item_id
             """;
+    private static final String DELETE_SQL = "DELETE FROM quick_buy WHERE player_uuid = ? AND slot = ?";
 
     private final File databaseFile;
     private final Logger logger;
@@ -85,6 +86,27 @@ public class QuickBuyService {
             statement.executeUpdate();
         } catch (SQLException ex) {
             logger.log(Level.WARNING, "Failed to save quick buy slot for " + playerId, ex);
+        }
+    }
+
+    public void removeQuickBuySlot(UUID playerId, int slot) {
+        if (playerId == null) {
+            return;
+        }
+        Map<Integer, String> map = quickBuy.get(playerId);
+        if (map != null) {
+            map.remove(slot);
+        }
+        if (connection == null) {
+            logger.warning("Quick buy database is not available.");
+            return;
+        }
+        try (PreparedStatement statement = connection.prepareStatement(DELETE_SQL)) {
+            statement.setString(1, playerId.toString());
+            statement.setInt(2, slot);
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to remove quick buy slot for " + playerId, ex);
         }
     }
 

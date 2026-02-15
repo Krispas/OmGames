@@ -78,7 +78,7 @@ public class ShopMenu implements InventoryHolder {
             return;
         }
         if (isCustomizing()) {
-            handleCustomizeClick(player, event.getRawSlot());
+            handleCustomizeClick(player, event);
             return;
         }
         ShopItemDefinition item = itemSlots.get(event.getRawSlot());
@@ -121,7 +121,11 @@ public class ShopMenu implements InventoryHolder {
             if (slot < 0 || slot >= inventory.getSize()) {
                 continue;
             }
-            inventory.setItem(slot, item.createDisplayItem(team));
+            ItemStack display = item.createDisplayItem(team);
+            if (item.getBehavior() == ShopItemBehavior.ARMOR) {
+                display = decorateArmorDisplay(display);
+            }
+            inventory.setItem(slot, display);
             itemSlots.put(slot, item);
         }
         if (categoryType == ShopCategoryType.QUICK_BUY && isCustomizing()) {
@@ -179,6 +183,64 @@ public class ShopMenu implements InventoryHolder {
             definition = tiered.get(maxTier);
         }
         return definition != null ? definition.getId() : null;
+    }
+
+    private ItemStack decorateArmorDisplay(ItemStack item) {
+        if (item == null) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        java.util.List<Component> lore = meta.lore();
+        if (lore == null) {
+            lore = new java.util.ArrayList<>();
+        } else {
+            lore = new java.util.ArrayList<>(lore);
+        }
+        String owned = getCurrentArmorName();
+        if (owned != null) {
+            lore.add(Component.text("Owned: " + owned, NamedTextColor.GRAY));
+        }
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private String getCurrentArmorName() {
+        int tier = session.getArmorTier(viewerId);
+        if (tier <= 0) {
+            return "Leather Armor";
+        }
+        ShopItemDefinition current = config.getTieredItem(ShopItemBehavior.ARMOR, tier).orElse(null);
+        if (current == null) {
+            return "Tier " + tier;
+        }
+        String displayName = current.getDisplayName();
+        if (displayName != null && !displayName.isBlank()) {
+            return displayName;
+        }
+        return formatMaterialName(current.getMaterial());
+    }
+
+    private String formatMaterialName(Material material) {
+        if (material == null) {
+            return "Unknown";
+        }
+        String name = material.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+        String[] parts = name.split("\\s+");
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            if (part.isBlank()) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(' ');
+            }
+            builder.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                builder.append(part.substring(1));
+            }
+        }
+        return builder.toString();
     }
 
     private void buildCategoryRow() {
@@ -243,15 +305,26 @@ public class ShopMenu implements InventoryHolder {
         new ShopMenu(session, config, categoryType, player).open(player);
     }
 
-    private void handleCustomizeClick(Player player, int slot) {
+    private void handleCustomizeClick(Player player, InventoryClickEvent event) {
         if (quickBuyService == null) {
             return;
         }
+        int slot = event.getRawSlot();
         if (slot < CATEGORY_ROW_SIZE) {
             return;
         }
         Integer pending = quickBuyService.getPendingSlot(viewerId);
         if (categoryType == ShopCategoryType.QUICK_BUY) {
+            if (event.getClick().isRightClick()) {
+                ShopItemDefinition item = itemSlots.get(slot);
+                if (item != null) {
+                    quickBuyService.removeQuickBuySlot(viewerId, slot);
+                    quickBuyService.clearPendingSlot(viewerId);
+                    player.sendMessage(Component.text("Cleared slot " + slot + ".", NamedTextColor.GRAY));
+                    new ShopMenu(session, config, categoryType, player).open(player);
+                }
+                return;
+            }
             if (pending == null) {
                 quickBuyService.setPendingSlot(viewerId, slot);
                 player.sendMessage(Component.text("Selected slot " + slot + ".", NamedTextColor.YELLOW));

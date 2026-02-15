@@ -43,6 +43,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.WorldBorder;
 import org.bukkit.Chunk;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
@@ -72,12 +73,18 @@ public class GameSession {
     public static final String UPGRADES_SHOP_TAG = "bw_upgrades_shop";
     public static final String BED_BUG_TAG = "bw_bed_bug";
     public static final String DREAM_DEFENDER_TAG = "bw_dream_defender";
+    public static final String CRYSTAL_TAG = "bw_crystal";
+    public static final String CRYSTAL_EXPLOSION_TAG = "bw_crystal_exploded";
+    public static final String HAPPY_GHAST_TAG = "bw_happy_ghast";
     private static final Set<Material> SWORD_MATERIALS = EnumSet.of(
             Material.WOODEN_SWORD,
             Material.STONE_SWORD,
             Material.IRON_SWORD,
-            Material.DIAMOND_SWORD
+            Material.DIAMOND_SWORD,
+            Material.MACE,
+            Material.NETHERITE_SPEAR
     );
+    private static final Set<Material> WOODEN_SWORD_ONLY = EnumSet.of(Material.WOODEN_SWORD);
     private static final Set<Material> BOW_MATERIALS = EnumSet.of(Material.BOW);
     private static final Set<Material> CROSSBOW_MATERIALS = EnumSet.of(Material.CROSSBOW);
     private static final Set<Material> PICKAXE_MATERIALS = EnumSet.of(
@@ -115,6 +122,7 @@ public class GameSession {
     private final Map<TeamColor, BedState> bedStates = new EnumMap<>(TeamColor.class);
     private final Map<BlockPoint, TeamColor> bedBlocks = new HashMap<>();
     private final Set<BlockPoint> placedBlocks = new HashSet<>();
+    private final Map<BlockPoint, ItemStack> placedBlockItems = new HashMap<>();
     private final Set<Long> forcedChunks = new HashSet<>();
     private final Set<UUID> frozenPlayers = new HashSet<>();
     private final Set<UUID> eliminatedPlayers = new HashSet<>();
@@ -149,6 +157,11 @@ public class GameSession {
     private BukkitTask sidebarTask;
     private long matchStartMillis;
     private int startCountdownRemaining;
+    private Double previousBorderSize;
+    private Location previousBorderCenter;
+    private Double previousBorderDamageAmount;
+    private Double previousBorderDamageBuffer;
+    private Integer previousBorderWarningDistance;
 
     public GameSession(BedwarsManager bedwarsManager, Arena arena) {
         this.bedwarsManager = bedwarsManager;
@@ -272,6 +285,10 @@ public class GameSession {
         return pickaxeTiers.getOrDefault(playerId, 0);
     }
 
+    public int getArmorTier(UUID playerId) {
+        return armorTiers.getOrDefault(playerId, 0);
+    }
+
     public int getAxeTier(UUID playerId) {
         return axeTiers.getOrDefault(playerId, 0);
     }
@@ -332,11 +349,31 @@ public class GameSession {
     }
 
     public void recordPlacedBlock(BlockPoint point) {
+        recordPlacedBlock(point, null);
+    }
+
+    public void recordPlacedBlock(BlockPoint point, ItemStack item) {
+        if (point == null) {
+            return;
+        }
         placedBlocks.add(point);
+        if (item == null || item.getType() == Material.AIR) {
+            placedBlockItems.remove(point);
+            return;
+        }
+        ItemStack stored = item.clone();
+        stored.setAmount(1);
+        placedBlockItems.put(point, stored);
     }
 
     public void removePlacedBlock(BlockPoint point) {
         placedBlocks.remove(point);
+        placedBlockItems.remove(point);
+    }
+
+    public ItemStack removePlacedBlockItem(BlockPoint point) {
+        placedBlocks.remove(point);
+        return placedBlockItems.remove(point);
     }
 
     public boolean isPendingRespawn(UUID playerId) {
@@ -486,6 +523,9 @@ public class GameSession {
                 yield true;
             }
             case SWORD -> {
+                if (item.getMaterial() != Material.WOODEN_SWORD) {
+                    removeItems(player, WOODEN_SWORD_ONLY);
+                }
                 giveItem(player, item.createPurchaseItem(team));
                 if (team != null && hasTeamUpgrade(team, TeamUpgradeType.SHARPNESS)) {
                     applySharpness(player);
@@ -749,6 +789,7 @@ public class GameSession {
                 showTitleAll(Component.text("Sudden Death!", NamedTextColor.RED),
                         Component.text("Final battle begins.", NamedTextColor.GRAY));
                 broadcast(Component.text("Sudden Death has begun!", NamedTextColor.RED));
+                startSuddenDeathBorderShrink();
             });
         }, delaySeconds * 20L);
         tasks.add(task);
@@ -769,6 +810,22 @@ public class GameSession {
             });
         }, delaySeconds * 20L);
         tasks.add(task);
+    }
+
+    private void startSuddenDeathBorderShrink() {
+        World world = arena.getWorld();
+        BlockPoint corner1 = arena.getCorner1();
+        BlockPoint corner2 = arena.getCorner2();
+        BlockPoint center = arena.getCenter();
+        if (world == null || corner1 == null || corner2 == null || center == null) {
+            return;
+        }
+        EventSettings events = arena.getEventSettings();
+        int remainingSeconds = Math.max(1, events.getGameEndDelay() - events.getSuddenDeathDelay());
+        WorldBorder border = world.getWorldBorder();
+        double targetSize = 6.0;
+        border.setCenter(center.x() + 0.5, center.z() + 0.5);
+        border.setSize(Math.max(targetSize, 1.0), remainingSeconds);
     }
 
     private void scheduleRespawn(Player player, TeamColor team) {
@@ -947,6 +1004,9 @@ public class GameSession {
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
+            player.getInventory().clear();
+            player.getInventory().setArmorContents(null);
+            player.getInventory().setItemInOffHand(null);
             clearUpgradeEffects(player);
             if (lobby != null) {
                 player.teleport(lobby);
@@ -985,6 +1045,7 @@ public class GameSession {
         }
         forceLoadMap(world);
         clearDroppedItems(world);
+        applyWorldBorder(world);
     }
 
     private void forceLoadMap(World world) {
@@ -1068,6 +1129,7 @@ public class GameSession {
     private void stopInternal() {
         state = GameState.ENDING;
         releaseForcedChunks();
+        restoreWorldBorder();
         despawnShops();
         despawnSummons();
         closeFakeEnderChests();
@@ -1100,6 +1162,57 @@ public class GameSession {
         startCountdownRemaining = 0;
     }
 
+    private void applyWorldBorder(World world) {
+        BlockPoint corner1 = arena.getCorner1();
+        BlockPoint corner2 = arena.getCorner2();
+        if (world == null || corner1 == null || corner2 == null) {
+            return;
+        }
+        WorldBorder border = world.getWorldBorder();
+        if (previousBorderSize == null) {
+            previousBorderSize = border.getSize();
+            previousBorderCenter = border.getCenter();
+            previousBorderDamageAmount = border.getDamageAmount();
+            previousBorderDamageBuffer = border.getDamageBuffer();
+            previousBorderWarningDistance = border.getWarningDistance();
+        }
+        int minX = Math.min(corner1.x(), corner2.x());
+        int maxX = Math.max(corner1.x(), corner2.x());
+        int minZ = Math.min(corner1.z(), corner2.z());
+        int maxZ = Math.max(corner1.z(), corner2.z());
+        double centerX = (minX + maxX) / 2.0 + 0.5;
+        double centerZ = (minZ + maxZ) / 2.0 + 0.5;
+        double sizeX = (maxX - minX) + 1.0;
+        double sizeZ = (maxZ - minZ) + 1.0;
+        double size = Math.max(sizeX, sizeZ) + 2.0;
+        border.setCenter(centerX, centerZ);
+        border.setSize(size);
+    }
+
+    private void restoreWorldBorder() {
+        World world = arena.getWorld();
+        if (world == null || previousBorderSize == null || previousBorderCenter == null) {
+            return;
+        }
+        WorldBorder border = world.getWorldBorder();
+        border.setCenter(previousBorderCenter);
+        border.setSize(previousBorderSize);
+        if (previousBorderDamageAmount != null) {
+            border.setDamageAmount(previousBorderDamageAmount);
+        }
+        if (previousBorderDamageBuffer != null) {
+            border.setDamageBuffer(previousBorderDamageBuffer);
+        }
+        if (previousBorderWarningDistance != null) {
+            border.setWarningDistance(previousBorderWarningDistance);
+        }
+        previousBorderSize = null;
+        previousBorderCenter = null;
+        previousBorderDamageAmount = null;
+        previousBorderDamageBuffer = null;
+        previousBorderWarningDistance = null;
+    }
+
     private void despawnSummons() {
         World world = arena.getWorld();
         if (world == null) {
@@ -1107,7 +1220,9 @@ public class GameSession {
         }
         for (org.bukkit.entity.Entity entity : world.getEntities()) {
             if (entity.getScoreboardTags().contains(BED_BUG_TAG)
-                    || entity.getScoreboardTags().contains(DREAM_DEFENDER_TAG)) {
+                    || entity.getScoreboardTags().contains(DREAM_DEFENDER_TAG)
+                    || entity.getScoreboardTags().contains(CRYSTAL_TAG)
+                    || entity.getScoreboardTags().contains(HAPPY_GHAST_TAG)) {
                 entity.remove();
             }
         }
@@ -1153,6 +1268,7 @@ public class GameSession {
         eliminatedPlayers.clear();
         eliminatedTeams.clear();
         placedBlocks.clear();
+        placedBlockItems.clear();
         forcedChunks.clear();
         bedStates.clear();
         bedBlocks.clear();
@@ -1266,6 +1382,8 @@ public class GameSession {
         ItemStack item = new ItemStack(material);
         LeatherArmorMeta meta = (LeatherArmorMeta) item.getItemMeta();
         meta.setColor(color);
+        meta.setUnbreakable(true);
+        meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE);
         item.setItemMeta(meta);
         return item;
     }
@@ -1371,9 +1489,20 @@ public class GameSession {
             player.getInventory().setLeggings(colorLeatherArmor(leggings, color));
             player.getInventory().setBoots(colorLeatherArmor(boots, color));
         } else {
-            player.getInventory().setLeggings(new ItemStack(leggings));
-            player.getInventory().setBoots(new ItemStack(boots));
+            player.getInventory().setLeggings(makeUnbreakable(new ItemStack(leggings)));
+            player.getInventory().setBoots(makeUnbreakable(new ItemStack(boots)));
         }
+    }
+
+    private ItemStack makeUnbreakable(ItemStack item) {
+        if (item == null) {
+            return null;
+        }
+        ItemMeta meta = item.getItemMeta();
+        meta.setUnbreakable(true);
+        meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE);
+        item.setItemMeta(meta);
+        return item;
     }
 
     private String armorBase(Material material) {
@@ -2011,9 +2140,6 @@ public class GameSession {
             if (upgrades == null || upgrades.getTier(TeamUpgradeType.HEAL_POOL) <= 0) {
                 continue;
             }
-            if (getBedState(team) != BedState.ALIVE) {
-                continue;
-            }
             BlockPoint base = baseCenters.get(team);
             if (base == null) {
                 continue;
@@ -2229,6 +2355,10 @@ public class GameSession {
         if (hasteTier > 0) {
             applyHaste(player, hasteTier);
         }
+        int featherTier = upgrades.getTier(TeamUpgradeType.FEATHER_FALLING);
+        if (featherTier > 0) {
+            applyFeatherFalling(player, featherTier);
+        }
     }
 
     private void applyProtection(Player player, int level) {
@@ -2268,6 +2398,34 @@ public class GameSession {
                 true,
                 false,
                 true));
+    }
+
+    private void applyFeatherFalling(Player player, int level) {
+        if (level <= 0) {
+            return;
+        }
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        boolean changed = false;
+        for (int i = 0; i < armor.length; i++) {
+            ItemStack piece = armor[i];
+            if (piece == null) {
+                continue;
+            }
+            if (!piece.getType().name().endsWith("_BOOTS")) {
+                continue;
+            }
+            ItemMeta meta = piece.getItemMeta();
+            if (meta.getEnchantLevel(Enchantment.FEATHER_FALLING) >= level) {
+                continue;
+            }
+            meta.addEnchant(Enchantment.FEATHER_FALLING, level, true);
+            piece.setItemMeta(meta);
+            armor[i] = piece;
+            changed = true;
+        }
+        if (changed) {
+            player.getInventory().setArmorContents(armor);
+        }
     }
 
     private void applyEnchantment(Player player, Set<Material> materials, Enchantment enchantment, int level) {
@@ -2349,10 +2507,21 @@ public class GameSession {
             }
         }
         shopNpcIds.clear();
+        World world = arena.getWorld();
+        if (world == null) {
+            return;
+        }
+        for (org.bukkit.entity.Entity entity : world.getEntitiesByClass(Villager.class)) {
+            if (entity.getScoreboardTags().contains(ITEM_SHOP_TAG)
+                    || entity.getScoreboardTags().contains(UPGRADES_SHOP_TAG)) {
+                entity.remove();
+            }
+        }
     }
 
     private void spawnShopNpc(World world, ShopLocation location, ShopType type) {
         Location spawn = location.toLocation(world);
+        clearExistingShopNpc(world, spawn);
         Villager villager = world.spawn(spawn, Villager.class, entity -> {
             entity.setAI(false);
             entity.setInvulnerable(true);
@@ -2365,6 +2534,26 @@ public class GameSession {
             entity.addScoreboardTag(type == ShopType.ITEM ? ITEM_SHOP_TAG : UPGRADES_SHOP_TAG);
         });
         shopNpcIds.add(villager.getUniqueId());
+    }
+
+    private void clearExistingShopNpc(World world, Location spawn) {
+        if (world == null || spawn == null) {
+            return;
+        }
+        int blockX = spawn.getBlockX();
+        int blockY = spawn.getBlockY();
+        int blockZ = spawn.getBlockZ();
+        for (org.bukkit.entity.Entity entity : world.getNearbyEntities(spawn, 0.6, 0.6, 0.6)) {
+            if (!(entity instanceof Villager villager)) {
+                continue;
+            }
+            Location location = villager.getLocation();
+            if (location.getBlockX() == blockX
+                    && location.getBlockY() == blockY
+                    && location.getBlockZ() == blockZ) {
+                villager.remove();
+            }
+        }
     }
 
     private boolean isWithinRadius(BlockPoint a, BlockPoint b, int radius) {

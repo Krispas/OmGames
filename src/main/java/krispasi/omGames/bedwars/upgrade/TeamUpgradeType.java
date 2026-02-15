@@ -10,6 +10,8 @@ public enum TeamUpgradeType {
             List.of("Sharpness I on team swords.")),
     HASTE("Haste", Material.IRON_PICKAXE, new int[]{2, 4},
             List.of("Permanent Haste for your team.")),
+    FEATHER_FALLING("Feather Falling", Material.FEATHER, new int[]{2, 4},
+            List.of("Feather Falling on team boots.")),
     FORGE("Forge", Material.FURNACE, new int[]{2, 4, 6, 8},
             List.of("Upgrade your base generator.")),
     HEAL_POOL("Heal Pool", Material.BEACON, new int[]{1},
@@ -67,8 +69,8 @@ public enum TeamUpgradeType {
         return switch (tier) {
             case 1 -> "Iron Forge";
             case 2 -> "Golden Forge";
-            case 3 -> "Molten Forge";
-            case 4 -> "Molten Forge (Max)";
+            case 3 -> "Emerald Forge";
+            case 4 -> "Molten Forge";
             default -> displayName;
         };
     }

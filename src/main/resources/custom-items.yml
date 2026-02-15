@@ -3,22 +3,37 @@ custom-items:
     type: FIREBALL
     material: FIRE_CHARGE
     velocity: 1.15
-    yield: 3.2
+    yield: 2.4
     incendiary: false
     damage: 4.0
-    knockback: 1.6
+    knockback: 0.8
   bridge_egg:
     type: BRIDGE_EGG
     material: EGG
     velocity: 1.2
     max-blocks: 64
-    bridge-width: 2
+    bridge-width: 1
   bed_bug:
     type: BED_BUG
     material: SNOWBALL
     velocity: 1.2
+    damage: 1
+    health: -1
     lifetime-seconds: 15
   dream_defender:
     type: DREAM_DEFENDER
     material: IRON_GOLEM_SPAWN_EGG
+    damage: 10
+    health: 15
+    lifetime-seconds: 180
+  crystal:
+    type: CRYSTAL
+    material: END_CRYSTAL
+    damage: 0
+    yield: 6.0
+  happy_ghast:
+    type: HAPPY_GHAST
+    material: GHAST_SPAWN_EGG
+    health: 40
+    speed: 0.25
     lifetime-seconds: 180
