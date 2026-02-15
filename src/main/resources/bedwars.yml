@@ -46,15 +46,15 @@ arenas:
       cyan: 1068 51 1451, 1067 51 1451
       pink: 989 51 1372, 989 51 1373
 
-    generators:
-      base_red: 815 51 1451
-      base_blue: 915 51 1351
-      base_lime: 815 51 1525
-      base_white: 989 51 1625
-      base_black: 915 51 1625
-      base_purple: 1089 51 1525
-      base_cyan: 1089 51 1451
-      base_pink: 989 51 1351
+    Generators:
+      base_gen_red: 815 51 1451
+      base_gen_blue: 915 51 1351
+      base_gen_lime: 815 51 1525
+      base_gen_white: 989 51 1625
+      base_gen_black: 915 51 1625
+      base_gen_purple: 1089 51 1525
+      base_gen_cyan: 1089 51 1451
+      base_gen_pink: 989 51 1351
       diamond_1: 952 51 1564
       diamond_2: 1028 51 1488
       diamond_3: 952 51 1412
@@ -73,15 +73,6 @@ arenas:
       base_purple: 1083 51 1525
       base_cyan: 1083 51 1451
       base_pink: 989 51 1357
-    Base_Generators:
-      base_gen_red: 815 51 1451
-      base_gen_blue: 915 51 1351
-      base_gen_lime: 815 51 1525
-      base_gen_white: 989 51 1625
-      base_gen_black: 915 51 1625
-      base_gem_purple: 1089 51 1525
-      base_gen_cyan: 1089 51 1451
-      base_gen_pink: 989 51 1351
     Shops:
       red:
         main: 821 51 1442 1.8

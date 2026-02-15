@@ -22,6 +22,7 @@ import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.BedLocation;
 import krispasi.omGames.bedwars.model.BedState;
 import krispasi.omGames.bedwars.model.BlockPoint;
+import krispasi.omGames.bedwars.model.EventSettings;
 import krispasi.omGames.bedwars.model.ShopLocation;
 import krispasi.omGames.bedwars.model.ShopType;
 import krispasi.omGames.bedwars.model.TeamColor;
@@ -128,6 +129,7 @@ public class GameSession {
     private final Set<UUID> eliminatedPlayers = new HashSet<>();
     private final Set<TeamColor> eliminatedTeams = new HashSet<>();
     private final Set<UUID> pendingRespawns = new HashSet<>();
+    private final Set<UUID> respawnGracePlayers = new HashSet<>();
     private final Map<UUID, BukkitTask> respawnTasks = new HashMap<>();
     private final Map<UUID, BukkitTask> respawnCountdownTasks = new HashMap<>();
     private final Map<UUID, Long> respawnProtectionEnds = new HashMap<>();
@@ -617,6 +619,7 @@ public class GameSession {
         }
         if (getBedState(team) == BedState.ALIVE) {
             pendingRespawns.add(player.getUniqueId());
+            respawnGracePlayers.add(player.getUniqueId());
         } else {
             eliminatePlayer(player, team);
         }
@@ -833,6 +836,8 @@ public class GameSession {
         if (spawn == null) {
             return;
         }
+        UUID playerId = player.getUniqueId();
+        boolean allowRespawnAfterBedBreak = respawnGracePlayers.contains(playerId);
         BukkitTask existing = respawnTasks.remove(player.getUniqueId());
         if (existing != null) {
             existing.cancel();
@@ -843,11 +848,12 @@ public class GameSession {
         }
         startRespawnCountdown(player);
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> safeRun("respawn", () -> {
-            if (state != GameState.RUNNING || getBedState(team) == BedState.DESTROYED) {
-                eliminatedPlayers.add(player.getUniqueId());
+            if (state != GameState.RUNNING || (getBedState(team) == BedState.DESTROYED && !allowRespawnAfterBedBreak)) {
+                eliminatedPlayers.add(playerId);
                 setSpectator(player);
-                removeRespawnProtection(player.getUniqueId());
-                cancelRespawnCountdown(player.getUniqueId());
+                removeRespawnProtection(playerId);
+                cancelRespawnCountdown(playerId);
+                respawnGracePlayers.remove(playerId);
                 respawnTasks.remove(player.getUniqueId());
                 checkTeamEliminated(team);
                 return;
@@ -860,7 +866,8 @@ public class GameSession {
             giveStarterKit(player, team);
             applyPermanentItems(player, team);
             grantRespawnProtection(player);
-            cancelRespawnCountdown(player.getUniqueId());
+            cancelRespawnCountdown(playerId);
+            respawnGracePlayers.remove(playerId);
             respawnTasks.remove(player.getUniqueId());
             plugin.getServer().getScheduler().runTaskLater(plugin,
                     () -> applyPermanentItems(player, team),
@@ -872,6 +879,7 @@ public class GameSession {
 
     private void eliminatePlayer(Player player, TeamColor team) {
         eliminatedPlayers.add(player.getUniqueId());
+        respawnGracePlayers.remove(player.getUniqueId());
         setSpectator(player);
         checkTeamEliminated(team);
     }
@@ -1152,6 +1160,7 @@ public class GameSession {
         respawnProtectionTasks.clear();
         respawnProtectionEnds.clear();
         pendingRespawns.clear();
+        respawnGracePlayers.clear();
         if (generatorManager != null) {
             generatorManager.stop();
             generatorManager = null;

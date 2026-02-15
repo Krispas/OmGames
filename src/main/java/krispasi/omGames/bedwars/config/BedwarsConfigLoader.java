@@ -3,10 +3,12 @@ package krispasi.omGames.bedwars.config;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 import krispasi.omGames.bedwars.generator.GeneratorInfo;
 import krispasi.omGames.bedwars.generator.GeneratorSettings;
@@ -92,7 +94,11 @@ public class BedwarsConfigLoader {
             }
 
             List<GeneratorInfo> generators = new ArrayList<>();
+            Set<GeneratorKey> generatorKeys = new HashSet<>();
             ConfigurationSection generatorSection = arenaSection.getConfigurationSection("generators");
+            if (generatorSection == null) {
+                generatorSection = arenaSection.getConfigurationSection("Generators");
+            }
             ConfigurationSection baseGeneratorSection = arenaSection.getConfigurationSection("Base_Generators");
             if (baseGeneratorSection == null) {
                 baseGeneratorSection = arenaSection.getConfigurationSection("base_generators");
@@ -115,7 +121,7 @@ public class BedwarsConfigLoader {
                     }
                     GeneratorInfo info = parseGenerator(key, location, arenaId);
                     if (info != null) {
-                        generators.add(info);
+                        addGenerator(generators, generatorKeys, info, arenaId);
                     }
                 }
             }
@@ -131,7 +137,7 @@ public class BedwarsConfigLoader {
                     }
                     GeneratorInfo info = parseBaseGenerator(key, location, arenaId);
                     if (info != null) {
-                        generators.add(info);
+                        addGenerator(generators, generatorKeys, info, arenaId);
                     }
                 }
             }
@@ -471,6 +477,21 @@ public class BedwarsConfigLoader {
             return null;
         }
         return new GeneratorInfo(GeneratorType.BASE, team, location, key);
+    }
+
+    private void addGenerator(List<GeneratorInfo> generators,
+                              Set<GeneratorKey> generatorKeys,
+                              GeneratorInfo info,
+                              String arenaId) {
+        GeneratorKey key = new GeneratorKey(info.type(), info.team(), info.location());
+        if (generatorKeys.add(key)) {
+            generators.add(info);
+        } else {
+            logger.warning("Duplicate generator ignored in " + arenaId + ": " + info.key());
+        }
+    }
+
+    private record GeneratorKey(GeneratorType type, TeamColor team, BlockPoint location) {
     }
 
     private ShopLocation parseShopLocation(String value, String label, String arenaId) {

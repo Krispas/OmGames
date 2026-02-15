@@ -67,6 +67,7 @@ import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.event.block.Action;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -78,8 +79,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
-import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.AttributeInstance;
+import java.lang.reflect.Method;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.EnumSet;
 import java.util.List;
@@ -1522,14 +1522,48 @@ public class BedwarsListener implements Listener {
         }
         double speed = custom.getSpeed();
         if (speed > 0.0) {
-            AttributeInstance move = entity.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED);
-            if (move != null) {
-                move.setBaseValue(speed);
+            applyEntitySpeed(entity, speed);
+        }
+    }
+
+    private void applyEntitySpeed(LivingEntity entity, double speed) {
+        try {
+            Class<?> attributeClass = Class.forName("org.bukkit.attribute.Attribute");
+            Method getAttribute = LivingEntity.class.getMethod("getAttribute", attributeClass);
+            Object movement = resolveAttribute(attributeClass, "GENERIC_MOVEMENT_SPEED");
+            applyAttributeValue(entity, getAttribute, movement, speed);
+            Object flying = resolveAttribute(attributeClass, "GENERIC_FLYING_SPEED");
+            applyAttributeValue(entity, getAttribute, flying, speed);
+        } catch (ReflectiveOperationException ignored) {
+        }
+    }
+
+    private Object resolveAttribute(Class<?> attributeClass, String name) {
+        if (attributeClass == null || name == null) {
+            return null;
+        }
+        try {
+            return Enum.valueOf((Class) attributeClass, name);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private void applyAttributeValue(LivingEntity entity,
+                                     Method getAttribute,
+                                     Object attribute,
+                                     double value) {
+        if (entity == null || getAttribute == null || attribute == null) {
+            return;
+        }
+        try {
+            Object instance = getAttribute.invoke(entity, attribute);
+            if (instance == null) {
+                return;
             }
-            AttributeInstance fly = entity.getAttribute(Attribute.GENERIC_FLYING_SPEED);
-            if (fly != null) {
-                fly.setBaseValue(speed);
-            }
+            Method setBaseValue = instance.getClass().getMethod("setBaseValue", double.class);
+            setBaseValue.invoke(instance, value);
+        } catch (ReflectiveOperationException ignored) {
         }
     }
 
