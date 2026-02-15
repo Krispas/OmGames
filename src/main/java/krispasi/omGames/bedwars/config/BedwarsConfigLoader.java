@@ -428,6 +428,9 @@ public class BedwarsConfigLoader {
     }
 
     private GeneratorInfo parseGenerator(String key, BlockPoint location, String arenaId) {
+        if (key.startsWith("base_gen_") || key.startsWith("base_gem_")) {
+            return parseBaseGenerator(key, location, arenaId);
+        }
         if (key.startsWith("base_")) {
             String teamKey = key.substring("base_".length());
             TeamColor team = TeamColor.fromKey(teamKey);

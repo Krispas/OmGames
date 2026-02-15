@@ -23,6 +23,7 @@ import org.bukkit.entity.Egg;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.IronGolem;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
@@ -44,6 +45,7 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
+import org.bukkit.event.entity.EntityDismountEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
@@ -67,8 +69,10 @@ import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.event.block.Action;
+import org.bukkit.DyeColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Projectile;
@@ -89,6 +93,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 import org.bukkit.potion.PotionEffectType;
 import java.util.EnumMap;
+import java.util.Locale;
 
 public class BedwarsListener implements Listener {
     private final BedwarsManager bedwarsManager;
@@ -124,9 +129,18 @@ public class BedwarsListener implements Listener {
     private static final double HAPPY_GHAST_SPAWN_Y_OFFSET = 1.5;
     private static final double BASALT_BREAK_CHANCE = 0.35;
     private static final double DEFENDER_TARGET_RANGE = 16.0;
+    private static final double SUMMON_NAME_OFFSET = 0.7;
+    private static final double SUMMON_TIMER_OFFSET = 0.45;
+    private static final String SUMMON_NAME_TAG = "bw_summon_nameplate";
+    private static final String HAPPY_GHAST_MOUNTED_TAG = "bw_happy_ghast_mounted";
+    private static final String DREAM_DEFENDER_NAME = "Dream Defender";
+    private static final String BED_BUG_NAME = "Bed Bug";
+    private static final String HAPPY_GHAST_NAME = "Happy Ghast";
     private final NamespacedKey customProjectileKey;
     private final NamespacedKey summonTeamKey;
     private final Map<UUID, BukkitTask> defenderTasks = new HashMap<>();
+    private final Map<UUID, BukkitTask> summonNameTasks = new HashMap<>();
+    private final Map<UUID, SummonNameplate> summonNameplates = new HashMap<>();
 
     public BedwarsListener(BedwarsManager bedwarsManager) {
         this.bedwarsManager = bedwarsManager;
@@ -884,6 +898,7 @@ public class BedwarsListener implements Listener {
             if (task != null) {
                 task.cancel();
             }
+            cleanupSummonTracker(event.getEntity().getUniqueId());
         });
     }
 
@@ -1070,8 +1085,29 @@ public class BedwarsListener implements Listener {
             if (session == null) {
                 return;
             }
+            org.bukkit.entity.Entity vehicle = event.getPlayer().getVehicle();
+            if (vehicle instanceof LivingEntity living && isHappyGhast(living)) {
+                living.remove();
+                cleanupSummonTracker(living.getUniqueId());
+            }
             session.handlePlayerQuit(event.getPlayer().getUniqueId());
             showArmorForPlayer(event.getPlayer(), session);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityDismount(EntityDismountEvent event) {
+        safeHandle("onEntityDismount", () -> {
+            if (!(event.getDismounted() instanceof LivingEntity living)) {
+                return;
+            }
+            if (!isHappyGhast(living)) {
+                return;
+            }
+            bedwarsManager.getPlugin().getServer().getScheduler().runTask(bedwarsManager.getPlugin(), () -> {
+                living.remove();
+                cleanupSummonTracker(living.getUniqueId());
+            });
         });
     }
 
@@ -1369,12 +1405,324 @@ public class BedwarsListener implements Listener {
         entity.addScoreboardTag(GameSession.HAPPY_GHAST_TAG);
         setSummonTeam(entity, team);
         entity.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
+        applyHappyGhastHarness(entity, team);
+        scheduleHappyGhastHarness(entity, team);
         applySummonStats(entity, custom);
+        scheduleMountHappyGhast(entity, player);
         int lifetimeSeconds = custom != null && custom.getLifetimeSeconds() > 0
                 ? custom.getLifetimeSeconds()
                 : 180;
         scheduleSummonDespawn(entity, lifetimeSeconds);
         return true;
+    }
+
+    private void scheduleMountHappyGhast(org.bukkit.entity.Entity entity, Player player) {
+        if (entity == null || player == null) {
+            return;
+        }
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!entity.isValid() || entity.isDead() || !player.isOnline()) {
+                    return;
+                }
+                entity.addPassenger(player);
+                entity.addScoreboardTag(HAPPY_GHAST_MOUNTED_TAG);
+            }
+        }.runTaskLater(bedwarsManager.getPlugin(), 1L);
+    }
+
+    private void applyHappyGhastHarness(LivingEntity entity, TeamColor team) {
+        if (entity == null) {
+            return;
+        }
+        DyeColor dyeColor = team != null ? team.dyeColor() : null;
+        invokeBooleanSetter(entity, "setHasHarness", true);
+        invokeBooleanSetter(entity, "setHasCarryingHarness", true);
+        invokeBooleanSetter(entity, "setHarnessed", true);
+        invokeBooleanSetter(entity, "setHarness", true);
+        invokeBooleanSetter(entity, "setSaddled", true);
+        if (dyeColor != null) {
+            invokeObjectSetter(entity, "setHarnessColor", DyeColor.class, dyeColor);
+            invokeObjectSetter(entity, "setHarnessColour", DyeColor.class, dyeColor);
+            invokeObjectSetter(entity, "setHarnessDyeColor", DyeColor.class, dyeColor);
+        }
+        ItemStack harness = createHarnessItem(team, dyeColor);
+        if (harness != null) {
+            invokeObjectSetter(entity, "setHarness", ItemStack.class, harness);
+            invokeObjectSetter(entity, "setHarnessItem", ItemStack.class, harness);
+            invokeObjectSetter(entity, "setCarryingHarnessItem", ItemStack.class, harness);
+            invokeObjectSetter(entity, "setSaddle", ItemStack.class, harness);
+            invokeObjectSetter(entity, "setHarnessMaterial", Material.class, harness.getType());
+            invokeObjectSetter(entity, "setHarness", Material.class, harness.getType());
+            applyHarnessEquipment(entity, harness);
+        }
+        applyHarnessByReflection(entity, harness, dyeColor);
+        applyHappyGhastHarnessNms(entity, harness, dyeColor);
+    }
+
+    private void scheduleHappyGhastHarness(LivingEntity entity, TeamColor team) {
+        if (entity == null) {
+            return;
+        }
+        bedwarsManager.getPlugin().getServer().getScheduler().runTaskLater(bedwarsManager.getPlugin(),
+                () -> applyHappyGhastHarness(entity, team), 1L);
+        bedwarsManager.getPlugin().getServer().getScheduler().runTaskLater(bedwarsManager.getPlugin(),
+                () -> applyHappyGhastHarness(entity, team), 20L);
+    }
+
+    private ItemStack createHarnessItem(TeamColor team, DyeColor dyeColor) {
+        if (team != null) {
+            Material teamMaterial = Material.matchMaterial(team.key().toUpperCase(Locale.ROOT) + "_HARNESS");
+            if (teamMaterial != null) {
+                return new ItemStack(teamMaterial);
+            }
+        }
+        if (dyeColor != null) {
+            Material dyeMaterial = Material.matchMaterial(dyeColor.name() + "_HARNESS");
+            if (dyeMaterial != null) {
+                return new ItemStack(dyeMaterial);
+            }
+        }
+        Material material = Material.matchMaterial("WHITE_HARNESS");
+        if (material == null) {
+            material = Material.matchMaterial("HAPPY_GHAST_HARNESS");
+        }
+        if (material == null) {
+            material = Material.matchMaterial("GHAST_HARNESS");
+        }
+        if (material != null) {
+            return new ItemStack(material);
+        }
+        for (Material candidate : Material.values()) {
+            if (candidate.name().endsWith("_HARNESS")) {
+                return new ItemStack(candidate);
+            }
+        }
+        return null;
+    }
+
+    private void applyHarnessEquipment(LivingEntity entity, ItemStack harness) {
+        if (entity == null || harness == null) {
+            return;
+        }
+        EntityEquipment equipment = entity.getEquipment();
+        if (equipment == null) {
+            return;
+        }
+        equipment.setChestplate(harness);
+        EquipmentSlot bodySlot = resolveEquipmentSlot("BODY");
+        if (bodySlot != null) {
+            equipment.setItem(bodySlot, harness);
+        }
+    }
+
+    private EquipmentSlot resolveEquipmentSlot(String name) {
+        if (name == null) {
+            return null;
+        }
+        try {
+            return EquipmentSlot.valueOf(name);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private void applyHarnessByReflection(LivingEntity entity, ItemStack harness, DyeColor dyeColor) {
+        if (entity == null) {
+            return;
+        }
+        Method[] methods = entity.getClass().getMethods();
+        Method[] declared = entity.getClass().getDeclaredMethods();
+        for (Method method : concatMethods(methods, declared)) {
+            String name = method.getName().toLowerCase(Locale.ROOT);
+            if (!name.contains("harness") && !name.contains("saddle")) {
+                continue;
+            }
+            if (method.getParameterCount() != 1) {
+                continue;
+            }
+            Class<?> param = method.getParameterTypes()[0];
+            Object arg = null;
+            if (harness != null && param.isAssignableFrom(ItemStack.class)) {
+                arg = harness;
+            } else if (harness != null && param.isAssignableFrom(Material.class)) {
+                arg = harness.getType();
+            } else if (dyeColor != null && param.isAssignableFrom(DyeColor.class)) {
+                arg = dyeColor;
+            } else if (dyeColor != null && "org.bukkit.Color".equals(param.getName())) {
+                arg = dyeColor.getColor();
+            } else if (dyeColor != null && param == String.class) {
+                arg = dyeColor.name();
+            } else if (param == boolean.class) {
+                arg = Boolean.TRUE;
+            }
+            if (arg == null) {
+                continue;
+            }
+            try {
+                method.setAccessible(true);
+                method.invoke(entity, arg);
+            } catch (ReflectiveOperationException ignored) {
+            }
+        }
+    }
+
+    private boolean invokeBooleanSetter(Object target, String methodName, boolean value) {
+        if (target == null || methodName == null) {
+            return false;
+        }
+        try {
+            Method method = target.getClass().getMethod(methodName, boolean.class);
+            method.invoke(target, value);
+            return true;
+        } catch (ReflectiveOperationException ignored) {
+            try {
+                Method method = target.getClass().getDeclaredMethod(methodName, boolean.class);
+                method.setAccessible(true);
+                method.invoke(target, value);
+                return true;
+            } catch (ReflectiveOperationException ignoredAgain) {
+                return false;
+            }
+        }
+    }
+
+    private boolean invokeObjectSetter(Object target, String methodName, Class<?> argType, Object value) {
+        if (target == null || methodName == null || argType == null) {
+            return false;
+        }
+        try {
+            Method method = target.getClass().getMethod(methodName, argType);
+            method.invoke(target, value);
+            return true;
+        } catch (ReflectiveOperationException ignored) {
+            try {
+                Method method = target.getClass().getDeclaredMethod(methodName, argType);
+                method.setAccessible(true);
+                method.invoke(target, value);
+                return true;
+            } catch (ReflectiveOperationException ignoredAgain) {
+                return false;
+            }
+        }
+    }
+
+    private Method[] concatMethods(Method[] first, Method[] second) {
+        int firstLen = first != null ? first.length : 0;
+        int secondLen = second != null ? second.length : 0;
+        Method[] combined = new Method[firstLen + secondLen];
+        if (firstLen > 0) {
+            System.arraycopy(first, 0, combined, 0, firstLen);
+        }
+        if (secondLen > 0) {
+            System.arraycopy(second, 0, combined, firstLen, secondLen);
+        }
+        return combined;
+    }
+
+    private void applyHappyGhastHarnessNms(LivingEntity entity, ItemStack harness, DyeColor dyeColor) {
+        if (entity == null) {
+            return;
+        }
+        try {
+            Method getHandle = entity.getClass().getMethod("getHandle");
+            Object handle = getHandle.invoke(entity);
+            if (handle == null) {
+                return;
+            }
+            Object nmsStack = toNmsItem(harness);
+            Object nmsDye = resolveNmsDyeColor(dyeColor);
+            Method[] methods = concatMethods(handle.getClass().getMethods(), handle.getClass().getDeclaredMethods());
+            for (Method method : methods) {
+                String name = method.getName().toLowerCase(Locale.ROOT);
+                if (!name.contains("harness") && !name.contains("saddle")) {
+                    continue;
+                }
+                if (method.getParameterCount() != 1) {
+                    continue;
+                }
+                Class<?> param = method.getParameterTypes()[0];
+                Object arg = null;
+                if (nmsStack != null && param.isInstance(nmsStack)) {
+                    arg = nmsStack;
+                } else if (nmsStack != null && param.getName().endsWith("ItemStack")) {
+                    arg = nmsStack;
+                } else if (nmsDye != null && param.isInstance(nmsDye)) {
+                    arg = nmsDye;
+                } else if (dyeColor != null && param == String.class) {
+                    arg = dyeColor.name();
+                } else if (param == boolean.class) {
+                    arg = Boolean.TRUE;
+                } else if (param == int.class) {
+                    arg = 1;
+                }
+                if (arg == null) {
+                    continue;
+                }
+                try {
+                    method.setAccessible(true);
+                    method.invoke(handle, arg);
+                } catch (ReflectiveOperationException ignored) {
+                }
+            }
+            for (var field : handle.getClass().getDeclaredFields()) {
+                String name = field.getName().toLowerCase(Locale.ROOT);
+                if (!name.contains("harness") && !name.contains("saddle")) {
+                    continue;
+                }
+                field.setAccessible(true);
+                Class<?> type = field.getType();
+                if (type == boolean.class) {
+                    field.setBoolean(handle, true);
+                } else if (type == int.class) {
+                    field.setInt(handle, 1);
+                } else if (nmsStack != null && type.isInstance(nmsStack)) {
+                    field.set(handle, nmsStack);
+                } else if (nmsDye != null && type.isInstance(nmsDye)) {
+                    field.set(handle, nmsDye);
+                }
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+    }
+
+    private Object toNmsItem(ItemStack item) {
+        if (item == null) {
+            return null;
+        }
+        try {
+            String version = getCraftBukkitVersion();
+            if (version == null) {
+                return null;
+            }
+            Class<?> craftItem = Class.forName("org.bukkit.craftbukkit." + version + ".inventory.CraftItemStack");
+            Method asNmsCopy = craftItem.getMethod("asNMSCopy", ItemStack.class);
+            return asNmsCopy.invoke(null, item);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private Object resolveNmsDyeColor(DyeColor dyeColor) {
+        if (dyeColor == null) {
+            return null;
+        }
+        try {
+            Class<?> dyeClass = Class.forName("net.minecraft.world.item.DyeColor");
+            return Enum.valueOf((Class) dyeClass, dyeColor.name());
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    private String getCraftBukkitVersion() {
+        String name = Bukkit.getServer().getClass().getPackage().getName();
+        int index = name.lastIndexOf('.');
+        if (index < 0) {
+            return null;
+        }
+        return name.substring(index + 1);
     }
 
     private void spawnBedBug(GameSession session, TeamColor team, Location location, CustomItemDefinition custom) {
@@ -1433,14 +1781,222 @@ public class BedwarsListener implements Listener {
         if (entity == null || lifetimeSeconds <= 0) {
             return;
         }
-        new BukkitRunnable() {
+        UUID entityId = entity.getUniqueId();
+        cleanupSummonTracker(entityId);
+        SummonNameplate nameplate = createSummonNameplate(entity);
+        if (nameplate != null) {
+            summonNameplates.put(entityId, nameplate);
+        }
+        BukkitTask task = new BukkitRunnable() {
+            private int remaining = lifetimeSeconds;
+            private int tickCounter = 0;
+
             @Override
             public void run() {
-                if (entity.isValid() && !entity.isDead()) {
-                    entity.remove();
+                if (!entity.isValid() || entity.isDead()) {
+                    cleanupSummonTracker(entityId);
+                    return;
                 }
+                if (isHappyGhast(entity)
+                        && entity.getScoreboardTags().contains(HAPPY_GHAST_MOUNTED_TAG)
+                        && entity.getPassengers().isEmpty()) {
+                    entity.remove();
+                    cleanupSummonTracker(entityId);
+                    return;
+                }
+                updateSummonNameplates(entity, nameplate);
+                if (tickCounter % 20 == 0) {
+                    if (remaining <= 0) {
+                        entity.remove();
+                        cleanupSummonTracker(entityId);
+                        return;
+                    }
+                    updateSummonName(entity, remaining);
+                    sendSummonActionBar(entity, remaining);
+                    remaining--;
+                }
+                tickCounter += 2;
             }
-        }.runTaskLater(bedwarsManager.getPlugin(), lifetimeSeconds * 20L);
+        }.runTaskTimer(bedwarsManager.getPlugin(), 0L, 2L);
+        summonNameTasks.put(entityId, task);
+    }
+
+    private void cleanupSummonTracker(UUID entityId) {
+        if (entityId == null) {
+            return;
+        }
+        BukkitTask task = summonNameTasks.remove(entityId);
+        if (task != null) {
+            task.cancel();
+        }
+        SummonNameplate nameplate = summonNameplates.remove(entityId);
+        if (nameplate != null) {
+            removeNameplate(nameplate);
+        }
+    }
+
+    private void updateSummonName(org.bukkit.entity.Entity entity, int remainingSeconds) {
+        if (!(entity instanceof LivingEntity living)) {
+            return;
+        }
+        String name = resolveSummonDisplayName(entity);
+        if (name == null || name.isBlank()) {
+            return;
+        }
+        TeamColor team = getSummonTeam(entity);
+        Component title = team != null
+                ? Component.text(team.displayName() + " " + name, team.textColor())
+                : Component.text(name, NamedTextColor.WHITE);
+        Component timer = Component.text("Despawn: " + Math.max(0, remainingSeconds) + "s", NamedTextColor.GRAY);
+        SummonNameplate nameplate = summonNameplates.get(entity.getUniqueId());
+        if (nameplate != null) {
+            living.customName(title);
+            living.setCustomNameVisible(false);
+            updateNameplateText(nameplate, title, timer);
+        } else {
+            living.customName(title.append(Component.newline()).append(timer));
+            living.setCustomNameVisible(true);
+        }
+    }
+
+    private void sendSummonActionBar(org.bukkit.entity.Entity entity, int remainingSeconds) {
+        if (!isHappyGhast(entity)) {
+            return;
+        }
+        for (org.bukkit.entity.Entity passenger : entity.getPassengers()) {
+            if (passenger instanceof Player player) {
+                player.sendActionBar(Component.text("Happy Ghast despawns in " + Math.max(0, remainingSeconds) + "s",
+                        NamedTextColor.GRAY));
+            }
+        }
+    }
+
+    private boolean isHappyGhast(org.bukkit.entity.Entity entity) {
+        return entity != null && entity.getScoreboardTags().contains(GameSession.HAPPY_GHAST_TAG);
+    }
+
+    private SummonNameplate createSummonNameplate(org.bukkit.entity.Entity entity) {
+        if (entity == null || entity.getWorld() == null) {
+            return null;
+        }
+        Location base = entity.getLocation();
+        double height = estimateEntityHeight(entity);
+        ArmorStand nameStand = spawnNameStand(base.clone().add(0, height + SUMMON_NAME_OFFSET, 0));
+        ArmorStand timerStand = spawnNameStand(base.clone().add(0, height + SUMMON_TIMER_OFFSET, 0));
+        return new SummonNameplate(nameStand.getUniqueId(), timerStand.getUniqueId());
+    }
+
+    private ArmorStand spawnNameStand(Location location) {
+        return location.getWorld().spawn(location, ArmorStand.class, stand -> {
+            stand.setInvisible(true);
+            stand.setMarker(true);
+            stand.setSmall(true);
+            stand.setGravity(false);
+            stand.setCustomNameVisible(true);
+            stand.setInvulnerable(true);
+            stand.setCollidable(false);
+            stand.addScoreboardTag(SUMMON_NAME_TAG);
+        });
+    }
+
+    private void updateSummonNameplates(org.bukkit.entity.Entity entity, SummonNameplate nameplate) {
+        if (entity == null || nameplate == null) {
+            return;
+        }
+        ArmorStand nameStand = getNameStand(nameplate.nameId());
+        ArmorStand timerStand = getNameStand(nameplate.timerId());
+        if (nameStand == null || timerStand == null) {
+            return;
+        }
+        Location base = entity.getLocation();
+        double height = estimateEntityHeight(entity);
+        nameStand.teleport(base.clone().add(0, height + SUMMON_NAME_OFFSET, 0));
+        timerStand.teleport(base.clone().add(0, height + SUMMON_TIMER_OFFSET, 0));
+    }
+
+    private void updateNameplateText(SummonNameplate nameplate, Component title, Component timer) {
+        ArmorStand nameStand = getNameStand(nameplate.nameId());
+        if (nameStand != null) {
+            nameStand.customName(title);
+        }
+        ArmorStand timerStand = getNameStand(nameplate.timerId());
+        if (timerStand != null) {
+            timerStand.customName(timer);
+        }
+    }
+
+    private ArmorStand getNameStand(UUID id) {
+        if (id == null) {
+            return null;
+        }
+        org.bukkit.entity.Entity entity = Bukkit.getEntity(id);
+        return entity instanceof ArmorStand stand ? stand : null;
+    }
+
+    private void removeNameplate(SummonNameplate nameplate) {
+        ArmorStand nameStand = getNameStand(nameplate.nameId());
+        if (nameStand != null) {
+            nameStand.remove();
+        }
+        ArmorStand timerStand = getNameStand(nameplate.timerId());
+        if (timerStand != null) {
+            timerStand.remove();
+        }
+    }
+
+    private double estimateEntityHeight(org.bukkit.entity.Entity entity) {
+        if (entity == null) {
+            return 1.6;
+        }
+        try {
+            Method method = entity.getClass().getMethod("getHeight");
+            Object value = method.invoke(entity);
+            if (value instanceof Number number) {
+                return number.doubleValue();
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+        return 1.6;
+    }
+
+    private record SummonNameplate(UUID nameId, UUID timerId) {
+    }
+
+    private String resolveSummonDisplayName(org.bukkit.entity.Entity entity) {
+        if (entity == null) {
+            return null;
+        }
+        if (entity.getScoreboardTags().contains(GameSession.DREAM_DEFENDER_TAG)) {
+            return DREAM_DEFENDER_NAME;
+        }
+        if (entity.getScoreboardTags().contains(GameSession.BED_BUG_TAG)) {
+            return BED_BUG_NAME;
+        }
+        if (entity.getScoreboardTags().contains(GameSession.HAPPY_GHAST_TAG)) {
+            return HAPPY_GHAST_NAME;
+        }
+        return toDisplayName(entity.getType());
+    }
+
+    private String toDisplayName(EntityType type) {
+        if (type == null) {
+            return "";
+        }
+        String[] parts = type.name().toLowerCase(Locale.ROOT).split("_");
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(' ');
+            }
+            builder.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                builder.append(part.substring(1));
+            }
+        }
+        return builder.toString();
     }
 
     private Player findNearestEnemy(Location origin, TeamColor owner, GameSession session, double range) {

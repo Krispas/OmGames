@@ -494,11 +494,11 @@ shop:
           - "Explodes when destroyed."
         custom-item: crystal
       happy_ghast:
-        material: GHAST_SPAWN_EGG
+        material: HAPPY_GHAST_SPAWN_EGG
         amount: 1
         cost:
-          material: EMERALD
-          amount: 6
+          material: GOLD
+          amount: 32
         display-name: "Happy Ghast"
         lore:
           - "Summons a happy ghast."

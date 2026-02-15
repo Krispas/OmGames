@@ -34,6 +34,6 @@ custom-items:
   happy_ghast:
     type: HAPPY_GHAST
     material: GHAST_SPAWN_EGG
-    health: 40
-    speed: 0.25
+    health: 100
+    speed: 0.15
     lifetime-seconds: 180
