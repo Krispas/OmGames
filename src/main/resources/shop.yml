@@ -284,6 +284,9 @@ shop:
           effect:
             type: BURST
             colors: [RED, ORANGE]
+          explosion:
+            power: 3.5
+            damage: 6.0
     armor:
       chainmail_armor:
         material: CHAINMAIL_CHESTPLATE

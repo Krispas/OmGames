@@ -124,11 +124,27 @@ public class ShopConfigLoader {
         String customItemId = section.getString("custom-item");
         Integer fireworkPower = null;
         FireworkEffect fireworkEffect = null;
+        Double fireworkExplosionPower = null;
+        Double fireworkExplosionDamage = null;
         if (material == Material.FIREWORK_ROCKET) {
             ConfigurationSection fireworkSection = section.getConfigurationSection("firework");
             if (fireworkSection != null) {
                 fireworkPower = fireworkSection.getInt("power");
                 fireworkEffect = parseFireworkEffect(fireworkSection.getConfigurationSection("effect"));
+                if (fireworkSection.isConfigurationSection("explosion")) {
+                    ConfigurationSection explosion = fireworkSection.getConfigurationSection("explosion");
+                    if (explosion != null) {
+                        fireworkExplosionPower = explosion.getDouble("power");
+                        fireworkExplosionDamage = explosion.getDouble("damage");
+                    }
+                } else {
+                    if (fireworkSection.contains("explosion.power")) {
+                        fireworkExplosionPower = fireworkSection.getDouble("explosion.power");
+                    }
+                    if (fireworkSection.contains("explosion.damage")) {
+                        fireworkExplosionDamage = fireworkSection.getDouble("explosion.damage");
+                    }
+                }
             }
         }
         if (customItemId != null) {
@@ -141,7 +157,8 @@ public class ShopConfigLoader {
         }
 
         return new ShopItemDefinition(id, material, amount, cost, behavior, teamColor, tier,
-                enchants, potionEffects, displayName, lore, customItemId, fireworkPower, fireworkEffect);
+                enchants, potionEffects, displayName, lore, customItemId,
+                fireworkPower, fireworkEffect, fireworkExplosionPower, fireworkExplosionDamage);
     }
 
     private ShopCost parseCost(ConfigurationSection section) {

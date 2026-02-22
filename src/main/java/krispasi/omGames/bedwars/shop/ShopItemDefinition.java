@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import krispasi.omGames.bedwars.item.CustomItemData;
+import krispasi.omGames.bedwars.item.FireworkData;
 import krispasi.omGames.bedwars.model.TeamColor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -32,6 +33,8 @@ public class ShopItemDefinition {
     private final String customItemId;
     private final Integer fireworkPower;
     private final FireworkEffect fireworkEffect;
+    private final Double fireworkExplosionPower;
+    private final Double fireworkExplosionDamage;
 
     public ShopItemDefinition(String id,
                               Material material,
@@ -46,7 +49,9 @@ public class ShopItemDefinition {
                               List<String> lore,
                               String customItemId,
                               Integer fireworkPower,
-                              FireworkEffect fireworkEffect) {
+                              FireworkEffect fireworkEffect,
+                              Double fireworkExplosionPower,
+                              Double fireworkExplosionDamage) {
         this.id = id;
         this.material = material;
         this.amount = amount;
@@ -61,6 +66,8 @@ public class ShopItemDefinition {
         this.customItemId = customItemId;
         this.fireworkPower = fireworkPower;
         this.fireworkEffect = fireworkEffect;
+        this.fireworkExplosionPower = fireworkExplosionPower;
+        this.fireworkExplosionDamage = fireworkExplosionDamage;
     }
 
     public String getId() {
@@ -139,6 +146,7 @@ public class ShopItemDefinition {
                 fireworkMeta.clearEffects();
                 fireworkMeta.addEffect(fireworkEffect);
             }
+            FireworkData.apply(fireworkMeta, fireworkExplosionPower, fireworkExplosionDamage);
             meta = fireworkMeta;
         }
 

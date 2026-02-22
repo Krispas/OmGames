@@ -457,6 +457,7 @@ public class GameSession {
             generatorManager.setBaseForgeTier(team, nextTier);
         }
         applyTeamUpgradeEffects(team);
+        announceTeamUpgrade(team, player, type, nextTier);
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
         return true;
     }
@@ -2307,6 +2308,25 @@ public class GameSession {
             }
             player.sendMessage(message);
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f);
+        }
+    }
+
+    private void announceTeamUpgrade(TeamColor team, Player buyer, TeamUpgradeType type, int tier) {
+        if (team == null || buyer == null || type == null) {
+            return;
+        }
+        String upgradeName = type.tierName(tier);
+        Component message = Component.text(buyer.getName(), NamedTextColor.YELLOW)
+                .append(Component.text(" purchased ", NamedTextColor.GRAY))
+                .append(Component.text(upgradeName, NamedTextColor.GREEN));
+        for (UUID playerId : assignments.keySet()) {
+            if (assignments.get(playerId) != team) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                player.sendMessage(message);
+            }
         }
     }
 

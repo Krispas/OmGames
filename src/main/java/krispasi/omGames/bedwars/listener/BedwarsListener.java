@@ -6,6 +6,7 @@ import krispasi.omGames.bedwars.item.CustomItemConfig;
 import krispasi.omGames.bedwars.item.CustomItemData;
 import krispasi.omGames.bedwars.item.CustomItemDefinition;
 import krispasi.omGames.bedwars.item.CustomItemType;
+import krispasi.omGames.bedwars.item.FireworkData;
 import krispasi.omGames.bedwars.model.BlockPoint;
 import krispasi.omGames.bedwars.model.ShopType;
 import krispasi.omGames.bedwars.model.TeamColor;
@@ -21,6 +22,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.Container;
 import org.bukkit.entity.Egg;
 import org.bukkit.entity.Fireball;
+import org.bukkit.entity.Firework;
 import org.bukkit.entity.IronGolem;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.ArmorStand;
@@ -46,6 +48,7 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.entity.EntityDismountEvent;
+import org.bukkit.event.entity.FireworkExplodeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
@@ -83,6 +86,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.bukkit.Sound;
 import java.lang.reflect.Method;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.EnumSet;
@@ -133,6 +137,7 @@ public class BedwarsListener implements Listener {
     private static final double SUMMON_TIMER_OFFSET = 0.45;
     private static final String SUMMON_NAME_TAG = "bw_summon_nameplate";
     private static final String HAPPY_GHAST_MOUNTED_TAG = "bw_happy_ghast_mounted";
+    private static final long FIREBALL_COOLDOWN_MILLIS = 500L;
     private static final String DREAM_DEFENDER_NAME = "Dream Defender";
     private static final String BED_BUG_NAME = "Bed Bug";
     private static final String HAPPY_GHAST_NAME = "Happy Ghast";
@@ -141,6 +146,7 @@ public class BedwarsListener implements Listener {
     private final Map<UUID, BukkitTask> defenderTasks = new HashMap<>();
     private final Map<UUID, BukkitTask> summonNameTasks = new HashMap<>();
     private final Map<UUID, SummonNameplate> summonNameplates = new HashMap<>();
+    private final Map<UUID, Long> fireballCooldowns = new HashMap<>();
 
     public BedwarsListener(BedwarsManager bedwarsManager) {
         this.bedwarsManager = bedwarsManager;
@@ -312,6 +318,9 @@ public class BedwarsListener implements Listener {
             event.setCancelled(true);
             boolean used = switch (custom.getType()) {
                 case FIREBALL -> {
+                    if (!canUseFireball(player)) {
+                        yield false;
+                    }
                     launchFireball(player, custom);
                     yield true;
                 }
@@ -431,6 +440,82 @@ public class BedwarsListener implements Listener {
             boolean limited = event.getEntity() instanceof Fireball;
             filterExplosionBlocks(session, event.blockList(), limited);
         });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onFireworkExplode(FireworkExplodeEvent event) {
+        safeHandle("onFireworkExplode", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            Firework firework = event.getEntity();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            if (firework == null || !session.isInArenaWorld(firework.getWorld())) {
+                return;
+            }
+            Double explosionPower = FireworkData.getExplosionPower(firework.getFireworkMeta());
+            Double explosionDamage = FireworkData.getExplosionDamage(firework.getFireworkMeta());
+            if (!hasCustomFireworkSettings(explosionPower, explosionDamage)) {
+                return;
+            }
+            double radius = explosionPower != null ? Math.max(0.0, explosionPower) : 2.5;
+            double damage = explosionDamage != null ? Math.max(0.0, explosionDamage) : 0.0;
+            if (radius <= 0.0 || damage <= 0.0) {
+                return;
+            }
+            TeamColor ownerTeam = null;
+            org.bukkit.projectiles.ProjectileSource shooter = firework.getShooter();
+            if (shooter instanceof Player player) {
+                if (session.isParticipant(player.getUniqueId())) {
+                    ownerTeam = session.getTeam(player.getUniqueId());
+                }
+            }
+            Location origin = firework.getLocation();
+            firework.getWorld().playSound(origin, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.0f);
+            double radiusSquared = radius * radius;
+            for (Player target : origin.getWorld().getNearbyPlayers(origin, radius, radius, radius)) {
+                if (!session.isParticipant(target.getUniqueId()) || target.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
+                    continue;
+                }
+                if (session.hasRespawnProtection(target.getUniqueId())) {
+                    continue;
+                }
+                if (ownerTeam != null && ownerTeam == session.getTeam(target.getUniqueId())) {
+                    continue;
+                }
+                if (target.getLocation().distanceSquared(origin) > radiusSquared) {
+                    continue;
+                }
+                Player damager = shooter instanceof Player ? (Player) shooter : null;
+                if (damager != null) {
+                    target.damage(damage, damager);
+                    session.recordCombat(damager.getUniqueId(), target.getUniqueId());
+                } else {
+                    target.damage(damage);
+                }
+                Vector direction = target.getLocation().toVector().subtract(origin.toVector());
+                if (direction.lengthSquared() > 0.0001) {
+                    direction.normalize().multiply(Math.min(1.6, 0.4 + radius * 0.2));
+                    target.setVelocity(target.getVelocity().add(direction.setY(0.3)));
+                }
+                session.recordDamage(target.getUniqueId());
+            }
+        });
+    }
+
+    private boolean hasCustomFireworkSettings(Firework firework) {
+        if (firework == null) {
+            return false;
+        }
+        Double explosionPower = FireworkData.getExplosionPower(firework.getFireworkMeta());
+        Double explosionDamage = FireworkData.getExplosionDamage(firework.getFireworkMeta());
+        return hasCustomFireworkSettings(explosionPower, explosionDamage);
+    }
+
+    private boolean hasCustomFireworkSettings(Double explosionPower, Double explosionDamage) {
+        boolean powerSet = explosionPower != null && explosionPower > 0.0;
+        boolean damageSet = explosionDamage != null && explosionDamage > 0.0;
+        return powerSet || damageSet;
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -738,6 +823,12 @@ public class BedwarsListener implements Listener {
                 CustomItemDefinition definition = resolveCustomProjectile(fireball);
                 if (definition != null && definition.getType() == CustomItemType.FIREBALL) {
                     event.setDamage(Math.max(0.0, definition.getDamage()));
+                }
+            }
+            if (event.getDamager() instanceof Firework firework) {
+                if (hasCustomFireworkSettings(firework)) {
+                    event.setCancelled(true);
+                    return;
                 }
             }
             if (!sameTeamTnt && event.getDamager() instanceof TNTPrimed) {
@@ -1090,6 +1181,7 @@ public class BedwarsListener implements Listener {
                 living.remove();
                 cleanupSummonTracker(living.getUniqueId());
             }
+            fireballCooldowns.remove(event.getPlayer().getUniqueId());
             session.handlePlayerQuit(event.getPlayer().getUniqueId());
             showArmorForPlayer(event.getPlayer(), session);
         });
@@ -1243,6 +1335,19 @@ public class BedwarsListener implements Listener {
         fireball.setYield(custom.getYield());
         fireball.setVelocity(player.getLocation().getDirection().normalize().multiply(custom.getVelocity()));
         fireball.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
+    }
+
+    private boolean canUseFireball(Player player) {
+        if (player == null) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        long last = fireballCooldowns.getOrDefault(player.getUniqueId(), 0L);
+        if (now - last < FIREBALL_COOLDOWN_MILLIS) {
+            return false;
+        }
+        fireballCooldowns.put(player.getUniqueId(), now);
+        return true;
     }
 
     private void launchBridgeEgg(Player player, GameSession session, CustomItemDefinition custom) {
