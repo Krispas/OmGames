@@ -8,6 +8,11 @@ import org.bukkit.ChatColor;
 import org.bukkit.DyeColor;
 import org.bukkit.Material;
 
+/**
+ * Team metadata for display and materials.
+ * <p>Provides chat colors, wool and bed materials, ordering, and key parsing.</p>
+ * @see krispasi.omGames.bedwars.model.Arena
+ */
 public enum TeamColor {
     RED("red", "Red", NamedTextColor.RED, DyeColor.RED, Material.RED_WOOL, Material.RED_BED),
     BLUE("blue", "Blue", NamedTextColor.BLUE, DyeColor.BLUE, Material.BLUE_WOOL, Material.BLUE_BED),

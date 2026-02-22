@@ -69,6 +69,15 @@ import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
+/**
+ * Runtime state machine for a single BedWars match.
+ * <p>Tracks team assignments, beds, generators, placed blocks, upgrades, traps,
+ * and per-player tool tiers.</p>
+ * <p>Enforces match rules such as respawn timing, combat restrictions, sudden death,
+ * and world border behavior.</p>
+ * <p>Creates and tears down shop NPCs, scoreboards, and other match-scoped entities.</p>
+ * @see krispasi.omGames.bedwars.game.GameState
+ */
 public class GameSession {
     public static final String ITEM_SHOP_TAG = "bw_item_shop";
     public static final String UPGRADES_SHOP_TAG = "bw_upgrades_shop";

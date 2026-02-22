@@ -27,6 +27,14 @@ import krispasi.omGames.bedwars.gui.TeamAssignMenu;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.TeamColor;
 
+/**
+ * Service layer and coordinator for BedWars runtime.
+ * <p>Loads arenas, shop configuration, and custom items, and manages quick-buy
+ * data via {@link krispasi.omGames.bedwars.shop.QuickBuyService}.</p>
+ * <p>Owns the active {@link krispasi.omGames.bedwars.game.GameSession} and handles
+ * start, stop, and end-of-game cleanup.</p>
+ * @see krispasi.omGames.bedwars.game.GameSession
+ */
 public class BedwarsManager {
     private final JavaPlugin plugin;
     private final QuickBuyService quickBuyService;
@@ -105,7 +113,7 @@ public class BedwarsManager {
     }
 
     public void openMapSelect(Player player) {
-        if (arenas.isEmpty()) {
+        if ( arenas.isEmpty()) {
             player.sendMessage(Component.text("No arenas configured.", NamedTextColor.RED));
             return;
         }

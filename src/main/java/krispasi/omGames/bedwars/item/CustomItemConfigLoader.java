@@ -9,6 +9,12 @@ import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
+/**
+ * Loads {@code custom-items.yml} into a
+ * {@link krispasi.omGames.bedwars.item.CustomItemConfig}.</p>
+ * <p>Validates {@link krispasi.omGames.bedwars.item.CustomItemType} and applies defaults
+ * for omitted fields.</p>
+ */
 public class CustomItemConfigLoader {
     private final File file;
     private final Logger logger;

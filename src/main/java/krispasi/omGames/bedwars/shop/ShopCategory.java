@@ -5,6 +5,11 @@ import java.util.HashMap;
 import java.util.Map;
 import org.bukkit.Material;
 
+/**
+ * Represents a shop category layout.
+ * <p>Defines title, icon, size, and slot-to-item mapping loaded from config.</p>
+ * @see krispasi.omGames.bedwars.shop.ShopCategoryType
+ */
 public class ShopCategory {
     private final ShopCategoryType type;
     private final String title;

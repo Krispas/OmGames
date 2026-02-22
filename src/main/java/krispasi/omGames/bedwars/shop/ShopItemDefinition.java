@@ -18,6 +18,12 @@ import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.potion.PotionEffect;
 
+/**
+ * Definition of a shop item with metadata and behavior.
+ * <p>Builds display and purchase {@link org.bukkit.inventory.ItemStack}s with lore, enchants,
+ * and custom data such as firework explosion settings.</p>
+ * @see krispasi.omGames.bedwars.shop.ShopCost
+ */
 public class ShopItemDefinition {
     private final String id;
     private final Material material;

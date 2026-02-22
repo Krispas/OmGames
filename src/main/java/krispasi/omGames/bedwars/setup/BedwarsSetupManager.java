@@ -26,6 +26,11 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
+/**
+ * Implements the {@code /bw setup} workflow for creating and editing arenas.
+ * <p>Writes player locations, generator settings, and event times to {@code bedwars.yml}.</p>
+ * <p>Also provides status output to guide setup completion.</p>
+ */
 public class BedwarsSetupManager {
     private static final String ARENAS_PATH = "arenas";
     private static final String KEY_WORLD = "world";

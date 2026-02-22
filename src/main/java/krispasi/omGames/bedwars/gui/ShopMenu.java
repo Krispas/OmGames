@@ -25,6 +25,13 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+/**
+ * Inventory UI for item purchases and quick-buy editing.
+ * <p>Builds category tabs from {@link krispasi.omGames.bedwars.shop.ShopConfig} and
+ * dispatches purchases to {@link krispasi.omGames.bedwars.game.GameSession}.</p>
+ * <p>Supports Quick Buy customization via
+ * {@link krispasi.omGames.bedwars.shop.QuickBuyService}.</p>
+ */
 public class ShopMenu implements InventoryHolder {
     private static final int CATEGORY_ROW_SIZE = 9;
     private final GameSession session;

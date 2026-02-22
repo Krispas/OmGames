@@ -22,6 +22,14 @@ import krispasi.omGames.bedwars.model.TeamColor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
+/**
+ * Parses {@code bedwars.yml} into {@link krispasi.omGames.bedwars.model.Arena} instances.
+ * <p>Validates and normalizes beds, spawns, generators, shops, and anti-build settings.</p>
+ * <p>Reads generator and event timing settings into
+ * {@link krispasi.omGames.bedwars.generator.GeneratorSettings} and
+ * {@link krispasi.omGames.bedwars.model.EventSettings}.</p>
+ * @see krispasi.omGames.bedwars.model.Arena
+ */
 public class BedwarsConfigLoader {
     private final File file;
     private final Logger logger;

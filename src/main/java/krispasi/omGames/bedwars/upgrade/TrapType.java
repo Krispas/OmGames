@@ -3,6 +3,11 @@ package krispasi.omGames.bedwars.upgrade;
 import java.util.List;
 import org.bukkit.Material;
 
+/**
+ * Defines trap options and their descriptions.
+ * <p>Queued in {@link krispasi.omGames.bedwars.upgrade.TeamUpgradeState} and triggered
+ * when enemies enter base range.</p>
+ */
 public enum TrapType {
     ITS_A_TRAP("It's a Trap!", Material.TRIPWIRE_HOOK,
             List.of("Blindness + Slowness.")),

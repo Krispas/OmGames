@@ -1,5 +1,10 @@
 package krispasi.omGames.bedwars.model;
 
+/**
+ * Match event timing configuration.
+ * <p>Controls tier upgrades, bed destruction timing, sudden death, and forced game end
+ * in seconds.</p>
+ */
 public class EventSettings {
     private static final int DEFAULT_TIER_2_DELAY = 360;
     private static final int DEFAULT_TIER_3_DELAY = 720;

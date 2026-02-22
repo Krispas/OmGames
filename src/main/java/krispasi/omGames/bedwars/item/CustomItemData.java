@@ -7,6 +7,10 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
+/**
+ * Persistent data helper for tagging {@link org.bukkit.inventory.ItemStack} with custom item ids.
+ * <p>Used by shop items and listeners to recognize custom behaviors.</p>
+ */
 public final class CustomItemData {
     private static final NamespacedKey KEY =
             new NamespacedKey(JavaPlugin.getProvidingPlugin(CustomItemData.class), "custom_item");

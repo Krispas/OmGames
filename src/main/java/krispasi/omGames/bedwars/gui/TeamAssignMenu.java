@@ -19,6 +19,11 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
+/**
+ * Inventory UI for assigning players to teams and starting the match.
+ * <p>Lets admins cycle {@link krispasi.omGames.bedwars.model.TeamColor} for each player
+ * and launch the session.</p>
+ */
 public class TeamAssignMenu implements InventoryHolder {
     private static final int INVENTORY_SIZE = 54;
     private static final int TEAM_ROW_START = 45;

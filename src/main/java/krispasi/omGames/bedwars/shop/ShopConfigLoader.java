@@ -19,6 +19,11 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
+/**
+ * Parses {@code shop.yml} into a {@link krispasi.omGames.bedwars.shop.ShopConfig}.
+ * <p>Handles enchants, potion effects, custom items, and firework metadata.</p>
+ * <p>Also records explicit slot positions when provided in config.</p>
+ */
 public class ShopConfigLoader {
     private final File file;
     private final Logger logger;

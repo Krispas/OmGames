@@ -15,6 +15,11 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bukkit.plugin.java.JavaPlugin;
 
+/**
+ * Persists quick-buy layout per player.
+ * <p>Stores slot mappings in SQLite and tracks edit state during
+ * {@link krispasi.omGames.bedwars.gui.ShopMenu} customization.</p>
+ */
 public class QuickBuyService {
     private static final String TABLE_SQL = """
             CREATE TABLE IF NOT EXISTS quick_buy (

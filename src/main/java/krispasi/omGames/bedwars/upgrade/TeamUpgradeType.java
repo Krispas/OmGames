@@ -3,6 +3,10 @@ package krispasi.omGames.bedwars.upgrade;
 import java.util.List;
 import org.bukkit.Material;
 
+/**
+ * Defines available team upgrades with tiers and costs.
+ * <p>Exposes human-friendly tier names and cost lookup for shop display.</p>
+ */
 public enum TeamUpgradeType {
     PROTECTION("Protection", Material.IRON_CHESTPLATE, new int[]{2, 4, 8, 16},
             List.of("Adds Protection to team armor.")),

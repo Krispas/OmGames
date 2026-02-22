@@ -26,6 +26,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
+/**
+ * Schedules generator drops and manages holograms for a match.
+ * <p>Uses {@link krispasi.omGames.bedwars.generator.GeneratorSettings} to control
+ * intervals, amounts, and caps for base, diamond, and emerald generators.</p>
+ * <p>Handles forge splitting, visual drops, and cleanup of stale items.</p>
+ * @see krispasi.omGames.bedwars.generator.GeneratorSettings
+ */
 public class GeneratorManager {
     private static final long CLEANUP_INTERVAL_TICKS = 20L * 20L;
     private static final long HOLOGRAM_UPDATE_INTERVAL_TICKS = 20L;

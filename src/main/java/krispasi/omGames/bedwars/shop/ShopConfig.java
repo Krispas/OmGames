@@ -6,6 +6,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * In-memory shop configuration.
+ * <p>Holds items, categories, and tiered lookups for tool and armor upgrades.</p>
+ * @see krispasi.omGames.bedwars.shop.ShopConfigLoader
+ */
 public class ShopConfig {
     private final Map<String, ShopItemDefinition> items;
     private final Map<ShopCategoryType, ShopCategory> categories;

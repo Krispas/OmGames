@@ -5,6 +5,11 @@ import java.util.Locale;
 import java.util.Map;
 import org.bukkit.Material;
 
+/**
+ * Read-only registry of {@link krispasi.omGames.bedwars.item.CustomItemDefinition}.
+ * <p>Supports lookups by id and by unique {@link org.bukkit.Material}.</p>
+ * @see krispasi.omGames.bedwars.item.CustomItemConfigLoader
+ */
 public class CustomItemConfig {
     private final Map<String, CustomItemDefinition> items;
 

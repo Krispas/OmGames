@@ -99,6 +99,12 @@ import org.bukkit.potion.PotionEffectType;
 import java.util.EnumMap;
 import java.util.Locale;
 
+/**
+ * Main Bukkit listener for BedWars gameplay.
+ * <p>Enforces match rules and handles GUI actions, custom items, combat, entity behavior,
+ * and block placement during a {@link krispasi.omGames.bedwars.game.GameSession}.</p>
+ * <p>Also applies custom projectile metadata and manages summon lifetimes.</p>
+ */
 public class BedwarsListener implements Listener {
     private final BedwarsManager bedwarsManager;
     private static final double TNT_DAMAGE_MULTIPLIER = 0.6;

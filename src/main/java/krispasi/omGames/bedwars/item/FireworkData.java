@@ -6,6 +6,12 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
+/**
+ * Persistent data helper for firework explosion metadata.
+ * <p>Stores explosion power and damage on {@link org.bukkit.inventory.meta.ItemMeta} to
+ * drive custom firework blasts.</p>
+ * @see krispasi.omGames.bedwars.listener.BedwarsListener
+ */
 public final class FireworkData {
     private static final NamespacedKey EXPLOSION_POWER_KEY =
             new NamespacedKey(JavaPlugin.getProvidingPlugin(FireworkData.class), "firework_explosion_power");

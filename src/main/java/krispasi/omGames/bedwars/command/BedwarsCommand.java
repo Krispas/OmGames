@@ -14,6 +14,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
 
+/**
+ * Command executor and tab completer for {@code /bw}.
+ * <p>Checks permissions and routes start, stop, reload, and setup actions to
+ * {@link krispasi.omGames.bedwars.BedwarsManager} and
+ * {@link krispasi.omGames.bedwars.setup.BedwarsSetupManager}.</p>
+ * @see krispasi.omGames.bedwars.setup.BedwarsSetupManager
+ */
 public class BedwarsCommand implements CommandExecutor, TabCompleter {
     private final BedwarsManager bedwarsManager;
     private final BedwarsSetupManager setupManager;

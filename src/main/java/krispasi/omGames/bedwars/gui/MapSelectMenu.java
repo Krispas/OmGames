@@ -15,6 +15,12 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+/**
+ * Inventory UI for selecting an arena to start.
+ * <p>Lists arenas from {@link krispasi.omGames.bedwars.BedwarsManager} and opens
+ * {@link krispasi.omGames.bedwars.gui.TeamAssignMenu}.</p>
+ * @see krispasi.omGames.bedwars.gui.TeamAssignMenu
+ */
 public class MapSelectMenu implements InventoryHolder {
     private final BedwarsManager bedwarsManager;
     private final Inventory inventory;

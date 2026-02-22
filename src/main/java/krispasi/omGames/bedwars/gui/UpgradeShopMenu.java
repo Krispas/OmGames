@@ -22,6 +22,13 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+/**
+ * Inventory UI for team upgrades and traps.
+ * <p>Shows current tiers from {@link krispasi.omGames.bedwars.upgrade.TeamUpgradeState} and
+ * purchases {@link krispasi.omGames.bedwars.upgrade.TeamUpgradeType} or
+ * {@link krispasi.omGames.bedwars.upgrade.TrapType}.</p>
+ * <p>Displays queued traps and costs based on team state.</p>
+ */
 public class UpgradeShopMenu implements InventoryHolder {
     private static final int INVENTORY_SIZE = 54;
     private static final int PROTECTION_SLOT = 10;

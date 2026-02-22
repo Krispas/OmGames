@@ -2,6 +2,10 @@ package krispasi.omGames.bedwars.model;
 
 import java.util.Locale;
 
+/**
+ * Shop NPC type metadata.
+ * <p>Maps config keys to display names for item and upgrade shops.</p>
+ */
 public enum ShopType {
     ITEM("main", "Item Shop"),
     UPGRADES("upgrades", "Upgrades Shop");

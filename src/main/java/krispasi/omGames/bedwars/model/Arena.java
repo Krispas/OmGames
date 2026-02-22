@@ -13,6 +13,12 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 
+/**
+ * Immutable arena configuration container.
+ * <p>Holds world metadata, bounds, spawns, beds, generators, and shop locations loaded by
+ * {@link krispasi.omGames.bedwars.config.BedwarsConfigLoader}.</p>
+ * @see krispasi.omGames.bedwars.model.TeamColor
+ */
 public class Arena {
     private final String id;
     private final String worldName;

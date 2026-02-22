@@ -8,6 +8,15 @@ import org.bukkit.*;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
+/**
+ * Main Bukkit plugin class for OmGames.
+ * <p>Initializes BedWars configuration files and loads them through
+ * {@link krispasi.omGames.bedwars.BedwarsManager}.</p>
+ * <p>Registers the {@code /bw} command and the BedWars event listener, and
+ * shuts down active sessions on disable.</p>
+ * @see krispasi.omGames.bedwars.BedwarsManager
+ * @see krispasi.omGames.bedwars.listener.BedwarsListener
+ */
 public final class OmGames extends JavaPlugin {
     private BedwarsManager bedwarsManager;
     private BedwarsSetupManager setupManager;
@@ -33,7 +42,7 @@ public final class OmGames extends JavaPlugin {
         }
 
         getServer().getPluginManager().registerEvents(new BedwarsListener(bedwarsManager), this);
-        setupBedwars();
+        //setupBedwars();
     }
 
     @Override
@@ -42,7 +51,7 @@ public final class OmGames extends JavaPlugin {
             bedwarsManager.shutdown();
         }
     }
-    private void setupBedwars() {
+/*    private void setupBedwars() {
         WorldCreator creator = new WorldCreator("slumber");
         creator.environment(World.Environment.NORMAL);
         creator.type(WorldType.FLAT);
@@ -73,5 +82,5 @@ public final class OmGames extends JavaPlugin {
         } else {
             System.out.println("Failed to create bedwars");
         }
-    }
+*/
 }

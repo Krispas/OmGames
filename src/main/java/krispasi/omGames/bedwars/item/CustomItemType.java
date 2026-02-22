@@ -1,5 +1,9 @@
 package krispasi.omGames.bedwars.item;
 
+/**
+ * Supported custom item types with default tuning values.
+ * <p>Defaults are used when a field is missing from {@code custom-items.yml}.</p>
+ */
 public enum CustomItemType {
     FIREBALL(1.15, 3.2f, false, 0, 1, 4.0, 1.6, 0, -1.0, -1.0),
     BRIDGE_EGG(1.2, 0.0f, false, 64, 1, 0.0, 0.0, 0, -1.0, -1.0),

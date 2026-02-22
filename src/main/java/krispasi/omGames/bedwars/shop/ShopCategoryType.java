@@ -3,6 +3,11 @@ package krispasi.omGames.bedwars.shop;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Enumeration of shop categories and config keys.
+ * <p>Defines default titles and display order used by the shop GUI.</p>
+ * @see krispasi.omGames.bedwars.gui.ShopMenu
+ */
 public enum ShopCategoryType {
     QUICK_BUY("quick_buy", "Quick Buy"),
     BLOCKS("blocks", "Blocks"),

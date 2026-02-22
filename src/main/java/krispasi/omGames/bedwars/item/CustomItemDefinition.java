@@ -2,6 +2,12 @@ package krispasi.omGames.bedwars.item;
 
 import org.bukkit.Material;
 
+/**
+ * Data model for a custom item definition.
+ * <p>Includes material, projectile tuning (velocity, yield, damage, knockback), and
+ * entity stats (health, speed, lifetime).</p>
+ * @see krispasi.omGames.bedwars.item.CustomItemType
+ */
 public class CustomItemDefinition {
     private final String id;
     private final CustomItemType type;

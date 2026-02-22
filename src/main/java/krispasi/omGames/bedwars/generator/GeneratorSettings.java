@@ -2,6 +2,12 @@ package krispasi.omGames.bedwars.generator;
 
 import java.util.Arrays;
 
+/**
+ * Configuration model for generator timings, amounts, and caps.
+ * <p>Stores per-tier arrays for base forges and advanced generators and clamps
+ * tier access to safe bounds.</p>
+ * @see krispasi.omGames.bedwars.generator.GeneratorManager
+ */
 public class GeneratorSettings {
     private static final long[] DEFAULT_BASE_IRON_INTERVALS = {20L, 16L, 14L, 12L, 8L};
     private static final long[] DEFAULT_BASE_GOLD_INTERVALS = {160L, 120L, 100L, 90L, 70L};
