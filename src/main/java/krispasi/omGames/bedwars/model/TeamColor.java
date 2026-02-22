@@ -14,12 +14,12 @@ public enum TeamColor {
     LIME("lime", "Lime", NamedTextColor.GREEN, DyeColor.LIME, Material.LIME_WOOL, Material.LIME_BED),
     WHITE("white", "White", NamedTextColor.WHITE, DyeColor.WHITE, Material.WHITE_WOOL, Material.WHITE_BED),
     BLACK("black", "Black", NamedTextColor.BLACK, DyeColor.BLACK, Material.BLACK_WOOL, Material.BLACK_BED),
-    PURPLE("purple", "Purple", NamedTextColor.DARK_PURPLE, DyeColor.PURPLE, Material.PURPLE_WOOL, Material.PURPLE_BED),
+    YELLOW("yellow", "Yellow", NamedTextColor.YELLOW, DyeColor.YELLOW, Material.YELLOW_WOOL, Material.YELLOW_BED),
     CYAN("cyan", "Cyan", NamedTextColor.AQUA, DyeColor.CYAN, Material.CYAN_WOOL, Material.CYAN_BED),
     PINK("pink", "Pink", NamedTextColor.LIGHT_PURPLE, DyeColor.PINK, Material.PINK_WOOL, Material.PINK_BED);
 
     private static final List<TeamColor> ORDERED = List.of(
-            RED, BLUE, LIME, WHITE, BLACK, PURPLE, CYAN, PINK
+            RED, BLUE, LIME, WHITE, BLACK, YELLOW, CYAN, PINK
     );
 
     private final String key;
@@ -73,7 +73,7 @@ public enum TeamColor {
             case LIME -> ChatColor.GREEN;
             case WHITE -> ChatColor.WHITE;
             case BLACK -> ChatColor.DARK_GRAY;
-            case PURPLE -> ChatColor.DARK_PURPLE;
+            case YELLOW -> ChatColor.YELLOW;
             case CYAN -> ChatColor.AQUA;
             case PINK -> ChatColor.LIGHT_PURPLE;
         };

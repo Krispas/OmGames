@@ -6,30 +6,81 @@ arenas:
     generator-settings:
       base-forge:
         iron:
-          intervals-seconds: [1, 0.8, 0.7, 0.6, 0.4]
-          amounts: [1, 1, 1, 1, 2]
-          caps: [46, 64, 96, 112, 128]
+          intervals-seconds:
+            - 1
+            - 0.8
+            - 0.7
+            - 0.6
+            - 0.4
+          amounts:
+            - 1
+            - 1
+            - 1
+            - 1
+            - 2
+          caps:
+            - 46
+            - 64
+            - 96
+            - 112
+            - 128
         gold:
-          intervals-seconds: [8, 6, 5, 4.5, 3.5]
-          amounts: [1, 1, 1, 1, 2]
-          caps: [4, 8, 12, 20, 30]
+          intervals-seconds:
+            - 8
+            - 6
+            - 5
+            - 4.5
+            - 3.5
+          amounts:
+            - 1
+            - 1
+            - 1
+            - 1
+            - 2
+          caps:
+            - 4
+            - 8
+            - 12
+            - 20
+            - 30
         emerald:
-          intervals-seconds: [0, 0, 0, 80, 40]
-          amounts: [0, 0, 0, 1, 1]
-          caps: [0, 0, 0, 1, 2]
+          intervals-seconds:
+            - 0
+            - 0
+            - 0
+            - 80
+            - 40
+          amounts:
+            - 0
+            - 0
+            - 0
+            - 1
+            - 1
+          caps:
+            - 0
+            - 0
+            - 0
+            - 1
+            - 2
       diamond:
-        intervals-seconds: [30, 23, 12]
+        intervals-seconds:
+          - 30
+          - 23
+          - 12
         cap: 4
       emerald:
-        intervals-seconds: [50, 30, 12]
+        intervals-seconds:
+          - 50
+          - 30
+          - 12
         cap: 2
       resource-despawn-seconds: 300
     event-times:
-      tier-2: 360
-      tier-3: 720
-      bed-destruction: 1440
-      sudden-death: 1800
-      game-end: 3000
+      tier-2: 300
+      tier-3: 660
+      bed-destruction: 1380
+      sudden-death: 1740
+      game-end: 2360
     world: bedwars
     lobby-height: 120
     center: 951 120 1488
@@ -42,7 +93,7 @@ arenas:
       lime: 836 51 1525, 837 51 1525
       white: 989 51 1604, 989 51 1603
       black: 915 51 1604, 915 51 1603
-      purple: 1068 51 1525, 1067 51 1525
+      yellow: 1068 51 1525, 1067 51 1525
       cyan: 1068 51 1451, 1067 51 1451
       pink: 989 51 1372, 989 51 1373
 
@@ -52,7 +103,7 @@ arenas:
       base_gen_lime: 815 51 1525
       base_gen_white: 989 51 1625
       base_gen_black: 915 51 1625
-      base_gen_purple: 1089 51 1525
+      base_gen_yellow: 1089 51 1525
       base_gen_cyan: 1089 51 1451
       base_gen_pink: 989 51 1351
       diamond_1: 952 51 1564
@@ -70,7 +121,7 @@ arenas:
       base_lime: 821 51 1525
       base_white: 989 51 1619
       base_black: 915 51 1619
-      base_purple: 1083 51 1525
+      base_yellow: 1083 51 1525
       base_cyan: 1083 51 1451
       base_pink: 989 51 1357
     Shops:
@@ -86,7 +137,7 @@ arenas:
       white:
         main: 980 51 1619 -89.6
         upgrades: 998 51 1619 89.4
-      purple:
+      yellow:
         main: 1083 51 1534 -179.5
         upgrades: 1083 51 1516 1.4
       cyan:
@@ -98,3 +149,152 @@ arenas:
       blue:
         main: 924 51 1357 90.7
         upgrades: 906 51 1357 -88.7
+  slumber:
+    world: bedwars
+    center: -1000 51 -1000
+    corner_1: ''
+    corner_2: ''
+    base-radius: 0
+    lobby-height: 51
+    anti-build:
+      base-generator-radius: 0
+      advanced-generator-radius: 0
+    beds:
+      red: ''
+      blue: ''
+      lime: ''
+      white: ''
+      black: ''
+      yellow: ''
+      cyan: ''
+      pink: ''
+    generators:
+      diamond_1: ''
+      emerald_1: ''
+      diamond_2: ''
+      emerald_2: ''
+      diamond_3: ''
+      emerald_3: ''
+      diamond_4: ''
+      emerald_4: ''
+    Spawns:
+      base_red: ''
+      base_blue: ''
+      base_lime: ''
+      base_white: ''
+      base_black: ''
+      base_yellow: ''
+      base_cyan: ''
+      base_pink: ''
+    Base_Generators:
+      base_gen_red: ''
+      base_gen_blue: ''
+      base_gen_lime: ''
+      base_gen_white: ''
+      base_gen_black: ''
+      base_gen_yellow: ''
+      base_gen_cyan: ''
+      base_gen_pink: ''
+    Shops:
+      red:
+        main: ''
+        upgrades: ''
+      blue:
+        main: ''
+        upgrades: ''
+      lime:
+        main: ''
+        upgrades: ''
+      white:
+        main: ''
+        upgrades: ''
+      black:
+        main: ''
+        upgrades: ''
+      yellow:
+        main: ''
+        upgrades: ''
+      cyan:
+        main: ''
+        upgrades: ''
+      pink:
+        main: ''
+        upgrades: ''
+    generator-settings:
+      base-forge:
+        iron:
+          intervals-seconds:
+            - 1.0
+            - 0.8
+            - 0.7
+            - 0.6
+            - 0.4
+          amounts:
+            - 1
+            - 1
+            - 1
+            - 1
+            - 2
+          caps:
+            - 32
+            - 64
+            - 96
+            - 112
+            - 128
+        gold:
+          intervals-seconds:
+            - 8.0
+            - 6.0
+            - 5.0
+            - 4.5
+            - 3.5
+          amounts:
+            - 1
+            - 1
+            - 1
+            - 1
+            - 2
+          caps:
+            - 4
+            - 8
+            - 12
+            - 20
+            - 30
+        emerald:
+          intervals-seconds:
+            - 0.0
+            - 0.0
+            - 0.0
+            - 80.0
+            - 40.0
+          amounts:
+            - 0
+            - 0
+            - 0
+            - 0
+            - 1
+          caps:
+            - 0
+            - 0
+            - 0
+            - 1
+            - 2
+      diamond:
+        intervals-seconds:
+          - 30.0
+          - 23.0
+          - 12.0
+        cap: 4
+      emerald:
+        intervals-seconds:
+          - 50.0
+          - 30.0
+          - 12.0
+        cap: 2
+      resource-despawn-seconds: 300
+    event-times:
+      tier-2: 300
+      tier-3: 660
+      bed-destruction: 1380
+      sudden-death: 1740
+      game-end: 2360

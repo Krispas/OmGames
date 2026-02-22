@@ -3,10 +3,10 @@ custom-items:
     type: FIREBALL
     material: FIRE_CHARGE
     velocity: 1.15
-    yield: 2.4
+    yield: 2.0
     incendiary: false
     damage: 4.0
-    knockback: 0.8
+    knockback: 0.5
   bridge_egg:
     type: BRIDGE_EGG
     material: EGG
@@ -23,7 +23,7 @@ custom-items:
   dream_defender:
     type: DREAM_DEFENDER
     material: IRON_GOLEM_SPAWN_EGG
-    damage: 10
+    damage: 8
     health: 15
     lifetime-seconds: 180
   crystal:
