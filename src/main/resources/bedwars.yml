@@ -88,24 +88,24 @@ arenas:
     corner_2: 1126 100 1624
 
     beds:
-      red: 836 51 1451, 837 51 1451
+      red: 989 51 1372, 989 51 1373
       blue: 915 51 1372, 915 51 1373
-      lime: 836 51 1525, 837 51 1525
+      lime: 836 51 1451, 837 51 1451
       white: 989 51 1604, 989 51 1603
-      black: 915 51 1604, 915 51 1603
-      yellow: 1068 51 1525, 1067 51 1525
-      cyan: 1068 51 1451, 1067 51 1451
-      pink: 989 51 1372, 989 51 1373
+      black: 1068 51 1451, 1067 51 1451
+      yellow: 836 51 1525, 837 51 1525
+      cyan: 915 51 1604, 915 51 1603
+      pink: 1068 51 1525, 1067 51 1525
 
     Generators:
-      base_gen_red: 815 51 1451
+      base_gen_red: 989 51 1351
       base_gen_blue: 915 51 1351
-      base_gen_lime: 815 51 1525
+      base_gen_lime: 815 51 1451
       base_gen_white: 989 51 1625
-      base_gen_black: 915 51 1625
-      base_gen_yellow: 1089 51 1525
-      base_gen_cyan: 1089 51 1451
-      base_gen_pink: 989 51 1351
+      base_gen_black: 1089 51 1451
+      base_gen_yellow: 815 51 1525
+      base_gen_cyan: 915 51 1625
+      base_gen_pink: 1089 51 1525
       diamond_1: 952 51 1564
       diamond_2: 1028 51 1488
       diamond_3: 952 51 1412
@@ -116,110 +116,110 @@ arenas:
       emerald_4: 976 65 1454
 
     Spawns:
-      base_red: 821 51 1451
+      base_red: 989 51 1357
       base_blue: 915 51 1357
-      base_lime: 821 51 1525
+      base_lime: 821 51 1451
       base_white: 989 51 1619
-      base_black: 915 51 1619
-      base_yellow: 1083 51 1525
-      base_cyan: 1083 51 1451
-      base_pink: 989 51 1357
+      base_black: 1083 51 1451
+      base_yellow: 821 51 1525
+      base_cyan: 915 51 1619
+      base_pink: 1083 51 1525
     Shops:
       red:
+        main: 998 51 1357 91.8
+        upgrades: 980 51 1357 -89.0
+      lime:
         main: 821 51 1442 1.8
         upgrades: 821 51 1460 -179.8
-      lime:
-        main: 821 51 1516 1.1
-        upgrades: 821 51 1534 -179.4
       black:
-        main: 906 51 1619 -89.7
-        upgrades: 924 51 1619 90.3
+        main: 1083 51 1460 -177.3
+        upgrades: 1083 51 1442 0.7
       white:
         main: 980 51 1619 -89.6
         upgrades: 998 51 1619 89.4
       yellow:
+        main: 821 51 1516 1.1
+        upgrades: 821 51 1534 -179.4
+      cyan:
+        main: 906 51 1619 -89.7
+        upgrades: 924 51 1619 90.3
+      pink:
         main: 1083 51 1534 -179.5
         upgrades: 1083 51 1516 1.4
-      cyan:
-        main: 1083 51 1460 -177.3
-        upgrades: 1083 51 1442 0.7
-      pink:
-        main: 998 51 1357 91.8
-        upgrades: 980 51 1357 -89.0
       blue:
         main: 924 51 1357 90.7
         upgrades: 906 51 1357 -88.7
   slumber:
     world: bedwars
     center: -1000 51 -1000
-    corner_1: ''
-    corner_2: ''
-    base-radius: 0
-    lobby-height: 51
+    corner_1: -908 34 -897
+    corner_2: -1099 99 -1108
+    base-radius: 21
+    lobby-height: 120
     anti-build:
-      base-generator-radius: 0
-      advanced-generator-radius: 0
+      base-generator-radius: 10
+      advanced-generator-radius: 4
     beds:
-      red: ''
-      blue: ''
-      lime: ''
-      white: ''
-      black: ''
-      yellow: ''
-      cyan: ''
-      pink: ''
+      red: -970 59 -1056, -970 59 -1055
+      blue: -1024 59 -1062, -1024 59 -1061
+      lime: -1056 59 -1030, -1055 59 -1030
+      white: -976 59 -938, -976 59 -939
+      black: -938 59 -1024, -939 59 -1024
+      yellow: -1062 59 -976, -1061 59 -976
+      cyan: -1030 59 -944, -1030 59 -945
+      pink: -944 59 -970, -945 59 -970
     generators:
-      diamond_1: ''
-      emerald_1: ''
-      diamond_2: ''
-      emerald_2: ''
-      diamond_3: ''
-      emerald_3: ''
-      diamond_4: ''
-      emerald_4: ''
+      diamond_1: -972 59 -1022
+      emerald_1: -995 52 -1019
+      diamond_2: -978 59 -972
+      emerald_2: -981 52 -995
+      diamond_3: -1028 59 -978
+      emerald_3: -1005 52 -981
+      diamond_4: -1022 59 -1028
+      emerald_4: -1019 52 -1005
     Spawns:
-      base_red: ''
-      base_blue: ''
-      base_lime: ''
-      base_white: ''
-      base_black: ''
-      base_yellow: ''
-      base_cyan: ''
-      base_pink: ''
+      base_red: -970 62 -1070
+      base_blue: -1024 62 -1076
+      base_lime: -1070 62 -1030
+      base_white: -976 62 -924
+      base_black: -924 62 -1024
+      base_yellow: -1076 62 -976
+      base_cyan: -1030 62 -930
+      base_pink: -930 62 -970
     Base_Generators:
-      base_gen_red: ''
-      base_gen_blue: ''
-      base_gen_lime: ''
-      base_gen_white: ''
-      base_gen_black: ''
-      base_gen_yellow: ''
-      base_gen_cyan: ''
-      base_gen_pink: ''
+      base_gen_red: -970 61 -1075
+      base_gen_blue: -1024 61 -1081
+      base_gen_lime: -1075 61 -1030
+      base_gen_white: -976 61 -919
+      base_gen_black: -919 61 -1024
+      base_gen_yellow: -1081 61 -976
+      base_gen_cyan: -1030 61 -925
+      base_gen_pink: -925 61 -970
     Shops:
       red:
-        main: ''
-        upgrades: ''
+        main: -960 62 -1070 WEST
+        upgrades: -980 62 -1070 EAST
       blue:
-        main: ''
-        upgrades: ''
+        main: -1014 62 -1076 WEST
+        upgrades: -1034 62 -1076 EAST
       lime:
-        main: ''
-        upgrades: ''
+        main: -1070 62 -1040 SOUTH
+        upgrades: -1070 62 -1020 NORTH
       white:
-        main: ''
-        upgrades: ''
+        main: -986 62 -924 EAST
+        upgrades: -966 62 -924 WEST
       black:
-        main: ''
-        upgrades: ''
+        main: -924 62 -1014 NORTH
+        upgrades: -924 62 -1034 SOUTH
       yellow:
-        main: ''
-        upgrades: ''
+        main: -1076 62 -986 SOUTH
+        upgrades: -1076 62 -966 NORTH
       cyan:
-        main: ''
-        upgrades: ''
+        main: -1040 62 -930 EAST
+        upgrades: -1020 62 -930 WEST
       pink:
-        main: ''
-        upgrades: ''
+        main: -930 62 -960 NORTH
+        upgrades: -930 62 -980 SOUTH
     generator-settings:
       base-forge:
         iron:
@@ -271,8 +271,8 @@ arenas:
             - 0
             - 0
             - 0
-            - 0
             - 1
+            - 2
           caps:
             - 0
             - 0

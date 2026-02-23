@@ -87,20 +87,20 @@ public class BedwarsSetupManager {
         ConfigurationSection beds = arena.getConfigurationSection(KEY_BEDS);
         for (TeamColor team : TeamColor.ordered()) {
             String value = beds != null ? beds.getString(team.key()) : null;
-            sendStatusLine(player, "bed." + team.key(), value);
+            sendStatusLine(player, team.key() + ".bed", value);
         }
 
         ConfigurationSection spawns = getSectionAnyCase(arena, KEY_SPAWNS);
         for (TeamColor team : TeamColor.ordered()) {
             String value = spawns != null ? spawns.getString("base_" + team.key()) : null;
-            sendStatusLine(player, "spawn." + team.key(), value);
+            sendStatusLine(player, team.key() + ".spawn", value);
         }
 
         ConfigurationSection baseGenerators = getSectionAnyCase(arena, KEY_BASE_GENERATORS);
         ConfigurationSection generators = arena.getConfigurationSection(KEY_GENERATORS);
         for (TeamColor team : TeamColor.ordered()) {
             String value = findBaseGeneratorValue(baseGenerators, generators, team);
-            sendStatusLine(player, "base-gen." + team.key(), value);
+            sendStatusLine(player, team.key() + ".base-gen", value);
         }
 
         if (generators != null) {
@@ -119,9 +119,9 @@ public class BedwarsSetupManager {
         ConfigurationSection shops = getSectionAnyCase(arena, KEY_SHOPS);
         for (TeamColor team : TeamColor.ordered()) {
             ConfigurationSection teamSection = shops != null ? shops.getConfigurationSection(team.key()) : null;
-            sendStatusLine(player, "shop." + team.key() + ".main",
+            sendStatusLine(player, team.key() + ".shop",
                     teamSection != null ? teamSection.getString("main") : null);
-            sendStatusLine(player, "shop." + team.key() + ".upgrades",
+            sendStatusLine(player, team.key() + ".upgrades",
                     teamSection != null ? teamSection.getString("upgrades") : null);
         }
 
@@ -278,6 +278,12 @@ public class BedwarsSetupManager {
         keys.add("anti-build.advanced-generator-radius");
         keys.add("lobby-height");
         for (TeamColor team : TeamColor.ordered()) {
+            keys.add(team.key() + ".bed");
+            keys.add(team.key() + ".spawn");
+            keys.add(team.key() + ".base-gen");
+            keys.add(team.key() + ".shop");
+            keys.add(team.key() + ".upgrades");
+            // Backwards-compatible aliases.
             keys.add("bed." + team.key());
             keys.add("spawn." + team.key());
             keys.add("base-gen." + team.key());
@@ -618,7 +624,8 @@ public class BedwarsSetupManager {
             }
             String normalized = raw.trim().toLowerCase(Locale.ROOT)
                     .replace('_', '.')
-                    .replace(' ', '.');
+                    .replace(' ', '.')
+                    .replace('-', '.');
             if (normalized.equals(KEY_WORLD)) {
                 return Optional.of(new SetupTarget(SetupKind.WORLD, null, null, null, null, null, "world"));
             }
@@ -688,24 +695,65 @@ public class BedwarsSetupManager {
                     }
                 }
             }
+            TeamColor teamPrefix = parseTeamPrefix(normalized);
+            if (teamPrefix != null) {
+                String remainder = normalized.substring(teamPrefix.key().length() + 1);
+                if (remainder.equals("bed")) {
+                    return Optional.of(new SetupTarget(SetupKind.BED, teamPrefix, null, null, null, null,
+                            teamPrefix.key() + ".bed"));
+                }
+                if (remainder.equals("spawn")) {
+                    return Optional.of(new SetupTarget(SetupKind.SPAWN, teamPrefix, null, null, null, null,
+                            teamPrefix.key() + ".spawn"));
+                }
+                if (remainder.equals("base-gen") || remainder.equals("basegen") || remainder.equals("base.gen")) {
+                    return Optional.of(new SetupTarget(SetupKind.BASE_GEN, teamPrefix, null, null, null, null,
+                            teamPrefix.key() + ".base-gen"));
+                }
+                if (remainder.equals("shop") || remainder.equals("main")) {
+                    return Optional.of(new SetupTarget(SetupKind.SHOP, teamPrefix, null, null, ShopType.ITEM, null,
+                            teamPrefix.key() + ".shop"));
+                }
+                if (remainder.equals("upgrades") || remainder.equals("upgrade")) {
+                    return Optional.of(new SetupTarget(SetupKind.SHOP, teamPrefix, null, null, ShopType.UPGRADES, null,
+                            teamPrefix.key() + ".upgrades"));
+                }
+            }
             return Optional.empty();
         }
 
         private static boolean isAntiBuildKey(String normalized) {
             return (normalized.startsWith("anti-build")
                     || normalized.startsWith("anti.build")
-                    || normalized.startsWith("antibuild"))
+                    || normalized.startsWith("antibuild")
+                    || normalized.startsWith("anti-break")
+                    || normalized.startsWith("anti.break")
+                    || normalized.startsWith("antibreak"))
                     && (normalized.contains("generator")
                     || normalized.contains("base-generator-radius")
                     || normalized.contains("advanced-generator-radius")
                     || normalized.contains("base.generator.radius")
-                    || normalized.contains("advanced.generator.radius"));
+                    || normalized.contains("advanced.generator.radius")
+                    || normalized.endsWith(".base")
+                    || normalized.endsWith(".advanced")
+                    || normalized.contains(".base.")
+                    || normalized.contains(".advanced."));
         }
 
         private static boolean isAdvancedAntiBuildKey(String normalized) {
             return normalized.contains("advanced")
                     || normalized.contains("advanced-generator-radius")
-                    || normalized.contains("advanced.generator.radius");
+                    || normalized.contains("advanced.generator.radius")
+                    || normalized.endsWith(".advanced");
+        }
+
+        private static TeamColor parseTeamPrefix(String normalized) {
+            int dotIndex = normalized.indexOf('.');
+            if (dotIndex <= 0) {
+                return null;
+            }
+            String prefix = normalized.substring(0, dotIndex);
+            return TeamColor.fromKey(prefix);
         }
 
         private static GeneratorType parseGeneratorType(String value) {

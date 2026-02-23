@@ -2,9 +2,12 @@ package krispasi.omGames.bedwars.command;
 
 import java.util.Arrays;
 import krispasi.omGames.bedwars.BedwarsManager;
+import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -59,6 +62,39 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             bedwarsManager.stopSession(player);
             return true;
         }
+        if (args[0].equalsIgnoreCase("tp")) {
+            if (!sender.hasPermission("omgames.bw.start")) {
+                sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                return true;
+            }
+            if (args.length < 2) {
+                sender.sendMessage(Component.text("Usage: /bw tp <arena>", NamedTextColor.YELLOW));
+                return true;
+            }
+            String arenaName = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).trim();
+            if (arenaName.isBlank()) {
+                sender.sendMessage(Component.text("Usage: /bw tp <arena>", NamedTextColor.YELLOW));
+                return true;
+            }
+            Arena arena = findArena(arenaName);
+            if (arena == null) {
+                sender.sendMessage(Component.text("Arena not found: " + arenaName, NamedTextColor.RED));
+                return true;
+            }
+            World world = arena.getWorld();
+            if (world == null) {
+                sender.sendMessage(Component.text("World not loaded: " + arena.getWorldName(), NamedTextColor.RED));
+                return true;
+            }
+            if (arena.getCenter() == null) {
+                sender.sendMessage(Component.text("Arena center not set: " + arena.getId(), NamedTextColor.RED));
+                return true;
+            }
+            Location target = arena.getCenter().toLocation(world);
+            player.teleport(target);
+            sender.sendMessage(Component.text("Teleported to center of " + arena.getId() + ".", NamedTextColor.GREEN));
+            return true;
+        }
         if (args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("omgames.bw.reload")) {
                 sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
@@ -103,7 +139,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw stop | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw stop | /bw tp <arena> | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -111,8 +147,15 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "stop", "reload", "setup")
+            return Stream.of("start", "stop", "tp", "reload", "setup")
                     .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("tp")) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return bedwarsManager.getArenas().stream()
+                    .map(Arena::getId)
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("setup")) {
@@ -133,5 +176,21 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                     .toList();
         }
         return List.of();
+    }
+
+    private Arena findArena(String name) {
+        if (name == null) {
+            return null;
+        }
+        String trimmed = name.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        for (Arena arena : bedwarsManager.getArenas()) {
+            if (arena.getId().equalsIgnoreCase(trimmed)) {
+                return arena;
+            }
+        }
+        return bedwarsManager.getArena(trimmed);
     }
 }
