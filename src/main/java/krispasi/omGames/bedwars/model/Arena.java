@@ -22,8 +22,9 @@ import org.bukkit.World;
 public class Arena {
     private final String id;
     private final String worldName;
-    private final int lobbyHeight;
     private final BlockPoint center;
+    private final BlockPoint gameLobby;
+    private final BlockPoint mapLobby;
     private final int baseRadius;
     private final BlockPoint corner1;
     private final BlockPoint corner2;
@@ -39,8 +40,9 @@ public class Arena {
 
     public Arena(String id,
                  String worldName,
-                 int lobbyHeight,
                  BlockPoint center,
+                 BlockPoint gameLobby,
+                 BlockPoint mapLobby,
                  int baseRadius,
                  BlockPoint corner1,
                  BlockPoint corner2,
@@ -55,8 +57,9 @@ public class Arena {
                  Map<TeamColor, ShopLocation> upgradeShops) {
         this.id = Objects.requireNonNull(id, "id");
         this.worldName = Objects.requireNonNull(worldName, "worldName");
-        this.lobbyHeight = lobbyHeight;
         this.center = center;
+        this.gameLobby = gameLobby;
+        this.mapLobby = mapLobby;
         this.baseRadius = baseRadius;
         this.corner1 = corner1;
         this.corner2 = corner2;
@@ -79,12 +82,16 @@ public class Arena {
         return worldName;
     }
 
-    public int getLobbyHeight() {
-        return lobbyHeight;
-    }
-
     public BlockPoint getCenter() {
         return center;
+    }
+
+    public BlockPoint getGameLobby() {
+        return gameLobby;
+    }
+
+    public BlockPoint getMapLobby() {
+        return mapLobby;
     }
 
     public int getBaseRadius() {
@@ -156,11 +163,19 @@ public class Arena {
     }
 
     public Location getLobbyLocation() {
+        return toLobbyLocation(gameLobby);
+    }
+
+    public Location getMapLobbyLocation() {
+        return toLobbyLocation(mapLobby);
+    }
+
+    private Location toLobbyLocation(BlockPoint point) {
         World world = getWorld();
-        if (world == null || center == null) {
+        if (world == null || point == null) {
             return null;
         }
-        return new Location(world, center.x() + 0.5, lobbyHeight, center.z() + 0.5);
+        return new Location(world, point.x() + 0.5, point.y(), point.z() + 0.5);
     }
 
     public List<TeamColor> getTeams() {

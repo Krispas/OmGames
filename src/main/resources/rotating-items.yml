@@ -1,0 +1,146 @@
+shop:
+  categories:
+    rotating:
+      title: "Rotating Items"
+      icon: NETHER_STAR
+      size: 54
+      entries:
+        respawn_beacon: 10
+        sniper_bolt: 11
+        flamethrower: 12
+        bedrock: 13
+        bridge_builder: 14
+        creeping_arrow: 15
+        tactical_nuke: 16
+        bridge_zapper: 19
+        thorns_upgrade: 28
+        fire_aspect_upgrade: 29
+        garry_upgrade: 30
+  items:
+    rotating:
+      respawn_beacon:
+        material: BEACON
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Respawn Beacon"
+        lore:
+          - "Respawn a teammate"
+          - "after 30 seconds."
+        custom-item: respawn_beacon
+        limit:
+          scope: TEAM
+          amount: 1
+      sniper_bolt:
+        material: FIRE_CHARGE
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 40
+        display-name: "Sniper Bolt"
+        lore:
+          - "Super fast fireball."
+        custom-item: sniper_bolt
+      flamethrower:
+        material: BLAZE_ROD
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 1
+        display-name: "Flamethrower"
+        lore:
+          - "32 uses."
+          - "Fires slow fireballs."
+        custom-item: flamethrower
+        limit:
+          scope: PLAYER
+          amount: 5
+      bedrock:
+        material: BEDROCK
+        amount: 4
+        cost:
+          material: IRON
+          amount: 128
+        display-name: "Bedrock"
+        limit:
+          scope: TEAM
+          amount: 1
+      bridge_builder:
+        material: PISTON
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 20
+        display-name: "Bridge Builder"
+        lore:
+          - "Builds a 3x3 tunnel"
+          - "20 blocks forward."
+        custom-item: bridge_builder
+        limit:
+          scope: PLAYER
+          amount: 3
+      creeping_arrow:
+        material: ARROW
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 1
+        display-name: "Creeping Arrow"
+        lore:
+          - "Spawns a creeper on impact."
+        custom-item: creeping_arrow
+        limit:
+          scope: PLAYER
+          amount: 20
+      tactical_nuke:
+        material: REPEATER
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 16
+        display-name: "Tactical Nuke"
+        lore:
+          - "Marks a target and"
+          - "detonates in 1 minute."
+        custom-item: tactical_nuke
+        limit:
+          scope: TEAM
+          amount: 1
+      bridge_zapper:
+        material: FLINT
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 3
+        display-name: "Bridge Zapper"
+        lore:
+          - "Destroys 10 bridge blocks."
+        custom-item: bridge_zapper
+      thorns_upgrade:
+        material: CACTUS
+        amount: 1
+        cost:
+          material: DIAMOND
+          amount: 2
+        display-name: "Thorns"
+        behavior: UPGRADE
+        upgrade: THORNS
+      fire_aspect_upgrade:
+        material: BLAZE_POWDER
+        amount: 1
+        cost:
+          material: DIAMOND
+          amount: 4
+        display-name: "Fire Aspect"
+        behavior: UPGRADE
+        upgrade: FIRE_ASPECT
+      garry_upgrade:
+        material: WARDEN_SPAWN_EGG
+        amount: 1
+        cost:
+          material: DIAMOND
+          amount: 4
+        display-name: "Garry the Warden"
+        behavior: UPGRADE
+        upgrade: GARRY

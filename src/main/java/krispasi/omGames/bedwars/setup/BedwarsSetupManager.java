@@ -35,10 +35,11 @@ public class BedwarsSetupManager {
     private static final String ARENAS_PATH = "arenas";
     private static final String KEY_WORLD = "world";
     private static final String KEY_CENTER = "center";
+    private static final String KEY_GAME_LOBBY = "game-lobby";
+    private static final String KEY_MAP_LOBBY = "map-lobby";
     private static final String KEY_CORNER_1 = "corner_1";
     private static final String KEY_CORNER_2 = "corner_2";
     private static final String KEY_BASE_RADIUS = "base-radius";
-    private static final String KEY_LOBBY_HEIGHT = "lobby-height";
     private static final String KEY_BEDS = "beds";
     private static final String KEY_GENERATORS = "generators";
     private static final String KEY_BASE_GENERATORS = "Base_Generators";
@@ -72,8 +73,8 @@ public class BedwarsSetupManager {
         sendStatusLine(player, KEY_CORNER_2, arena.getString(KEY_CORNER_2));
         sendStatusLine(player, KEY_BASE_RADIUS, arena.contains(KEY_BASE_RADIUS)
                 ? String.valueOf(arena.getInt(KEY_BASE_RADIUS)) : null);
-        sendStatusLine(player, "lobby-height", arena.contains(KEY_LOBBY_HEIGHT)
-                ? String.valueOf(arena.getInt(KEY_LOBBY_HEIGHT)) : null);
+        sendStatusLine(player, KEY_GAME_LOBBY, arena.getString(KEY_GAME_LOBBY));
+        sendStatusLine(player, KEY_MAP_LOBBY, arena.getString(KEY_MAP_LOBBY));
         ConfigurationSection antiBuild = getSectionAnyCase(arena, KEY_ANTI_BUILD);
         sendStatusLine(player, "anti-build.base-generator-radius",
                 antiBuild != null && antiBuild.contains("base-generator-radius")
@@ -147,7 +148,8 @@ public class BedwarsSetupManager {
         arena.set(KEY_CORNER_1, "");
         arena.set(KEY_CORNER_2, "");
         arena.set(KEY_BASE_RADIUS, 0);
-        arena.set(KEY_LOBBY_HEIGHT, location.getBlockY());
+        arena.set(KEY_GAME_LOBBY, formatPoint(location));
+        arena.set(KEY_MAP_LOBBY, formatPoint(location));
         ConfigurationSection antiBuild = arena.createSection(KEY_ANTI_BUILD);
         antiBuild.set("base-generator-radius", 0);
         antiBuild.set("advanced-generator-radius", 0);
@@ -254,7 +256,8 @@ public class BedwarsSetupManager {
                     return;
                 }
             }
-            case LOBBY_HEIGHT -> arena.set(KEY_LOBBY_HEIGHT, location.getBlockY());
+            case GAME_LOBBY -> arena.set(KEY_GAME_LOBBY, formatPoint(location));
+            case MAP_LOBBY -> arena.set(KEY_MAP_LOBBY, formatPoint(location));
             case SPAWN -> setSpawn(arena, target.team(), location);
             case BASE_GEN -> setBaseGenerator(arena, target.team(), location);
             case GENERATOR -> setGenerator(arena, target.generatorType(), target.generatorIndex(), location);
@@ -276,7 +279,8 @@ public class BedwarsSetupManager {
         keys.add(KEY_BASE_RADIUS);
         keys.add("anti-build.base-generator-radius");
         keys.add("anti-build.advanced-generator-radius");
-        keys.add("lobby-height");
+        keys.add(KEY_GAME_LOBBY);
+        keys.add(KEY_MAP_LOBBY);
         for (TeamColor team : TeamColor.ordered()) {
             keys.add(team.key() + ".bed");
             keys.add(team.key() + ".spawn");
@@ -603,7 +607,8 @@ public class BedwarsSetupManager {
         BASE_RADIUS,
         ANTI_BUILD_BASE,
         ANTI_BUILD_ADVANCED,
-        LOBBY_HEIGHT,
+        GAME_LOBBY,
+        MAP_LOBBY,
         BED,
         SPAWN,
         BASE_GEN,
@@ -650,8 +655,11 @@ public class BedwarsSetupManager {
                         : "anti-build.base-generator-radius";
                 return Optional.of(new SetupTarget(kind, null, null, null, null, null, label));
             }
-            if (normalized.equals("lobby-height") || normalized.equals("lobbyheight")) {
-                return Optional.of(new SetupTarget(SetupKind.LOBBY_HEIGHT, null, null, null, null, null, "lobby-height"));
+            if (normalized.equals("game-lobby") || normalized.equals("game.lobby") || normalized.equals("gamelobby")) {
+                return Optional.of(new SetupTarget(SetupKind.GAME_LOBBY, null, null, null, null, null, KEY_GAME_LOBBY));
+            }
+            if (normalized.equals("map-lobby") || normalized.equals("map.lobby") || normalized.equals("maplobby")) {
+                return Optional.of(new SetupTarget(SetupKind.MAP_LOBBY, null, null, null, null, null, KEY_MAP_LOBBY));
             }
             if (normalized.startsWith("bed.")) {
                 TeamColor team = TeamColor.fromKey(normalized.substring("bed.".length()));

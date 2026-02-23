@@ -14,6 +14,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class CustomItemData {
     private static final NamespacedKey KEY =
             new NamespacedKey(JavaPlugin.getProvidingPlugin(CustomItemData.class), "custom_item");
+    private static final NamespacedKey USES_KEY =
+            new NamespacedKey(JavaPlugin.getProvidingPlugin(CustomItemData.class), "custom_item_uses");
 
     private CustomItemData() {
     }
@@ -35,5 +37,29 @@ public final class CustomItemData {
             return null;
         }
         return meta.getPersistentDataContainer().get(KEY, PersistentDataType.STRING);
+    }
+
+    public static int getUses(ItemStack stack) {
+        if (stack == null) {
+            return 0;
+        }
+        ItemMeta meta = stack.getItemMeta();
+        if (meta == null) {
+            return 0;
+        }
+        Integer value = meta.getPersistentDataContainer().get(USES_KEY, PersistentDataType.INTEGER);
+        return value != null ? value : 0;
+    }
+
+    public static void setUses(ItemMeta meta, int uses) {
+        if (meta == null) {
+            return;
+        }
+        PersistentDataContainer container = meta.getPersistentDataContainer();
+        if (uses <= 0) {
+            container.remove(USES_KEY);
+            return;
+        }
+        container.set(USES_KEY, PersistentDataType.INTEGER, uses);
     }
 }

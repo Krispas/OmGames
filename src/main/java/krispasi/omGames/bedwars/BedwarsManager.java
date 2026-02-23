@@ -10,6 +10,7 @@ import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
 import krispasi.omGames.bedwars.item.CustomItemConfigLoader;
 import krispasi.omGames.bedwars.shop.QuickBuyService;
+import krispasi.omGames.bedwars.stats.BedwarsStatsService;
 import krispasi.omGames.bedwars.shop.ShopConfig;
 import krispasi.omGames.bedwars.shop.ShopConfigLoader;
 import net.kyori.adventure.text.Component;
@@ -38,6 +39,7 @@ import krispasi.omGames.bedwars.model.TeamColor;
 public class BedwarsManager {
     private final JavaPlugin plugin;
     private final QuickBuyService quickBuyService;
+    private final BedwarsStatsService statsService;
     private Map<String, Arena> arenas = Map.of();
     private GameSession activeSession;
     private ShopConfig shopConfig = ShopConfig.empty();
@@ -46,6 +48,7 @@ public class BedwarsManager {
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.quickBuyService = new QuickBuyService(plugin);
+        this.statsService = new BedwarsStatsService(plugin);
     }
 
     public void loadArenas() {
@@ -58,8 +61,14 @@ public class BedwarsManager {
     public void loadShopConfig() {
         File configFile = new File(plugin.getDataFolder(), "shop.yml");
         migrateShopConfig(configFile);
-        ShopConfigLoader loader = new ShopConfigLoader(configFile, plugin.getLogger());
-        shopConfig = loader.load();
+        ShopConfig baseConfig = new ShopConfigLoader(configFile, plugin.getLogger()).load();
+        File rotatingFile = new File(plugin.getDataFolder(), "rotating-items.yml");
+        if (rotatingFile.exists()) {
+            ShopConfig rotatingConfig = new ShopConfigLoader(rotatingFile, plugin.getLogger()).load();
+            shopConfig = ShopConfig.merge(baseConfig, rotatingConfig);
+        } else {
+            shopConfig = baseConfig;
+        }
         plugin.getLogger().info("Loaded BedWars shop config.");
     }
 
@@ -73,6 +82,10 @@ public class BedwarsManager {
 
     public void loadQuickBuy() {
         quickBuyService.load();
+    }
+
+    public void loadStats() {
+        statsService.load();
     }
 
     public Collection<Arena> getArenas() {
@@ -103,6 +116,10 @@ public class BedwarsManager {
         return quickBuyService;
     }
 
+    public BedwarsStatsService getStatsService() {
+        return statsService;
+    }
+
     public boolean isBedwarsWorld(String worldName) {
         for (Arena arena : arenas.values()) {
             if (arena.getWorldName().equalsIgnoreCase(worldName)) {
@@ -113,15 +130,24 @@ public class BedwarsManager {
     }
 
     public void openMapSelect(Player player) {
+        openMapSelect(player, true);
+    }
+
+    public void openMapSelect(Player player, boolean statsEnabled) {
         if ( arenas.isEmpty()) {
             player.sendMessage(Component.text("No arenas configured.", NamedTextColor.RED));
             return;
         }
-        new MapSelectMenu(this).open(player);
+        new MapSelectMenu(this, statsEnabled).open(player);
     }
 
     public void openTeamAssignMenu(Player player, Arena arena) {
+        openTeamAssignMenu(player, arena, true);
+    }
+
+    public void openTeamAssignMenu(Player player, Arena arena, boolean statsEnabled) {
         GameSession session = new GameSession(this, arena);
+        session.setStatsEnabled(statsEnabled);
         new TeamAssignMenu(this, session).open(player);
     }
 
@@ -144,6 +170,27 @@ public class BedwarsManager {
         activeSession = session;
         session.start(plugin, initiator);
         initiator.sendMessage(Component.text("BedWars started on " + session.getArena().getId() + ".", NamedTextColor.GREEN));
+    }
+
+    public void startLobby(Player initiator, GameSession session, int lobbySeconds) {
+        if (session.getAssignedCount() == 0) {
+            initiator.sendMessage(Component.text("Assign at least one player to a team.", NamedTextColor.RED));
+            return;
+        }
+
+        World world = session.getArena().getWorld();
+        if (world == null) {
+            initiator.sendMessage(Component.text("World not loaded: " + session.getArena().getWorldName(), NamedTextColor.RED));
+            return;
+        }
+
+        if (activeSession != null) {
+            activeSession.stop();
+        }
+
+        activeSession = session;
+        session.startLobby(plugin, initiator, lobbySeconds);
+        initiator.sendMessage(Component.text("BedWars lobby started on " + session.getArena().getId() + ".", NamedTextColor.GREEN));
     }
 
     public void stopSession(Player initiator) {
@@ -177,6 +224,13 @@ public class BedwarsManager {
                 }
             }
         }
+        if (winner != null && session.isStatsEnabled()) {
+            for (Map.Entry<UUID, TeamColor> entry : session.getAssignments().entrySet()) {
+                if (winner.equals(entry.getValue())) {
+                    statsService.addWin(entry.getKey());
+                }
+            }
+        }
         session.stop();
         activeSession = null;
     }
@@ -187,6 +241,7 @@ public class BedwarsManager {
             activeSession = null;
         }
         quickBuyService.shutdown();
+        statsService.shutdown();
         clearDroppedItems();
     }
 

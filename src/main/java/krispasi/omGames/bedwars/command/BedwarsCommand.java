@@ -2,10 +2,15 @@ package krispasi.omGames.bedwars.command;
 
 import java.util.Arrays;
 import krispasi.omGames.bedwars.BedwarsManager;
+import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.model.Arena;
+import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
+import krispasi.omGames.bedwars.stats.BedwarsPlayerStats;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -39,6 +44,18 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Only players can use this command.", NamedTextColor.RED));
             return true;
         }
+        if (args.length > 0 && args[0].equalsIgnoreCase("stats")) {
+            BedwarsPlayerStats stats = bedwarsManager.getStatsService().getStats(player.getUniqueId());
+            player.sendMessage(Component.text("BedWars Stats", NamedTextColor.GOLD));
+            player.sendMessage(Component.text("Wins: " + stats.getWins(), NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Kills: " + stats.getKills(), NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Deaths: " + stats.getDeaths(), NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Final Kills: " + stats.getFinalKills(), NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Final Deaths: " + stats.getFinalDeaths(), NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Games Played: " + stats.getGamesPlayed(), NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("Beds Broken: " + stats.getBedsBroken(), NamedTextColor.YELLOW));
+            return true;
+        }
         if (!sender.hasPermission("omgames.bw.start")
                 && !sender.hasPermission("omgames.bw.setup")
                 && !sender.hasPermission("omgames.bw.reload")) {
@@ -62,6 +79,18 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             bedwarsManager.stopSession(player);
             return true;
         }
+        if (args[0].equalsIgnoreCase("test")) {
+            if (!sender.hasPermission("omgames.bw.start")) {
+                sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                return true;
+            }
+            if (args.length < 2 || !args[1].equalsIgnoreCase("start")) {
+                sender.sendMessage(Component.text("Usage: /bw test start", NamedTextColor.YELLOW));
+                return true;
+            }
+            bedwarsManager.openMapSelect(player, false);
+            return true;
+        }
         if (args[0].equalsIgnoreCase("tp")) {
             if (!sender.hasPermission("omgames.bw.start")) {
                 sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
@@ -69,6 +98,13 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
             if (args.length < 2) {
                 sender.sendMessage(Component.text("Usage: /bw tp <arena>", NamedTextColor.YELLOW));
+                return true;
+            }
+            if (args.length == 2 && args[1].equalsIgnoreCase("lobby")) {
+                World world = player.getWorld();
+                Location target = new Location(world, 0, 73, -1);
+                player.teleport(target);
+                sender.sendMessage(Component.text("Teleported to lobby.", NamedTextColor.GREEN));
                 return true;
             }
             String arenaName = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).trim();
@@ -93,6 +129,81 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             Location target = arena.getCenter().toLocation(world);
             player.teleport(target);
             sender.sendMessage(Component.text("Teleported to center of " + arena.getId() + ".", NamedTextColor.GREEN));
+            return true;
+        }
+        if (args[0].equalsIgnoreCase("out")) {
+            if (!sender.hasPermission("omgames.bw.start")) {
+                sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                return true;
+            }
+            return handleGameOut(sender, player, args);
+        }
+        if (args[0].equalsIgnoreCase("game")) {
+            if (!sender.hasPermission("omgames.bw.start")) {
+                sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                return true;
+            }
+            if (args.length < 2) {
+                sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team> [player] | /bw game revive <team>", NamedTextColor.YELLOW));
+                return true;
+            }
+            String action = args[1].toLowerCase(Locale.ROOT);
+            if (action.equals("out")) {
+                return handleGameOut(sender, player, Arrays.copyOfRange(args, 1, args.length));
+            }
+            if (action.equals("join")) {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /bw game join <team> [player]", NamedTextColor.YELLOW));
+                    return true;
+                }
+                TeamColor team = TeamColor.fromKey(args[2]);
+                if (team == null) {
+                    sender.sendMessage(Component.text("Unknown team: " + args[2], NamedTextColor.RED));
+                    return true;
+                }
+                Player target = args.length >= 4 ? Bukkit.getPlayer(args[3]) : player;
+                if (target == null) {
+                    sender.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+                    return true;
+                }
+                GameSession session = bedwarsManager.getActiveSession();
+                if (session == null || !session.isActive()) {
+                    sender.sendMessage(Component.text("No active BedWars session.", NamedTextColor.RED));
+                    return true;
+                }
+                if (!session.forceJoin(target, team)) {
+                    sender.sendMessage(Component.text("Could not add player to team " + team.displayName() + ".", NamedTextColor.RED));
+                    return true;
+                }
+                sender.sendMessage(Component.text("Added " + target.getName() + " to " + team.displayName() + ".", NamedTextColor.GREEN));
+                if (target != player) {
+                    target.sendMessage(Component.text("You were added to " + team.displayName() + ".", NamedTextColor.GREEN));
+                }
+                return true;
+            }
+            if (action.equals("revive")) {
+                if (args.length < 3) {
+                    sender.sendMessage(Component.text("Usage: /bw game revive <team>", NamedTextColor.YELLOW));
+                    return true;
+                }
+                TeamColor team = TeamColor.fromKey(args[2]);
+                if (team == null) {
+                    sender.sendMessage(Component.text("Unknown team: " + args[2], NamedTextColor.RED));
+                    return true;
+                }
+                GameSession session = bedwarsManager.getActiveSession();
+                if (session == null || !session.isActive()) {
+                    sender.sendMessage(Component.text("No active BedWars session.", NamedTextColor.RED));
+                    return true;
+                }
+                if (!session.reviveBed(team)) {
+                    sender.sendMessage(Component.text("Could not revive " + team.displayName() + " bed.", NamedTextColor.RED));
+                    return true;
+                }
+                sender.sendMessage(Component.text(team.displayName() + " bed revived.", NamedTextColor.GREEN));
+                return true;
+            }
+            sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team> [player] | /bw game revive <team>", NamedTextColor.YELLOW));
             return true;
         }
         if (args[0].equalsIgnoreCase("reload")) {
@@ -139,7 +250,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw stop | /bw tp <arena> | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw out [player] | /bw game out [player] | /bw game join <team> [player] | /bw game revive <team> | /bw stats | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -147,14 +258,63 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "stop", "tp", "reload", "setup")
+            return Stream.of("start", "test", "stop", "tp", "out", "game", "stats", "reload", "setup")
                     .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("test")) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Stream.of("start")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("out")) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
+                    .toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("game")) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Stream.of("out", "join", "revive")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("join")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return Stream.of(TeamColor.values())
+                    .map(TeamColor::key)
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("join")) {
+            String input = args[3].toLowerCase(Locale.ROOT);
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("revive")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return Stream.of(TeamColor.values())
+                    .map(TeamColor::key)
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("out")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("tp")) {
             String input = args[1].toLowerCase(Locale.ROOT);
-            return bedwarsManager.getArenas().stream()
-                    .map(Arena::getId)
+            List<String> options = new java.util.ArrayList<>();
+            options.add("lobby");
+            bedwarsManager.getArenas().forEach(arena -> options.add(arena.getId()));
+            return options.stream()
                     .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
@@ -192,5 +352,28 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
         return bedwarsManager.getArena(trimmed);
+    }
+
+    private boolean handleGameOut(CommandSender sender, Player caller, String[] args) {
+        Player target = args.length >= 2 ? Bukkit.getPlayer(args[1]) : caller;
+        if (target == null) {
+            sender.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+            return true;
+        }
+        GameSession session = bedwarsManager.getActiveSession();
+        if (session == null || !session.isActive()) {
+            sender.sendMessage(Component.text("No active BedWars session.", NamedTextColor.RED));
+            return true;
+        }
+        session.removeParticipant(target);
+        session.addEditor(target);
+        target.setGameMode(GameMode.CREATIVE);
+        target.setAllowFlight(true);
+        target.setFlying(true);
+        sender.sendMessage(Component.text("Removed " + target.getName() + " from the match.", NamedTextColor.YELLOW));
+        if (target != caller) {
+            target.sendMessage(Component.text("You were removed from the match.", NamedTextColor.YELLOW));
+        }
+        return true;
     }
 }

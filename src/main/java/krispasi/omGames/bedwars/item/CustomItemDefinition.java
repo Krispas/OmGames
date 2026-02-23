@@ -22,6 +22,8 @@ public class CustomItemDefinition {
     private final int lifetimeSeconds;
     private final double health;
     private final double speed;
+    private final double range;
+    private final int uses;
 
     public CustomItemDefinition(String id,
                                 CustomItemType type,
@@ -35,7 +37,9 @@ public class CustomItemDefinition {
                                 double knockback,
                                 int lifetimeSeconds,
                                 double health,
-                                double speed) {
+                                double speed,
+                                double range,
+                                int uses) {
         this.id = id;
         this.type = type;
         this.material = material;
@@ -49,6 +53,8 @@ public class CustomItemDefinition {
         this.lifetimeSeconds = lifetimeSeconds;
         this.health = health;
         this.speed = speed;
+        this.range = range;
+        this.uses = uses;
     }
 
     public String getId() {
@@ -101,5 +107,13 @@ public class CustomItemDefinition {
 
     public double getSpeed() {
         return speed;
+    }
+
+    public double getRange() {
+        return range;
+    }
+
+    public int getUses() {
+        return uses;
     }
 }

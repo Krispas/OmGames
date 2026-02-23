@@ -14,6 +14,8 @@ public enum ShopItemBehavior {
     PICKAXE,
     AXE,
     SHEARS,
+    SHIELD,
     POTION,
+    UPGRADE,
     UTILITY
 }

@@ -21,6 +21,7 @@ import org.bukkit.plugin.java.JavaPlugin;
  * {@link krispasi.omGames.bedwars.gui.ShopMenu} customization.</p>
  */
 public class QuickBuyService {
+    public static final String EMPTY_MARKER = "__empty__";
     private static final String TABLE_SQL = """
             CREATE TABLE IF NOT EXISTS quick_buy (
               player_uuid TEXT NOT NULL,
@@ -73,6 +74,10 @@ public class QuickBuyService {
             return Map.of();
         }
         return Collections.unmodifiableMap(map);
+    }
+
+    public static boolean isEmptyMarker(String itemId) {
+        return EMPTY_MARKER.equalsIgnoreCase(itemId);
     }
 
     public void setQuickBuySlot(UUID playerId, int slot, String itemId) {

@@ -6,6 +6,7 @@ package krispasi.omGames.bedwars.game;
  */
 public enum GameState {
     IDLE,
+    LOBBY,
     STARTING,
     RUNNING,
     ENDING

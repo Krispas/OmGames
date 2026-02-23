@@ -38,6 +38,7 @@ shop:
         knockback_stick: 13
         mace: 14
         netherite_spear: 15
+        netherite_spear_lunging: 16
     ranged:
       title: "Ranged"
       icon: BOW
@@ -51,6 +52,8 @@ shop:
         crossbow_quickcharge: 15
         crossbow_multishot: 16
         explosive_firework: 17
+        trident_loyalty_1: 18
+        trident_loyalty_3: 19
     armor:
       title: "Armor"
       icon: IRON_CHESTPLATE
@@ -93,6 +96,9 @@ shop:
         water_bucket: 27
         crystal: 28
         happy_ghast: 29
+        shield: 30
+        damage_potion_ii: 31
+        damage_potion_i: 32
     miscellaneous:
       title: "Miscellaneous"
       icon: BREWING_STAND
@@ -203,9 +209,19 @@ shop:
         material: NETHERITE_SPEAR
         amount: 1
         cost:
+          material: GOLD
+          amount: 16
+        display-name: "Netherite Spear"
+      netherite_spear_lunging:
+        material: NETHERITE_SPEAR
+        amount: 1
+        cost:
           material: EMERALD
           amount: 4
-        display-name: "Netherite Spear"
+        display-name: "Netherite Spear (Lunging III, Sharpness V)"
+        enchants:
+          LUNGING: 3
+          SHARPNESS: 5
     ranged:
       bow:
         material: BOW
@@ -287,6 +303,26 @@ shop:
           explosion:
             power: 3.5
             damage: 6.0
+            knockback: 1.1
+      trident_loyalty_1:
+        material: TRIDENT
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 32
+        display-name: "Trident (Loyalty I)"
+        enchants:
+          LOYALTY: 1
+      trident_loyalty_3:
+        material: TRIDENT
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Trident (Loyalty III, Sharpness V)"
+        enchants:
+          LOYALTY: 3
+          SHARPNESS: 5
     armor:
       chainmail_armor:
         material: CHAINMAIL_CHESTPLATE
@@ -506,5 +542,32 @@ shop:
         lore:
           - "Summons a happy ghast."
         custom-item: happy_ghast
+      shield:
+        material: SHIELD
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 32
+        display-name: "Shield"
+        lore:
+          - "Permanent item."
+      damage_potion_ii:
+        material: SPLASH_POTION
+        amount: 3
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Splash Potion of Harming II"
+        potion-effects:
+          - "INSTANT_DAMAGE:2:1"
+      damage_potion_i:
+        material: SPLASH_POTION
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 16
+        display-name: "Splash Potion of Harming"
+        potion-effects:
+          - "INSTANT_DAMAGE:1:1"
     miscellaneous: {}
 

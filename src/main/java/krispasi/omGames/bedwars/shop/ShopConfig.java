@@ -47,6 +47,10 @@ public class ShopConfig {
         return categories;
     }
 
+    public Map<String, ShopItemDefinition> getItems() {
+        return items;
+    }
+
     public ShopItemDefinition getFirstByBehavior(ShopItemBehavior behavior) {
         for (ShopItemDefinition item : items.values()) {
             if (item.getBehavior() == behavior) {
@@ -70,5 +74,61 @@ public class ShopConfig {
             return Map.of();
         }
         return Collections.unmodifiableMap(map);
+    }
+
+    public static ShopConfig merge(ShopConfig base, ShopConfig extra) {
+        if (base == null) {
+            return extra != null ? extra : ShopConfig.empty();
+        }
+        if (extra == null) {
+            return base;
+        }
+        Map<String, ShopItemDefinition> mergedItems = new HashMap<>(base.items);
+        for (Map.Entry<String, ShopItemDefinition> entry : extra.items.entrySet()) {
+            mergedItems.putIfAbsent(entry.getKey(), entry.getValue());
+        }
+        Map<ShopCategoryType, ShopCategory> mergedCategories = new EnumMap<>(ShopCategoryType.class);
+        mergedCategories.putAll(base.categories);
+        for (Map.Entry<ShopCategoryType, ShopCategory> entry : extra.categories.entrySet()) {
+            ShopCategoryType type = entry.getKey();
+            ShopCategory extraCategory = entry.getValue();
+            ShopCategory existing = mergedCategories.get(type);
+            if (existing == null) {
+                mergedCategories.put(type, extraCategory);
+                continue;
+            }
+            Map<Integer, String> mergedEntries = new HashMap<>(existing.getEntries());
+            for (Map.Entry<Integer, String> slot : extraCategory.getEntries().entrySet()) {
+                mergedEntries.putIfAbsent(slot.getKey(), slot.getValue());
+            }
+            mergedCategories.put(type, new ShopCategory(type,
+                    existing.getTitle(),
+                    existing.getIcon(),
+                    existing.getSize(),
+                    mergedEntries));
+        }
+        Map<ShopItemBehavior, Map<Integer, ShopItemDefinition>> tiered = buildTieredItems(mergedItems);
+        return new ShopConfig(mergedItems, mergedCategories, tiered);
+    }
+
+    public static Map<ShopItemBehavior, Map<Integer, ShopItemDefinition>> buildTieredItems(
+            Map<String, ShopItemDefinition> items) {
+        Map<ShopItemBehavior, Map<Integer, ShopItemDefinition>> tiered = new EnumMap<>(ShopItemBehavior.class);
+        for (ShopItemDefinition item : items.values()) {
+            if (item.getTier() <= 0) {
+                continue;
+            }
+            ShopItemBehavior behavior = item.getBehavior();
+            if (behavior != ShopItemBehavior.ARMOR
+                    && behavior != ShopItemBehavior.PICKAXE
+                    && behavior != ShopItemBehavior.AXE
+                    && behavior != ShopItemBehavior.BOW
+                    && behavior != ShopItemBehavior.CROSSBOW) {
+                continue;
+            }
+            tiered.computeIfAbsent(behavior, key -> new HashMap<>())
+                    .put(item.getTier(), item);
+        }
+        return tiered;
     }
 }

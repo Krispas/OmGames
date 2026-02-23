@@ -17,11 +17,13 @@ public final class FireworkData {
             new NamespacedKey(JavaPlugin.getProvidingPlugin(FireworkData.class), "firework_explosion_power");
     private static final NamespacedKey EXPLOSION_DAMAGE_KEY =
             new NamespacedKey(JavaPlugin.getProvidingPlugin(FireworkData.class), "firework_explosion_damage");
+    private static final NamespacedKey EXPLOSION_KNOCKBACK_KEY =
+            new NamespacedKey(JavaPlugin.getProvidingPlugin(FireworkData.class), "firework_explosion_knockback");
 
     private FireworkData() {
     }
 
-    public static void apply(ItemMeta meta, Double power, Double damage) {
+    public static void apply(ItemMeta meta, Double power, Double damage, Double knockback) {
         if (meta == null) {
             return;
         }
@@ -31,6 +33,9 @@ public final class FireworkData {
         }
         if (damage != null) {
             container.set(EXPLOSION_DAMAGE_KEY, PersistentDataType.DOUBLE, damage);
+        }
+        if (knockback != null) {
+            container.set(EXPLOSION_KNOCKBACK_KEY, PersistentDataType.DOUBLE, knockback);
         }
     }
 
@@ -46,5 +51,12 @@ public final class FireworkData {
             return null;
         }
         return meta.getPersistentDataContainer().get(EXPLOSION_DAMAGE_KEY, PersistentDataType.DOUBLE);
+    }
+
+    public static Double getExplosionKnockback(ItemMeta meta) {
+        if (meta == null) {
+            return null;
+        }
+        return meta.getPersistentDataContainer().get(EXPLOSION_KNOCKBACK_KEY, PersistentDataType.DOUBLE);
     }
 }

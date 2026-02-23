@@ -12,6 +12,9 @@ import krispasi.omGames.bedwars.shop.ShopCategoryType;
 import krispasi.omGames.bedwars.shop.ShopConfig;
 import krispasi.omGames.bedwars.shop.ShopItemBehavior;
 import krispasi.omGames.bedwars.shop.ShopItemDefinition;
+import krispasi.omGames.bedwars.shop.ShopItemLimit;
+import krispasi.omGames.bedwars.shop.ShopItemLimitScope;
+import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -91,6 +94,10 @@ public class ShopMenu implements InventoryHolder {
         ShopItemDefinition item = itemSlots.get(event.getRawSlot());
         if (item != null) {
             boolean purchased = session.handleShopPurchase(player, item);
+            if (purchased && item.getBehavior() == ShopItemBehavior.UPGRADE) {
+                new ShopMenu(session, config, categoryType, player).open(player);
+                return;
+            }
             if (purchased && categoryType == ShopCategoryType.TOOLS) {
                 ShopItemBehavior behavior = item.getBehavior();
                 if (behavior == ShopItemBehavior.PICKAXE || behavior == ShopItemBehavior.AXE) {
@@ -116,7 +123,21 @@ public class ShopMenu implements InventoryHolder {
         }
         if (categoryType == ShopCategoryType.QUICK_BUY && quickBuyService != null) {
             for (Map.Entry<Integer, String> entry : quickBuyService.getQuickBuy(viewerId).entrySet()) {
-                entries.put(entry.getKey(), entry.getValue());
+                if (QuickBuyService.isEmptyMarker(entry.getValue())) {
+                    entries.remove(entry.getKey());
+                } else {
+                    entries.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        entries.entrySet().removeIf(entry -> {
+            ShopItemDefinition item = config.getItem(entry.getValue());
+            return item != null && !session.isRotatingItemAvailable(item);
+        });
+        if (categoryType == ShopCategoryType.ROTATING) {
+            java.util.Set<String> rotating = session.getRotatingItemIds();
+            if (!rotating.isEmpty()) {
+                entries.entrySet().removeIf(entry -> !rotating.contains(entry.getValue()));
             }
         }
         for (Map.Entry<Integer, String> entry : entries.entrySet()) {
@@ -129,9 +150,13 @@ public class ShopMenu implements InventoryHolder {
                 continue;
             }
             ItemStack display = item.createDisplayItem(team);
+            if (item.getBehavior() == ShopItemBehavior.UPGRADE && item.getUpgradeType() != null) {
+                display = buildUpgradeDisplay(item);
+            }
             if (item.getBehavior() == ShopItemBehavior.ARMOR) {
                 display = decorateArmorDisplay(display);
             }
+            display = applyLimitLore(display, item);
             inventory.setItem(slot, display);
             itemSlots.put(slot, item);
         }
@@ -212,6 +237,36 @@ public class ShopMenu implements InventoryHolder {
         return item;
     }
 
+    private ItemStack applyLimitLore(ItemStack item, ShopItemDefinition definition) {
+        if (item == null || definition == null) {
+            return item;
+        }
+        ShopItemLimit limit = definition.getLimit();
+        if (limit == null || !limit.isValid()) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return item;
+        }
+        java.util.List<Component> lore = meta.lore();
+        if (lore == null) {
+            lore = new java.util.ArrayList<>();
+        } else {
+            lore = new java.util.ArrayList<>(lore);
+        }
+        String scope = limit.scope() == ShopItemLimitScope.TEAM ? "team" : "player";
+        lore.add(Component.text("Limit: " + limit.amount() + " per " + scope, NamedTextColor.GRAY));
+        int remaining = session.getRemainingLimit(viewerId, definition);
+        if (remaining >= 0) {
+            lore.add(Component.text("Remaining: " + remaining,
+                    remaining > 0 ? NamedTextColor.GREEN : NamedTextColor.RED));
+        }
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
     private String getCurrentArmorName() {
         int tier = session.getArmorTier(viewerId);
         if (tier <= 0) {
@@ -248,6 +303,92 @@ public class ShopMenu implements InventoryHolder {
             }
         }
         return builder.toString();
+    }
+
+    private ItemStack buildUpgradeDisplay(ShopItemDefinition item) {
+        TeamUpgradeType type = item.getUpgradeType();
+        if (type == null) {
+            return item.createDisplayItem(team);
+        }
+        if (type == TeamUpgradeType.GARRY) {
+            return buildGarryDisplay(type);
+        }
+        int tier = session.getUpgradeTier(team, type);
+        int maxTier = type.maxTier();
+        boolean maxed = tier >= maxTier;
+        int nextTier = Math.min(tier + 1, maxTier);
+
+        ItemStack display = new ItemStack(type.icon());
+        ItemMeta meta = display.getItemMeta();
+        String title = maxed ? type.tierName(tier) : type.tierName(nextTier);
+        meta.displayName(Component.text(title, maxed ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+
+        java.util.List<Component> lore = new java.util.ArrayList<>();
+        for (String line : type.description()) {
+            lore.add(Component.text(line, NamedTextColor.GRAY));
+        }
+        lore.add(Component.text(" ", NamedTextColor.DARK_GRAY));
+        if (tier > 0) {
+            lore.add(Component.text("Current: " + type.tierName(tier), NamedTextColor.GRAY));
+        }
+        if (maxed) {
+            lore.add(Component.text("Maxed", NamedTextColor.GREEN));
+            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+        } else {
+            lore.add(Component.text("Cost: " + type.nextCost(tier) + " Diamonds", NamedTextColor.YELLOW));
+            lore.add(Component.text("Click to purchase", NamedTextColor.GRAY));
+        }
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        meta.lore(lore);
+        display.setItemMeta(meta);
+        return display;
+    }
+
+    private ItemStack buildGarryDisplay(TeamUpgradeType type) {
+        ItemStack display = new ItemStack(type.icon());
+        ItemMeta meta = display.getItemMeta();
+        String nextName = session.getGarryNextName();
+        int cost = session.getGarryNextCost();
+        boolean available = cost > 0;
+        boolean maxed = cost <= 0 && session.isGarryUnlocked()
+                && session.isGarryWifeAlive()
+                && session.isGarryJrAlive();
+        String title = nextName != null ? nextName : type.displayName();
+        meta.displayName(Component.text(title, maxed ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+
+        java.util.List<Component> lore = new java.util.ArrayList<>();
+        for (String line : type.description()) {
+            lore.add(Component.text(line, NamedTextColor.GRAY));
+        }
+        lore.add(Component.text(" ", NamedTextColor.DARK_GRAY));
+        if (session.isGarryUnlocked()) {
+            String active = "Garry";
+            if (session.isGarryWifeAlive() && session.isGarryJrAlive()) {
+                active = "Garry, Wife, Jr.";
+            } else if (session.isGarryWifeAlive()) {
+                active = "Garry, Wife";
+            } else if (session.isGarryJrAlive()) {
+                active = "Garry, Jr.";
+            }
+            lore.add(Component.text("Active: " + active, NamedTextColor.GRAY));
+        } else {
+            lore.add(Component.text("Active: none", NamedTextColor.GRAY));
+        }
+        if (maxed) {
+            lore.add(Component.text("All wardens active", NamedTextColor.GREEN));
+            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+        } else if (available) {
+            lore.add(Component.text("Cost: " + cost + " Diamonds", NamedTextColor.YELLOW));
+            lore.add(Component.text("Click to purchase", NamedTextColor.GRAY));
+        } else {
+            lore.add(Component.text("Not available", NamedTextColor.RED));
+        }
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        meta.lore(lore);
+        display.setItemMeta(meta);
+        return display;
     }
 
     private void buildCategoryRow() {
@@ -323,13 +464,18 @@ public class ShopMenu implements InventoryHolder {
         Integer pending = quickBuyService.getPendingSlot(viewerId);
         if (categoryType == ShopCategoryType.QUICK_BUY) {
             if (event.getClick().isRightClick()) {
-                ShopItemDefinition item = itemSlots.get(slot);
-                if (item != null) {
+                String override = quickBuyService.getQuickBuy(viewerId).get(slot);
+                if (override != null) {
                     quickBuyService.removeQuickBuySlot(viewerId, slot);
                     quickBuyService.clearPendingSlot(viewerId);
-                    player.sendMessage(Component.text("Cleared slot " + slot + ".", NamedTextColor.GRAY));
+                    player.sendMessage(Component.text("Restored slot " + slot + ".", NamedTextColor.GRAY));
                     new ShopMenu(session, config, categoryType, player).open(player);
+                    return;
                 }
+                quickBuyService.setQuickBuySlot(viewerId, slot, QuickBuyService.EMPTY_MARKER);
+                quickBuyService.clearPendingSlot(viewerId);
+                player.sendMessage(Component.text("Cleared slot " + slot + ".", NamedTextColor.GRAY));
+                new ShopMenu(session, config, categoryType, player).open(player);
                 return;
             }
             if (pending == null) {

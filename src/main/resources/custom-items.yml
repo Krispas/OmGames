@@ -34,6 +34,64 @@ custom-items:
   happy_ghast:
     type: HAPPY_GHAST
     material: GHAST_SPAWN_EGG
-    health: 100
+    health: 150
     speed: 0.15
     lifetime-seconds: 180
+  respawn_beacon:
+    type: RESPAWN_BEACON
+    material: BEACON
+    lifetime-seconds: 30
+  sniper_bolt:
+    type: FIREBALL
+    material: FIRE_CHARGE
+    velocity: 3.0
+    yield: 2.0
+    incendiary: false
+    damage: 4.0
+    knockback: 0.5
+  flamethrower:
+    type: FLAMETHROWER
+    material: BLAZE_ROD
+    velocity: 0.6
+    yield: 0.6
+    damage: 2.0
+    knockback: 0.3
+    uses: 32
+  bridge_builder:
+    type: BRIDGE_BUILDER
+    material: PISTON
+    max-blocks: 20
+    bridge-width: 3
+  creeping_arrow:
+    type: CREEPING_ARROW
+    material: ARROW
+    damage: 6.0
+    yield: 2.0
+    lifetime-seconds: 20
+  tactical_nuke:
+    type: TACTICAL_NUKE
+    material: REPEATER
+    yield: 30.0
+    lifetime-seconds: 60
+  bridge_zapper:
+    type: BRIDGE_ZAPPER
+    material: FLINT
+    max-blocks: 10
+  garry:
+    type: WARDEN
+    material: WARDEN_SPAWN_EGG
+    health: 200
+    damage: 12
+    range: 32
+  garry_wife:
+    type: WARDEN
+    material: WARDEN_SPAWN_EGG
+    health: 200
+    damage: 12
+    range: 32
+  garry_jr:
+    type: WARDEN
+    material: WARDEN_SPAWN_EGG
+    health: 200
+    damage: 12
+    range: 32

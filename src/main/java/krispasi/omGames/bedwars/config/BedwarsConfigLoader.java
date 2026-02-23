@@ -68,8 +68,19 @@ public class BedwarsConfigLoader {
             BlockPoint center = parsePoint(arenaSection.getString("center"), "center", arenaId);
             BlockPoint corner1 = parseOptionalPoint(arenaSection.getString("corner_1"));
             BlockPoint corner2 = parseOptionalPoint(arenaSection.getString("corner_2"));
+            BlockPoint gameLobby = parseOptionalPoint(arenaSection.getString("game-lobby"));
+            BlockPoint mapLobby = parseOptionalPoint(arenaSection.getString("map-lobby"));
+            if (gameLobby == null && center != null && arenaSection.contains("lobby-height")) {
+                int lobbyHeight = arenaSection.getInt("lobby-height", 0);
+                gameLobby = new BlockPoint(center.x(), lobbyHeight, center.z());
+            }
+            if (gameLobby == null) {
+                gameLobby = center;
+            }
+            if (mapLobby == null) {
+                mapLobby = gameLobby;
+            }
             int baseRadius = arenaSection.getInt("base-radius", 0);
-            int lobbyHeight = arenaSection.getInt("lobby-height", 0);
             int baseGeneratorRadius = arenaSection.getInt("anti-build.base-generator-radius", 0);
             int advancedGeneratorRadius = arenaSection.getInt("anti-build.advanced-generator-radius", 0);
             GeneratorSettings generatorSettings = parseGeneratorSettings(arenaSection, arenaId);
@@ -219,8 +230,9 @@ public class BedwarsConfigLoader {
             Arena arena = new Arena(
                     arenaId,
                     worldName,
-                    lobbyHeight,
                     center,
+                    gameLobby,
+                    mapLobby,
                     baseRadius,
                     corner1,
                     corner2,

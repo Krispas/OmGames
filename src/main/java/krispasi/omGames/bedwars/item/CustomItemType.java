@@ -5,12 +5,19 @@ package krispasi.omGames.bedwars.item;
  * <p>Defaults are used when a field is missing from {@code custom-items.yml}.</p>
  */
 public enum CustomItemType {
-    FIREBALL(1.15, 3.2f, false, 0, 1, 4.0, 1.6, 0, -1.0, -1.0),
-    BRIDGE_EGG(1.2, 0.0f, false, 64, 1, 0.0, 0.0, 0, -1.0, -1.0),
-    BED_BUG(1.2, 0.0f, false, 0, 1, 0.0, 0.0, 15, -1.0, -1.0),
-    DREAM_DEFENDER(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 180, -1.0, -1.0),
-    CRYSTAL(0.0, 6.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0),
-    HAPPY_GHAST(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 180, -1.0, -1.0);
+    FIREBALL(1.15, 3.2f, false, 0, 1, 4.0, 1.6, 0, -1.0, -1.0, -1.0, 0),
+    BRIDGE_EGG(1.2, 0.0f, false, 64, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0),
+    BED_BUG(1.2, 0.0f, false, 0, 1, 0.0, 0.0, 15, -1.0, -1.0, -1.0, 0),
+    DREAM_DEFENDER(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 180, -1.0, -1.0, -1.0, 0),
+    CRYSTAL(0.0, 6.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0),
+    HAPPY_GHAST(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 180, -1.0, -1.0, -1.0, 0),
+    RESPAWN_BEACON(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 30, -1.0, -1.0, -1.0, 0),
+    FLAMETHROWER(0.6, 0.6f, false, 0, 1, 2.0, 0.3, 0, -1.0, -1.0, -1.0, 32),
+    BRIDGE_BUILDER(0.0, 0.0f, false, 20, 3, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0),
+    CREEPING_ARROW(0.0, 0.0f, false, 0, 1, 6.0, 0.0, 20, -1.0, -1.0, -1.0, 0),
+    TACTICAL_NUKE(0.0, 30.0f, false, 0, 1, 0.0, 0.0, 60, -1.0, -1.0, -1.0, 0),
+    BRIDGE_ZAPPER(0.0, 0.0f, false, 10, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0),
+    WARDEN(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, 32.0, 0);
 
     private final double defaultVelocity;
     private final float defaultYield;
@@ -22,6 +29,8 @@ public enum CustomItemType {
     private final int defaultLifetimeSeconds;
     private final double defaultHealth;
     private final double defaultSpeed;
+    private final double defaultRange;
+    private final int defaultUses;
 
     CustomItemType(double defaultVelocity,
                    float defaultYield,
@@ -32,7 +41,9 @@ public enum CustomItemType {
                    double defaultKnockback,
                    int defaultLifetimeSeconds,
                    double defaultHealth,
-                   double defaultSpeed) {
+                   double defaultSpeed,
+                   double defaultRange,
+                   int defaultUses) {
         this.defaultVelocity = defaultVelocity;
         this.defaultYield = defaultYield;
         this.defaultIncendiary = defaultIncendiary;
@@ -43,6 +54,8 @@ public enum CustomItemType {
         this.defaultLifetimeSeconds = defaultLifetimeSeconds;
         this.defaultHealth = defaultHealth;
         this.defaultSpeed = defaultSpeed;
+        this.defaultRange = defaultRange;
+        this.defaultUses = defaultUses;
     }
 
     public double getDefaultVelocity() {
@@ -83,5 +96,13 @@ public enum CustomItemType {
 
     public double getDefaultSpeed() {
         return defaultSpeed;
+    }
+
+    public double getDefaultRange() {
+        return defaultRange;
+    }
+
+    public int getDefaultUses() {
+        return defaultUses;
     }
 }

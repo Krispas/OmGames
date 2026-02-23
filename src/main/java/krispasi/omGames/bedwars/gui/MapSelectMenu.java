@@ -22,12 +22,15 @@ import org.bukkit.inventory.meta.ItemMeta;
  * @see krispasi.omGames.bedwars.gui.TeamAssignMenu
  */
 public class MapSelectMenu implements InventoryHolder {
+    private static final int RANDOM_SLOT = 26;
     private final BedwarsManager bedwarsManager;
+    private final boolean statsEnabled;
     private final Inventory inventory;
     private final Map<Integer, String> arenaSlots = new HashMap<>();
 
-    public MapSelectMenu(BedwarsManager bedwarsManager) {
+    public MapSelectMenu(BedwarsManager bedwarsManager, boolean statsEnabled) {
         this.bedwarsManager = bedwarsManager;
+        this.statsEnabled = statsEnabled;
         this.inventory = Bukkit.createInventory(this, 27, Component.text("BedWars - Select Arena", NamedTextColor.GOLD));
         build();
     }
@@ -46,6 +49,10 @@ public class MapSelectMenu implements InventoryHolder {
             return;
         }
         event.setCancelled(true);
+        if (event.getRawSlot() == RANDOM_SLOT) {
+            openRandomArena((Player) event.getWhoClicked());
+            return;
+        }
         String arenaId = arenaSlots.get(event.getRawSlot());
         if (arenaId == null) {
             return;
@@ -54,12 +61,15 @@ public class MapSelectMenu implements InventoryHolder {
         if (arena == null) {
             return;
         }
-        bedwarsManager.openTeamAssignMenu((Player) event.getWhoClicked(), arena);
+        bedwarsManager.openTeamAssignMenu((Player) event.getWhoClicked(), arena, statsEnabled);
     }
 
     private void build() {
         int slot = 0;
         for (Arena arena : bedwarsManager.getArenas()) {
+            if (slot == RANDOM_SLOT) {
+                slot++;
+            }
             if (slot >= inventory.getSize()) {
                 break;
             }
@@ -75,5 +85,27 @@ public class MapSelectMenu implements InventoryHolder {
             arenaSlots.put(slot, arena.getId());
             slot++;
         }
+        inventory.setItem(RANDOM_SLOT, buildRandomItem());
+    }
+
+    private ItemStack buildRandomItem() {
+        ItemStack item = new ItemStack(Material.NETHER_STAR);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(Component.text("Random Map", NamedTextColor.YELLOW));
+        meta.lore(java.util.List.of(
+                Component.text("Click to pick a random arena.", NamedTextColor.GRAY)
+        ));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private void openRandomArena(Player player) {
+        java.util.List<Arena> arenas = bedwarsManager.getArenas().stream().toList();
+        if (arenas.isEmpty()) {
+            player.sendMessage(Component.text("No arenas configured.", NamedTextColor.RED));
+            return;
+        }
+        Arena arena = arenas.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(arenas.size()));
+        bedwarsManager.openTeamAssignMenu(player, arena, statsEnabled);
     }
 }

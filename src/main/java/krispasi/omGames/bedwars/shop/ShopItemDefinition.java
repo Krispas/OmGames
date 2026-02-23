@@ -6,6 +6,7 @@ import java.util.Map;
 import krispasi.omGames.bedwars.item.CustomItemData;
 import krispasi.omGames.bedwars.item.FireworkData;
 import krispasi.omGames.bedwars.model.TeamColor;
+import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.FireworkEffect;
@@ -37,10 +38,13 @@ public class ShopItemDefinition {
     private final String displayName;
     private final List<String> lore;
     private final String customItemId;
+    private final TeamUpgradeType upgradeType;
+    private final ShopItemLimit limit;
     private final Integer fireworkPower;
     private final FireworkEffect fireworkEffect;
     private final Double fireworkExplosionPower;
     private final Double fireworkExplosionDamage;
+    private final Double fireworkExplosionKnockback;
 
     public ShopItemDefinition(String id,
                               Material material,
@@ -54,10 +58,13 @@ public class ShopItemDefinition {
                               String displayName,
                               List<String> lore,
                               String customItemId,
+                              TeamUpgradeType upgradeType,
+                              ShopItemLimit limit,
                               Integer fireworkPower,
                               FireworkEffect fireworkEffect,
                               Double fireworkExplosionPower,
-                              Double fireworkExplosionDamage) {
+                              Double fireworkExplosionDamage,
+                              Double fireworkExplosionKnockback) {
         this.id = id;
         this.material = material;
         this.amount = amount;
@@ -70,10 +77,13 @@ public class ShopItemDefinition {
         this.displayName = displayName;
         this.lore = lore;
         this.customItemId = customItemId;
+        this.upgradeType = upgradeType;
+        this.limit = limit;
         this.fireworkPower = fireworkPower;
         this.fireworkEffect = fireworkEffect;
         this.fireworkExplosionPower = fireworkExplosionPower;
         this.fireworkExplosionDamage = fireworkExplosionDamage;
+        this.fireworkExplosionKnockback = fireworkExplosionKnockback;
     }
 
     public String getId() {
@@ -106,6 +116,14 @@ public class ShopItemDefinition {
 
     public String getCustomItemId() {
         return customItemId;
+    }
+
+    public TeamUpgradeType getUpgradeType() {
+        return upgradeType;
+    }
+
+    public ShopItemLimit getLimit() {
+        return limit;
     }
 
     public String getDisplayName() {
@@ -152,7 +170,7 @@ public class ShopItemDefinition {
                 fireworkMeta.clearEffects();
                 fireworkMeta.addEffect(fireworkEffect);
             }
-            FireworkData.apply(fireworkMeta, fireworkExplosionPower, fireworkExplosionDamage);
+            FireworkData.apply(fireworkMeta, fireworkExplosionPower, fireworkExplosionDamage, fireworkExplosionKnockback);
             meta = fireworkMeta;
         }
 

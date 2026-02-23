@@ -25,6 +25,7 @@ public final class OmGames extends JavaPlugin {
     public void onEnable() {
         saveResource("bedwars.yml", false);
         saveResource("shop.yml", false);
+        saveResource("rotating-items.yml", false);
         saveResource("custom-items.yml", false);
 
         bedwarsManager = new BedwarsManager(this);
@@ -32,6 +33,7 @@ public final class OmGames extends JavaPlugin {
         bedwarsManager.loadCustomItems();
         bedwarsManager.loadShopConfig();
         bedwarsManager.loadQuickBuy();
+        bedwarsManager.loadStats();
         setupManager = new BedwarsSetupManager(this, bedwarsManager);
 
         PluginCommand command = getCommand("bw");

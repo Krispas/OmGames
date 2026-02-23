@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Logger;
+import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
 import org.bukkit.Color;
 import org.bukkit.DyeColor;
 import org.bukkit.FireworkEffect;
@@ -118,6 +119,10 @@ public class ShopConfigLoader {
         Map<Enchantment, Integer> enchants = parseEnchants(section.getConfigurationSection("enchants"));
         List<PotionEffect> potionEffects = parsePotionEffects(section.getStringList("potion-effects"));
         ShopItemBehavior behavior = parseBehavior(section.getString("behavior"));
+        TeamUpgradeType upgradeType = parseUpgrade(section.getString("upgrade"));
+        if (behavior == null && upgradeType != null) {
+            behavior = ShopItemBehavior.UPGRADE;
+        }
         if (behavior == null) {
             behavior = inferBehavior(categoryKey, material, potionEffects);
         }
@@ -127,10 +132,12 @@ public class ShopConfigLoader {
         String displayName = section.getString("display-name");
         List<String> lore = section.getStringList("lore");
         String customItemId = section.getString("custom-item");
+        ShopItemLimit limit = parseLimit(section.getConfigurationSection("limit"));
         Integer fireworkPower = null;
         FireworkEffect fireworkEffect = null;
         Double fireworkExplosionPower = null;
         Double fireworkExplosionDamage = null;
+        Double fireworkExplosionKnockback = null;
         if (material == Material.FIREWORK_ROCKET) {
             ConfigurationSection fireworkSection = section.getConfigurationSection("firework");
             if (fireworkSection != null) {
@@ -141,6 +148,7 @@ public class ShopConfigLoader {
                     if (explosion != null) {
                         fireworkExplosionPower = explosion.getDouble("power");
                         fireworkExplosionDamage = explosion.getDouble("damage");
+                        fireworkExplosionKnockback = explosion.getDouble("knockback");
                     }
                 } else {
                     if (fireworkSection.contains("explosion.power")) {
@@ -148,6 +156,9 @@ public class ShopConfigLoader {
                     }
                     if (fireworkSection.contains("explosion.damage")) {
                         fireworkExplosionDamage = fireworkSection.getDouble("explosion.damage");
+                    }
+                    if (fireworkSection.contains("explosion.knockback")) {
+                        fireworkExplosionKnockback = fireworkSection.getDouble("explosion.knockback");
                     }
                 }
             }
@@ -162,8 +173,9 @@ public class ShopConfigLoader {
         }
 
         return new ShopItemDefinition(id, material, amount, cost, behavior, teamColor, tier,
-                enchants, potionEffects, displayName, lore, customItemId,
-                fireworkPower, fireworkEffect, fireworkExplosionPower, fireworkExplosionDamage);
+                enchants, potionEffects, displayName, lore, customItemId, upgradeType, limit,
+                fireworkPower, fireworkEffect, fireworkExplosionPower, fireworkExplosionDamage,
+                fireworkExplosionKnockback);
     }
 
     private ShopCost parseCost(ConfigurationSection section) {
@@ -174,6 +186,18 @@ public class ShopConfigLoader {
         Material material = parseMaterial(materialName);
         int amount = section.getInt("amount", 0);
         return new ShopCost(material, amount);
+    }
+
+    private ShopItemLimit parseLimit(ConfigurationSection section) {
+        if (section == null) {
+            return null;
+        }
+        ShopItemLimitScope scope = ShopItemLimitScope.fromString(section.getString("scope"));
+        int amount = section.getInt("amount", 0);
+        if (scope == null || amount <= 0) {
+            return null;
+        }
+        return new ShopItemLimit(scope, amount);
     }
 
     private Material parseMaterial(String materialName) {
@@ -219,6 +243,9 @@ public class ShopConfigLoader {
         if (material == Material.SHEARS) {
             return ShopItemBehavior.SHEARS;
         }
+        if (material == Material.SHIELD) {
+            return ShopItemBehavior.SHIELD;
+        }
         String name = material.name();
         if (name.endsWith("_PICKAXE")) {
             return ShopItemBehavior.PICKAXE;
@@ -248,9 +275,22 @@ public class ShopConfigLoader {
             case "ranged" -> ShopItemBehavior.UTILITY;
             case "armor" -> ShopItemBehavior.ARMOR;
             case "tools" -> ShopItemBehavior.UTILITY;
-            case "utility", "miscellaneous" -> ShopItemBehavior.UTILITY;
+            case "utility", "miscellaneous", "rotating" -> ShopItemBehavior.UTILITY;
             default -> null;
         };
+    }
+
+    private TeamUpgradeType parseUpgrade(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        try {
+            return TeamUpgradeType.valueOf(normalized);
+        } catch (IllegalArgumentException ex) {
+            logger.warning("Unknown upgrade type: " + value);
+            return null;
+        }
     }
 
     private FireworkEffect parseFireworkEffect(ConfigurationSection section) {
@@ -503,22 +543,6 @@ public class ShopConfigLoader {
 
     private Map<ShopItemBehavior, Map<Integer, ShopItemDefinition>> buildTieredItems(
             Map<String, ShopItemDefinition> items) {
-        Map<ShopItemBehavior, Map<Integer, ShopItemDefinition>> tiered = new EnumMap<>(ShopItemBehavior.class);
-        for (ShopItemDefinition item : items.values()) {
-            if (item.getTier() <= 0) {
-                continue;
-            }
-            ShopItemBehavior behavior = item.getBehavior();
-            if (behavior != ShopItemBehavior.ARMOR
-                    && behavior != ShopItemBehavior.PICKAXE
-                    && behavior != ShopItemBehavior.AXE
-                    && behavior != ShopItemBehavior.BOW
-                    && behavior != ShopItemBehavior.CROSSBOW) {
-                continue;
-            }
-            tiered.computeIfAbsent(behavior, key -> new HashMap<>())
-                    .put(item.getTier(), item);
-        }
-        return tiered;
+        return ShopConfig.buildTieredItems(items);
     }
 }

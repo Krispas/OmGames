@@ -71,6 +71,8 @@ public class CustomItemConfigLoader {
         int lifetimeSeconds = section.getInt("lifetime-seconds", type.getDefaultLifetimeSeconds());
         double health = section.getDouble("health", type.getDefaultHealth());
         double speed = section.getDouble("speed", type.getDefaultSpeed());
+        double range = section.getDouble("range", type.getDefaultRange());
+        int uses = Math.max(0, section.getInt("uses", type.getDefaultUses()));
         int maxBlocks = section.getInt("max-blocks", type.getDefaultMaxBlocks());
         int bridgeWidth = section.getInt("bridge-width", type.getDefaultBridgeWidth());
         if (maxBlocks < 0) {
@@ -84,7 +86,7 @@ public class CustomItemConfigLoader {
         }
         String normalizedId = id.toLowerCase(Locale.ROOT);
         return new CustomItemDefinition(normalizedId, type, material, velocity, yield, incendiary,
-                maxBlocks, bridgeWidth, damage, knockback, lifetimeSeconds, health, speed);
+                maxBlocks, bridgeWidth, damage, knockback, lifetimeSeconds, health, speed, range, uses);
     }
 
     private CustomItemType parseType(String raw) {

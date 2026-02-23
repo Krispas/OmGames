@@ -16,6 +16,13 @@ public enum TeamUpgradeType {
             List.of("Permanent Haste for your team.")),
     FEATHER_FALLING("Feather Falling", Material.FEATHER, new int[]{2, 4},
             List.of("Feather Falling on team boots.")),
+    THORNS("Thorns", Material.CACTUS, new int[]{2, 4, 8},
+            List.of("Thorns on team armor.")),
+    FIRE_ASPECT("Fire Aspect", Material.BLAZE_POWDER, new int[]{4},
+            List.of("Fire Aspect I on team weapons.")),
+    GARRY("Garry the Warden", Material.WARDEN_SPAWN_EGG, new int[]{4, 6, 8},
+            List.of("Shared upgrade.",
+                    "Spawns Garry at the center.")),
     FORGE("Forge", Material.FURNACE, new int[]{2, 4, 6, 8},
             List.of("Upgrade your base generator.")),
     HEAL_POOL("Heal Pool", Material.BEACON, new int[]{1},
@@ -65,7 +72,17 @@ public enum TeamUpgradeType {
             case FORGE -> forgeName(tier);
             case SHARPNESS -> displayName;
             case HEAL_POOL -> displayName;
+            case GARRY -> garryName(tier);
             default -> displayName + " " + toRoman(tier);
+        };
+    }
+
+    private String garryName(int tier) {
+        return switch (tier) {
+            case 1 -> "Garry";
+            case 2 -> "Garry's Wife";
+            case 3 -> "Garry Jr.";
+            default -> displayName;
         };
     }
 

@@ -12,11 +12,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
+import java.util.Locale;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.generator.GeneratorInfo;
 import krispasi.omGames.bedwars.generator.GeneratorManager;
 import krispasi.omGames.bedwars.generator.GeneratorType;
 import krispasi.omGames.bedwars.gui.ShopMenu;
+import krispasi.omGames.bedwars.gui.TeamPickMenu;
 import krispasi.omGames.bedwars.gui.UpgradeShopMenu;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.BedLocation;
@@ -26,17 +28,23 @@ import krispasi.omGames.bedwars.model.EventSettings;
 import krispasi.omGames.bedwars.model.ShopLocation;
 import krispasi.omGames.bedwars.model.ShopType;
 import krispasi.omGames.bedwars.model.TeamColor;
+import krispasi.omGames.bedwars.item.TeamSelectItemData;
+import krispasi.omGames.bedwars.item.CustomItemData;
+import krispasi.omGames.bedwars.item.CustomItemDefinition;
 import krispasi.omGames.bedwars.shop.ShopConfig;
 import krispasi.omGames.bedwars.shop.ShopCost;
 import krispasi.omGames.bedwars.shop.ShopCategoryType;
 import krispasi.omGames.bedwars.shop.ShopItemBehavior;
 import krispasi.omGames.bedwars.shop.ShopItemDefinition;
+import krispasi.omGames.bedwars.shop.ShopItemLimit;
+import krispasi.omGames.bedwars.shop.ShopItemLimitScope;
 import krispasi.omGames.bedwars.upgrade.TeamUpgradeState;
 import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
 import krispasi.omGames.bedwars.upgrade.TrapType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
@@ -52,6 +60,7 @@ import org.bukkit.block.Container;
 import org.bukkit.block.data.type.Bed;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Villager;
 import org.bukkit.entity.Item;
 import org.bukkit.inventory.Inventory;
@@ -79,6 +88,12 @@ import org.bukkit.scoreboard.Team;
  * @see krispasi.omGames.bedwars.game.GameState
  */
 public class GameSession {
+    public enum RotatingSelectionMode {
+        TWO_RANDOM,
+        ONE_RANDOM,
+        MANUAL
+    }
+
     public static final String ITEM_SHOP_TAG = "bw_item_shop";
     public static final String UPGRADES_SHOP_TAG = "bw_upgrades_shop";
     public static final String BED_BUG_TAG = "bw_bed_bug";
@@ -86,6 +101,10 @@ public class GameSession {
     public static final String CRYSTAL_TAG = "bw_crystal";
     public static final String CRYSTAL_EXPLOSION_TAG = "bw_crystal_exploded";
     public static final String HAPPY_GHAST_TAG = "bw_happy_ghast";
+    public static final String CREEPING_CREEPER_TAG = "bw_creeping_creeper";
+    public static final String GARRY_TAG = "bw_garry";
+    public static final String GARRY_WIFE_TAG = "bw_garry_wife";
+    public static final String GARRY_JR_TAG = "bw_garry_jr";
     private static final Set<Material> SWORD_MATERIALS = EnumSet.of(
             Material.WOODEN_SWORD,
             Material.STONE_SWORD,
@@ -111,6 +130,20 @@ public class GameSession {
             Material.GOLDEN_AXE,
             Material.DIAMOND_AXE
     );
+    private static final Set<Material> ATTACK_MATERIALS = EnumSet.of(
+            Material.WOODEN_SWORD,
+            Material.STONE_SWORD,
+            Material.IRON_SWORD,
+            Material.DIAMOND_SWORD,
+            Material.MACE,
+            Material.NETHERITE_SPEAR,
+            Material.WOODEN_AXE,
+            Material.STONE_AXE,
+            Material.IRON_AXE,
+            Material.GOLDEN_AXE,
+            Material.DIAMOND_AXE,
+            Material.TRIDENT
+    );
     private static final int START_COUNTDOWN_SECONDS = 5;
     private static final int RESPAWN_DELAY_SECONDS = 5;
     private static final int RESPAWN_PROTECTION_SECONDS = 5;
@@ -120,6 +153,7 @@ public class GameSession {
     private static final int TRAP_CHECK_INTERVAL_TICKS = 20;
     private static final int TRAP_MAX_COUNT = 3;
     private static final int TRAP_BLINDNESS_SECONDS = 8;
+    private static final int GARRY_RESPAWN_SECONDS = 10;
     private static final int TRAP_SLOW_SECONDS = 8;
     private static final int TRAP_COUNTER_SECONDS = 15;
     private static final int TRAP_FATIGUE_SECONDS = 10;
@@ -147,6 +181,13 @@ public class GameSession {
     private final Map<UUID, Scoreboard> previousScoreboards = new HashMap<>();
     private final Map<UUID, Scoreboard> activeScoreboards = new HashMap<>();
     private final Map<UUID, List<String>> sidebarLines = new HashMap<>();
+    private final Set<String> rotatingItemIds = new HashSet<>();
+    private final List<String> manualRotatingItemIds = new ArrayList<>();
+    private RotatingSelectionMode rotatingMode = RotatingSelectionMode.TWO_RANDOM;
+    private final Map<UUID, Integer> killCounts = new HashMap<>();
+    private final Map<TeamColor, Map<String, Integer>> teamPurchaseCounts = new EnumMap<>(TeamColor.class);
+    private final Map<UUID, Map<String, Integer>> playerPurchaseCounts = new HashMap<>();
+    private final Set<UUID> editorPlayers = new HashSet<>();
     private final Set<TeamColor> teamsInMatch = EnumSet.noneOf(TeamColor.class);
     private final Set<UUID> shopNpcIds = new HashSet<>();
     private final Map<TeamColor, TeamUpgradeState> teamUpgrades = new EnumMap<>(TeamColor.class);
@@ -156,6 +197,15 @@ public class GameSession {
     private final Map<UUID, Integer> pickaxeTiers = new HashMap<>();
     private final Map<UUID, Integer> axeTiers = new HashMap<>();
     private final Set<UUID> shearsUnlocked = new HashSet<>();
+    private final Set<UUID> shieldUnlocked = new HashSet<>();
+    private boolean garryUnlocked;
+    private boolean garryWifeAlive;
+    private boolean garryJrAlive;
+    private UUID garryId;
+    private UUID garryWifeId;
+    private UUID garryJrId;
+    private BukkitTask garryRespawnTask;
+    private boolean suddenDeathActive;
     private final Map<UUID, Long> lastCombatTimes = new HashMap<>();
     private final Map<UUID, UUID> lastDamagers = new HashMap<>();
     private final Map<UUID, Long> lastDamagerTimes = new HashMap<>();
@@ -168,11 +218,18 @@ public class GameSession {
     private BukkitTask sidebarTask;
     private long matchStartMillis;
     private int startCountdownRemaining;
+    private int maxTeamSize = 4;
+    private boolean teamPickEnabled;
+    private BukkitTask lobbyCountdownTask;
+    private boolean lobbyCountdownPaused;
+    private int lobbyCountdownRemaining;
+    private UUID lobbyInitiatorId;
     private Double previousBorderSize;
     private Location previousBorderCenter;
     private Double previousBorderDamageAmount;
     private Double previousBorderDamageBuffer;
     private Integer previousBorderWarningDistance;
+    private boolean statsEnabled = true;
 
     public GameSession(BedwarsManager bedwarsManager, Arena arena) {
         this.bedwarsManager = bedwarsManager;
@@ -195,12 +252,28 @@ public class GameSession {
         return state == GameState.STARTING;
     }
 
+    public boolean isLobby() {
+        return state == GameState.LOBBY;
+    }
+
+    public boolean isLobbyInitiator(UUID playerId) {
+        return playerId != null && playerId.equals(lobbyInitiatorId);
+    }
+
     public boolean isRunning() {
         return state == GameState.RUNNING;
     }
 
     public boolean isActive() {
-        return state == GameState.STARTING || state == GameState.RUNNING;
+        return state == GameState.LOBBY || state == GameState.STARTING || state == GameState.RUNNING;
+    }
+
+    public boolean isStatsEnabled() {
+        return statsEnabled;
+    }
+
+    public void setStatsEnabled(boolean statsEnabled) {
+        this.statsEnabled = statsEnabled;
     }
 
     public void applyUpgradesTo(Player player) {
@@ -220,6 +293,9 @@ public class GameSession {
         } else {
             assignments.put(playerId, team);
         }
+        if (state == GameState.LOBBY) {
+            updateTeamsInMatch();
+        }
     }
 
     public TeamColor getTeam(UUID playerId) {
@@ -230,12 +306,230 @@ public class GameSession {
         return Collections.unmodifiableMap(assignments);
     }
 
+    public int getMaxTeamSize() {
+        return maxTeamSize;
+    }
+
+    public void setMaxTeamSize(int size) {
+        maxTeamSize = Math.max(1, Math.min(4, size));
+    }
+
+    public boolean isTeamPickEnabled() {
+        return teamPickEnabled;
+    }
+
+    public void setTeamPickEnabled(boolean enabled) {
+        teamPickEnabled = enabled;
+    }
+
+    public int getTeamMemberCount(TeamColor team) {
+        if (team == null) {
+            return 0;
+        }
+        int count = 0;
+        for (TeamColor assigned : assignments.values()) {
+            if (team.equals(assigned)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public boolean isTeamFull(TeamColor team) {
+        return team != null && getTeamMemberCount(team) >= maxTeamSize;
+    }
+
     public int getAssignedCount() {
         return assignments.size();
     }
 
     public boolean isParticipant(UUID playerId) {
         return assignments.containsKey(playerId);
+    }
+
+    public int getKillCount(UUID playerId) {
+        return killCounts.getOrDefault(playerId, 0);
+    }
+
+    public void addKill(UUID playerId) {
+        if (playerId == null || !isParticipant(playerId)) {
+            return;
+        }
+        killCounts.merge(playerId, 1, Integer::sum);
+        Player player = Bukkit.getPlayer(playerId);
+        if (player != null) {
+            updateSidebarForPlayer(player);
+        }
+    }
+
+    public boolean isEditor(UUID playerId) {
+        return playerId != null && editorPlayers.contains(playerId);
+    }
+
+    public boolean isTeamInMatch(TeamColor team) {
+        return team != null && teamsInMatch.contains(team);
+    }
+
+    public boolean removeParticipant(Player player) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        if (!isParticipant(playerId)) {
+            return false;
+        }
+        assignments.remove(playerId);
+        eliminatedPlayers.remove(playerId);
+        pendingRespawns.remove(playerId);
+        respawnGracePlayers.remove(playerId);
+        frozenPlayers.remove(playerId);
+        armorTiers.remove(playerId);
+        pickaxeTiers.remove(playerId);
+        axeTiers.remove(playerId);
+        shearsUnlocked.remove(playerId);
+        shieldUnlocked.remove(playerId);
+        killCounts.remove(playerId);
+        playerPurchaseCounts.remove(playerId);
+        lastCombatTimes.remove(playerId);
+        lastDamagers.remove(playerId);
+        lastDamagerTimes.remove(playerId);
+        lastDamageTimes.remove(playerId);
+        lastRegenTimes.remove(playerId);
+        cancelRespawnCountdown(playerId);
+        removeRespawnProtection(playerId);
+        BukkitTask respawnTask = respawnTasks.remove(playerId);
+        if (respawnTask != null) {
+            respawnTask.cancel();
+        }
+        restoreSidebar(playerId);
+        clearUpgradeEffects(player);
+        fakeEnderChests.remove(playerId);
+        if (state == GameState.LOBBY) {
+            updateTeamsInMatch();
+        }
+        return true;
+    }
+
+    public boolean forceJoin(Player player, TeamColor team) {
+        if (player == null || team == null) {
+            return false;
+        }
+        if (!isActive()) {
+            return false;
+        }
+        if (state != GameState.LOBBY && !teamsInMatch.contains(team)) {
+            return false;
+        }
+        Location spawn = null;
+        if (state != GameState.LOBBY) {
+            spawn = arena.getSpawn(team);
+            if (spawn == null) {
+                return false;
+            }
+        }
+        UUID playerId = player.getUniqueId();
+        removeEditor(player);
+        assignments.put(playerId, team);
+        eliminatedPlayers.remove(playerId);
+        pendingRespawns.remove(playerId);
+        respawnGracePlayers.remove(playerId);
+        frozenPlayers.remove(playerId);
+        cancelRespawnCountdown(playerId);
+        removeRespawnProtection(playerId);
+        BukkitTask respawnTask = respawnTasks.remove(playerId);
+        if (respawnTask != null) {
+            respawnTask.cancel();
+        }
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
+        double maxHealth = player.getMaxHealth();
+        player.setHealth(Math.max(1.0, maxHealth));
+
+        if (state == GameState.LOBBY) {
+            updateTeamsInMatch();
+            Location lobby = arena.getMapLobbyLocation();
+            if (lobby == null) {
+                lobby = arena.getLobbyLocation();
+            }
+            if (lobby != null) {
+                player.teleport(lobby);
+            }
+            player.getInventory().clear();
+            player.setGameMode(GameMode.SURVIVAL);
+            player.setAllowFlight(false);
+            player.setFlying(false);
+            hideEditorsFrom(player);
+            updateSidebarForPlayer(player);
+            return true;
+        }
+
+        player.teleport(spawn);
+        player.getInventory().clear();
+        giveStarterKit(player, team);
+        applyPermanentItemsWithShield(player, team);
+        player.setGameMode(GameMode.SURVIVAL);
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        if (state == GameState.STARTING) {
+            frozenPlayers.add(playerId);
+        } else if (state == GameState.RUNNING) {
+            grantRespawnProtection(player);
+            if (statsEnabled) {
+                bedwarsManager.getStatsService().addGamePlayed(playerId);
+            }
+        }
+        hideEditorsFrom(player);
+        updateSidebarForPlayer(player);
+        return true;
+    }
+
+    public boolean reviveBed(TeamColor team) {
+        if (team == null) {
+            return false;
+        }
+        if (!teamsInMatch.contains(team)) {
+            return false;
+        }
+        if (getBedState(team) == BedState.ALIVE) {
+            return false;
+        }
+        BedLocation location = arena.getBeds().get(team);
+        World world = arena.getWorld();
+        if (location == null || world == null) {
+            return false;
+        }
+        bedStates.put(team, BedState.ALIVE);
+        bedBlocks.put(location.head(), team);
+        bedBlocks.put(location.foot(), team);
+        restoreBed(world, team, location);
+        eliminatedTeams.remove(team);
+        return true;
+    }
+
+    public void addEditor(Player player) {
+        if (player == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        editorPlayers.add(playerId);
+        if (state == GameState.RUNNING) {
+            applyEditorInvisibility(player);
+            hideEditorFromParticipants(player);
+        }
+    }
+
+    public void removeEditor(Player player) {
+        if (player == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        if (!editorPlayers.remove(playerId)) {
+            return;
+        }
+        if (player.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
+            player.removePotionEffect(PotionEffectType.INVISIBILITY);
+        }
+        showEditorToParticipants(player);
     }
 
     public boolean isInCombat(UUID playerId) {
@@ -302,6 +596,32 @@ public class GameSession {
 
     public int getAxeTier(UUID playerId) {
         return axeTiers.getOrDefault(playerId, 0);
+    }
+
+    public void syncToolTiers(Player player) {
+        if (player == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        if (!isActive() || !isParticipant(playerId)) {
+            return;
+        }
+        if (!isInArenaWorld(player.getWorld())) {
+            return;
+        }
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return;
+        }
+        int pickaxeTier = resolveToolTier(player, config, ShopItemBehavior.PICKAXE);
+        int axeTier = resolveToolTier(player, config, ShopItemBehavior.AXE);
+        updateToolTier(pickaxeTiers, playerId, pickaxeTier);
+        updateToolTier(axeTiers, playerId, axeTier);
+        if (hasInventoryItem(player, Material.SHEARS)) {
+            shearsUnlocked.add(playerId);
+        } else {
+            shearsUnlocked.remove(playerId);
+        }
     }
 
     public boolean isFrozen(UUID playerId) {
@@ -421,13 +741,36 @@ public class GameSession {
         new ShopMenu(this, config, ShopCategoryType.QUICK_BUY, player).open(player);
     }
 
+    public void openTeamPickMenu(Player player) {
+        if (player == null) {
+            return;
+        }
+        if (!isLobby() || !teamPickEnabled || !isInArenaWorld(player.getWorld())) {
+            return;
+        }
+        new TeamPickMenu(this, player).open(player);
+    }
+
     public boolean handleShopPurchase(Player player, ShopItemDefinition item) {
         if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
             return false;
         }
+        if (!isRotatingItemAvailable(item)) {
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            player.sendMessage(Component.text("This rotating item is not available in this match.", NamedTextColor.RED));
+            return false;
+        }
+        if (item.getBehavior() == ShopItemBehavior.UPGRADE) {
+            return handleUpgradePurchaseInternal(player, item.getUpgradeType());
+        }
         ShopCost cost = item.getCost();
         if (cost == null || !cost.isValid() || !hasResources(player, cost)) {
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        if (!canPurchaseLimitedItem(player, item)) {
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            player.sendMessage(Component.text("Purchase limit reached.", NamedTextColor.RED));
             return false;
         }
         if (!applyPurchase(player, item)) {
@@ -435,13 +778,29 @@ public class GameSession {
             return false;
         }
         removeResources(player, cost);
+        recordLimitedPurchase(player, item);
         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
         return true;
     }
 
     public boolean handleUpgradePurchase(Player player, TeamUpgradeType type) {
+        return handleUpgradePurchaseInternal(player, type);
+    }
+
+    private boolean handleUpgradePurchaseInternal(Player player, TeamUpgradeType type) {
+        if (player == null || type == null) {
+            return false;
+        }
         if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
             return false;
+        }
+        if (!isRotatingUpgradeAvailable(type)) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            player.sendMessage(Component.text("This rotating upgrade is not available in this match.", NamedTextColor.RED));
+            return false;
+        }
+        if (type == TeamUpgradeType.GARRY) {
+            return handleGarryUpgradePurchase(player);
         }
         TeamColor team = getTeam(player.getUniqueId());
         if (team == null) {
@@ -496,6 +855,278 @@ public class GameSession {
         return true;
     }
 
+    public boolean isGarryUnlocked() {
+        return garryUnlocked;
+    }
+
+    public boolean isGarryWifeAlive() {
+        return garryWifeAlive;
+    }
+
+    public boolean isGarryJrAlive() {
+        return garryJrAlive;
+    }
+
+    public int getGarryNextCost() {
+        if (suddenDeathActive) {
+            return -1;
+        }
+        if (!garryUnlocked) {
+            return 4;
+        }
+        if (!garryWifeAlive) {
+            return garryJrAlive ? 8 : 6;
+        }
+        if (!garryJrAlive) {
+            return 8;
+        }
+        return -1;
+    }
+
+    public String getGarryNextName() {
+        if (suddenDeathActive) {
+            return "Garry (Disabled)";
+        }
+        if (!garryUnlocked) {
+            return "Garry";
+        }
+        if (!garryWifeAlive) {
+            return "Garry's Wife";
+        }
+        if (!garryJrAlive) {
+            return "Garry Jr.";
+        }
+        return "Garry";
+    }
+
+    private boolean handleGarryUpgradePurchase(Player player) {
+        if (suddenDeathActive) {
+            player.sendMessage(Component.text("Garry upgrades are disabled during Sudden Death.", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        int cost = getGarryNextCost();
+        if (cost <= 0) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        ShopCost shopCost = new ShopCost(Material.DIAMOND, cost);
+        if (!hasResources(player, shopCost)) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        org.bukkit.entity.Warden warden;
+        String name;
+        if (!garryUnlocked) {
+            warden = spawnGarryWarden(GARRY_TAG, "Garry", "garry");
+            if (warden == null) {
+                player.sendMessage(Component.text("Garry cannot spawn here.", NamedTextColor.RED));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                return false;
+            }
+            garryUnlocked = true;
+            garryId = warden.getUniqueId();
+            name = "Garry";
+        } else if (!garryWifeAlive) {
+            warden = spawnGarryWarden(GARRY_WIFE_TAG, "Garry's Wife", "garry_wife");
+            if (warden == null) {
+                player.sendMessage(Component.text("Garry's Wife cannot spawn here.", NamedTextColor.RED));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                return false;
+            }
+            garryWifeAlive = true;
+            garryWifeId = warden.getUniqueId();
+            name = "Garry's Wife";
+        } else if (!garryJrAlive) {
+            warden = spawnGarryWarden(GARRY_JR_TAG, "Garry Jr.", "garry_jr");
+            if (warden == null) {
+                player.sendMessage(Component.text("Garry Jr. cannot spawn here.", NamedTextColor.RED));
+                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                return false;
+            }
+            garryJrAlive = true;
+            garryJrId = warden.getUniqueId();
+            name = "Garry Jr.";
+        } else {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        removeResources(player, shopCost);
+        broadcast(Component.text(player.getName(), NamedTextColor.YELLOW)
+                .append(Component.text(" summoned ", NamedTextColor.GRAY))
+                .append(Component.text(name, NamedTextColor.RED)));
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
+        return true;
+    }
+
+    public void handleGarryDeath(org.bukkit.entity.Entity entity, Player killer) {
+        if (entity == null) {
+            return;
+        }
+        String killerName = killer != null ? killer.getName() : "unknown";
+        if (entity.getScoreboardTags().contains(GARRY_TAG)) {
+            garryId = null;
+            if (!garryUnlocked || suddenDeathActive) {
+                return;
+            }
+            broadcast(Component.text("Garry has been killed by " + killerName
+                    + " and will respawn in " + GARRY_RESPAWN_SECONDS + "s.", NamedTextColor.RED));
+            scheduleGarryRespawn();
+            return;
+        }
+        if (entity.getScoreboardTags().contains(GARRY_WIFE_TAG)) {
+            garryWifeAlive = false;
+            garryWifeId = null;
+            broadcast(Component.text("Garry's Wife has been killed by " + killerName + ".", NamedTextColor.RED));
+            return;
+        }
+        if (entity.getScoreboardTags().contains(GARRY_JR_TAG)) {
+            garryJrAlive = false;
+            garryJrId = null;
+            broadcast(Component.text("Garry Jr. has been killed by " + killerName + ".", NamedTextColor.RED));
+        }
+    }
+
+    private void scheduleGarryRespawn() {
+        if (garryRespawnTask != null) {
+            garryRespawnTask.cancel();
+        }
+        garryRespawnTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> safeRun("garryRespawn", () -> {
+            if (state != GameState.RUNNING || suddenDeathActive) {
+                return;
+            }
+            org.bukkit.entity.Warden warden = spawnGarryWarden(GARRY_TAG, "Garry", "garry");
+            if (warden != null) {
+                garryId = warden.getUniqueId();
+            }
+        }), GARRY_RESPAWN_SECONDS * 20L);
+    }
+
+    private void despawnGarryWardens() {
+        World world = arena.getWorld();
+        if (world == null) {
+            return;
+        }
+        for (org.bukkit.entity.Entity entity : world.getEntities()) {
+            if (entity.getScoreboardTags().contains(GARRY_TAG)
+                    || entity.getScoreboardTags().contains(GARRY_WIFE_TAG)
+                    || entity.getScoreboardTags().contains(GARRY_JR_TAG)) {
+                entity.remove();
+            }
+        }
+        garryId = null;
+        garryWifeId = null;
+        garryJrId = null;
+        garryWifeAlive = false;
+        garryJrAlive = false;
+        if (garryRespawnTask != null) {
+            garryRespawnTask.cancel();
+            garryRespawnTask = null;
+        }
+    }
+
+    private org.bukkit.entity.Warden spawnGarryWarden(String tag, String name, String customId) {
+        World world = arena.getWorld();
+        BlockPoint center = arena.getCenter();
+        if (world == null || center == null) {
+            return null;
+        }
+        Location spawn = center.toLocation(world);
+        int highest = world.getHighestBlockYAt(spawn);
+        spawn.setY(highest + 1);
+        org.bukkit.entity.Warden warden = world.spawn(spawn, org.bukkit.entity.Warden.class, entity -> {
+            entity.setRemoveWhenFarAway(false);
+            entity.customName(Component.text(name, NamedTextColor.RED));
+            entity.setCustomNameVisible(true);
+            entity.addScoreboardTag(tag);
+        });
+        CustomItemDefinition custom = bedwarsManager.getCustomItemConfig().getItem(customId);
+        applyCustomEntityStats(warden, custom);
+        return warden;
+    }
+
+    private void applyCustomEntityStats(LivingEntity entity, CustomItemDefinition custom) {
+        if (entity == null || custom == null) {
+            return;
+        }
+        double health = custom.getHealth();
+        if (health > 0.0) {
+            entity.setMaxHealth(health);
+            entity.setHealth(Math.min(health, entity.getMaxHealth()));
+        }
+        double speed = custom.getSpeed();
+        if (speed > 0.0) {
+            applyAttribute(entity, "GENERIC_MOVEMENT_SPEED", speed);
+            applyAttribute(entity, "GENERIC_FLYING_SPEED", speed);
+        }
+        double range = custom.getRange();
+        if (range > 0.0) {
+            applyAttribute(entity, "GENERIC_FOLLOW_RANGE", range);
+        }
+    }
+
+    private void applyAttribute(LivingEntity entity, String attributeName, double value) {
+        if (entity == null || attributeName == null || attributeName.isBlank()) {
+            return;
+        }
+        try {
+            org.bukkit.attribute.Attribute attribute = org.bukkit.attribute.Attribute.valueOf(attributeName);
+            org.bukkit.attribute.AttributeInstance instance = entity.getAttribute(attribute);
+            if (instance != null) {
+                instance.setBaseValue(value);
+            }
+        } catch (IllegalArgumentException ignored) {
+        }
+    }
+
+    private boolean canPurchaseLimitedItem(Player player, ShopItemDefinition item) {
+        ShopItemLimit limit = item.getLimit();
+        if (limit == null || !limit.isValid()) {
+            return true;
+        }
+        ShopItemLimitScope scope = limit.scope();
+        String itemId = item.getId();
+        if (scope == ShopItemLimitScope.PLAYER) {
+            Map<String, Integer> counts = playerPurchaseCounts.get(player.getUniqueId());
+            int current = counts != null ? counts.getOrDefault(itemId, 0) : 0;
+            return current < limit.amount();
+        }
+        if (scope == ShopItemLimitScope.TEAM) {
+            TeamColor team = getTeam(player.getUniqueId());
+            if (team == null) {
+                return false;
+            }
+            Map<String, Integer> counts = teamPurchaseCounts.get(team);
+            int current = counts != null ? counts.getOrDefault(itemId, 0) : 0;
+            return current < limit.amount();
+        }
+        return true;
+    }
+
+    private void recordLimitedPurchase(Player player, ShopItemDefinition item) {
+        ShopItemLimit limit = item.getLimit();
+        if (limit == null || !limit.isValid()) {
+            return;
+        }
+        ShopItemLimitScope scope = limit.scope();
+        String itemId = item.getId();
+        if (scope == ShopItemLimitScope.PLAYER) {
+            playerPurchaseCounts
+                    .computeIfAbsent(player.getUniqueId(), key -> new HashMap<>())
+                    .merge(itemId, 1, Integer::sum);
+            return;
+        }
+        if (scope == ShopItemLimitScope.TEAM) {
+            TeamColor team = getTeam(player.getUniqueId());
+            if (team == null) {
+                return;
+            }
+            teamPurchaseCounts
+                    .computeIfAbsent(team, key -> new HashMap<>())
+                    .merge(itemId, 1, Integer::sum);
+        }
+    }
+
     public int getUpgradeTier(TeamColor team, TeamUpgradeType type) {
         if (team == null) {
             return 0;
@@ -531,39 +1162,159 @@ public class GameSession {
         ShopItemBehavior behavior = item.getBehavior();
         return switch (behavior) {
             case BLOCK, UTILITY, POTION -> {
-                giveItem(player, item.createPurchaseItem(team));
+                giveItem(player, createPurchaseItem(item, team));
+                if (behavior == ShopItemBehavior.UTILITY
+                        && team != null
+                        && hasTeamUpgrade(team, TeamUpgradeType.FIRE_ASPECT)
+                        && ATTACK_MATERIALS.contains(item.getMaterial())) {
+                    applyFireAspect(player);
+                }
                 yield true;
             }
             case SWORD -> {
                 if (item.getMaterial() != Material.WOODEN_SWORD) {
                     removeItems(player, WOODEN_SWORD_ONLY);
                 }
-                giveItem(player, item.createPurchaseItem(team));
+                giveItem(player, createPurchaseItem(item, team));
                 if (team != null && hasTeamUpgrade(team, TeamUpgradeType.SHARPNESS)) {
                     applySharpness(player);
+                }
+                if (team != null && hasTeamUpgrade(team, TeamUpgradeType.FIRE_ASPECT)) {
+                    applyFireAspect(player);
                 }
                 yield true;
             }
             case BOW -> {
                 removeItems(player, BOW_MATERIALS);
-                giveItem(player, item.createPurchaseItem(team));
+                giveItem(player, createPurchaseItem(item, team));
                 yield true;
             }
             case CROSSBOW -> {
                 if (countItem(player, Material.CROSSBOW) >= 3) {
                     yield false;
                 }
-                giveItem(player, item.createPurchaseItem(team));
+                giveItem(player, createPurchaseItem(item, team));
                 yield true;
             }
             case ARMOR -> applyTierUpgrade(player, item, armorTiers, ShopItemBehavior.ARMOR);
             case PICKAXE -> applyTierUpgrade(player, item, pickaxeTiers, ShopItemBehavior.PICKAXE);
             case AXE -> applyTierUpgrade(player, item, axeTiers, ShopItemBehavior.AXE);
             case SHEARS -> applyShears(player, item, team);
+            case SHIELD -> applyShield(player, item);
+            case UPGRADE -> handleUpgradePurchaseInternal(player, item.getUpgradeType());
         };
     }
 
+    private ItemStack createPurchaseItem(ShopItemDefinition item, TeamColor team) {
+        ItemStack stack = item.createPurchaseItem(team);
+        applyCustomItemMetadata(stack, item);
+        return stack;
+    }
+
+    private void applyCustomItemMetadata(ItemStack item, ShopItemDefinition definition) {
+        if (item == null || definition == null) {
+            return;
+        }
+        String customId = definition.getCustomItemId();
+        if (customId == null || customId.isBlank()) {
+            return;
+        }
+        CustomItemDefinition custom = bedwarsManager.getCustomItemConfig().getItem(customId);
+        if (custom == null) {
+            return;
+        }
+        if (custom.getUses() > 0) {
+            ItemMeta meta = item.getItemMeta();
+            if (meta == null) {
+                return;
+            }
+            CustomItemData.setUses(meta, custom.getUses());
+            updateUsesLore(meta, custom.getUses());
+            item.setItemMeta(meta);
+        }
+    }
+
+    private void updateUsesLore(ItemMeta meta, int uses) {
+        if (meta == null) {
+            return;
+        }
+        List<Component> lore = meta.lore();
+        if (lore == null) {
+            lore = new ArrayList<>();
+        } else {
+            lore = new ArrayList<>(lore);
+        }
+        Component line = Component.text("Uses: " + uses, NamedTextColor.GRAY);
+        boolean replaced = false;
+        for (int i = 0; i < lore.size(); i++) {
+            Component existing = lore.get(i);
+            if (existing == null) {
+                continue;
+            }
+            String plain = PlainTextComponentSerializer.plainText().serialize(existing);
+            if (plain != null && plain.toLowerCase(Locale.ROOT).startsWith("uses:")) {
+                lore.set(i, line);
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced) {
+            lore.add(line);
+        }
+        meta.lore(lore);
+    }
+
+    public void startLobby(JavaPlugin plugin, Player initiator, int lobbySeconds) {
+        this.plugin = plugin;
+        stopInternal();
+        resetState();
+        state = GameState.LOBBY;
+        lobbyInitiatorId = initiator != null ? initiator.getUniqueId() : null;
+        prepareWorld();
+        updateTeamsInMatch();
+        initializeTeamUpgrades();
+        initializeBaseCenters();
+        initializeBeds();
+        applyBedLayout();
+
+        lobbyCountdownRemaining = Math.max(0, lobbySeconds);
+        lobbyCountdownPaused = false;
+        startCountdownRemaining = lobbyCountdownRemaining;
+
+        Location lobby = resolveMapLobbyLocation();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!isInArenaWorld(player.getWorld())) {
+                continue;
+            }
+            if (lobby != null) {
+                player.teleport(lobby);
+                player.setRespawnLocation(lobby, true);
+            }
+            player.getInventory().clear();
+            player.setFoodLevel(20);
+            player.setSaturation(20.0f);
+            double maxHealth = player.getMaxHealth();
+            player.setHealth(Math.max(1.0, maxHealth));
+            player.setGameMode(GameMode.SURVIVAL);
+            player.setAllowFlight(false);
+            player.setFlying(false);
+            if (isLobbyInitiator(player.getUniqueId())) {
+                giveLobbyControlItems(player);
+            }
+            if (teamPickEnabled) {
+                giveTeamSelectItem(player);
+            }
+        }
+
+        startLobbyCountdown();
+        startSidebarUpdates();
+    }
+
     public void start(JavaPlugin plugin, Player initiator) {
+        start(plugin, initiator, START_COUNTDOWN_SECONDS);
+    }
+
+    public void start(JavaPlugin plugin, Player initiator, int countdownSeconds) {
         this.plugin = plugin;
         stopInternal();
         resetState();
@@ -574,9 +1325,11 @@ public class GameSession {
         initializeBaseCenters();
         initializeBeds();
         applyBedLayout();
+        rollRotatingItems();
         spawnShops();
-        startCountdownRemaining = START_COUNTDOWN_SECONDS;
+        startCountdownRemaining = Math.max(0, countdownSeconds);
 
+        Location respawnLobby = resolveMapLobbyLocation();
         for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
             TeamColor team = entry.getValue();
@@ -595,16 +1348,43 @@ public class GameSession {
             double maxHealth = player.getMaxHealth();
             player.setHealth(Math.max(1.0, maxHealth));
             giveStarterKit(player, team);
-            applyPermanentItems(player, team);
+            applyPermanentItemsWithShield(player, team);
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
             frozenPlayers.add(player.getUniqueId());
             player.sendMessage(Component.text("You are on the ").append(team.displayComponent()).append(Component.text(" team.")));
+            if (respawnLobby != null) {
+                player.setRespawnLocation(respawnLobby, true);
+            }
         }
 
-        startCountdown();
+        startCountdown(countdownSeconds);
         startSidebarUpdates();
+    }
+
+    public int getLobbyCountdownRemaining() {
+        return lobbyCountdownRemaining;
+    }
+
+    public boolean isLobbyCountdownPaused() {
+        return lobbyCountdownPaused;
+    }
+
+    public void toggleLobbyCountdownPause() {
+        if (lobbyCountdownTask == null) {
+            return;
+        }
+        lobbyCountdownPaused = !lobbyCountdownPaused;
+    }
+
+    public void skipLobbyCountdown() {
+        if (lobbyCountdownTask == null) {
+            return;
+        }
+        lobbyCountdownRemaining = 0;
+        lobbyCountdownPaused = false;
+        beginMatchFromLobby();
     }
 
     public void stop() {
@@ -644,9 +1424,9 @@ public class GameSession {
         if (team == null) {
             return;
         }
+        Location lobby = resolveMapLobbyLocation();
         if (getBedState(team) == BedState.DESTROYED && eliminatedPlayers.contains(playerId)) {
             setSpectator(player);
-            Location lobby = arena.getLobbyLocation();
             if (lobby != null) {
                 player.teleport(lobby);
             }
@@ -656,7 +1436,6 @@ public class GameSession {
             return;
         }
         setSpectator(player);
-        Location lobby = arena.getLobbyLocation();
         if (lobby != null) {
             player.teleport(lobby);
         }
@@ -666,6 +1445,9 @@ public class GameSession {
     public void handleBedDestroyed(TeamColor team, Player breaker) {
         if (team == null || getBedState(team) == BedState.DESTROYED) {
             return;
+        }
+        if (statsEnabled && breaker != null && isParticipant(breaker.getUniqueId())) {
+            bedwarsManager.getStatsService().addBedBroken(breaker.getUniqueId());
         }
         destroyBed(team);
         broadcast(Component.text("The ", NamedTextColor.RED)
@@ -689,6 +1471,60 @@ public class GameSession {
         checkTeamEliminated(team);
     }
 
+    public boolean triggerRespawnBeacon(Player activator, int delaySeconds) {
+        if (activator == null || !isRunning()) {
+            return false;
+        }
+        UUID activatorId = activator.getUniqueId();
+        if (!isParticipant(activatorId)) {
+            return false;
+        }
+        TeamColor team = getTeam(activatorId);
+        if (team == null) {
+            return false;
+        }
+        if (getBedState(team) != BedState.DESTROYED) {
+            activator.sendMessage(Component.text("Your bed is still alive.", NamedTextColor.RED));
+            return false;
+        }
+        if (getTeamMemberCount(team) != 2) {
+            activator.sendMessage(Component.text("Respawn Beacon can only be used in 2-player teams.", NamedTextColor.RED));
+            return false;
+        }
+        UUID targetId = null;
+        for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
+            if (entry.getValue() != team) {
+                continue;
+            }
+            UUID playerId = entry.getKey();
+            if (playerId.equals(activatorId)) {
+                continue;
+            }
+            if (eliminatedPlayers.contains(playerId)) {
+                targetId = playerId;
+                break;
+            }
+        }
+        if (targetId == null) {
+            activator.sendMessage(Component.text("No eliminated teammate to respawn.", NamedTextColor.RED));
+            return false;
+        }
+        Player target = Bukkit.getPlayer(targetId);
+        if (target == null || !target.isOnline()) {
+            activator.sendMessage(Component.text("Your teammate must be online to respawn.", NamedTextColor.RED));
+            return false;
+        }
+        eliminatedPlayers.remove(targetId);
+        respawnGracePlayers.add(targetId);
+        setSpectator(target);
+        Location lobby = arena.getLobbyLocation();
+        if (lobby != null) {
+            target.teleport(lobby);
+        }
+        scheduleRespawn(target, team, delaySeconds, true);
+        return true;
+    }
+
     private void playSoundToParticipants(Sound sound, float volume, float pitch) {
         for (UUID playerId : assignments.keySet()) {
             Player player = Bukkit.getPlayer(playerId);
@@ -706,9 +1542,13 @@ public class GameSession {
         eliminatePlayer(player, team);
     }
 
-    private void startCountdown() {
+    private void startCountdown(int seconds) {
+        if (seconds <= 0) {
+            beginRunning();
+            return;
+        }
         BukkitTask task = new BukkitRunnable() {
-            private int remaining = START_COUNTDOWN_SECONDS;
+            private int remaining = seconds;
 
             @Override
             public void run() {
@@ -732,11 +1572,62 @@ public class GameSession {
         tasks.add(task);
     }
 
+    private void startLobbyCountdown() {
+        if (lobbyCountdownTask != null) {
+            lobbyCountdownTask.cancel();
+        }
+        lobbyCountdownTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                safeRun("lobbyCountdown", () -> {
+                    if (state != GameState.LOBBY) {
+                        cancel();
+                        return;
+                    }
+                    if (lobbyCountdownPaused) {
+                        return;
+                    }
+                    if (lobbyCountdownRemaining <= 0) {
+                        showTitleAll(Component.text("GO!", NamedTextColor.GREEN), Component.empty());
+                        beginMatchFromLobby();
+                        cancel();
+                        return;
+                    }
+                    startCountdownRemaining = lobbyCountdownRemaining;
+                    showTitleAll(Component.text("Starting in " + lobbyCountdownRemaining, NamedTextColor.YELLOW), Component.empty());
+                    lobbyCountdownRemaining--;
+                });
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
+        tasks.add(lobbyCountdownTask);
+    }
+
+    private void beginMatchFromLobby() {
+        if (lobbyCountdownTask != null) {
+            lobbyCountdownTask.cancel();
+            lobbyCountdownTask = null;
+        }
+        Player initiator = lobbyInitiatorId != null ? Bukkit.getPlayer(lobbyInitiatorId) : null;
+        if (initiator == null) {
+            initiator = Bukkit.getOnlinePlayers().stream().findFirst().orElse(null);
+        }
+        if (initiator == null) {
+            stop();
+            return;
+        }
+        start(plugin, initiator, 0);
+    }
+
     private void beginRunning() {
         state = GameState.RUNNING;
         frozenPlayers.clear();
         matchStartMillis = System.currentTimeMillis();
         startCountdownRemaining = 0;
+        if (statsEnabled) {
+            for (UUID playerId : assignments.keySet()) {
+                bedwarsManager.getStatsService().addGamePlayed(playerId);
+            }
+        }
         generatorManager = new GeneratorManager(plugin, arena, this);
         syncForgeTiers();
         generatorManager.start();
@@ -799,6 +1690,8 @@ public class GameSession {
                 if (state != GameState.RUNNING) {
                     return;
                 }
+                suddenDeathActive = true;
+                despawnGarryWardens();
                 showTitleAll(Component.text("Sudden Death!", NamedTextColor.RED),
                         Component.text("Final battle begins.", NamedTextColor.GRAY));
                 broadcast(Component.text("Sudden Death has begun!", NamedTextColor.RED));
@@ -842,12 +1735,17 @@ public class GameSession {
     }
 
     private void scheduleRespawn(Player player, TeamColor team) {
+        UUID playerId = player.getUniqueId();
+        boolean allowRespawnAfterBedBreak = respawnGracePlayers.contains(playerId);
+        scheduleRespawn(player, team, RESPAWN_DELAY_SECONDS, allowRespawnAfterBedBreak);
+    }
+
+    private void scheduleRespawn(Player player, TeamColor team, int delaySeconds, boolean allowRespawnAfterBedBreak) {
         Location spawn = arena.getSpawn(team);
         if (spawn == null) {
             return;
         }
         UUID playerId = player.getUniqueId();
-        boolean allowRespawnAfterBedBreak = respawnGracePlayers.contains(playerId);
         BukkitTask existing = respawnTasks.remove(player.getUniqueId());
         if (existing != null) {
             existing.cancel();
@@ -856,7 +1754,7 @@ public class GameSession {
         if (existingCountdown != null) {
             existingCountdown.cancel();
         }
-        startRespawnCountdown(player);
+        startRespawnCountdown(player, delaySeconds);
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> safeRun("respawn", () -> {
             if (state != GameState.RUNNING || (getBedState(team) == BedState.DESTROYED && !allowRespawnAfterBedBreak)) {
                 eliminatedPlayers.add(playerId);
@@ -874,17 +1772,17 @@ public class GameSession {
             player.setFlying(false);
             player.getInventory().clear();
             giveStarterKit(player, team);
-            applyPermanentItems(player, team);
+            applyPermanentItemsWithShield(player, team);
             grantRespawnProtection(player);
             cancelRespawnCountdown(playerId);
             respawnGracePlayers.remove(playerId);
             respawnTasks.remove(player.getUniqueId());
             plugin.getServer().getScheduler().runTaskLater(plugin,
-                    () -> applyPermanentItems(player, team),
+                    () -> applyPermanentItemsWithShield(player, team),
                     1L);
-        }), RESPAWN_DELAY_SECONDS * 20L);
+        }), Math.max(0, delaySeconds) * 20L);
         respawnTasks.put(player.getUniqueId(), task);
-        showTitle(player, Component.text("Respawning in " + RESPAWN_DELAY_SECONDS, NamedTextColor.YELLOW), Component.empty());
+        showTitle(player, Component.text("Respawning in " + delaySeconds, NamedTextColor.YELLOW), Component.empty());
     }
 
     private void eliminatePlayer(Player player, TeamColor team) {
@@ -1025,12 +1923,13 @@ public class GameSession {
             player.getInventory().clear();
             player.getInventory().setArmorContents(null);
             player.getInventory().setItemInOffHand(null);
-            clearUpgradeEffects(player);
-            if (lobby != null) {
-                player.teleport(lobby);
-            }
-        }
-    }
+          clearUpgradeEffects(player);
+          if (lobby != null) {
+              player.teleport(lobby);
+              player.setRespawnLocation(lobby, true);
+          }
+      }
+  }
 
     private void restoreBeds() {
         World world = arena.getWorld();
@@ -1146,6 +2045,7 @@ public class GameSession {
 
     private void stopInternal() {
         state = GameState.ENDING;
+        clearEditors();
         releaseForcedChunks();
         restoreWorldBorder();
         despawnShops();
@@ -1177,6 +2077,13 @@ public class GameSession {
         }
         frozenPlayers.clear();
         sidebarTask = null;
+        if (lobbyCountdownTask != null) {
+            lobbyCountdownTask.cancel();
+        }
+        lobbyCountdownTask = null;
+        lobbyCountdownPaused = false;
+        lobbyCountdownRemaining = 0;
+        lobbyInitiatorId = null;
         matchStartMillis = 0L;
         startCountdownRemaining = 0;
     }
@@ -1241,7 +2148,11 @@ public class GameSession {
             if (entity.getScoreboardTags().contains(BED_BUG_TAG)
                     || entity.getScoreboardTags().contains(DREAM_DEFENDER_TAG)
                     || entity.getScoreboardTags().contains(CRYSTAL_TAG)
-                    || entity.getScoreboardTags().contains(HAPPY_GHAST_TAG)) {
+                    || entity.getScoreboardTags().contains(HAPPY_GHAST_TAG)
+                    || entity.getScoreboardTags().contains(CREEPING_CREEPER_TAG)
+                    || entity.getScoreboardTags().contains(GARRY_TAG)
+                    || entity.getScoreboardTags().contains(GARRY_WIFE_TAG)
+                    || entity.getScoreboardTags().contains(GARRY_JR_TAG)) {
                 entity.remove();
             }
         }
@@ -1284,6 +2195,7 @@ public class GameSession {
     }
 
     private void resetState() {
+        clearEditors();
         eliminatedPlayers.clear();
         eliminatedTeams.clear();
         placedBlocks.clear();
@@ -1295,6 +2207,10 @@ public class GameSession {
         previousScoreboards.clear();
         activeScoreboards.clear();
         sidebarLines.clear();
+        rotatingItemIds.clear();
+        killCounts.clear();
+        teamPurchaseCounts.clear();
+        playerPurchaseCounts.clear();
         respawnProtectionEnds.clear();
         respawnProtectionTasks.clear();
         teamsInMatch.clear();
@@ -1306,11 +2222,250 @@ public class GameSession {
         pickaxeTiers.clear();
         axeTiers.clear();
         shearsUnlocked.clear();
+        shieldUnlocked.clear();
         lastCombatTimes.clear();
         lastDamagers.clear();
         lastDamagerTimes.clear();
         lastDamageTimes.clear();
         lastRegenTimes.clear();
+        garryUnlocked = false;
+        garryWifeAlive = false;
+        garryJrAlive = false;
+        garryId = null;
+        garryWifeId = null;
+        garryJrId = null;
+        if (garryRespawnTask != null) {
+            garryRespawnTask.cancel();
+            garryRespawnTask = null;
+        }
+        suddenDeathActive = false;
+    }
+
+    public Set<String> getRotatingItemIds() {
+        return Collections.unmodifiableSet(rotatingItemIds);
+    }
+
+    public RotatingSelectionMode getRotatingMode() {
+        return rotatingMode;
+    }
+
+    public void setRotatingMode(RotatingSelectionMode mode) {
+        if (mode == null) {
+            return;
+        }
+        rotatingMode = mode;
+        if (rotatingMode == RotatingSelectionMode.MANUAL) {
+            syncManualRotatingSelection();
+        } else {
+            rotatingItemIds.clear();
+        }
+    }
+
+    public RotatingSelectionMode cycleRotatingMode() {
+        RotatingSelectionMode[] values = RotatingSelectionMode.values();
+        int next = (rotatingMode.ordinal() + 1) % values.length;
+        setRotatingMode(values[next]);
+        return rotatingMode;
+    }
+
+    public List<String> getManualRotatingItemIds() {
+        return Collections.unmodifiableList(manualRotatingItemIds);
+    }
+
+    public boolean toggleManualRotatingItem(String id) {
+        String normalized = normalizeItemId(id);
+        if (normalized == null) {
+            return false;
+        }
+        if (!isRotatingCandidate(normalized)) {
+            return false;
+        }
+        if (manualRotatingItemIds.remove(normalized)) {
+            syncManualRotatingSelection();
+            return true;
+        }
+        if (manualRotatingItemIds.size() >= 2) {
+            return false;
+        }
+        manualRotatingItemIds.add(normalized);
+        syncManualRotatingSelection();
+        return true;
+    }
+
+    public void seedManualRotatingItemsIfEmpty() {
+        if (!manualRotatingItemIds.isEmpty()) {
+            return;
+        }
+        List<String> candidates = getRotatingCandidateIds();
+        if (candidates.isEmpty()) {
+            return;
+        }
+        Collections.shuffle(candidates);
+        int count = Math.min(2, candidates.size());
+        for (int i = 0; i < count; i++) {
+            manualRotatingItemIds.add(candidates.get(i));
+        }
+        syncManualRotatingSelection();
+    }
+
+    public List<String> getRotatingCandidateIds() {
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return List.of();
+        }
+        krispasi.omGames.bedwars.shop.ShopCategory category = config.getCategory(ShopCategoryType.ROTATING);
+        if (category == null || category.getEntries().isEmpty()) {
+            return List.of();
+        }
+        List<String> candidates = new ArrayList<>();
+        for (String id : category.getEntries().values()) {
+            String normalized = normalizeItemId(id);
+            if (normalized != null && !candidates.contains(normalized)) {
+                candidates.add(normalized);
+            }
+        }
+        return candidates;
+    }
+
+    public boolean isRotatingItemAvailable(ShopItemDefinition item) {
+        if (item == null) {
+            return false;
+        }
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return true;
+        }
+        krispasi.omGames.bedwars.shop.ShopCategory category = config.getCategory(ShopCategoryType.ROTATING);
+        if (category == null || category.getEntries().isEmpty()) {
+            return true;
+        }
+        boolean rotating = category.getEntries().containsValue(item.getId());
+        if (!rotating) {
+            return true;
+        }
+        if (rotatingItemIds.isEmpty()) {
+            return true;
+        }
+        return rotatingItemIds.contains(item.getId());
+    }
+
+    public boolean isRotatingUpgradeAvailable(TeamUpgradeType type) {
+        if (type == null) {
+            return true;
+        }
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return true;
+        }
+        krispasi.omGames.bedwars.shop.ShopCategory category = config.getCategory(ShopCategoryType.ROTATING);
+        if (category == null || category.getEntries().isEmpty()) {
+            return true;
+        }
+        boolean hasRotating = false;
+        for (String id : category.getEntries().values()) {
+            ShopItemDefinition definition = config.getItem(id);
+            if (definition == null || definition.getBehavior() != ShopItemBehavior.UPGRADE) {
+                continue;
+            }
+            if (definition.getUpgradeType() != type) {
+                continue;
+            }
+            hasRotating = true;
+            if (rotatingItemIds.isEmpty() || rotatingItemIds.contains(definition.getId())) {
+                return true;
+            }
+        }
+        return !hasRotating;
+    }
+
+    private void rollRotatingItems() {
+        rotatingItemIds.clear();
+        List<String> candidates = getRotatingCandidateIds();
+        if (candidates.isEmpty()) {
+            return;
+        }
+        if (rotatingMode == RotatingSelectionMode.MANUAL) {
+            List<String> selected = new ArrayList<>();
+            for (String id : manualRotatingItemIds) {
+                String normalized = normalizeItemId(id);
+                if (normalized != null && candidates.contains(normalized) && !selected.contains(normalized)) {
+                    selected.add(normalized);
+                }
+            }
+            if (selected.isEmpty()) {
+                selected.addAll(pickRandom(candidates, 2));
+            }
+            rotatingItemIds.addAll(selected.subList(0, Math.min(2, selected.size())));
+            return;
+        }
+        int target = rotatingMode == RotatingSelectionMode.ONE_RANDOM ? 1 : 2;
+        rotatingItemIds.addAll(pickRandom(candidates, target));
+    }
+
+    private List<String> pickRandom(List<String> candidates, int count) {
+        if (candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+        int target = Math.max(1, Math.min(count, candidates.size()));
+        if (candidates.size() <= target) {
+            return new ArrayList<>(candidates);
+        }
+        List<String> shuffled = new ArrayList<>(candidates);
+        Collections.shuffle(shuffled);
+        return new ArrayList<>(shuffled.subList(0, target));
+    }
+
+    private boolean isRotatingCandidate(String id) {
+        String normalized = normalizeItemId(id);
+        if (normalized == null) {
+            return false;
+        }
+        return getRotatingCandidateIds().contains(normalized);
+    }
+
+    private void syncManualRotatingSelection() {
+        if (rotatingMode != RotatingSelectionMode.MANUAL) {
+            return;
+        }
+        rotatingItemIds.clear();
+        for (String id : manualRotatingItemIds) {
+            String normalized = normalizeItemId(id);
+            if (normalized != null) {
+                rotatingItemIds.add(normalized);
+            }
+        }
+    }
+
+    private String normalizeItemId(String id) {
+        if (id == null) {
+            return null;
+        }
+        String trimmed = id.trim();
+        return trimmed.isBlank() ? null : trimmed;
+    }
+
+    public int getRemainingLimit(UUID playerId, ShopItemDefinition item) {
+        if (playerId == null || item == null) {
+            return -1;
+        }
+        ShopItemLimit limit = item.getLimit();
+        if (limit == null || !limit.isValid()) {
+            return -1;
+        }
+        int current = 0;
+        if (limit.scope() == ShopItemLimitScope.PLAYER) {
+            Map<String, Integer> counts = playerPurchaseCounts.get(playerId);
+            current = counts != null ? counts.getOrDefault(item.getId(), 0) : 0;
+        } else if (limit.scope() == ShopItemLimitScope.TEAM) {
+            TeamColor team = getTeam(playerId);
+            if (team == null) {
+                return 0;
+            }
+            Map<String, Integer> counts = teamPurchaseCounts.get(team);
+            current = counts != null ? counts.getOrDefault(item.getId(), 0) : 0;
+        }
+        int remaining = limit.amount() - current;
+        return Math.max(0, remaining);
     }
 
     private void closeFakeEnderChests() {
@@ -1397,6 +2552,65 @@ public class GameSession {
         equipBaseArmor(player, team);
     }
 
+    private void giveTeamSelectItem(Player player) {
+        ItemStack item = new ItemStack(Material.RED_BED);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(Component.text("Pick a Team", NamedTextColor.YELLOW));
+        meta.lore(List.of(
+                Component.text("Right click to choose your team.", NamedTextColor.GRAY)
+        ));
+        TeamSelectItemData.apply(meta);
+        item.setItemMeta(meta);
+        placeLobbyItem(player, item, 4);
+    }
+
+    private void giveLobbyControlItems(Player player) {
+        if (player == null) {
+            return;
+        }
+        ItemStack manage = new ItemStack(Material.WHITE_BED);
+        ItemMeta manageMeta = manage.getItemMeta();
+        manageMeta.displayName(Component.text("Manage Teams", NamedTextColor.YELLOW));
+        manageMeta.lore(List.of(
+                Component.text("Right click to edit teams.", NamedTextColor.GRAY)
+        ));
+        krispasi.omGames.bedwars.item.LobbyControlItemData.apply(manageMeta, "manage");
+        manage.setItemMeta(manageMeta);
+
+        ItemStack pause = new ItemStack(Material.RED_CONCRETE);
+        ItemMeta pauseMeta = pause.getItemMeta();
+        pauseMeta.displayName(Component.text("Pause Timer", NamedTextColor.RED));
+        pauseMeta.lore(List.of(
+                Component.text("Right click to pause/resume.", NamedTextColor.GRAY)
+        ));
+        krispasi.omGames.bedwars.item.LobbyControlItemData.apply(pauseMeta, "pause");
+        pause.setItemMeta(pauseMeta);
+
+        ItemStack skip = new ItemStack(Material.GREEN_CONCRETE);
+        ItemMeta skipMeta = skip.getItemMeta();
+        skipMeta.displayName(Component.text("Skip Timer", NamedTextColor.GREEN));
+        skipMeta.lore(List.of(
+                Component.text("Right click to start.", NamedTextColor.GRAY)
+        ));
+        krispasi.omGames.bedwars.item.LobbyControlItemData.apply(skipMeta, "skip");
+        skip.setItemMeta(skipMeta);
+
+        placeLobbyItem(player, manage, 0);
+        placeLobbyItem(player, pause, 1);
+        placeLobbyItem(player, skip, 2);
+    }
+
+    private void placeLobbyItem(Player player, ItemStack item, int slot) {
+        if (player == null || item == null) {
+            return;
+        }
+        if (slot >= 0 && slot < 9 && player.getInventory().getItem(slot) == null) {
+            player.getInventory().setItem(slot, item);
+            return;
+        }
+        player.getInventory().addItem(item);
+    }
+
     private ItemStack colorLeatherArmor(Material material, org.bukkit.Color color) {
         ItemStack item = new ItemStack(material);
         LeatherArmorMeta meta = (LeatherArmorMeta) item.getItemMeta();
@@ -1429,8 +2643,16 @@ public class GameSession {
         if (shearsUnlocked.contains(playerId)) {
             giveShears(player, team);
         }
+        if (shieldUnlocked.contains(playerId)) {
+            giveShield(player, team);
+        }
         applyTeamUpgrades(player, team);
         player.updateInventory();
+    }
+
+    private void applyPermanentItemsWithShield(Player player, TeamColor team) {
+        applyPermanentItems(player, team);
+        equipShieldOffhand(player, team);
     }
 
     private void equipBaseArmor(Player player, TeamColor team) {
@@ -1476,6 +2698,16 @@ public class GameSession {
         return true;
     }
 
+    private boolean applyShield(Player player, ShopItemDefinition item) {
+        UUID playerId = player.getUniqueId();
+        if (shieldUnlocked.contains(playerId)) {
+            return false;
+        }
+        shieldUnlocked.add(playerId);
+        giveItem(player, item.createPurchaseItem(getTeam(playerId)));
+        return true;
+    }
+
     private void equipTieredItem(Player player,
                                  TeamColor team,
                                  ShopConfig config,
@@ -1488,6 +2720,85 @@ public class GameSession {
         }
         removeItems(player, removeSet);
         giveItem(player, definition.createPurchaseItem(team));
+    }
+
+    private int resolveToolTier(Player player, ShopConfig config, ShopItemBehavior behavior) {
+        if (player == null || config == null) {
+            return 0;
+        }
+        Map<Integer, ShopItemDefinition> tiered = config.getTieredItems(behavior);
+        if (tiered == null || tiered.isEmpty()) {
+            return 0;
+        }
+        Map<Material, Integer> materialTiers = new EnumMap<>(Material.class);
+        for (Map.Entry<Integer, ShopItemDefinition> entry : tiered.entrySet()) {
+            Integer tier = entry.getKey();
+            ShopItemDefinition definition = entry.getValue();
+            if (tier == null || tier <= 0 || definition == null) {
+                continue;
+            }
+            Material material = definition.getMaterial();
+            if (material == null) {
+                continue;
+            }
+            materialTiers.merge(material, tier, Math::max);
+        }
+        if (materialTiers.isEmpty()) {
+            return 0;
+        }
+        int foundTier = 0;
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item == null) {
+                continue;
+            }
+            Integer tier = materialTiers.get(item.getType());
+            if (tier != null) {
+                foundTier = Math.max(foundTier, tier);
+            }
+        }
+        ItemStack main = player.getInventory().getItemInMainHand();
+        if (main != null) {
+            Integer tier = materialTiers.get(main.getType());
+            if (tier != null) {
+                foundTier = Math.max(foundTier, tier);
+            }
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null) {
+            Integer tier = materialTiers.get(offhand.getType());
+            if (tier != null) {
+                foundTier = Math.max(foundTier, tier);
+            }
+        }
+        return foundTier;
+    }
+
+    private void updateToolTier(Map<UUID, Integer> map, UUID playerId, int tier) {
+        if (playerId == null) {
+            return;
+        }
+        if (tier <= 0) {
+            map.remove(playerId);
+        } else {
+            map.put(playerId, tier);
+        }
+    }
+
+    private boolean hasInventoryItem(Player player, Material material) {
+        if (player == null || material == null) {
+            return false;
+        }
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item != null && item.getType() == material) {
+                return true;
+            }
+        }
+        ItemStack main = player.getInventory().getItemInMainHand();
+        if (main != null && main.getType() == material) {
+            return true;
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        return offhand != null && offhand.getType() == material;
     }
 
     private void equipArmor(Player player, TeamColor team, ShopConfig config, int tier) {
@@ -1555,6 +2866,72 @@ public class GameSession {
         } else {
             giveItem(player, new ItemStack(Material.SHEARS));
         }
+    }
+
+    private void giveShield(Player player, TeamColor team) {
+        if (player.getInventory().contains(Material.SHIELD)) {
+            return;
+        }
+        ItemStack shield = createShieldItem(team);
+        if (shield != null) {
+            giveItem(player, shield);
+        }
+    }
+
+    private ItemStack createShieldItem(TeamColor team) {
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return new ItemStack(Material.SHIELD);
+        }
+        ShopItemDefinition definition = config.getFirstByBehavior(ShopItemBehavior.SHIELD);
+        if (definition != null) {
+            return definition.createPurchaseItem(team);
+        }
+        return new ItemStack(Material.SHIELD);
+    }
+
+    private void equipShieldOffhand(Player player, TeamColor team) {
+        if (player == null) {
+            return;
+        }
+        if (!shieldUnlocked.contains(player.getUniqueId())) {
+            return;
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && offhand.getType() == Material.SHIELD) {
+            return;
+        }
+        ItemStack shield = removeShieldFromStorage(player);
+        if (shield == null) {
+            shield = createShieldItem(team);
+        }
+        if (shield == null) {
+            shield = new ItemStack(Material.SHIELD);
+        }
+        if (offhand != null && !offhand.getType().isAir()) {
+            Map<Integer, ItemStack> leftovers = player.getInventory().addItem(offhand);
+            for (ItemStack leftover : leftovers.values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+            }
+        }
+        player.getInventory().setItemInOffHand(shield);
+    }
+
+    private ItemStack removeShieldFromStorage(Player player) {
+        if (player == null) {
+            return null;
+        }
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (item == null || item.getType() != Material.SHIELD) {
+                continue;
+            }
+            contents[i] = null;
+            player.getInventory().setStorageContents(contents);
+            return item;
+        }
+        return null;
     }
 
     private void downgradeTools(UUID playerId) {
@@ -1694,11 +3071,34 @@ public class GameSession {
         if (!isParticipant(playerId)) {
             return;
         }
+        if (state == GameState.LOBBY) {
+            Location lobby = arena.getMapLobbyLocation();
+            if (lobby == null) {
+                lobby = arena.getLobbyLocation();
+            }
+            if (lobby != null) {
+                player.teleport(lobby);
+            }
+            player.getInventory().clear();
+            if (isLobbyInitiator(playerId)) {
+                giveLobbyControlItems(player);
+            }
+            if (teamPickEnabled) {
+                giveTeamSelectItem(player);
+            }
+            player.setGameMode(GameMode.SURVIVAL);
+            player.setAllowFlight(false);
+            player.setFlying(false);
+            syncToolTiers(player);
+            hideEditorsFrom(player);
+            updateSidebarForPlayer(player);
+            return;
+        }
+
         TeamColor team = getTeam(playerId);
         if (team == null) {
             return;
         }
-
         if (state == GameState.STARTING) {
             Location spawn = arena.getSpawn(team);
             if (spawn != null) {
@@ -1706,11 +3106,13 @@ public class GameSession {
             }
             player.getInventory().clear();
             giveStarterKit(player, team);
-            applyPermanentItems(player, team);
+            applyPermanentItemsWithShield(player, team);
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
             frozenPlayers.add(playerId);
+            syncToolTiers(player);
+            hideEditorsFrom(player);
             updateSidebarForPlayer(player);
             return;
         }
@@ -1719,23 +3121,26 @@ public class GameSession {
             return;
         }
 
+        Location lobby = resolveMapLobbyLocation();
         if (eliminatedPlayers.contains(playerId)) {
             setSpectator(player);
-            Location lobby = arena.getLobbyLocation();
             if (lobby != null) {
                 player.teleport(lobby);
             }
+            syncToolTiers(player);
+            hideEditorsFrom(player);
             updateSidebarForPlayer(player);
             return;
         }
 
         if (pendingRespawns.remove(playerId)) {
             setSpectator(player);
-            Location lobby = arena.getLobbyLocation();
             if (lobby != null) {
                 player.teleport(lobby);
             }
             scheduleRespawn(player, team);
+            syncToolTiers(player);
+            hideEditorsFrom(player);
             updateSidebarForPlayer(player);
             return;
         }
@@ -1748,7 +3153,9 @@ public class GameSession {
         player.setAllowFlight(false);
         player.setFlying(false);
         grantRespawnProtection(player);
-        applyPermanentItems(player, team);
+        applyPermanentItemsWithShield(player, team);
+        syncToolTiers(player);
+        hideEditorsFrom(player);
         updateSidebarForPlayer(player);
     }
 
@@ -1896,11 +3303,26 @@ public class GameSession {
         }
 
         lines.add(ChatColor.DARK_GRAY + "   ");
+        lines.add(ChatColor.GOLD + "Kills: " + ChatColor.WHITE + getKillCount(player.getUniqueId()));
         lines.add(ChatColor.AQUA + "Made by Krispasi");
         return lines;
     }
 
+    private Location resolveMapLobbyLocation() {
+        Location mapLobby = arena.getMapLobbyLocation();
+        if (mapLobby != null) {
+            return mapLobby;
+        }
+        return arena.getLobbyLocation();
+    }
+
     private String buildEventLine() {
+        if (state == GameState.LOBBY) {
+            if (lobbyCountdownPaused) {
+                return ChatColor.YELLOW + "Countdown Paused";
+            }
+            return ChatColor.YELLOW + "Starting in " + lobbyCountdownRemaining + "s";
+        }
         if (state == GameState.STARTING) {
             return ChatColor.YELLOW + "Starting in " + startCountdownRemaining + "s";
         }
@@ -1978,8 +3400,12 @@ public class GameSession {
     }
 
     private void startRespawnCountdown(Player player) {
+        startRespawnCountdown(player, RESPAWN_DELAY_SECONDS);
+    }
+
+    private void startRespawnCountdown(Player player, int delaySeconds) {
         BukkitTask task = new BukkitRunnable() {
-            private int remaining = RESPAWN_DELAY_SECONDS;
+            private int remaining = Math.max(0, delaySeconds);
 
             @Override
             public void run() {
@@ -2397,6 +3823,13 @@ public class GameSession {
         if (featherTier > 0) {
             applyFeatherFalling(player, featherTier);
         }
+        int thornsTier = upgrades.getTier(TeamUpgradeType.THORNS);
+        if (thornsTier > 0) {
+            applyThorns(player, thornsTier);
+        }
+        if (upgrades.getTier(TeamUpgradeType.FIRE_ASPECT) > 0) {
+            applyFireAspect(player);
+        }
     }
 
     private void applyProtection(Player player, int level) {
@@ -2466,6 +3899,35 @@ public class GameSession {
         }
     }
 
+    private void applyThorns(Player player, int level) {
+        if (level <= 0) {
+            return;
+        }
+        ItemStack[] armor = player.getInventory().getArmorContents();
+        boolean changed = false;
+        for (int i = 0; i < armor.length; i++) {
+            ItemStack piece = armor[i];
+            if (piece == null) {
+                continue;
+            }
+            ItemMeta meta = piece.getItemMeta();
+            if (meta.getEnchantLevel(Enchantment.THORNS) >= level) {
+                continue;
+            }
+            meta.addEnchant(Enchantment.THORNS, level, true);
+            piece.setItemMeta(meta);
+            armor[i] = piece;
+            changed = true;
+        }
+        if (changed) {
+            player.getInventory().setArmorContents(armor);
+        }
+    }
+
+    private void applyFireAspect(Player player) {
+        applyEnchantment(player, ATTACK_MATERIALS, Enchantment.FIRE_ASPECT, 1);
+    }
+
     private void applyEnchantment(Player player, Set<Material> materials, Enchantment enchantment, int level) {
         ItemStack[] contents = player.getInventory().getStorageContents();
         boolean changed = false;
@@ -2517,6 +3979,84 @@ public class GameSession {
         player.removePotionEffect(PotionEffectType.BLINDNESS);
         player.removePotionEffect(PotionEffectType.SLOWNESS);
         player.removePotionEffect(PotionEffectType.MINING_FATIGUE);
+    }
+
+    private void applyEditorInvisibility(Player player) {
+        if (player == null) {
+            return;
+        }
+        player.addPotionEffect(new PotionEffect(
+                PotionEffectType.INVISIBILITY,
+                Integer.MAX_VALUE,
+                0,
+                false,
+                false,
+                false
+        ));
+    }
+
+    private void hideEditorFromParticipants(Player editor) {
+        if (plugin == null || editor == null) {
+            return;
+        }
+        UUID editorId = editor.getUniqueId();
+        for (UUID playerId : assignments.keySet()) {
+            if (playerId.equals(editorId)) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                player.hidePlayer(plugin, editor);
+            }
+        }
+    }
+
+    private void hideEditorsFrom(Player viewer) {
+        if (plugin == null || viewer == null) {
+            return;
+        }
+        for (UUID editorId : editorPlayers) {
+            Player editor = Bukkit.getPlayer(editorId);
+            if (editor != null && !editor.getUniqueId().equals(viewer.getUniqueId())) {
+                viewer.hidePlayer(plugin, editor);
+            }
+        }
+    }
+
+    private void showEditorToParticipants(Player editor) {
+        if (plugin == null || editor == null) {
+            return;
+        }
+        UUID editorId = editor.getUniqueId();
+        for (UUID playerId : assignments.keySet()) {
+            if (playerId.equals(editorId)) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                player.showPlayer(plugin, editor);
+            }
+        }
+    }
+
+    private void clearEditors() {
+        if (editorPlayers.isEmpty()) {
+            return;
+        }
+        if (plugin != null) {
+            for (UUID editorId : new HashSet<>(editorPlayers)) {
+                Player editor = Bukkit.getPlayer(editorId);
+                if (editor != null) {
+                    if (editor.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
+                        editor.removePotionEffect(PotionEffectType.INVISIBILITY);
+                    }
+                    for (Player viewer : Bukkit.getOnlinePlayers()) {
+                        viewer.showPlayer(plugin, editor);
+                    }
+                }
+            }
+        }
+        editorPlayers.clear();
     }
 
     private void spawnShops() {

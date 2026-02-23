@@ -82,8 +82,9 @@ arenas:
       sudden-death: 1740
       game-end: 2360
     world: bedwars
-    lobby-height: 120
     center: 951 120 1488
+    game-lobby: 0 73 -1
+    map-lobby: 951 120 1488
     corner_1: 787 22 1324
     corner_2: 1126 100 1624
 
@@ -155,7 +156,8 @@ arenas:
     corner_1: -908 34 -897
     corner_2: -1099 99 -1108
     base-radius: 21
-    lobby-height: 120
+    game-lobby: 0 73 -1
+    map-lobby: -1000 120 -1000
     anti-build:
       base-generator-radius: 10
       advanced-generator-radius: 4
