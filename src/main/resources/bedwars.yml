@@ -189,14 +189,14 @@ arenas:
       base_cyan: -1030 62 -930
       base_pink: -930 62 -970
     Base_Generators:
-      base_gen_red: -970 61 -1075
-      base_gen_blue: -1024 61 -1081
-      base_gen_lime: -1075 61 -1030
-      base_gen_white: -976 61 -919
-      base_gen_black: -919 61 -1024
-      base_gen_yellow: -1081 61 -976
-      base_gen_cyan: -1030 61 -925
-      base_gen_pink: -925 61 -970
+      base_gen_red: -970 62 -1075
+      base_gen_blue: -1024 62 -1081
+      base_gen_lime: -1075 62 -1030
+      base_gen_white: -976 62 -919
+      base_gen_black: -919 62 -1024
+      base_gen_yellow: -1081 62 -976
+      base_gen_cyan: -1030 62 -925
+      base_gen_pink: -925 62 -970
     Shops:
       red:
         main: -960 62 -1070 WEST
