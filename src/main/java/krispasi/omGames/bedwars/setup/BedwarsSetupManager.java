@@ -440,7 +440,7 @@ public class BedwarsSetupManager {
     }
 
     private File getConfigFile() {
-        return new File(plugin.getDataFolder(), "bedwars.yml");
+        return bedwarsManager.getBedwarsConfigFile("bedwars.yml");
     }
 
     private ConfigurationSection getOrCreateArena(YamlConfiguration config, String arenaId, boolean create) {

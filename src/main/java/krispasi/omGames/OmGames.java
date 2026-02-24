@@ -23,10 +23,10 @@ public final class OmGames extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        saveResource("bedwars.yml", false);
-        saveResource("shop.yml", false);
-        saveResource("rotating-items.yml", false);
-        saveResource("custom-items.yml", false);
+        ensureBedwarsConfig("bedwars.yml");
+        ensureBedwarsConfig("shop.yml");
+        ensureBedwarsConfig("rotating-items.yml");
+        ensureBedwarsConfig("custom-items.yml");
 
         bedwarsManager = new BedwarsManager(this);
         bedwarsManager.loadArenas();
@@ -51,6 +51,36 @@ public final class OmGames extends JavaPlugin {
     public void onDisable() {
         if (bedwarsManager != null) {
             bedwarsManager.shutdown();
+        }
+    }
+
+    private void ensureBedwarsConfig(String name) {
+        java.io.File dataFolder = getDataFolder();
+        java.io.File bedwarsFolder = new java.io.File(dataFolder, "Bedwars");
+        if (!bedwarsFolder.exists()) {
+            bedwarsFolder.mkdirs();
+        }
+        java.io.File target = new java.io.File(bedwarsFolder, name);
+        if (target.exists()) {
+            return;
+        }
+        java.io.File legacy = new java.io.File(dataFolder, name);
+        if (legacy.exists()) {
+            try {
+                java.nio.file.Files.move(legacy.toPath(), target.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                return;
+            } catch (java.io.IOException ex) {
+                getLogger().warning("Failed to move " + name + " into Bedwars/: " + ex.getMessage());
+            }
+        }
+        try (java.io.InputStream input = getResource(name)) {
+            if (input == null) {
+                return;
+            }
+            java.nio.file.Files.copy(input, target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (java.io.IOException ex) {
+            getLogger().warning("Failed to save Bedwars config " + name + ": " + ex.getMessage());
         }
     }
 /*    private void setupBedwars() {

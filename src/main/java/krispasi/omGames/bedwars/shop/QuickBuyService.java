@@ -47,7 +47,7 @@ public class QuickBuyService {
     private final Map<UUID, Integer> pendingSlots = new HashMap<>();
 
     public QuickBuyService(JavaPlugin plugin) {
-        this.databaseFile = new File(plugin.getDataFolder(), "quickbuy.db");
+        this.databaseFile = resolveDatabaseFile(plugin, "quickbuy.db");
         this.logger = plugin.getLogger();
     }
 
@@ -159,6 +159,11 @@ public class QuickBuyService {
             logger.log(Level.SEVERE, "SQLite driver not found.", ex);
         }
         connection = DriverManager.getConnection("jdbc:sqlite:" + databaseFile.getAbsolutePath());
+    }
+
+    private static File resolveDatabaseFile(JavaPlugin plugin, String name) {
+        File base = new File(plugin.getDataFolder(), "Bedwars");
+        return new File(base, name);
     }
 
     private void createTable() throws SQLException {

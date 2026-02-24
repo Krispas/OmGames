@@ -55,7 +55,7 @@ public class BedwarsStatsService {
     private final Map<UUID, BedwarsPlayerStats> cache = new HashMap<>();
 
     public BedwarsStatsService(JavaPlugin plugin) {
-        this.databaseFile = new File(plugin.getDataFolder(), "bedwars-stats.db");
+        this.databaseFile = resolveDatabaseFile(plugin, "bedwars-stats.db");
         this.logger = plugin.getLogger();
     }
 
@@ -195,6 +195,11 @@ public class BedwarsStatsService {
             logger.log(Level.SEVERE, "SQLite driver not found.", ex);
         }
         connection = DriverManager.getConnection("jdbc:sqlite:" + databaseFile.getAbsolutePath());
+    }
+
+    private static File resolveDatabaseFile(JavaPlugin plugin, String name) {
+        File base = new File(plugin.getDataFolder(), "Bedwars");
+        return new File(base, name);
     }
 
     private void createTable() throws SQLException {

@@ -51,18 +51,30 @@ public class BedwarsManager {
         this.statsService = new BedwarsStatsService(plugin);
     }
 
+    public File getBedwarsDataFolder() {
+        File folder = new File(plugin.getDataFolder(), "Bedwars");
+        if (!folder.exists()) {
+            folder.mkdirs();
+        }
+        return folder;
+    }
+
+    public File getBedwarsConfigFile(String name) {
+        return new File(getBedwarsDataFolder(), name);
+    }
+
     public void loadArenas() {
-        File configFile = new File(plugin.getDataFolder(), "bedwars.yml");
+        File configFile = getBedwarsConfigFile("bedwars.yml");
         BedwarsConfigLoader loader = new BedwarsConfigLoader(configFile, plugin.getLogger());
         arenas = loader.load();
         plugin.getLogger().info("Loaded " + arenas.size() + " BedWars arenas.");
     }
 
     public void loadShopConfig() {
-        File configFile = new File(plugin.getDataFolder(), "shop.yml");
+        File configFile = getBedwarsConfigFile("shop.yml");
         migrateShopConfig(configFile);
         ShopConfig baseConfig = new ShopConfigLoader(configFile, plugin.getLogger()).load();
-        File rotatingFile = new File(plugin.getDataFolder(), "rotating-items.yml");
+        File rotatingFile = getBedwarsConfigFile("rotating-items.yml");
         if (rotatingFile.exists()) {
             ShopConfig rotatingConfig = new ShopConfigLoader(rotatingFile, plugin.getLogger()).load();
             shopConfig = ShopConfig.merge(baseConfig, rotatingConfig);
@@ -73,7 +85,7 @@ public class BedwarsManager {
     }
 
     public void loadCustomItems() {
-        File configFile = new File(plugin.getDataFolder(), "custom-items.yml");
+        File configFile = getBedwarsConfigFile("custom-items.yml");
         migrateCustomItems(configFile);
         CustomItemConfigLoader loader = new CustomItemConfigLoader(configFile, plugin.getLogger());
         customItemConfig = loader.load();
