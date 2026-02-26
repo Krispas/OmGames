@@ -376,10 +376,7 @@ public class ShopConfigLoader {
             return enchants;
         }
         for (String key : section.getKeys(false)) {
-            Enchantment enchantment = Enchantment.getByKey(NamespacedKey.minecraft(key.toLowerCase(Locale.ROOT)));
-            if (enchantment == null) {
-                enchantment = Enchantment.getByName(key.toUpperCase(Locale.ROOT));
-            }
+            Enchantment enchantment = resolveEnchantment(key);
             if (enchantment == null) {
                 logger.warning("Unknown enchantment in shop config: " + key);
                 continue;
@@ -388,6 +385,52 @@ public class ShopConfigLoader {
             enchants.put(enchantment, Math.max(1, level));
         }
         return enchants;
+    }
+
+    private Enchantment resolveEnchantment(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        Enchantment enchantment = resolveByKey(key);
+        if (enchantment != null) {
+            return enchantment;
+        }
+        enchantment = Enchantment.getByName(key.toUpperCase(Locale.ROOT));
+        if (enchantment != null) {
+            return enchantment;
+        }
+        String alias = enchantmentAlias(key);
+        if (alias == null) {
+            return null;
+        }
+        enchantment = resolveByKey(alias);
+        if (enchantment != null) {
+            return enchantment;
+        }
+        return Enchantment.getByName(alias.toUpperCase(Locale.ROOT));
+    }
+
+    private Enchantment resolveByKey(String key) {
+        String normalized = key.trim().toLowerCase(Locale.ROOT);
+        NamespacedKey namespaced = NamespacedKey.fromString(normalized);
+        if (namespaced != null) {
+            Enchantment enchantment = Enchantment.getByKey(namespaced);
+            if (enchantment != null) {
+                return enchantment;
+            }
+        }
+        if (normalized.contains(":")) {
+            return null;
+        }
+        return Enchantment.getByKey(NamespacedKey.minecraft(normalized));
+    }
+
+    private String enchantmentAlias(String key) {
+        String normalized = key.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        return switch (normalized) {
+            case "LUNGING" -> "minecraft:lunge";
+            default -> null;
+        };
     }
 
     private List<PotionEffect> parsePotionEffects(List<String> rawEffects) {

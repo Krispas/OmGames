@@ -2,6 +2,7 @@ settings:
   garry-family-damage: 12.0
   garry-family-health: 200.0
   garry-family-range: 32.0
+  garry-family-speed: 0.3
 
 shop:
   categories:
@@ -17,6 +18,7 @@ shop:
         bridge_builder: 14
         creeping_arrow: 15
         tactical_nuke: 16
+        totem_of_undying: 21
         portable_shopkeeper: 20
         bridge_zapper: 19
         thorns_upgrade: 28
@@ -113,6 +115,19 @@ shop:
         limit:
           scope: TEAM
           amount: 1
+      totem_of_undying:
+        material: TOTEM_OF_UNDYING
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 2
+        display-name: "Totem of Undying"
+        lore:
+          - "Saves you from death."
+          - "Also rescues from the void."
+        limit:
+          scope: PLAYER
+          amount: 2
       portable_shopkeeper:
         material: VILLAGER_SPAWN_EGG
         amount: 1

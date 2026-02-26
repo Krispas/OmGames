@@ -56,13 +56,17 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.text("Beds Broken: " + stats.getBedsBroken(), NamedTextColor.YELLOW));
             return true;
         }
-        if (args.length > 0 && args[0].equalsIgnoreCase("quick_buy")) {
+        if (args.length > 0 && isQuickBuyCommand(args[0])) {
             GameSession session = bedwarsManager.getActiveSession();
             if (session != null && session.isActive() && session.isParticipant(player.getUniqueId())) {
                 player.sendMessage(Component.text("You cannot edit Quick Buy while in a BedWars match.", NamedTextColor.RED));
                 return true;
             }
             bedwarsManager.openQuickBuyEditor(player);
+            return true;
+        }
+        if (!player.isOp()) {
+            sender.sendMessage(Component.text("Only OP can use this command (except /bw stats and /bw quick-buy).", NamedTextColor.RED));
             return true;
         }
         if (!sender.hasPermission("omgames.bw.start")
@@ -152,18 +156,28 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
                 return true;
             }
+            if (!player.isOp()) {
+                sender.sendMessage(Component.text("Only OP can use /bw game commands.", NamedTextColor.RED));
+                return true;
+            }
             if (args.length < 2) {
-                sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team> [player] | /bw game revive <team> | /bw game skipphase", NamedTextColor.YELLOW));
+                sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw game skipphase", NamedTextColor.YELLOW));
                 return true;
             }
             String action = args[1].toLowerCase(Locale.ROOT);
             if (action.equals("out")) {
                 return handleGameOut(sender, player, Arrays.copyOfRange(args, 1, args.length));
             }
+            if (action.equals("spectate")) {
+                return handleGameSpectate(sender, player, Arrays.copyOfRange(args, 1, args.length));
+            }
             if (action.equals("join")) {
                 if (args.length < 3) {
-                    sender.sendMessage(Component.text("Usage: /bw game join <team> [player]", NamedTextColor.YELLOW));
+                    sender.sendMessage(Component.text("Usage: /bw game join <team|spectate> [player]", NamedTextColor.YELLOW));
                     return true;
+                }
+                if (args[2].equalsIgnoreCase("spectate")) {
+                    return handleGameSpectate(sender, player, Arrays.copyOfRange(args, 2, args.length));
                 }
                 TeamColor team = TeamColor.fromKey(args[2]);
                 if (team == null) {
@@ -226,7 +240,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Component.text("Skipped to " + phase + ".", NamedTextColor.GREEN));
                 return true;
             }
-            sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team> [player] | /bw game revive <team> | /bw game skipphase", NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw game skipphase", NamedTextColor.YELLOW));
             return true;
         }
         if (args[0].equalsIgnoreCase("reload")) {
@@ -273,7 +287,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw out [player] | /bw game out [player] | /bw game join <team> [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw out [player] | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -300,19 +314,27 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("game")) {
             String input = args[1].toLowerCase(Locale.ROOT);
-            return Stream.of("out", "join", "revive", "skipphase")
+            return Stream.of("out", "join", "spectate", "revive", "skipphase")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("join")) {
             String input = args[2].toLowerCase(Locale.ROOT);
-            return Stream.of(TeamColor.values())
-                    .map(TeamColor::key)
+            return Stream.concat(
+                            Stream.of("spectate"),
+                            Stream.of(TeamColor.values()).map(TeamColor::key))
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
         if (args.length == 4 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("join")) {
             String input = args[3].toLowerCase(Locale.ROOT);
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("spectate")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
             return Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)
                     .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
@@ -398,5 +420,44 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             target.sendMessage(Component.text("You were removed from the match.", NamedTextColor.YELLOW));
         }
         return true;
+    }
+
+    private boolean handleGameSpectate(CommandSender sender, Player caller, String[] args) {
+        Player target = args.length >= 2 ? Bukkit.getPlayer(args[1]) : caller;
+        if (target == null) {
+            sender.sendMessage(Component.text("Player not found.", NamedTextColor.RED));
+            return true;
+        }
+        GameSession session = bedwarsManager.getActiveSession();
+        if (session == null || !session.isActive()) {
+            sender.sendMessage(Component.text("No active BedWars session.", NamedTextColor.RED));
+            return true;
+        }
+        session.removeEditor(target);
+        session.removeParticipant(target);
+        target.getInventory().clear();
+        target.setGameMode(GameMode.SPECTATOR);
+        Location spectate = session.getArena().getMapLobbyLocation();
+        if (spectate == null) {
+            spectate = session.getArena().getLobbyLocation();
+        }
+        if (spectate != null) {
+            target.teleport(spectate);
+        }
+        sender.sendMessage(Component.text("Set " + target.getName() + " to spectator.", NamedTextColor.YELLOW));
+        if (target != caller) {
+            target.sendMessage(Component.text("You were set to spectator.", NamedTextColor.YELLOW));
+        }
+        return true;
+    }
+
+    private boolean isQuickBuyCommand(String arg) {
+        if (arg == null) {
+            return false;
+        }
+        return arg.equalsIgnoreCase("quick_buy")
+                || arg.equalsIgnoreCase("quick-buy")
+                || arg.equalsIgnoreCase("quck-buy")
+                || arg.equalsIgnoreCase("quck_buy");
     }
 }

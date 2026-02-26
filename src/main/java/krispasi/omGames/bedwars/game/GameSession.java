@@ -88,6 +88,8 @@ import org.bukkit.scoreboard.Team;
  * @see krispasi.omGames.bedwars.game.GameState
  */
 public class GameSession {
+    private static final String SIDEBAR_OBJECTIVE_ID = "bedwars";
+    private static final String HEALTH_OBJECTIVE_ID = "bedwars_hp";
     public enum RotatingSelectionMode {
         TWO_RANDOM,
         ONE_RANDOM,
@@ -1109,6 +1111,7 @@ public class GameSession {
         applyCustomEntityStats(warden, custom);
         applyGarryFamilyHealthOverride(warden);
         applyGarryFamilyRangeOverride(warden);
+        applyGarryFamilySpeedOverride(warden);
         updateGarryFamilyHealthDisplay(warden);
         return warden;
     }
@@ -1134,6 +1137,17 @@ public class GameSession {
             return;
         }
         applyAttribute(warden, "GENERIC_FOLLOW_RANGE", range);
+    }
+
+    private void applyGarryFamilySpeedOverride(org.bukkit.entity.Warden warden) {
+        if (warden == null) {
+            return;
+        }
+        double speed = bedwarsManager.getGarryFamilySpeed();
+        if (speed <= 0.0) {
+            return;
+        }
+        applyAttribute(warden, "GENERIC_MOVEMENT_SPEED", speed);
     }
 
     private void applyCustomEntityStats(LivingEntity entity, CustomItemDefinition custom) {
@@ -1624,6 +1638,7 @@ public class GameSession {
         if (statsEnabled && breaker != null && isParticipant(breaker.getUniqueId())) {
             bedwarsManager.getStatsService().addBedBroken(breaker.getUniqueId());
         }
+        grantPendingRespawnGrace(team);
         destroyBed(team);
         broadcast(Component.text("The ", NamedTextColor.RED)
                 .append(team.displayComponent())
@@ -1809,6 +1824,7 @@ public class GameSession {
         startUpgradeTasks();
         startRegenTask();
         scheduleGameEvents();
+        announceCurrentRotatingItems();
     }
 
     private void scheduleGameEvents() {
@@ -1966,7 +1982,8 @@ public class GameSession {
         }
         startRespawnCountdown(player, delaySeconds);
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> safeRun("respawn", () -> {
-            if (state != GameState.RUNNING || (getBedState(team) == BedState.DESTROYED && !allowRespawnAfterBedBreak)) {
+            boolean allowRespawn = allowRespawnAfterBedBreak || respawnGracePlayers.contains(playerId);
+            if (state != GameState.RUNNING || (getBedState(team) == BedState.DESTROYED && !allowRespawn)) {
                 eliminatedPlayers.add(playerId);
                 pendingRespawns.remove(playerId);
                 setSpectator(player);
@@ -1995,6 +2012,21 @@ public class GameSession {
         }), Math.max(0, delaySeconds) * 20L);
         respawnTasks.put(player.getUniqueId(), task);
         showTitle(player, Component.text("Respawning in " + delaySeconds, NamedTextColor.YELLOW), Component.empty());
+    }
+
+    private void grantPendingRespawnGrace(TeamColor team) {
+        if (team == null) {
+            return;
+        }
+        for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
+            if (entry.getValue() != team) {
+                continue;
+            }
+            UUID playerId = entry.getKey();
+            if (pendingRespawns.contains(playerId)) {
+                respawnGracePlayers.add(playerId);
+            }
+        }
     }
 
     private void eliminatePlayer(Player player, TeamColor team) {
@@ -2571,6 +2603,9 @@ public class GameSession {
         if (!rotating) {
             return true;
         }
+        if (suddenDeathActive) {
+            return false;
+        }
         if (rotatingItemIds.isEmpty()) {
             return true;
         }
@@ -2600,6 +2635,9 @@ public class GameSession {
             }
             hasRotating = true;
             if (rotatingItemIds.isEmpty() || rotatingItemIds.contains(definition.getId())) {
+                if (suddenDeathActive) {
+                    return false;
+                }
                 return true;
             }
         }
@@ -2628,6 +2666,68 @@ public class GameSession {
         }
         int target = rotatingMode == RotatingSelectionMode.ONE_RANDOM ? 1 : 2;
         rotatingItemIds.addAll(pickRandom(candidates, target));
+    }
+
+    private void announceCurrentRotatingItems() {
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return;
+        }
+        krispasi.omGames.bedwars.shop.ShopCategory category = config.getCategory(ShopCategoryType.ROTATING);
+        if (category == null || category.getEntries().isEmpty()) {
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        for (String id : rotatingItemIds) {
+            names.add(resolveRotatingItemName(id, config.getItem(id)));
+        }
+        if (names.isEmpty()) {
+            broadcast(Component.text("Rotating Items: none", NamedTextColor.GRAY));
+            return;
+        }
+        names.sort(String.CASE_INSENSITIVE_ORDER);
+        broadcast(Component.text("Rotating Items: ", NamedTextColor.AQUA)
+                .append(Component.text(String.join(", ", names), NamedTextColor.YELLOW)));
+    }
+
+    private String resolveRotatingItemName(String id, ShopItemDefinition definition) {
+        if (definition != null) {
+            String displayName = definition.getDisplayName();
+            if (displayName != null && !displayName.isBlank()) {
+                return displayName;
+            }
+            TeamUpgradeType upgradeType = definition.getUpgradeType();
+            if (upgradeType != null) {
+                return upgradeType.displayName();
+            }
+        }
+        return humanizeRotatingId(id);
+    }
+
+    private String humanizeRotatingId(String id) {
+        if (id == null || id.isBlank()) {
+            return "Unknown";
+        }
+        String normalized = id.replace('-', ' ').replace('_', ' ').trim();
+        if (normalized.isBlank()) {
+            return id;
+        }
+        String[] parts = normalized.split("\\s+");
+        StringBuilder builder = new StringBuilder();
+        for (String part : parts) {
+            if (part.isBlank()) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(' ');
+            }
+            String lower = part.toLowerCase(Locale.ROOT);
+            builder.append(Character.toUpperCase(lower.charAt(0)));
+            if (lower.length() > 1) {
+                builder.append(lower.substring(1));
+            }
+        }
+        return builder.length() > 0 ? builder.toString() : id;
     }
 
     private List<String> pickRandom(List<String> candidates, int count) {
@@ -3431,17 +3531,14 @@ public class GameSession {
         if (scoreboard == null) {
             previousScoreboards.putIfAbsent(playerId, player.getScoreboard());
             scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
-            Objective objective = scoreboard.registerNewObjective(
-                    "bedwars",
-                    "dummy",
-                    Component.text("BED WARS", NamedTextColor.GOLD)
-            );
-            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
             activeScoreboards.put(playerId, scoreboard);
         }
+        ensureSidebarObjective(scoreboard);
+        ensureHealthObjective(scoreboard);
         player.setScoreboard(scoreboard);
         updateTeamColors(scoreboard);
         updateSidebarLines(player, scoreboard);
+        updateBelowNameHealth(scoreboard);
     }
 
     private void restoreSidebar(UUID playerId) {
@@ -3468,15 +3565,7 @@ public class GameSession {
     }
 
     private void updateSidebarLines(Player player, Scoreboard scoreboard) {
-        Objective objective = scoreboard.getObjective("bedwars");
-        if (objective == null) {
-            objective = scoreboard.registerNewObjective(
-                    "bedwars",
-                    "dummy",
-                    Component.text("BED WARS", NamedTextColor.GOLD)
-            );
-            objective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        }
+        Objective objective = ensureSidebarObjective(scoreboard);
         List<String> previous = sidebarLines.get(player.getUniqueId());
         if (previous != null) {
             for (String line : previous) {
@@ -3489,6 +3578,53 @@ public class GameSession {
             objective.getScore(line).setScore(score--);
         }
         sidebarLines.put(player.getUniqueId(), lines);
+    }
+
+    private Objective ensureSidebarObjective(Scoreboard scoreboard) {
+        Objective objective = scoreboard.getObjective(SIDEBAR_OBJECTIVE_ID);
+        if (objective == null) {
+            objective = scoreboard.registerNewObjective(
+                    SIDEBAR_OBJECTIVE_ID,
+                    "dummy",
+                    Component.text("BED WARS", NamedTextColor.GOLD)
+            );
+        }
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        return objective;
+    }
+
+    private Objective ensureHealthObjective(Scoreboard scoreboard) {
+        Objective objective = scoreboard.getObjective(HEALTH_OBJECTIVE_ID);
+        if (objective == null) {
+            objective = scoreboard.registerNewObjective(
+                    HEALTH_OBJECTIVE_ID,
+                    "dummy",
+                    Component.text("HP", NamedTextColor.RED)
+            );
+        }
+        objective.setDisplaySlot(DisplaySlot.BELOW_NAME);
+        return objective;
+    }
+
+    private void updateBelowNameHealth(Scoreboard scoreboard) {
+        Objective objective = ensureHealthObjective(scoreboard);
+        for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
+            Player target = Bukkit.getPlayer(entry.getKey());
+            String entryName = target != null ? target.getName() : null;
+            if (entryName == null || entryName.isBlank()) {
+                org.bukkit.OfflinePlayer offline = Bukkit.getOfflinePlayer(entry.getKey());
+                entryName = offline != null ? offline.getName() : null;
+            }
+            if (entryName == null || entryName.isBlank()) {
+                continue;
+            }
+            if (target == null || !target.isOnline() || !isInArenaWorld(target.getWorld())) {
+                scoreboard.resetScores(entryName);
+                continue;
+            }
+            int health = (int) Math.ceil(Math.max(0.0, target.getHealth()));
+            objective.getScore(entryName).setScore(health);
+        }
     }
 
     private void updateTeamColors(Scoreboard scoreboard) {
@@ -3791,8 +3927,7 @@ public class GameSession {
         if (world == null || center == null) {
             return;
         }
-        int configured = arena.getCenterRadius();
-        int radius = configured > 0 ? configured : DEFAULT_CENTER_RADIUS;
+        int radius = resolveCenterRadius();
         if (radius <= 0) {
             return;
         }
@@ -3811,22 +3946,97 @@ public class GameSession {
             double dx = location.getX() - centerX;
             double dz = location.getZ() - centerZ;
             double distanceSquared = dx * dx + dz * dz;
-            if (distanceSquared <= radiusSquared) {
+            if (distanceSquared > radiusSquared) {
+                if (distanceSquared <= 0.0001) {
+                    warden.teleport(centerLocation);
+                } else {
+                    double distance = Math.sqrt(distanceSquared);
+                    double scale = Math.max(0.0, (radius - 0.2) / distance);
+                    double clampedX = centerX + dx * scale;
+                    double clampedZ = centerZ + dz * scale;
+                    Location clamped = new Location(world, clampedX, location.getY(), clampedZ,
+                            location.getYaw(), location.getPitch());
+                    warden.teleport(clamped);
+                }
+            }
+            LivingEntity currentTarget = warden.getTarget();
+            UUID currentTargetId = null;
+            if (currentTarget instanceof Player playerTarget && isCenterRadiusParticipant(playerTarget)) {
+                currentTargetId = playerTarget.getUniqueId();
+            }
+            Player randomTarget = pickRandomCenterRadiusParticipant(currentTargetId);
+            if (randomTarget == null && currentTargetId != null) {
+                randomTarget = Bukkit.getPlayer(currentTargetId);
+            }
+            warden.setTarget(randomTarget);
+            if (randomTarget == null) {
+                warden.setTarget(null);
+            }
+        }
+    }
+
+    private int resolveCenterRadius() {
+        int configured = arena.getCenterRadius();
+        return configured > 0 ? configured : DEFAULT_CENTER_RADIUS;
+    }
+
+    public boolean isInsideCenterRadius(Location location) {
+        if (location == null) {
+            return false;
+        }
+        World world = arena.getWorld();
+        BlockPoint center = arena.getCenter();
+        if (world == null || center == null || location.getWorld() == null || !world.equals(location.getWorld())) {
+            return false;
+        }
+        int radius = resolveCenterRadius();
+        if (radius <= 0) {
+            return true;
+        }
+        double centerX = center.x() + 0.5;
+        double centerZ = center.z() + 0.5;
+        double dx = location.getX() - centerX;
+        double dz = location.getZ() - centerZ;
+        return dx * dx + dz * dz <= (double) radius * radius;
+    }
+
+    public boolean isCenterRadiusParticipant(Player player) {
+        if (player == null || !isParticipant(player.getUniqueId())) {
+            return false;
+        }
+        if (!isInArenaWorld(player.getWorld()) || player.getGameMode() == GameMode.SPECTATOR) {
+            return false;
+        }
+        return isInsideCenterRadius(player.getLocation());
+    }
+
+    public Player pickRandomCenterRadiusParticipant() {
+        return pickRandomCenterRadiusParticipant(null);
+    }
+
+    public Player pickRandomCenterRadiusParticipant(UUID excludePlayerId) {
+        if (state != GameState.RUNNING) {
+            return null;
+        }
+        List<Player> candidates = new ArrayList<>();
+        for (UUID playerId : assignments.keySet()) {
+            if (excludePlayerId != null && excludePlayerId.equals(playerId)) {
                 continue;
             }
-            if (distanceSquared <= 0.0001) {
-                warden.teleport(centerLocation);
-            } else {
-                double distance = Math.sqrt(distanceSquared);
-                double scale = Math.max(0.0, (radius - 0.2) / distance);
-                double clampedX = centerX + dx * scale;
-                double clampedZ = centerZ + dz * scale;
-                Location clamped = new Location(world, clampedX, location.getY(), clampedZ,
-                        location.getYaw(), location.getPitch());
-                warden.teleport(clamped);
+            Player candidate = Bukkit.getPlayer(playerId);
+            if (!isCenterRadiusParticipant(candidate)) {
+                continue;
             }
-            warden.setTarget(null);
+            candidates.add(candidate);
         }
+        if (candidates.isEmpty() && excludePlayerId != null) {
+            return pickRandomCenterRadiusParticipant(null);
+        }
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        Collections.shuffle(candidates);
+        return candidates.get(0);
     }
 
     private boolean isGarryFamilyWarden(org.bukkit.entity.Warden warden) {

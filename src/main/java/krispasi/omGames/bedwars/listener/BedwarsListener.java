@@ -180,6 +180,8 @@ public class BedwarsListener implements Listener {
     private static final String HAPPY_GHAST_MOUNTED_TAG = "bw_happy_ghast_mounted";
     private static final long FIREBALL_COOLDOWN_MILLIS = 500L;
     private static final long FLAMETHROWER_COOLDOWN_MILLIS = 120L;
+    private static final long GARRY_SHRIEK_COOLDOWN_MILLIS = 40_000L;
+    private static final long VOID_TOTEM_FALL_PROTECTION_MILLIS = 5_000L;
     private static final int NUKE_TARGET_DISTANCE = 512;
     private static final int NUKE_COUNTDOWN_CHAT_SECONDS = 15;
     private static final String DREAM_DEFENDER_NAME = "Dream Defender";
@@ -195,6 +197,8 @@ public class BedwarsListener implements Listener {
     private final Map<UUID, SummonNameplate> summonNameplates = new HashMap<>();
     private final Map<UUID, Long> fireballCooldowns = new HashMap<>();
     private final Map<UUID, Long> flamethrowerCooldowns = new HashMap<>();
+    private final Map<UUID, Long> garryShriekCooldowns = new HashMap<>();
+    private final Map<UUID, Long> voidTotemFallProtection = new HashMap<>();
 
     public BedwarsListener(BedwarsManager bedwarsManager) {
         this.bedwarsManager = bedwarsManager;
@@ -398,6 +402,9 @@ public class BedwarsListener implements Listener {
             GameSession session = bedwarsManager.getActiveSession();
             Player player = event.getPlayer();
             if (!isOutsideRunningBedwarsGame(player, session)) {
+                return;
+            }
+            if (player.isOp()) {
                 return;
             }
             if (!(clicked.getBlockData() instanceof Openable)) {
@@ -1048,6 +1055,16 @@ public class BedwarsListener implements Listener {
                     event.setCancelled(true);
                     return;
                 }
+                if (garryFamilySummon && event.getCause() == EntityDamageEvent.DamageCause.SONIC_BOOM) {
+                    long now = System.currentTimeMillis();
+                    UUID damagerId = event.getDamager().getUniqueId();
+                    long lastUse = garryShriekCooldowns.getOrDefault(damagerId, 0L);
+                    if (now - lastUse < GARRY_SHRIEK_COOLDOWN_MILLIS) {
+                        event.setCancelled(true);
+                        return;
+                    }
+                    garryShriekCooldowns.put(damagerId, now);
+                }
                 TeamColor ownerTeam = getSummonTeam(event.getDamager());
                 TeamColor victimTeam = session.getTeam(victim.getUniqueId());
                 if (!garryFamilySummon && ownerTeam != null && victimTeam != null && ownerTeam == victimTeam) {
@@ -1199,6 +1216,10 @@ public class BedwarsListener implements Listener {
                     event.setCancelled(true);
                     return;
                 }
+                if (tryRescuePlayerFromVoidWithTotem(player, session)) {
+                    event.setCancelled(true);
+                    return;
+                }
                 event.setDamage(1000.0);
                 session.recordDamage(player.getUniqueId());
                 return;
@@ -1211,6 +1232,12 @@ public class BedwarsListener implements Listener {
             if (participant) {
                 if (session.hasRespawnProtection(player.getUniqueId())) {
                     event.setCancelled(true);
+                    return;
+                }
+                if (event.getCause() == EntityDamageEvent.DamageCause.FALL
+                        && consumeVoidTotemFallProtection(player.getUniqueId())) {
+                    event.setCancelled(true);
+                    player.setFallDistance(0.0f);
                     return;
                 }
                 if (isAllowedParticipantEnvironmentalDamage(event.getCause())) {
@@ -1273,6 +1300,14 @@ public class BedwarsListener implements Listener {
                     || !session.isInArenaWorld(target.getWorld())
                     || target.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
                 event.setCancelled(true);
+                return;
+            }
+            if (isGarryFamilySummon(event.getEntity()) && !session.isCenterRadiusParticipant(target)) {
+                event.setCancelled(true);
+                if (event.getEntity() instanceof Mob mob) {
+                    Player replacement = session.pickRandomCenterRadiusParticipant();
+                    mob.setTarget(replacement);
+                }
                 return;
             }
             TeamColor ownerTeam = getSummonTeam(event.getEntity());
@@ -1498,6 +1533,7 @@ public class BedwarsListener implements Listener {
                 return;
             }
             Player player = event.getEntity();
+            voidTotemFallProtection.remove(player.getUniqueId());
             if (!session.isInArenaWorld(player.getWorld())) {
                 return;
             }
@@ -1546,6 +1582,7 @@ public class BedwarsListener implements Listener {
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null) {
                 Player player = event.getPlayer();
+                voidTotemFallProtection.remove(player.getUniqueId());
                 if (bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
                     bedwarsManager.getPlugin().getServer().getScheduler().runTask(bedwarsManager.getPlugin(),
                             () -> applyOutsideGameBedwarsBuffs(player));
@@ -1553,6 +1590,7 @@ public class BedwarsListener implements Listener {
                 return;
             }
             Player player = event.getPlayer();
+            voidTotemFallProtection.remove(player.getUniqueId());
             if (!session.isInArenaWorld(player.getWorld())) {
                 return;
             }
@@ -1618,6 +1656,13 @@ public class BedwarsListener implements Listener {
             }
             fireballCooldowns.remove(event.getPlayer().getUniqueId());
             flamethrowerCooldowns.remove(event.getPlayer().getUniqueId());
+            voidTotemFallProtection.remove(event.getPlayer().getUniqueId());
+            Player player = event.getPlayer();
+            if (session.isRunning()
+                    && session.isParticipant(player.getUniqueId())
+                    && session.isInArenaWorld(player.getWorld())) {
+                player.getInventory().clear();
+            }
             session.handlePlayerQuit(event.getPlayer().getUniqueId());
             showArmorForPlayer(event.getPlayer(), session);
         });
@@ -3063,6 +3108,7 @@ public class BedwarsListener implements Listener {
         if (nameplate != null) {
             removeNameplate(nameplate);
         }
+        garryShriekCooldowns.remove(entityId);
     }
 
     private void updateSummonName(org.bukkit.entity.Entity entity, int remainingSeconds) {
@@ -3906,6 +3952,68 @@ public class BedwarsListener implements Listener {
         meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE);
         item.setItemMeta(meta);
         return item;
+    }
+
+    private boolean tryRescuePlayerFromVoidWithTotem(Player player, GameSession session) {
+        if (player == null || session == null) {
+            return false;
+        }
+        EquipmentSlot totemHand = findHeldTotemHand(player);
+        if (totemHand == null) {
+            return false;
+        }
+        TeamColor team = session.getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        Location spawn = session.getArena().getSpawn(team);
+        if (spawn == null) {
+            return false;
+        }
+        consumeSingleItem(player, totemHand);
+        Location safeSpawn = spawn.clone().add(0.0, 1.0, 0.0);
+        player.teleport(safeSpawn);
+        player.setFallDistance(0.0f);
+        player.setFireTicks(0);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40 * 20, 1), true);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 5 * 20, 1), true);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 40 * 20, 0), true);
+        player.getWorld().playSound(player.getLocation(), Sound.ITEM_TOTEM_USE, 1.0f, 1.0f);
+        voidTotemFallProtection.put(player.getUniqueId(),
+                System.currentTimeMillis() + VOID_TOTEM_FALL_PROTECTION_MILLIS);
+        session.recordDamage(player.getUniqueId());
+        return true;
+    }
+
+    private EquipmentSlot findHeldTotemHand(Player player) {
+        if (player == null) {
+            return null;
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && offhand.getType() == Material.TOTEM_OF_UNDYING) {
+            return EquipmentSlot.OFF_HAND;
+        }
+        ItemStack mainHand = player.getInventory().getItemInMainHand();
+        if (mainHand != null && mainHand.getType() == Material.TOTEM_OF_UNDYING) {
+            return EquipmentSlot.HAND;
+        }
+        return null;
+    }
+
+    private boolean consumeVoidTotemFallProtection(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
+        Long expiresAt = voidTotemFallProtection.get(playerId);
+        if (expiresAt == null) {
+            return false;
+        }
+        if (System.currentTimeMillis() > expiresAt) {
+            voidTotemFallProtection.remove(playerId);
+            return false;
+        }
+        voidTotemFallProtection.remove(playerId);
+        return true;
     }
 
     private Player resolveAttacker(EntityDamageByEntityEvent event) {

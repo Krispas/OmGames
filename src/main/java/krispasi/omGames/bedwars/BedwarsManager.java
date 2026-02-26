@@ -2,6 +2,7 @@ package krispasi.omGames.bedwars;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -44,6 +45,7 @@ public class BedwarsManager {
     private static final double DEFAULT_GARRY_FAMILY_DAMAGE = 12.0;
     private static final double DEFAULT_GARRY_FAMILY_HEALTH = 200.0;
     private static final double DEFAULT_GARRY_FAMILY_RANGE = 32.0;
+    private static final double DEFAULT_GARRY_FAMILY_SPEED = 0.3;
     private final JavaPlugin plugin;
     private final QuickBuyService quickBuyService;
     private final BedwarsStatsService statsService;
@@ -55,6 +57,7 @@ public class BedwarsManager {
     private double garryFamilyDamage = DEFAULT_GARRY_FAMILY_DAMAGE;
     private double garryFamilyHealth = DEFAULT_GARRY_FAMILY_HEALTH;
     private double garryFamilyRange = DEFAULT_GARRY_FAMILY_RANGE;
+    private double garryFamilySpeed = DEFAULT_GARRY_FAMILY_SPEED;
 
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -95,11 +98,13 @@ public class BedwarsManager {
             garryFamilyDamage = loadGarryFamilyDamage(rotatingFile);
             garryFamilyHealth = loadGarryFamilyHealth(rotatingFile);
             garryFamilyRange = loadGarryFamilyRange(rotatingFile);
+            garryFamilySpeed = loadGarryFamilySpeed(rotatingFile);
         } else {
             shopConfig = baseConfig;
             garryFamilyDamage = DEFAULT_GARRY_FAMILY_DAMAGE;
             garryFamilyHealth = DEFAULT_GARRY_FAMILY_HEALTH;
             garryFamilyRange = DEFAULT_GARRY_FAMILY_RANGE;
+            garryFamilySpeed = DEFAULT_GARRY_FAMILY_SPEED;
         }
         plugin.getLogger().info("Loaded BedWars shop config.");
     }
@@ -166,6 +171,10 @@ public class BedwarsManager {
 
     public double getGarryFamilyRange() {
         return garryFamilyRange;
+    }
+
+    public double getGarryFamilySpeed() {
+        return garryFamilySpeed;
     }
 
     public boolean isBedwarsWorld(String worldName) {
@@ -700,6 +709,31 @@ public class BedwarsManager {
             config.set("settings.garry-family-range", DEFAULT_GARRY_FAMILY_RANGE);
             changed = true;
         }
+        if (!config.isSet("settings.garry-family-speed")) {
+            config.set("settings.garry-family-speed", DEFAULT_GARRY_FAMILY_SPEED);
+            changed = true;
+        }
+        if (ensureShopItem(config, "totem_of_undying", "rotating", "TOTEM_OF_UNDYING", 1,
+                "EMERALD", 2, "UTILITY", "Totem of Undying")) {
+            changed = true;
+        }
+        changed |= ensureShopEntry(config, "rotating", "totem_of_undying", 17);
+        org.bukkit.configuration.ConfigurationSection totem =
+                findItemSection(config, "totem_of_undying", "rotating");
+        if (totem != null) {
+            if (!totem.isSet("lore")) {
+                totem.set("lore", List.of("Saves you from death.", "Also rescues from the void."));
+                changed = true;
+            }
+            if (!totem.isSet("limit.scope")) {
+                totem.set("limit.scope", "PLAYER");
+                changed = true;
+            }
+            if (!totem.isSet("limit.amount")) {
+                totem.set("limit.amount", 2);
+                changed = true;
+            }
+        }
         if (!changed) {
             return;
         }
@@ -745,6 +779,19 @@ public class BedwarsManager {
         double configured = config.getDouble("settings.garry-family-range", DEFAULT_GARRY_FAMILY_RANGE);
         if (configured <= 0.0) {
             return DEFAULT_GARRY_FAMILY_RANGE;
+        }
+        return configured;
+    }
+
+    private double loadGarryFamilySpeed(File rotatingFile) {
+        if (rotatingFile == null || !rotatingFile.exists()) {
+            return DEFAULT_GARRY_FAMILY_SPEED;
+        }
+        org.bukkit.configuration.file.YamlConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(rotatingFile);
+        double configured = config.getDouble("settings.garry-family-speed", DEFAULT_GARRY_FAMILY_SPEED);
+        if (configured <= 0.0) {
+            return DEFAULT_GARRY_FAMILY_SPEED;
         }
         return configured;
     }
