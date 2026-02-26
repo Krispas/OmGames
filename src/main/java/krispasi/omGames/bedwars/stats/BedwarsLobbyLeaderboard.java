@@ -33,7 +33,7 @@ public class BedwarsLobbyLeaderboard {
     private static final long CHECK_INTERVAL_TICKS = 20L;
     private static final long REFRESH_INTERVAL_MILLIS = 15_000L;
     private static final double NEAR_RADIUS_BLOCKS = 24.0;
-    private static final double ANCHOR_X = -2.0;
+    private static final double ANCHOR_X = 4.0;
     private static final double ANCHOR_Y = 73.0;
     private static final double ANCHOR_Z = 1.0;
     private static final double DEPTH_OFFSET_X = -1.25;
