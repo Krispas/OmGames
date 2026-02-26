@@ -30,6 +30,7 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.Container;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Openable;
 import org.bukkit.Particle;
 import org.bukkit.Particle.DustOptions;
 import org.bukkit.entity.Egg;
@@ -380,6 +381,31 @@ public class BedwarsListener implements Listener {
                 return;
             }
             session.openFakeEnderChest(player);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onLobbyOpenableInteract(PlayerInteractEvent event) {
+        safeHandle("onLobbyOpenableInteract", () -> {
+            if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+                return;
+            }
+            Block clicked = event.getClickedBlock();
+            if (clicked == null) {
+                return;
+            }
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isLobby()) {
+                return;
+            }
+            Player player = event.getPlayer();
+            if (!session.isInArenaWorld(player.getWorld())) {
+                return;
+            }
+            if (!(clicked.getBlockData() instanceof Openable)) {
+                return;
+            }
+            event.setCancelled(true);
         });
     }
 
