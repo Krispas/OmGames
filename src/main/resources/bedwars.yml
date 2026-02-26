@@ -83,6 +83,7 @@ arenas:
       game-end: 2120
     world: bedwars
     center: 952 68 1488
+    center-radius: 51
     game-lobby: 0 73 -1
     map-lobby: 952 120 1488
     corner_1: 787 22 1324
@@ -153,6 +154,7 @@ arenas:
   slumber:
     world: bedwars
     center: -1000 51 -1000
+    center-radius: 34
     corner_1: -908 34 -897
     corner_2: -1099 99 -1108
     base-radius: 21

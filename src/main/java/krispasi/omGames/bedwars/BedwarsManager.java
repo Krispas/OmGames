@@ -40,6 +40,10 @@ import krispasi.omGames.bedwars.shop.ShopCategoryType;
  * @see krispasi.omGames.bedwars.game.GameSession
  */
 public class BedwarsManager {
+    private static final int DEFAULT_CENTER_RADIUS = 32;
+    private static final double DEFAULT_GARRY_FAMILY_DAMAGE = 12.0;
+    private static final double DEFAULT_GARRY_FAMILY_HEALTH = 200.0;
+    private static final double DEFAULT_GARRY_FAMILY_RANGE = 32.0;
     private final JavaPlugin plugin;
     private final QuickBuyService quickBuyService;
     private final BedwarsStatsService statsService;
@@ -48,6 +52,9 @@ public class BedwarsManager {
     private GameSession activeSession;
     private ShopConfig shopConfig = ShopConfig.empty();
     private CustomItemConfig customItemConfig = CustomItemConfig.empty();
+    private double garryFamilyDamage = DEFAULT_GARRY_FAMILY_DAMAGE;
+    private double garryFamilyHealth = DEFAULT_GARRY_FAMILY_HEALTH;
+    private double garryFamilyRange = DEFAULT_GARRY_FAMILY_RANGE;
 
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -70,6 +77,7 @@ public class BedwarsManager {
 
     public void loadArenas() {
         File configFile = getBedwarsConfigFile("bedwars.yml");
+        migrateBedwarsConfig(configFile);
         BedwarsConfigLoader loader = new BedwarsConfigLoader(configFile, plugin.getLogger());
         arenas = loader.load();
         plugin.getLogger().info("Loaded " + arenas.size() + " BedWars arenas.");
@@ -81,10 +89,17 @@ public class BedwarsManager {
         ShopConfig baseConfig = new ShopConfigLoader(configFile, plugin.getLogger()).load();
         File rotatingFile = getBedwarsConfigFile("rotating-items.yml");
         if (rotatingFile.exists()) {
+            migrateRotatingItemsConfig(rotatingFile);
             ShopConfig rotatingConfig = new ShopConfigLoader(rotatingFile, plugin.getLogger()).load();
             shopConfig = ShopConfig.merge(baseConfig, rotatingConfig);
+            garryFamilyDamage = loadGarryFamilyDamage(rotatingFile);
+            garryFamilyHealth = loadGarryFamilyHealth(rotatingFile);
+            garryFamilyRange = loadGarryFamilyRange(rotatingFile);
         } else {
             shopConfig = baseConfig;
+            garryFamilyDamage = DEFAULT_GARRY_FAMILY_DAMAGE;
+            garryFamilyHealth = DEFAULT_GARRY_FAMILY_HEALTH;
+            garryFamilyRange = DEFAULT_GARRY_FAMILY_RANGE;
         }
         plugin.getLogger().info("Loaded BedWars shop config.");
     }
@@ -141,6 +156,18 @@ public class BedwarsManager {
         return statsService;
     }
 
+    public double getGarryFamilyDamage() {
+        return garryFamilyDamage;
+    }
+
+    public double getGarryFamilyHealth() {
+        return garryFamilyHealth;
+    }
+
+    public double getGarryFamilyRange() {
+        return garryFamilyRange;
+    }
+
     public boolean isBedwarsWorld(String worldName) {
         for (Arena arena : arenas.values()) {
             if (arena.getWorldName().equalsIgnoreCase(worldName)) {
@@ -195,8 +222,8 @@ public class BedwarsManager {
     }
 
     public void startSession(Player initiator, GameSession session) {
-        if (session.getAssignedCount() == 0) {
-            initiator.sendMessage(Component.text("Assign at least one player to a team.", NamedTextColor.RED));
+        if (session.getAssignedCount() == 0 && !session.isTeamPickEnabled()) {
+            initiator.sendMessage(Component.text("Assign at least one player to a team or enable Team Pick.", NamedTextColor.RED));
             return;
         }
 
@@ -216,8 +243,8 @@ public class BedwarsManager {
     }
 
     public void startLobby(Player initiator, GameSession session, int lobbySeconds) {
-        if (session.getAssignedCount() == 0) {
-            initiator.sendMessage(Component.text("Assign at least one player to a team.", NamedTextColor.RED));
+        if (session.getAssignedCount() == 0 && !session.isTeamPickEnabled()) {
+            initiator.sendMessage(Component.text("Assign at least one player to a team or enable Team Pick.", NamedTextColor.RED));
             return;
         }
 
@@ -613,6 +640,37 @@ public class BedwarsManager {
         }
     }
 
+    private void migrateBedwarsConfig(File configFile) {
+        if (!configFile.exists()) {
+            return;
+        }
+        org.bukkit.configuration.file.YamlConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
+        org.bukkit.configuration.ConfigurationSection arenasSection = config.getConfigurationSection("arenas");
+        if (arenasSection == null) {
+            return;
+        }
+        boolean changed = false;
+        for (String arenaId : arenasSection.getKeys(false)) {
+            org.bukkit.configuration.ConfigurationSection arena = arenasSection.getConfigurationSection(arenaId);
+            if (arena == null) {
+                continue;
+            }
+            if (!arena.isSet("center-radius")) {
+                arena.set("center-radius", DEFAULT_CENTER_RADIUS);
+                changed = true;
+            }
+        }
+        if (!changed) {
+            return;
+        }
+        try {
+            config.save(configFile);
+        } catch (java.io.IOException ex) {
+            plugin.getLogger().warning("Failed to update bedwars.yml: " + ex.getMessage());
+        }
+    }
+
     private boolean ensureCustomItemValue(org.bukkit.configuration.ConfigurationSection section,
                                           String key,
                                           Object value) {
@@ -621,5 +679,73 @@ public class BedwarsManager {
         }
         section.set(key, value);
         return true;
+    }
+
+    private void migrateRotatingItemsConfig(File configFile) {
+        if (!configFile.exists()) {
+            return;
+        }
+        org.bukkit.configuration.file.YamlConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
+        boolean changed = false;
+        if (!config.isSet("settings.garry-family-damage")) {
+            config.set("settings.garry-family-damage", DEFAULT_GARRY_FAMILY_DAMAGE);
+            changed = true;
+        }
+        if (!config.isSet("settings.garry-family-health")) {
+            config.set("settings.garry-family-health", DEFAULT_GARRY_FAMILY_HEALTH);
+            changed = true;
+        }
+        if (!config.isSet("settings.garry-family-range")) {
+            config.set("settings.garry-family-range", DEFAULT_GARRY_FAMILY_RANGE);
+            changed = true;
+        }
+        if (!changed) {
+            return;
+        }
+        try {
+            config.save(configFile);
+        } catch (java.io.IOException ex) {
+            plugin.getLogger().warning("Failed to update rotating-items.yml: " + ex.getMessage());
+        }
+    }
+
+    private double loadGarryFamilyDamage(File rotatingFile) {
+        if (rotatingFile == null || !rotatingFile.exists()) {
+            return DEFAULT_GARRY_FAMILY_DAMAGE;
+        }
+        org.bukkit.configuration.file.YamlConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(rotatingFile);
+        double configured = config.getDouble("settings.garry-family-damage", DEFAULT_GARRY_FAMILY_DAMAGE);
+        if (configured < 0.0) {
+            return DEFAULT_GARRY_FAMILY_DAMAGE;
+        }
+        return configured;
+    }
+
+    private double loadGarryFamilyHealth(File rotatingFile) {
+        if (rotatingFile == null || !rotatingFile.exists()) {
+            return DEFAULT_GARRY_FAMILY_HEALTH;
+        }
+        org.bukkit.configuration.file.YamlConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(rotatingFile);
+        double configured = config.getDouble("settings.garry-family-health", DEFAULT_GARRY_FAMILY_HEALTH);
+        if (configured <= 0.0) {
+            return DEFAULT_GARRY_FAMILY_HEALTH;
+        }
+        return configured;
+    }
+
+    private double loadGarryFamilyRange(File rotatingFile) {
+        if (rotatingFile == null || !rotatingFile.exists()) {
+            return DEFAULT_GARRY_FAMILY_RANGE;
+        }
+        org.bukkit.configuration.file.YamlConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(rotatingFile);
+        double configured = config.getDouble("settings.garry-family-range", DEFAULT_GARRY_FAMILY_RANGE);
+        if (configured <= 0.0) {
+            return DEFAULT_GARRY_FAMILY_RANGE;
+        }
+        return configured;
     }
 }

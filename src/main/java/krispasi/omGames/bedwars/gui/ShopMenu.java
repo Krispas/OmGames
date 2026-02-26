@@ -269,8 +269,6 @@ public class ShopMenu implements InventoryHolder {
                 replacement = getNextToolItemId(ShopItemBehavior.PICKAXE, session.getPickaxeTier(viewerId));
             } else if (behavior == ShopItemBehavior.AXE) {
                 replacement = getNextToolItemId(ShopItemBehavior.AXE, session.getAxeTier(viewerId));
-            } else if (behavior == ShopItemBehavior.ARMOR) {
-                replacement = getNextToolItemId(ShopItemBehavior.ARMOR, session.getArmorTier(viewerId));
             }
             if (replacement != null) {
                 entry.setValue(replacement);

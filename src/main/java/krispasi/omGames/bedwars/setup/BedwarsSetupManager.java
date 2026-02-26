@@ -35,6 +35,7 @@ public class BedwarsSetupManager {
     private static final String ARENAS_PATH = "arenas";
     private static final String KEY_WORLD = "world";
     private static final String KEY_CENTER = "center";
+    private static final String KEY_CENTER_RADIUS = "center-radius";
     private static final String KEY_GAME_LOBBY = "game-lobby";
     private static final String KEY_MAP_LOBBY = "map-lobby";
     private static final String KEY_CORNER_1 = "corner_1";
@@ -69,6 +70,8 @@ public class BedwarsSetupManager {
         player.sendMessage(Component.text("Setup for " + arenaId + ":", NamedTextColor.GOLD));
         sendStatusLine(player, "world", arena.getString(KEY_WORLD));
         sendStatusLine(player, "center", arena.getString(KEY_CENTER));
+        sendStatusLine(player, KEY_CENTER_RADIUS, arena.contains(KEY_CENTER_RADIUS)
+                ? String.valueOf(arena.getInt(KEY_CENTER_RADIUS)) : null);
         sendStatusLine(player, KEY_CORNER_1, arena.getString(KEY_CORNER_1));
         sendStatusLine(player, KEY_CORNER_2, arena.getString(KEY_CORNER_2));
         sendStatusLine(player, KEY_BASE_RADIUS, arena.contains(KEY_BASE_RADIUS)
@@ -145,6 +148,7 @@ public class BedwarsSetupManager {
         Location location = player.getLocation();
         arena.set(KEY_WORLD, location.getWorld().getName());
         arena.set(KEY_CENTER, formatPoint(location));
+        arena.set(KEY_CENTER_RADIUS, 32);
         arena.set(KEY_CORNER_1, "");
         arena.set(KEY_CORNER_2, "");
         arena.set(KEY_BASE_RADIUS, 0);
@@ -240,6 +244,11 @@ public class BedwarsSetupManager {
         switch (target.kind()) {
             case WORLD -> arena.set(KEY_WORLD, location.getWorld().getName());
             case CENTER -> arena.set(KEY_CENTER, formatPoint(location));
+            case CENTER_RADIUS -> {
+                if (!applyNumeric(arena, KEY_CENTER_RADIUS, numericValue, player)) {
+                    return;
+                }
+            }
             case CORNER -> setCorner(arena, target.cornerIndex(), location);
             case BASE_RADIUS -> {
                 if (!applyNumeric(arena, KEY_BASE_RADIUS, numericValue, player)) {
@@ -274,6 +283,7 @@ public class BedwarsSetupManager {
         List<String> keys = new ArrayList<>();
         keys.add("world");
         keys.add("center");
+        keys.add(KEY_CENTER_RADIUS);
         keys.add(KEY_CORNER_1);
         keys.add(KEY_CORNER_2);
         keys.add(KEY_BASE_RADIUS);
@@ -603,6 +613,7 @@ public class BedwarsSetupManager {
     private enum SetupKind {
         WORLD,
         CENTER,
+        CENTER_RADIUS,
         CORNER,
         BASE_RADIUS,
         ANTI_BUILD_BASE,
@@ -636,6 +647,11 @@ public class BedwarsSetupManager {
             }
             if (normalized.equals(KEY_CENTER)) {
                 return Optional.of(new SetupTarget(SetupKind.CENTER, null, null, null, null, null, "center"));
+            }
+            if (normalized.equals("center.radius")
+                    || normalized.equals("centerradius")
+                    || normalized.equals(KEY_CENTER_RADIUS.replace('-', '.'))) {
+                return Optional.of(new SetupTarget(SetupKind.CENTER_RADIUS, null, null, null, null, null, KEY_CENTER_RADIUS));
             }
             if (normalized.equals("corner.1") || normalized.equals("corner1") || normalized.equals("corner_1")) {
                 return Optional.of(new SetupTarget(SetupKind.CORNER, null, null, null, null, 1, KEY_CORNER_1));

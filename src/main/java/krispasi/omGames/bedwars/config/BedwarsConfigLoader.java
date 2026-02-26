@@ -31,6 +31,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
  * @see krispasi.omGames.bedwars.model.Arena
  */
 public class BedwarsConfigLoader {
+    private static final int DEFAULT_CENTER_RADIUS = 32;
     private final File file;
     private final Logger logger;
 
@@ -66,6 +67,7 @@ public class BedwarsConfigLoader {
             }
 
             BlockPoint center = parsePoint(arenaSection.getString("center"), "center", arenaId);
+            int centerRadius = arenaSection.getInt("center-radius", DEFAULT_CENTER_RADIUS);
             BlockPoint corner1 = parseOptionalPoint(arenaSection.getString("corner_1"));
             BlockPoint corner2 = parseOptionalPoint(arenaSection.getString("corner_2"));
             BlockPoint gameLobby = parseOptionalPoint(arenaSection.getString("game-lobby"));
@@ -231,6 +233,7 @@ public class BedwarsConfigLoader {
                     arenaId,
                     worldName,
                     center,
+                    centerRadius,
                     gameLobby,
                     mapLobby,
                     baseRadius,

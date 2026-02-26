@@ -114,6 +114,10 @@ public class UpgradeShopMenu implements InventoryHolder {
     }
 
     private void setUpgrade(int slot, TeamUpgradeType type) {
+        if (!session.isRotatingUpgradeAvailable(type)) {
+            inventory.setItem(slot, new ItemStack(Material.AIR));
+            return;
+        }
         inventory.setItem(slot, buildUpgradeItem(type));
         upgradeSlots.put(slot, type);
     }

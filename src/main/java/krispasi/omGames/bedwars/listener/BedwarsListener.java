@@ -106,6 +106,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 import org.bukkit.Sound;
+import org.bukkit.potion.PotionEffect;
 import java.lang.reflect.Method;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.EnumSet;
@@ -395,11 +396,8 @@ public class BedwarsListener implements Listener {
                 return;
             }
             GameSession session = bedwarsManager.getActiveSession();
-            if (session == null || !session.isLobby()) {
-                return;
-            }
             Player player = event.getPlayer();
-            if (!session.isInArenaWorld(player.getWorld())) {
+            if (!isOutsideRunningBedwarsGame(player, session)) {
                 return;
             }
             if (!(clicked.getBlockData() instanceof Openable)) {
@@ -783,19 +781,15 @@ public class BedwarsListener implements Listener {
                 return;
             }
             GameSession session = bedwarsManager.getActiveSession();
+            if (isOutsideRunningBedwarsGame(player, session)) {
+                event.setCancelled(true);
+                applyOutsideGameBedwarsBuffs(player);
+                return;
+            }
             if (session == null || !session.isActive()) {
                 return;
             }
-            if (!session.isInArenaWorld(player.getWorld())) {
-                return;
-            }
-            if (session.isLobby()) {
-                event.setCancelled(true);
-                player.setFoodLevel(20);
-                player.setSaturation(20.0f);
-                return;
-            }
-            if (!session.isParticipant(player.getUniqueId())) {
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
                 return;
             }
             event.setCancelled(true);
@@ -822,11 +816,14 @@ public class BedwarsListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPlayerMove(PlayerMoveEvent event) {
         safeHandle("onPlayerMove", () -> {
+            Player player = event.getPlayer();
             GameSession session = bedwarsManager.getActiveSession();
+            if (isOutsideRunningBedwarsGame(player, session)) {
+                applyOutsideGameBedwarsBuffs(player);
+            }
             if (session == null || !session.isStarting()) {
                 return;
             }
-            Player player = event.getPlayer();
             if (!session.isParticipant(player.getUniqueId()) || !session.isFrozen(player.getUniqueId())) {
                 return;
             }
@@ -1034,6 +1031,9 @@ public class BedwarsListener implements Listener {
                         event.setCancelled(true);
                     }
                 }
+                if (!event.isCancelled() && isGarryFamilySummon(event.getEntity())) {
+                    scheduleGarryHealthNameRefresh(session, event.getEntity());
+                }
                 return;
             }
             if (!session.isInArenaWorld(victim.getWorld())) {
@@ -1042,6 +1042,7 @@ public class BedwarsListener implements Listener {
             Vector victimVelocityBeforeHit = victim.getVelocity().clone();
             boolean suppressKnockback = false;
             if (isSummon(event.getDamager())) {
+                boolean garryFamilySummon = isGarryFamilySummon(event.getDamager());
                 if (!session.isParticipant(victim.getUniqueId())
                         || victim.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
                     event.setCancelled(true);
@@ -1049,12 +1050,14 @@ public class BedwarsListener implements Listener {
                 }
                 TeamColor ownerTeam = getSummonTeam(event.getDamager());
                 TeamColor victimTeam = session.getTeam(victim.getUniqueId());
-                if (ownerTeam != null && victimTeam != null && ownerTeam == victimTeam) {
+                if (!garryFamilySummon && ownerTeam != null && victimTeam != null && ownerTeam == victimTeam) {
                     event.setCancelled(true);
                     return;
                 }
                 CustomItemDefinition summon = getSummonDefinition(event.getDamager());
-                if (summon != null && summon.getDamage() > 0.0) {
+                if (garryFamilySummon) {
+                    event.setDamage(Math.max(0.0, bedwarsManager.getGarryFamilyDamage()));
+                } else if (summon != null && summon.getDamage() > 0.0) {
                     event.setDamage(summon.getDamage());
                 }
                 suppressKnockback = isHappyGhastSummon(summon, event.getDamager());
@@ -1165,10 +1168,19 @@ public class BedwarsListener implements Listener {
             if (event instanceof EntityDamageByEntityEvent) {
                 return;
             }
+            GameSession session = bedwarsManager.getActiveSession();
             if (!(event.getEntity() instanceof Player player)) {
+                if (session == null || !session.isRunning()) {
+                    return;
+                }
+                if (!session.isInArenaWorld(event.getEntity().getWorld())) {
+                    return;
+                }
+                if (!event.isCancelled() && isGarryFamilySummon(event.getEntity())) {
+                    scheduleGarryHealthNameRefresh(session, event.getEntity());
+                }
                 return;
             }
-            GameSession session = bedwarsManager.getActiveSession();
             if (session == null) {
                 if (bedwarsManager.isBedwarsWorld(player.getWorld().getName())
                         && event.getCause() != EntityDamageEvent.DamageCause.VOID) {
@@ -1197,7 +1209,11 @@ public class BedwarsListener implements Listener {
             }
             boolean participant = session.isParticipant(player.getUniqueId());
             if (participant) {
-                if (event.getCause() == EntityDamageEvent.DamageCause.WORLD_BORDER) {
+                if (session.hasRespawnProtection(player.getUniqueId())) {
+                    event.setCancelled(true);
+                    return;
+                }
+                if (isAllowedParticipantEnvironmentalDamage(event.getCause())) {
                     session.recordDamage(player.getUniqueId());
                     return;
                 }
@@ -1213,10 +1229,19 @@ public class BedwarsListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onEntityRegainHealth(EntityRegainHealthEvent event) {
         safeHandle("onEntityRegainHealth", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
             if (!(event.getEntity() instanceof Player player)) {
+                if (session == null || !session.isRunning()) {
+                    return;
+                }
+                if (!session.isInArenaWorld(event.getEntity().getWorld())) {
+                    return;
+                }
+                if (isGarryFamilySummon(event.getEntity())) {
+                    scheduleGarryHealthNameRefresh(session, event.getEntity());
+                }
                 return;
             }
-            GameSession session = bedwarsManager.getActiveSession();
             if (session == null || !session.isRunning()) {
                 return;
             }
@@ -1252,7 +1277,10 @@ public class BedwarsListener implements Listener {
             }
             TeamColor ownerTeam = getSummonTeam(event.getEntity());
             TeamColor targetTeam = session.getTeam(target.getUniqueId());
-            if (ownerTeam != null && targetTeam != null && ownerTeam == targetTeam) {
+            if (!isGarryFamilySummon(event.getEntity())
+                    && ownerTeam != null
+                    && targetTeam != null
+                    && ownerTeam == targetTeam) {
                 event.setCancelled(true);
             }
         });
@@ -1517,6 +1545,11 @@ public class BedwarsListener implements Listener {
         safeHandle("onPlayerRespawn", () -> {
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null) {
+                Player player = event.getPlayer();
+                if (bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
+                    bedwarsManager.getPlugin().getServer().getScheduler().runTask(bedwarsManager.getPlugin(),
+                            () -> applyOutsideGameBedwarsBuffs(player));
+                }
                 return;
             }
             Player player = event.getPlayer();
@@ -1532,6 +1565,10 @@ public class BedwarsListener implements Listener {
             }
             session.handleRespawn(player);
             refreshInvisibility(player, session);
+            if (isOutsideRunningBedwarsGame(player, session)) {
+                bedwarsManager.getPlugin().getServer().getScheduler().runTask(bedwarsManager.getPlugin(),
+                        () -> applyOutsideGameBedwarsBuffs(player));
+            }
         });
     }
 
@@ -1539,12 +1576,15 @@ public class BedwarsListener implements Listener {
     public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
         safeHandle("onPlayerChangedWorld", () -> {
             GameSession session = bedwarsManager.getActiveSession();
-            if (session == null) {
-                return;
+            Player player = event.getPlayer();
+            if (session != null) {
+                session.handleWorldChange(player);
+                refreshInvisibility(player, session);
+                syncInvisibilityForViewer(player, session);
             }
-            session.handleWorldChange(event.getPlayer());
-            refreshInvisibility(event.getPlayer(), session);
-            syncInvisibilityForViewer(event.getPlayer(), session);
+            if (isOutsideRunningBedwarsGame(player, session)) {
+                applyOutsideGameBedwarsBuffs(player);
+            }
         });
     }
 
@@ -1552,12 +1592,15 @@ public class BedwarsListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         safeHandle("onPlayerJoin", () -> {
             GameSession session = bedwarsManager.getActiveSession();
-            if (session == null) {
-                return;
+            Player player = event.getPlayer();
+            if (session != null) {
+                session.handlePlayerJoin(player);
+                refreshInvisibility(player, session);
+                syncInvisibilityForViewer(player, session);
             }
-            session.handlePlayerJoin(event.getPlayer());
-            refreshInvisibility(event.getPlayer(), session);
-            syncInvisibilityForViewer(event.getPlayer(), session);
+            if (isOutsideRunningBedwarsGame(player, session)) {
+                applyOutsideGameBedwarsBuffs(player);
+            }
         });
     }
 
@@ -3289,6 +3332,40 @@ public class BedwarsListener implements Listener {
         return null;
     }
 
+    private boolean isGarryFamilySummon(org.bukkit.entity.Entity entity) {
+        return entity != null
+                && (entity.getScoreboardTags().contains(GameSession.GARRY_TAG)
+                || entity.getScoreboardTags().contains(GameSession.GARRY_WIFE_TAG)
+                || entity.getScoreboardTags().contains(GameSession.GARRY_JR_TAG));
+    }
+
+    private void scheduleGarryHealthNameRefresh(GameSession session, org.bukkit.entity.Entity entity) {
+        if (session == null || entity == null) {
+            return;
+        }
+        UUID entityId = entity.getUniqueId();
+        Bukkit.getScheduler().runTask(bedwarsManager.getPlugin(), () -> {
+            org.bukkit.entity.Entity live = Bukkit.getEntity(entityId);
+            if (live == null || !live.isValid() || live.isDead()) {
+                return;
+            }
+            session.updateGarryFamilyHealthDisplay(live);
+        });
+    }
+
+    private boolean isAllowedParticipantEnvironmentalDamage(EntityDamageEvent.DamageCause cause) {
+        if (cause == null) {
+            return false;
+        }
+        return cause == EntityDamageEvent.DamageCause.WORLD_BORDER
+                || cause == EntityDamageEvent.DamageCause.FALL
+                || cause == EntityDamageEvent.DamageCause.FIRE
+                || cause == EntityDamageEvent.DamageCause.FIRE_TICK
+                || cause == EntityDamageEvent.DamageCause.LAVA
+                || cause == EntityDamageEvent.DamageCause.HOT_FLOOR
+                || cause == EntityDamageEvent.DamageCause.CAMPFIRE;
+    }
+
     private void applySummonStats(LivingEntity entity, CustomItemDefinition custom) {
         if (entity == null || custom == null) {
             return;
@@ -3463,11 +3540,6 @@ public class BedwarsListener implements Listener {
         if (!session.isInArenaWorld(viewer.getWorld())) {
             return;
         }
-        Map<EquipmentSlot, ItemStack> hidden = new EnumMap<>(EquipmentSlot.class);
-        hidden.put(EquipmentSlot.HEAD, new ItemStack(Material.AIR));
-        hidden.put(EquipmentSlot.CHEST, new ItemStack(Material.AIR));
-        hidden.put(EquipmentSlot.LEGS, new ItemStack(Material.AIR));
-        hidden.put(EquipmentSlot.FEET, new ItemStack(Material.AIR));
         for (UUID targetId : session.getAssignments().keySet()) {
             Player target = Bukkit.getPlayer(targetId);
             if (target == null || target.equals(viewer)) {
@@ -3477,36 +3549,48 @@ public class BedwarsListener implements Listener {
                 continue;
             }
             if (target.hasPotionEffect(PotionEffectType.INVISIBILITY)) {
-                viewer.sendEquipmentChange(target, hidden);
+                viewer.sendEquipmentChange(target, buildInvisibleEquipment(target));
             } else {
-                ItemStack[] armor = target.getInventory().getArmorContents();
-                Map<EquipmentSlot, ItemStack> visible = new EnumMap<>(EquipmentSlot.class);
-                visible.put(EquipmentSlot.FEET, cloneOrAir(armor, 0));
-                visible.put(EquipmentSlot.LEGS, cloneOrAir(armor, 1));
-                visible.put(EquipmentSlot.CHEST, cloneOrAir(armor, 2));
-                visible.put(EquipmentSlot.HEAD, cloneOrAir(armor, 3));
-                viewer.sendEquipmentChange(target, visible);
+                viewer.sendEquipmentChange(target, buildVisibleEquipment(target));
             }
         }
     }
 
     private void hideArmorForPlayer(Player target, GameSession session) {
+        sendArmorUpdate(target, session, buildInvisibleEquipment(target));
+    }
+
+    private void showArmorForPlayer(Player target, GameSession session) {
+        sendArmorUpdate(target, session, buildVisibleEquipment(target));
+    }
+
+    private Map<EquipmentSlot, ItemStack> buildInvisibleEquipment(Player target) {
         Map<EquipmentSlot, ItemStack> hidden = new EnumMap<>(EquipmentSlot.class);
         hidden.put(EquipmentSlot.HEAD, new ItemStack(Material.AIR));
         hidden.put(EquipmentSlot.CHEST, new ItemStack(Material.AIR));
         hidden.put(EquipmentSlot.LEGS, new ItemStack(Material.AIR));
         hidden.put(EquipmentSlot.FEET, new ItemStack(Material.AIR));
-        sendArmorUpdate(target, session, hidden);
+        ItemStack mainHand = target.getInventory().getItemInMainHand();
+        if (mainHand != null && mainHand.getType() == Material.SHIELD) {
+            hidden.put(EquipmentSlot.HAND, new ItemStack(Material.AIR));
+        }
+        ItemStack offHand = target.getInventory().getItemInOffHand();
+        if (offHand != null && offHand.getType() == Material.SHIELD) {
+            hidden.put(EquipmentSlot.OFF_HAND, new ItemStack(Material.AIR));
+        }
+        return hidden;
     }
 
-    private void showArmorForPlayer(Player target, GameSession session) {
+    private Map<EquipmentSlot, ItemStack> buildVisibleEquipment(Player target) {
         ItemStack[] armor = target.getInventory().getArmorContents();
         Map<EquipmentSlot, ItemStack> visible = new EnumMap<>(EquipmentSlot.class);
         visible.put(EquipmentSlot.FEET, cloneOrAir(armor, 0));
         visible.put(EquipmentSlot.LEGS, cloneOrAir(armor, 1));
         visible.put(EquipmentSlot.CHEST, cloneOrAir(armor, 2));
         visible.put(EquipmentSlot.HEAD, cloneOrAir(armor, 3));
-        sendArmorUpdate(target, session, visible);
+        visible.put(EquipmentSlot.HAND, cloneOrAir(target.getInventory().getItemInMainHand()));
+        visible.put(EquipmentSlot.OFF_HAND, cloneOrAir(target.getInventory().getItemInOffHand()));
+        return visible;
     }
 
     private ItemStack cloneOrAir(ItemStack[] armor, int index) {
@@ -3514,6 +3598,10 @@ public class BedwarsListener implements Listener {
             return new ItemStack(Material.AIR);
         }
         ItemStack item = armor[index];
+        return cloneOrAir(item);
+    }
+
+    private ItemStack cloneOrAir(ItemStack item) {
         if (item == null || item.getType() == Material.AIR) {
             return new ItemStack(Material.AIR);
         }
@@ -3771,6 +3859,39 @@ public class BedwarsListener implements Listener {
         if (isProtectedItem(offhand)) {
             player.getInventory().setItemInOffHand(makeUnbreakable(offhand));
         }
+    }
+
+    private boolean isOutsideRunningBedwarsGame(Player player, GameSession session) {
+        if (player == null || !bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
+            return false;
+        }
+        if (session == null) {
+            return true;
+        }
+        if (!session.isInArenaWorld(player.getWorld())) {
+            return true;
+        }
+        return !session.isRunning() || !session.isParticipant(player.getUniqueId());
+    }
+
+    private void applyOutsideGameBedwarsBuffs(Player player) {
+        if (player == null || !bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
+            return;
+        }
+        if (player.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
+            return;
+        }
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
+        player.setExhaustion(0.0f);
+        player.addPotionEffect(new PotionEffect(
+                PotionEffectType.REGENERATION,
+                60,
+                0,
+                false,
+                false,
+                false
+        ), true);
     }
 
     private ItemStack makeUnbreakable(ItemStack item) {

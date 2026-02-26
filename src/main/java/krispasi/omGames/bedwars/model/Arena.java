@@ -23,6 +23,7 @@ public class Arena {
     private final String id;
     private final String worldName;
     private final BlockPoint center;
+    private final int centerRadius;
     private final BlockPoint gameLobby;
     private final BlockPoint mapLobby;
     private final int baseRadius;
@@ -41,6 +42,7 @@ public class Arena {
     public Arena(String id,
                  String worldName,
                  BlockPoint center,
+                 int centerRadius,
                  BlockPoint gameLobby,
                  BlockPoint mapLobby,
                  int baseRadius,
@@ -58,6 +60,7 @@ public class Arena {
         this.id = Objects.requireNonNull(id, "id");
         this.worldName = Objects.requireNonNull(worldName, "worldName");
         this.center = center;
+        this.centerRadius = centerRadius;
         this.gameLobby = gameLobby;
         this.mapLobby = mapLobby;
         this.baseRadius = baseRadius;
@@ -84,6 +87,10 @@ public class Arena {
 
     public BlockPoint getCenter() {
         return center;
+    }
+
+    public int getCenterRadius() {
+        return centerRadius;
     }
 
     public BlockPoint getGameLobby() {

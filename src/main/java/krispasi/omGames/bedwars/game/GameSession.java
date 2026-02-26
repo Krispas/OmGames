@@ -154,6 +154,7 @@ public class GameSession {
     private static final int TRAP_MAX_COUNT = 3;
     private static final int TRAP_BLINDNESS_SECONDS = 8;
     private static final int GARRY_RESPAWN_SECONDS = 10;
+    private static final int DEFAULT_CENTER_RADIUS = 32;
     private static final int TRAP_SLOW_SECONDS = 8;
     private static final int TRAP_COUNTER_SECONDS = 15;
     private static final int TRAP_FATIGUE_SECONDS = 10;
@@ -1032,6 +1033,26 @@ public class GameSession {
         }
     }
 
+    public void updateGarryFamilyHealthDisplay(org.bukkit.entity.Entity entity) {
+        if (!(entity instanceof LivingEntity living)) {
+            return;
+        }
+        String name = resolveGarryFamilyName(entity);
+        if (name == null) {
+            return;
+        }
+        double current = Math.max(0.0, living.getHealth());
+        double max = Math.max(0.0, living.getMaxHealth());
+        Component title = Component.text(name, NamedTextColor.RED)
+                .append(Component.newline())
+                .append(Component.text("Health: ", NamedTextColor.GRAY))
+                .append(Component.text(formatHealthValue(current), NamedTextColor.GREEN))
+                .append(Component.text("/", NamedTextColor.DARK_GRAY))
+                .append(Component.text(formatHealthValue(max), NamedTextColor.GREEN));
+        living.customName(title);
+        living.setCustomNameVisible(true);
+    }
+
     private void scheduleGarryRespawn() {
         if (garryRespawnTask != null) {
             garryRespawnTask.cancel();
@@ -1077,8 +1098,7 @@ public class GameSession {
             return null;
         }
         Location spawn = center.toLocation(world);
-        int highest = world.getHighestBlockYAt(spawn);
-        spawn.setY(highest + 1);
+        spawn.setY(center.y() + 1.0);
         org.bukkit.entity.Warden warden = world.spawn(spawn, org.bukkit.entity.Warden.class, entity -> {
             entity.setRemoveWhenFarAway(false);
             entity.customName(Component.text(name, NamedTextColor.RED));
@@ -1087,7 +1107,33 @@ public class GameSession {
         });
         CustomItemDefinition custom = bedwarsManager.getCustomItemConfig().getItem(customId);
         applyCustomEntityStats(warden, custom);
+        applyGarryFamilyHealthOverride(warden);
+        applyGarryFamilyRangeOverride(warden);
+        updateGarryFamilyHealthDisplay(warden);
         return warden;
+    }
+
+    private void applyGarryFamilyHealthOverride(org.bukkit.entity.Warden warden) {
+        if (warden == null) {
+            return;
+        }
+        double health = bedwarsManager.getGarryFamilyHealth();
+        if (health <= 0.0) {
+            return;
+        }
+        warden.setMaxHealth(health);
+        warden.setHealth(Math.min(health, warden.getMaxHealth()));
+    }
+
+    private void applyGarryFamilyRangeOverride(org.bukkit.entity.Warden warden) {
+        if (warden == null) {
+            return;
+        }
+        double range = bedwarsManager.getGarryFamilyRange();
+        if (range <= 0.0) {
+            return;
+        }
+        applyAttribute(warden, "GENERIC_FOLLOW_RANGE", range);
     }
 
     private void applyCustomEntityStats(LivingEntity entity, CustomItemDefinition custom) {
@@ -1108,6 +1154,29 @@ public class GameSession {
         if (range > 0.0) {
             applyAttribute(entity, "GENERIC_FOLLOW_RANGE", range);
         }
+    }
+
+    private String resolveGarryFamilyName(org.bukkit.entity.Entity entity) {
+        if (entity == null) {
+            return null;
+        }
+        if (entity.getScoreboardTags().contains(GARRY_TAG)) {
+            return "Garry";
+        }
+        if (entity.getScoreboardTags().contains(GARRY_WIFE_TAG)) {
+            return "Garry's Wife";
+        }
+        if (entity.getScoreboardTags().contains(GARRY_JR_TAG)) {
+            return "Garry Jr.";
+        }
+        return null;
+    }
+
+    private String formatHealthValue(double value) {
+        if (Math.abs(value - Math.rint(value)) < 0.05) {
+            return String.valueOf((int) Math.rint(value));
+        }
+        return String.format(Locale.ROOT, "%.1f", value);
     }
 
     private void applyAttribute(LivingEntity entity, String attributeName, double value) {
@@ -1510,7 +1579,6 @@ public class GameSession {
         }
         if (getBedState(team) == BedState.ALIVE) {
             pendingRespawns.add(player.getUniqueId());
-            respawnGracePlayers.add(player.getUniqueId());
         } else {
             eliminatePlayer(player, team);
         }
@@ -1533,14 +1601,20 @@ public class GameSession {
             }
             return;
         }
-        if (!pendingRespawns.remove(playerId)) {
+        if (!pendingRespawns.contains(playerId)) {
             return;
         }
         setSpectator(player);
         if (lobby != null) {
             player.teleport(lobby);
         }
-        scheduleRespawn(player, team);
+        boolean allowRespawnAfterBedBreak = respawnGracePlayers.contains(playerId);
+        if (getBedState(team) == BedState.DESTROYED && !allowRespawnAfterBedBreak) {
+            pendingRespawns.remove(playerId);
+            eliminatePlayer(player, team);
+            return;
+        }
+        scheduleRespawn(player, team, RESPAWN_DELAY_SECONDS, allowRespawnAfterBedBreak);
     }
 
     public void handleBedDestroyed(TeamColor team, Player breaker) {
@@ -1873,9 +1947,7 @@ public class GameSession {
     }
 
     private void scheduleRespawn(Player player, TeamColor team) {
-        UUID playerId = player.getUniqueId();
-        boolean allowRespawnAfterBedBreak = respawnGracePlayers.contains(playerId);
-        scheduleRespawn(player, team, RESPAWN_DELAY_SECONDS, allowRespawnAfterBedBreak);
+        scheduleRespawn(player, team, RESPAWN_DELAY_SECONDS, false);
     }
 
     private void scheduleRespawn(Player player, TeamColor team, int delaySeconds, boolean allowRespawnAfterBedBreak) {
@@ -1896,6 +1968,7 @@ public class GameSession {
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> safeRun("respawn", () -> {
             if (state != GameState.RUNNING || (getBedState(team) == BedState.DESTROYED && !allowRespawnAfterBedBreak)) {
                 eliminatedPlayers.add(playerId);
+                pendingRespawns.remove(playerId);
                 setSpectator(player);
                 removeRespawnProtection(playerId);
                 cancelRespawnCountdown(playerId);
@@ -1904,6 +1977,7 @@ public class GameSession {
                 checkTeamEliminated(team);
                 return;
             }
+            pendingRespawns.remove(playerId);
             player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
@@ -1924,8 +1998,10 @@ public class GameSession {
     }
 
     private void eliminatePlayer(Player player, TeamColor team) {
-        eliminatedPlayers.add(player.getUniqueId());
-        respawnGracePlayers.remove(player.getUniqueId());
+        UUID playerId = player.getUniqueId();
+        eliminatedPlayers.add(playerId);
+        pendingRespawns.remove(playerId);
+        respawnGracePlayers.remove(playerId);
         setSpectator(player);
         checkTeamEliminated(team);
     }
@@ -2661,6 +2737,7 @@ public class GameSession {
     }
 
     private void setSpectator(Player player) {
+        player.getInventory().clear();
         player.setGameMode(GameMode.SPECTATOR);
         player.setAllowFlight(true);
         player.setFlying(true);
@@ -3286,12 +3363,21 @@ public class GameSession {
             return;
         }
 
-        if (pendingRespawns.remove(playerId)) {
+        if (pendingRespawns.contains(playerId)) {
             setSpectator(player);
             if (lobby != null) {
                 player.teleport(lobby);
             }
-            scheduleRespawn(player, team);
+            boolean allowRespawnAfterBedBreak = respawnGracePlayers.contains(playerId);
+            if (getBedState(team) == BedState.DESTROYED && !allowRespawnAfterBedBreak) {
+                pendingRespawns.remove(playerId);
+                eliminatePlayer(player, team);
+                syncToolTiers(player);
+                hideEditorsFrom(player);
+                updateSidebarForPlayer(player);
+                return;
+            }
+            scheduleRespawn(player, team, RESPAWN_DELAY_SECONDS, allowRespawnAfterBedBreak);
             syncToolTiers(player);
             hideEditorsFrom(player);
             updateSidebarForPlayer(player);
@@ -3689,6 +3775,65 @@ public class GameSession {
                 0L,
                 TRAP_CHECK_INTERVAL_TICKS);
         tasks.add(trapTask);
+        BukkitTask garryRadiusTask = plugin.getServer().getScheduler().runTaskTimer(plugin,
+                () -> safeRun("garryCenterRadius", this::enforceGarryCenterRadius),
+                0L,
+                10L);
+        tasks.add(garryRadiusTask);
+    }
+
+    private void enforceGarryCenterRadius() {
+        if (state != GameState.RUNNING) {
+            return;
+        }
+        World world = arena.getWorld();
+        BlockPoint center = arena.getCenter();
+        if (world == null || center == null) {
+            return;
+        }
+        int configured = arena.getCenterRadius();
+        int radius = configured > 0 ? configured : DEFAULT_CENTER_RADIUS;
+        if (radius <= 0) {
+            return;
+        }
+        double radiusSquared = radius * radius;
+        double centerX = center.x() + 0.5;
+        double centerZ = center.z() + 0.5;
+        Location centerLocation = new Location(world, centerX, center.y() + 1.0, centerZ);
+        for (org.bukkit.entity.Entity entity : world.getEntities()) {
+            if (!(entity instanceof org.bukkit.entity.Warden warden)) {
+                continue;
+            }
+            if (!isGarryFamilyWarden(warden)) {
+                continue;
+            }
+            Location location = warden.getLocation();
+            double dx = location.getX() - centerX;
+            double dz = location.getZ() - centerZ;
+            double distanceSquared = dx * dx + dz * dz;
+            if (distanceSquared <= radiusSquared) {
+                continue;
+            }
+            if (distanceSquared <= 0.0001) {
+                warden.teleport(centerLocation);
+            } else {
+                double distance = Math.sqrt(distanceSquared);
+                double scale = Math.max(0.0, (radius - 0.2) / distance);
+                double clampedX = centerX + dx * scale;
+                double clampedZ = centerZ + dz * scale;
+                Location clamped = new Location(world, clampedX, location.getY(), clampedZ,
+                        location.getYaw(), location.getPitch());
+                warden.teleport(clamped);
+            }
+            warden.setTarget(null);
+        }
+    }
+
+    private boolean isGarryFamilyWarden(org.bukkit.entity.Warden warden) {
+        return warden != null
+                && (warden.getScoreboardTags().contains(GARRY_TAG)
+                || warden.getScoreboardTags().contains(GARRY_WIFE_TAG)
+                || warden.getScoreboardTags().contains(GARRY_JR_TAG));
     }
 
     private void startRegenTask() {

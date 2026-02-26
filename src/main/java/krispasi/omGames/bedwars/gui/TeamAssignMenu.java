@@ -312,7 +312,7 @@ public class TeamAssignMenu implements InventoryHolder {
         return switch (mode) {
             case ONE_RANDOM -> "One Random";
             case MANUAL -> "Manual";
-            default -> "Two Random";
+            default -> "Primary (Auto)";
         };
     }
 
@@ -389,29 +389,21 @@ public class TeamAssignMenu implements InventoryHolder {
         for (Player player : players) {
             session.assignTeam(player.getUniqueId(), null);
         }
-        Collections.shuffle(players);
-        Map<TeamColor, Integer> counts = new EnumMap<>(TeamColor.class);
-        for (TeamColor team : teams) {
-            counts.put(team, 0);
-        }
-        int teamIndex = 0;
+
+        // Build a pool of available team slots, then shuffle for unbiased random assignment.
         int max = session.getMaxTeamSize();
-        for (Player player : players) {
-            boolean assigned = false;
-            for (int tries = 0; tries < teams.size(); tries++) {
-                TeamColor team = teams.get(teamIndex);
-                teamIndex = (teamIndex + 1) % teams.size();
-                int current = counts.getOrDefault(team, 0);
-                if (current < max) {
-                    session.assignTeam(player.getUniqueId(), team);
-                    counts.put(team, current + 1);
-                    assigned = true;
-                    break;
-                }
+        List<TeamColor> slots = new ArrayList<>();
+        for (TeamColor team : teams) {
+            for (int i = 0; i < max; i++) {
+                slots.add(team);
             }
-            if (!assigned) {
-                break;
-            }
+        }
+
+        Collections.shuffle(players);
+        Collections.shuffle(slots);
+        int limit = Math.min(players.size(), slots.size());
+        for (int i = 0; i < limit; i++) {
+            session.assignTeam(players.get(i).getUniqueId(), slots.get(i));
         }
     }
 
