@@ -34,8 +34,8 @@ custom-items:
   happy_ghast:
     type: HAPPY_GHAST
     material: GHAST_SPAWN_EGG
-    health: 150
-    speed: 0.15
+    health: 100
+    speed: 0.12
     lifetime-seconds: 180
   respawn_beacon:
     type: RESPAWN_BEACON
@@ -62,6 +62,7 @@ custom-items:
     material: PISTON
     max-blocks: 20
     bridge-width: 3
+    speed: 5.0
   creeping_arrow:
     type: CREEPING_ARROW
     material: ARROW
@@ -80,6 +81,10 @@ custom-items:
   portable_shopkeeper:
     type: PORTABLE_SHOPKEEPER
     material: VILLAGER_SPAWN_EGG
+    lifetime-seconds: 30
+  magic_milk:
+    type: MAGIC_MILK
+    material: MILK_BUCKET
     lifetime-seconds: 30
   garry:
     type: WARDEN

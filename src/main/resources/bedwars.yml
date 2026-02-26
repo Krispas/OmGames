@@ -78,9 +78,9 @@ arenas:
     event-times:
       tier-2: 300
       tier-3: 660
-      bed-destruction: 1380
-      sudden-death: 1740
-      game-end: 2360
+      bed-destruction: 1260
+      sudden-death: 1560
+      game-end: 2120
     world: bedwars
     center: 952 68 1488
     game-lobby: 0 73 -1
@@ -297,6 +297,6 @@ arenas:
     event-times:
       tier-2: 300
       tier-3: 660
-      bed-destruction: 1380
-      sudden-death: 1740
-      game-end: 2360
+      bed-destruction: 1260
+      sudden-death: 1560
+      game-end: 2120

@@ -18,6 +18,7 @@ public enum CustomItemType {
     TACTICAL_NUKE(0.0, 30.0f, false, 0, 1, 0.0, 0.0, 60, -1.0, -1.0, -1.0, 0),
     BRIDGE_ZAPPER(0.0, 0.0f, false, 10, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0),
     PORTABLE_SHOPKEEPER(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 30, -1.0, -1.0, -1.0, 0),
+    MAGIC_MILK(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 30, -1.0, -1.0, -1.0, 0),
     WARDEN(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, 32.0, 0);
 
     private final double defaultVelocity;

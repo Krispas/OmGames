@@ -17,10 +17,11 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.TextDisplay;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -376,26 +377,25 @@ public class GeneratorManager {
                 : Component.text("Emerald Generator", NamedTextColor.GREEN);
         Component tier = Component.text("Tier " + toRoman(getTier(generator.type())), NamedTextColor.GRAY);
         Component timer = buildTimerComponent(generator.key());
-        ArmorStand titleStand = world.spawn(titleLocation, ArmorStand.class, stand -> configureHologram(stand, title));
-        ArmorStand tierStand = world.spawn(tierLocation, ArmorStand.class, stand -> configureHologram(stand, tier));
-        ArmorStand timerStand = world.spawn(timerLocation, ArmorStand.class, stand -> configureHologram(stand, timer));
+        TextDisplay titleStand = world.spawn(titleLocation, TextDisplay.class, display -> configureHologram(display, title));
+        TextDisplay tierStand = world.spawn(tierLocation, TextDisplay.class, display -> configureHologram(display, tier));
+        TextDisplay timerStand = world.spawn(timerLocation, TextDisplay.class, display -> configureHologram(display, timer));
         holograms.put(generator.key(), new GeneratorHologram(generator.type(),
                 titleStand.getUniqueId(),
                 tierStand.getUniqueId(),
                 timerStand.getUniqueId()));
     }
 
-    private void configureHologram(ArmorStand stand, Component text) {
-        stand.setMarker(true);
-        stand.setVisible(false);
-        stand.setGravity(false);
-        stand.setPersistent(true);
-        stand.setRemoveWhenFarAway(false);
-        stand.setSilent(true);
-        stand.setCanPickupItems(false);
-        stand.customName(text);
-        stand.setCustomNameVisible(true);
-        stand.addScoreboardTag(HOLOGRAM_TAG);
+    private void configureHologram(TextDisplay display, Component text) {
+        display.text(text);
+        display.setBillboard(Display.Billboard.CENTER);
+        display.setShadowed(false);
+        display.setSeeThrough(true);
+        display.setLineWidth(240);
+        display.setDefaultBackground(false);
+        display.setGravity(false);
+        display.setPersistent(true);
+        display.addScoreboardTag(HOLOGRAM_TAG);
     }
 
     private void updateHologramTiers() {
@@ -407,13 +407,13 @@ public class GeneratorManager {
             Map.Entry<String, GeneratorHologram> entry = iterator.next();
             GeneratorHologram hologram = entry.getValue();
             Entity entity = Bukkit.getEntity(hologram.tierId());
-            if (!(entity instanceof ArmorStand stand)) {
+            if (!(entity instanceof TextDisplay stand)) {
                 removeHologramEntities(hologram);
                 iterator.remove();
                 continue;
             }
             int tier = getTier(hologram.type());
-            stand.customName(Component.text("Tier " + toRoman(tier), NamedTextColor.GRAY));
+            stand.text(Component.text("Tier " + toRoman(tier), NamedTextColor.GRAY));
         }
     }
 
@@ -426,12 +426,12 @@ public class GeneratorManager {
             Map.Entry<String, GeneratorHologram> entry = iterator.next();
             GeneratorHologram hologram = entry.getValue();
             Entity entity = Bukkit.getEntity(hologram.timerId());
-            if (!(entity instanceof ArmorStand stand)) {
+            if (!(entity instanceof TextDisplay stand)) {
                 removeHologramEntities(hologram);
                 iterator.remove();
                 continue;
             }
-            stand.customName(buildTimerComponent(entry.getKey()));
+            stand.text(buildTimerComponent(entry.getKey()));
         }
     }
 
@@ -477,8 +477,11 @@ public class GeneratorManager {
     }
 
     private void removeWorldHolograms(World world) {
-        for (Entity entity : world.getEntitiesByClass(ArmorStand.class)) {
-            if (entity.getScoreboardTags().contains(HOLOGRAM_TAG)) {
+        for (Entity entity : world.getEntities()) {
+            if (!entity.getScoreboardTags().contains(HOLOGRAM_TAG)) {
+                continue;
+            }
+            if (entity instanceof TextDisplay || entity instanceof org.bukkit.entity.ArmorStand) {
                 entity.remove();
             }
         }

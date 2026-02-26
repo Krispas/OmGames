@@ -10,6 +10,7 @@ import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
 import krispasi.omGames.bedwars.item.CustomItemConfigLoader;
 import krispasi.omGames.bedwars.shop.QuickBuyService;
+import krispasi.omGames.bedwars.stats.BedwarsLobbyLeaderboard;
 import krispasi.omGames.bedwars.stats.BedwarsStatsService;
 import krispasi.omGames.bedwars.shop.ShopConfig;
 import krispasi.omGames.bedwars.shop.ShopConfigLoader;
@@ -42,6 +43,7 @@ public class BedwarsManager {
     private final JavaPlugin plugin;
     private final QuickBuyService quickBuyService;
     private final BedwarsStatsService statsService;
+    private final BedwarsLobbyLeaderboard lobbyLeaderboard;
     private Map<String, Arena> arenas = Map.of();
     private GameSession activeSession;
     private ShopConfig shopConfig = ShopConfig.empty();
@@ -51,6 +53,7 @@ public class BedwarsManager {
         this.plugin = plugin;
         this.quickBuyService = new QuickBuyService(plugin);
         this.statsService = new BedwarsStatsService(plugin);
+        this.lobbyLeaderboard = new BedwarsLobbyLeaderboard(plugin, statsService);
     }
 
     public File getBedwarsDataFolder() {
@@ -100,6 +103,10 @@ public class BedwarsManager {
 
     public void loadStats() {
         statsService.load();
+    }
+
+    public void startLobbyLeaderboard() {
+        lobbyLeaderboard.start();
     }
 
     public Collection<Arena> getArenas() {
@@ -276,6 +283,7 @@ public class BedwarsManager {
             activeSession.stop();
             activeSession = null;
         }
+        lobbyLeaderboard.stop();
         quickBuyService.shutdown();
         statsService.shutdown();
         clearDroppedItems();
@@ -345,6 +353,20 @@ public class BedwarsManager {
             String icon = misc.getString("icon");
             if (icon == null || icon.equalsIgnoreCase("CHEST")) {
                 misc.set("icon", "BREWING_STAND");
+                changed = true;
+            }
+        }
+        org.bukkit.configuration.ConfigurationSection magicMilk =
+                findItemSection(config, "magic_milk", "utility");
+        if (magicMilk != null) {
+            String customItem = magicMilk.getString("custom-item");
+            if (customItem == null || customItem.isBlank()) {
+                magicMilk.set("custom-item", "magic_milk");
+                changed = true;
+            }
+            java.util.List<String> lore = magicMilk.getStringList("lore");
+            if (lore.isEmpty()) {
+                magicMilk.set("lore", java.util.List.of("Grants temporary trap immunity."));
                 changed = true;
             }
         }
@@ -544,25 +566,43 @@ public class BedwarsManager {
         }
         org.bukkit.configuration.file.YamlConfiguration config =
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
+        boolean changed = false;
         org.bukkit.configuration.ConfigurationSection fireball =
                 config.getConfigurationSection("custom-items.fireball");
-        if (fireball == null) {
-            return;
+        if (fireball != null) {
+            double yield = fireball.getDouble("yield", -1.0);
+            if (yield < 0.0 || Math.abs(yield - 2.2) < 0.0001) {
+                fireball.set("yield", 3.2);
+                changed = true;
+            }
+            if (!fireball.isSet("damage")) {
+                fireball.set("damage", 4.0);
+                changed = true;
+            }
+            if (!fireball.isSet("knockback")) {
+                fireball.set("knockback", 1.6);
+                changed = true;
+            }
         }
-        boolean changed = false;
-        double yield = fireball.getDouble("yield", -1.0);
-        if (yield < 0.0 || Math.abs(yield - 2.2) < 0.0001) {
-            fireball.set("yield", 3.2);
+        org.bukkit.configuration.ConfigurationSection customItems =
+                config.getConfigurationSection("custom-items");
+        if (customItems == null) {
+            customItems = config.createSection("custom-items");
             changed = true;
         }
-        if (!fireball.isSet("damage")) {
-            fireball.set("damage", 4.0);
+        org.bukkit.configuration.ConfigurationSection magicMilk =
+                customItems.getConfigurationSection("magic_milk");
+        if (magicMilk == null) {
+            magicMilk = customItems.createSection("magic_milk");
             changed = true;
         }
-        if (!fireball.isSet("knockback")) {
-            fireball.set("knockback", 1.6);
+        if (magicMilk.isSet("duration-seconds") && !magicMilk.isSet("lifetime-seconds")) {
+            magicMilk.set("lifetime-seconds", magicMilk.getInt("duration-seconds"));
             changed = true;
         }
+        changed |= ensureCustomItemValue(magicMilk, "type", "MAGIC_MILK");
+        changed |= ensureCustomItemValue(magicMilk, "material", "MILK_BUCKET");
+        changed |= ensureCustomItemValue(magicMilk, "lifetime-seconds", 30);
         if (!changed) {
             return;
         }
@@ -571,5 +611,15 @@ public class BedwarsManager {
         } catch (java.io.IOException ex) {
             plugin.getLogger().warning("Failed to update custom-items.yml: " + ex.getMessage());
         }
+    }
+
+    private boolean ensureCustomItemValue(org.bukkit.configuration.ConfigurationSection section,
+                                          String key,
+                                          Object value) {
+        if (section == null || section.isSet(key)) {
+            return false;
+        }
+        section.set(key, value);
+        return true;
     }
 }

@@ -7,7 +7,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -109,6 +111,18 @@ public class BedwarsStatsService {
         updateStats(playerId, stats -> stats.addBedsBroken(1));
     }
 
+    public List<TopStatEntry> getTopWins(int limit) {
+        return getTopByColumn("wins", limit);
+    }
+
+    public List<TopStatEntry> getTopFinalKills(int limit) {
+        return getTopByColumn("final_kills", limit);
+    }
+
+    public List<TopStatEntry> getTopBedsBroken(int limit) {
+        return getTopByColumn("beds_broken", limit);
+    }
+
     private void updateStats(UUID playerId, java.util.function.Consumer<BedwarsPlayerStats> updater) {
         if (playerId == null) {
             return;
@@ -159,6 +173,55 @@ public class BedwarsStatsService {
             logger.log(Level.WARNING, "Failed to load stats for " + playerId, ex);
         }
         return new BedwarsPlayerStats();
+    }
+
+    private List<TopStatEntry> getTopByColumn(String column, int limit) {
+        if (connection == null || limit <= 0) {
+            return List.of();
+        }
+        String normalizedColumn = normalizeLeaderboardColumn(column);
+        if (normalizedColumn == null) {
+            return List.of();
+        }
+        String sql = "SELECT player_uuid, " + normalizedColumn + " AS value "
+                + "FROM bedwars_stats "
+                + "ORDER BY " + normalizedColumn + " DESC, player_uuid ASC "
+                + "LIMIT ?";
+        List<TopStatEntry> entries = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, limit);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    String rawUuid = rs.getString("player_uuid");
+                    if (rawUuid == null || rawUuid.isBlank()) {
+                        continue;
+                    }
+                    UUID playerId;
+                    try {
+                        playerId = UUID.fromString(rawUuid);
+                    } catch (IllegalArgumentException ignored) {
+                        continue;
+                    }
+                    int value = rs.getInt("value");
+                    entries.add(new TopStatEntry(playerId, value));
+                }
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load top stats for column " + normalizedColumn, ex);
+        }
+        return entries;
+    }
+
+    private String normalizeLeaderboardColumn(String column) {
+        if (column == null) {
+            return null;
+        }
+        return switch (column.toLowerCase(java.util.Locale.ROOT)) {
+            case "wins" -> "wins";
+            case "final_kills", "finalkills", "fk" -> "final_kills";
+            case "beds_broken", "bedsbroken", "beds" -> "beds_broken";
+            default -> null;
+        };
     }
 
     private void saveStats(UUID playerId, BedwarsPlayerStats stats) {
@@ -242,5 +305,8 @@ public class BedwarsStatsService {
             logger.log(Level.WARNING, "Failed to close stats database.", ex);
         }
         connection = null;
+    }
+
+    public record TopStatEntry(UUID playerId, int value) {
     }
 }

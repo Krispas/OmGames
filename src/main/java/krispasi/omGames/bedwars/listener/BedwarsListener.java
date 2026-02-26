@@ -60,6 +60,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.player.PlayerItemDamageEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
@@ -167,6 +168,7 @@ public class BedwarsListener implements Listener {
     private static final double DEFENDER_SPAWN_Y_OFFSET = 1.0;
     private static final double BED_BUG_SPAWN_Y_OFFSET = 1.0;
     private static final double CRYSTAL_SPAWN_Y_OFFSET = 1.0;
+    private static final double CREEPING_CREEPER_SPAWN_Y_OFFSET = 1.0;
     private static final double HAPPY_GHAST_SPAWN_Y_OFFSET = 1.5;
     private static final double BASALT_BREAK_CHANCE = 0.35;
     private static final double DEFENDER_TARGET_RANGE = 16.0;
@@ -433,6 +435,9 @@ public class BedwarsListener implements Listener {
             if (custom == null) {
                 return;
             }
+            if (custom.getType() == CustomItemType.MAGIC_MILK) {
+                return;
+            }
             if (!rightClick && custom.getType() != CustomItemType.BRIDGE_ZAPPER) {
                 return;
             }
@@ -487,6 +492,9 @@ public class BedwarsListener implements Listener {
                 case PORTABLE_SHOPKEEPER -> {
                     yield spawnPortableShopkeeper(player, session, custom, event);
                 }
+                case MAGIC_MILK -> {
+                    yield false;
+                }
                 case WARDEN -> {
                     yield false;
                 }
@@ -524,6 +532,35 @@ public class BedwarsListener implements Listener {
                 setSummonTeam(arrow, team);
             }
             arrow.setDamage(0.0);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerItemConsume(PlayerItemConsumeEvent event) {
+        safeHandle("onPlayerItemConsume", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            Player player = event.getPlayer();
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            ItemStack consumed = event.getItem();
+            String customId = CustomItemData.getId(consumed);
+            if (customId == null || !customId.equalsIgnoreCase("magic_milk")) {
+                return;
+            }
+            CustomItemDefinition custom = bedwarsManager.getCustomItemConfig().getItem(customId);
+            if (custom == null || custom.getType() != CustomItemType.MAGIC_MILK) {
+                return;
+            }
+            int immunitySeconds = Math.max(0, custom.getLifetimeSeconds());
+            if (immunitySeconds <= 0) {
+                return;
+            }
+            session.grantTrapImmunity(player.getUniqueId(), immunitySeconds);
+            player.sendMessage(Component.text("Magic Milk activated! Trap immunity for " + immunitySeconds + "s.", NamedTextColor.AQUA));
         });
     }
 
@@ -723,7 +760,16 @@ public class BedwarsListener implements Listener {
             if (session == null || !session.isActive()) {
                 return;
             }
-            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+            if (!session.isInArenaWorld(player.getWorld())) {
+                return;
+            }
+            if (session.isLobby()) {
+                event.setCancelled(true);
+                player.setFoodLevel(20);
+                player.setSaturation(20.0f);
+                return;
+            }
+            if (!session.isParticipant(player.getUniqueId())) {
                 return;
             }
             event.setCancelled(true);
@@ -967,6 +1013,8 @@ public class BedwarsListener implements Listener {
             if (!session.isInArenaWorld(victim.getWorld())) {
                 return;
             }
+            Vector victimVelocityBeforeHit = victim.getVelocity().clone();
+            boolean suppressKnockback = false;
             if (isSummon(event.getDamager())) {
                 if (!session.isParticipant(victim.getUniqueId())
                         || victim.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
@@ -983,6 +1031,7 @@ public class BedwarsListener implements Listener {
                 if (summon != null && summon.getDamage() > 0.0) {
                     event.setDamage(summon.getDamage());
                 }
+                suppressKnockback = isHappyGhastSummon(summon, event.getDamager());
             }
             if (event.getDamager() instanceof EnderCrystal crystal) {
                 TeamColor ownerTeam = getSummonTeam(crystal);
@@ -1059,6 +1108,9 @@ public class BedwarsListener implements Listener {
                 if (isFireballCustom(definition)) {
                     applyFireballKnockback(victim, fireball, definition);
                 }
+            }
+            if (!event.isCancelled() && suppressKnockback) {
+                restoreVelocityNextTick(victim, victimVelocityBeforeHit);
             }
             if (!event.isCancelled()
                     && attacker != null
@@ -1222,11 +1274,11 @@ public class BedwarsListener implements Listener {
                 CustomItemDefinition custom = getCustomItem(customId);
                 Location spawn;
                 if (event.getHitBlock() != null) {
-                    spawn = event.getHitBlock().getLocation().add(0.5, 0.0, 0.5);
+                    spawn = event.getHitBlock().getLocation().add(0.5, CREEPING_CREEPER_SPAWN_Y_OFFSET, 0.5);
                 } else if (event.getHitEntity() != null) {
-                    spawn = event.getHitEntity().getLocation();
+                    spawn = event.getHitEntity().getLocation().add(0.0, CREEPING_CREEPER_SPAWN_Y_OFFSET, 0.0);
                 } else {
-                    spawn = arrow.getLocation();
+                    spawn = arrow.getLocation().add(0.0, CREEPING_CREEPER_SPAWN_Y_OFFSET, 0.0);
                 }
                 spawnCreepingCreeper(session, team, spawn, custom);
                 arrow.remove();
@@ -1642,6 +1694,29 @@ public class BedwarsListener implements Listener {
         }.runTask(bedwarsManager.getPlugin());
     }
 
+    private boolean isHappyGhastSummon(CustomItemDefinition summon, org.bukkit.entity.Entity summonEntity) {
+        if (summon != null && summon.getType() == CustomItemType.HAPPY_GHAST) {
+            return true;
+        }
+        return summonEntity != null && summonEntity.getScoreboardTags().contains(GameSession.HAPPY_GHAST_TAG);
+    }
+
+    private void restoreVelocityNextTick(Player victim, Vector velocity) {
+        if (victim == null || velocity == null) {
+            return;
+        }
+        Vector restored = velocity.clone();
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!victim.isOnline()) {
+                    return;
+                }
+                victim.setVelocity(restored);
+            }
+        }.runTask(bedwarsManager.getPlugin());
+    }
+
     private boolean isSameCustomItemInMainHand(Player player, ItemStack usedItem) {
         ItemStack main = player.getInventory().getItemInMainHand();
         return matchesCustomItem(main, usedItem);
@@ -1761,8 +1836,12 @@ public class BedwarsListener implements Listener {
             return false;
         }
         int length = Math.max(1, custom.getMaxBlocks());
-        int width = Math.max(1, custom.getBridgeWidth());
-        int half = width / 2;
+        int openingWidth = Math.max(1, custom.getBridgeWidth());
+        int shellWidth = openingWidth + 2;
+        int shellHalf = shellWidth / 2;
+        int shellHeight = openingWidth + 2;
+        double blocksPerSecond = resolveBridgeBuilderBlocksPerSecond(custom);
+        double blocksPerTick = blocksPerSecond / 20.0;
         Vector direction = player.getLocation().getDirection().setY(0);
         if (direction.lengthSquared() < 0.01) {
             return false;
@@ -1774,6 +1853,7 @@ public class BedwarsListener implements Listener {
         ItemStack record = new ItemStack(blockType);
         new BukkitRunnable() {
             private int step = 0;
+            private double budget = 0.0;
 
             @Override
             public void run() {
@@ -1785,30 +1865,54 @@ public class BedwarsListener implements Listener {
                     cancel();
                     return;
                 }
-                Location base = origin.clone().add(direction.clone().multiply(step + 1));
-                int baseX = base.getBlockX();
-                int baseY = origin.getBlockY();
-                int baseZ = base.getBlockZ();
-                for (int y = 0; y < width; y++) {
-                    for (int offset = -half; offset <= half; offset++) {
-                        int dx = (int) Math.round(right.getX() * offset);
-                        int dz = (int) Math.round(right.getZ() * offset);
-                        Block target = base.getWorld().getBlockAt(baseX + dx, baseY + y, baseZ + dz);
-                        if (!target.getType().isAir()) {
-                            continue;
+                budget += blocksPerTick;
+                while (budget >= 1.0 && step < length) {
+                    Location base = origin.clone().add(direction.clone().multiply(step + 1));
+                    int baseX = base.getBlockX();
+                    int baseY = origin.getBlockY();
+                    int baseZ = base.getBlockZ();
+                    for (int y = 0; y < shellHeight; y++) {
+                        for (int offset = -shellHalf; offset <= shellHalf; offset++) {
+                            boolean border = y == 0
+                                    || y == shellHeight - 1
+                                    || Math.abs(offset) == shellHalf;
+                            if (!border) {
+                                continue;
+                            }
+                            int dx = (int) Math.round(right.getX() * offset);
+                            int dz = (int) Math.round(right.getZ() * offset);
+                            Block target = base.getWorld().getBlockAt(baseX + dx, baseY + y, baseZ + dz);
+                            if (!target.getType().isAir()) {
+                                continue;
+                            }
+                            BlockPoint point = new BlockPoint(target.getX(), target.getY(), target.getZ());
+                            if (!session.isInsideMap(point) || session.isPlacementBlocked(point)) {
+                                continue;
+                            }
+                            target.setType(blockType, false);
+                            session.recordPlacedBlock(point, record);
                         }
-                        BlockPoint point = new BlockPoint(target.getX(), target.getY(), target.getZ());
-                        if (!session.isInsideMap(point) || session.isPlacementBlocked(point)) {
-                            continue;
-                        }
-                        target.setType(blockType, false);
-                        session.recordPlacedBlock(point, record);
                     }
+                    step++;
+                    budget -= 1.0;
                 }
-                step++;
+                if (step >= length) {
+                    cancel();
+                }
             }
-        }.runTaskTimer(bedwarsManager.getPlugin(), 0L, 2L);
+        }.runTaskTimer(bedwarsManager.getPlugin(), 0L, 1L);
         return true;
+    }
+
+    private double resolveBridgeBuilderBlocksPerSecond(CustomItemDefinition custom) {
+        if (custom == null) {
+            return 8.0;
+        }
+        double configured = custom.getSpeed();
+        if (configured <= 0.0) {
+            configured = 8.0;
+        }
+        return Math.max(0.1, configured);
     }
 
     private boolean useBridgeZapper(Player player,
@@ -2383,6 +2487,7 @@ public class BedwarsListener implements Listener {
             mob.setRemoveWhenFarAway(true);
         }
         entity.setPersistent(false);
+        entity.setCollidable(false);
         entity.addScoreboardTag(GameSession.HAPPY_GHAST_TAG);
         setSummonTeam(entity, team);
         entity.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());

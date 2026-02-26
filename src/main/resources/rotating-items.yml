@@ -12,7 +12,7 @@ shop:
         bridge_builder: 14
         creeping_arrow: 15
         tactical_nuke: 16
-        portable_shopkeeper: 17
+        portable_shopkeeper: 20
         bridge_zapper: 19
         thorns_upgrade: 28
         fire_aspect_upgrade: 29

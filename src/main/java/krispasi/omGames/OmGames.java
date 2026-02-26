@@ -34,6 +34,7 @@ public final class OmGames extends JavaPlugin {
         bedwarsManager.loadShopConfig();
         bedwarsManager.loadQuickBuy();
         bedwarsManager.loadStats();
+        bedwarsManager.startLobbyLeaderboard();
         setupManager = new BedwarsSetupManager(this, bedwarsManager);
 
         PluginCommand command = getCommand("bw");

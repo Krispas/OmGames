@@ -94,15 +94,8 @@ public class ShopMenu implements InventoryHolder {
         ShopItemDefinition item = itemSlots.get(event.getRawSlot());
         if (item != null) {
             boolean purchased = session.handleShopPurchase(player, item);
-            if (purchased && item.getBehavior() == ShopItemBehavior.UPGRADE) {
+            if (purchased) {
                 new ShopMenu(session, config, categoryType, player).open(player);
-                return;
-            }
-            if (purchased && categoryType == ShopCategoryType.TOOLS) {
-                ShopItemBehavior behavior = item.getBehavior();
-                if (behavior == ShopItemBehavior.PICKAXE || behavior == ShopItemBehavior.AXE) {
-                    new ShopMenu(session, config, categoryType, player).open(player);
-                }
             }
         }
     }
@@ -129,6 +122,7 @@ public class ShopMenu implements InventoryHolder {
                     entries.put(entry.getKey(), entry.getValue());
                 }
             }
+            applyQuickBuyTierOverrides(entries);
         }
         entries.entrySet().removeIf(entry -> {
             ShopItemDefinition item = config.getItem(entry.getValue());
@@ -155,6 +149,9 @@ public class ShopMenu implements InventoryHolder {
             }
             if (item.getBehavior() == ShopItemBehavior.ARMOR) {
                 display = decorateArmorDisplay(display);
+            }
+            if (item.getBehavior() == ShopItemBehavior.SHIELD) {
+                display = decorateShieldDisplay(display);
             }
             display = applyLimitLore(display, item);
             inventory.setItem(slot, display);
@@ -235,6 +232,50 @@ public class ShopMenu implements InventoryHolder {
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;
+    }
+
+    private ItemStack decorateShieldDisplay(ItemStack item) {
+        if (item == null) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return item;
+        }
+        if (!session.hasShieldUnlocked(viewerId)) {
+            return item;
+        }
+        java.util.List<Component> lore = meta.lore();
+        if (lore == null) {
+            lore = new java.util.ArrayList<>();
+        } else {
+            lore = new java.util.ArrayList<>(lore);
+        }
+        lore.add(Component.text("Owned", NamedTextColor.GREEN));
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private void applyQuickBuyTierOverrides(Map<Integer, String> entries) {
+        for (Map.Entry<Integer, String> entry : entries.entrySet()) {
+            ShopItemDefinition item = config.getItem(entry.getValue());
+            if (item == null) {
+                continue;
+            }
+            ShopItemBehavior behavior = item.getBehavior();
+            String replacement = null;
+            if (behavior == ShopItemBehavior.PICKAXE) {
+                replacement = getNextToolItemId(ShopItemBehavior.PICKAXE, session.getPickaxeTier(viewerId));
+            } else if (behavior == ShopItemBehavior.AXE) {
+                replacement = getNextToolItemId(ShopItemBehavior.AXE, session.getAxeTier(viewerId));
+            } else if (behavior == ShopItemBehavior.ARMOR) {
+                replacement = getNextToolItemId(ShopItemBehavior.ARMOR, session.getArmorTier(viewerId));
+            }
+            if (replacement != null) {
+                entry.setValue(replacement);
+            }
+        }
     }
 
     private ItemStack applyLimitLore(ItemStack item, ShopItemDefinition definition) {

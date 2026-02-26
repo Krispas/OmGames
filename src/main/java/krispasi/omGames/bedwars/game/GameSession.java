@@ -157,6 +157,7 @@ public class GameSession {
     private static final int TRAP_SLOW_SECONDS = 8;
     private static final int TRAP_COUNTER_SECONDS = 15;
     private static final int TRAP_FATIGUE_SECONDS = 10;
+    private static final int LOBBY_REGEN_DURATION_TICKS = 60;
     private static final long REGEN_DELAY_MILLIS = 4000L;
     private static final long REGEN_INTERVAL_MILLIS = 3000L;
     private static final double SUDDEN_DEATH_BORDER_TARGET_SIZE = 6.0;
@@ -197,6 +198,8 @@ public class GameSession {
     private final Map<TeamColor, TeamUpgradeState> teamUpgrades = new EnumMap<>(TeamColor.class);
     private final Map<TeamColor, BlockPoint> baseCenters = new EnumMap<>(TeamColor.class);
     private final Map<TeamColor, Set<UUID>> baseOccupants = new EnumMap<>(TeamColor.class);
+    private final Map<UUID, Long> trapImmunityEnds = new HashMap<>();
+    private final Map<UUID, BukkitTask> trapImmunityTasks = new HashMap<>();
     private final Map<UUID, Integer> armorTiers = new HashMap<>();
     private final Map<UUID, Integer> pickaxeTiers = new HashMap<>();
     private final Map<UUID, Integer> axeTiers = new HashMap<>();
@@ -448,8 +451,7 @@ public class GameSession {
         if (respawnTask != null) {
             respawnTask.cancel();
         }
-        player.setFoodLevel(20);
-        player.setSaturation(20.0f);
+        applyLobbyBuffs(player);
         double maxHealth = player.getMaxHealth();
         player.setHealth(Math.max(1.0, maxHealth));
 
@@ -633,6 +635,10 @@ public class GameSession {
         return axeTiers.getOrDefault(playerId, 0);
     }
 
+    public boolean hasShieldUnlocked(UUID playerId) {
+        return playerId != null && shieldUnlocked.contains(playerId);
+    }
+
     public void syncToolTiers(Player player) {
         if (player == null) {
             return;
@@ -814,6 +820,10 @@ public class GameSession {
         }
         removeResources(player, cost);
         recordLimitedPurchase(player, item);
+        if (item.getBehavior() == ShopItemBehavior.SHIELD) {
+            equipShieldOffhand(player, getTeam(player.getUniqueId()));
+            player.updateInventory();
+        }
         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
         return true;
     }
@@ -1192,6 +1202,62 @@ public class GameSession {
         return getUpgradeState(team).getTraps();
     }
 
+    public void grantTrapImmunity(UUID playerId, int seconds) {
+        if (playerId == null) {
+            return;
+        }
+        clearTrapImmunity(playerId);
+        if (seconds <= 0) {
+            return;
+        }
+        long expiresAt = System.currentTimeMillis() + seconds * 1000L;
+        trapImmunityEnds.put(playerId, expiresAt);
+        if (plugin == null) {
+            return;
+        }
+        long delayTicks = Math.max(1L, seconds * 20L);
+        BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () ->
+                safeRun("trapImmunityExpire", () -> {
+                    Long end = trapImmunityEnds.get(playerId);
+                    if (end == null || end > System.currentTimeMillis()) {
+                        return;
+                    }
+                    trapImmunityEnds.remove(playerId);
+                    trapImmunityTasks.remove(playerId);
+                    Player player = Bukkit.getPlayer(playerId);
+                    if (player != null && player.isOnline()) {
+                        player.sendMessage(Component.text("Magic Milk expired. Traps can trigger again.", NamedTextColor.RED));
+                    }
+                }), delayTicks);
+        trapImmunityTasks.put(playerId, task);
+    }
+
+    public void clearTrapImmunity(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        trapImmunityEnds.remove(playerId);
+        BukkitTask task = trapImmunityTasks.remove(playerId);
+        if (task != null) {
+            task.cancel();
+        }
+    }
+
+    public boolean hasTrapImmunity(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
+        Long expiresAt = trapImmunityEnds.get(playerId);
+        if (expiresAt == null) {
+            return false;
+        }
+        if (expiresAt <= System.currentTimeMillis()) {
+            trapImmunityEnds.remove(playerId);
+            return false;
+        }
+        return true;
+    }
+
     private boolean applyPurchase(Player player, ShopItemDefinition item) {
         TeamColor team = getTeam(player.getUniqueId());
         ShopItemBehavior behavior = item.getBehavior();
@@ -1235,7 +1301,7 @@ public class GameSession {
             case PICKAXE -> applyTierUpgrade(player, item, pickaxeTiers, ShopItemBehavior.PICKAXE);
             case AXE -> applyTierUpgrade(player, item, axeTiers, ShopItemBehavior.AXE);
             case SHEARS -> applyShears(player, item, team);
-            case SHIELD -> applyShield(player, item);
+            case SHIELD -> applyShield(player);
             case UPGRADE -> handleUpgradePurchaseInternal(player, item.getUpgradeType());
         };
     }
@@ -1326,8 +1392,7 @@ public class GameSession {
                 player.setRespawnLocation(lobby, true);
             }
             player.getInventory().clear();
-            player.setFoodLevel(20);
-            player.setSaturation(20.0f);
+            applyLobbyBuffs(player);
             double maxHealth = player.getMaxHealth();
             player.setHealth(Math.max(1.0, maxHealth));
             player.setGameMode(GameMode.SURVIVAL);
@@ -1434,6 +1499,7 @@ public class GameSession {
             return;
         }
         clearCombat(player.getUniqueId());
+        clearTrapImmunity(player.getUniqueId());
         removeRespawnProtection(player.getUniqueId());
         downgradeTools(player.getUniqueId());
         removeItems(player, PICKAXE_MATERIALS);
@@ -2141,6 +2207,11 @@ public class GameSession {
         }
         respawnProtectionTasks.clear();
         respawnProtectionEnds.clear();
+        for (BukkitTask task : trapImmunityTasks.values()) {
+            task.cancel();
+        }
+        trapImmunityTasks.clear();
+        trapImmunityEnds.clear();
         pendingRespawns.clear();
         respawnGracePlayers.clear();
         if (generatorManager != null) {
@@ -2303,6 +2374,8 @@ public class GameSession {
         lastDamagerTimes.clear();
         lastDamageTimes.clear();
         lastRegenTimes.clear();
+        trapImmunityEnds.clear();
+        trapImmunityTasks.clear();
         garryUnlocked = false;
         garryWifeAlive = false;
         garryJrAlive = false;
@@ -2777,13 +2850,12 @@ public class GameSession {
         return true;
     }
 
-    private boolean applyShield(Player player, ShopItemDefinition item) {
+    private boolean applyShield(Player player) {
         UUID playerId = player.getUniqueId();
         if (shieldUnlocked.contains(playerId)) {
             return false;
         }
         shieldUnlocked.add(playerId);
-        giveItem(player, item.createPurchaseItem(getTeam(playerId)));
         return true;
     }
 
@@ -2948,7 +3020,7 @@ public class GameSession {
     }
 
     private void giveShield(Player player, TeamColor team) {
-        if (player.getInventory().contains(Material.SHIELD)) {
+        if (countItem(player, Material.SHIELD) > 0) {
             return;
         }
         ItemStack shield = createShieldItem(team);
@@ -3135,6 +3207,7 @@ public class GameSession {
     public void handlePlayerQuit(UUID playerId) {
         cancelRespawnCountdown(playerId);
         removeRespawnProtection(playerId);
+        clearTrapImmunity(playerId);
         BukkitTask task = respawnTasks.remove(playerId);
         if (task != null) {
             task.cancel();
@@ -3168,6 +3241,7 @@ public class GameSession {
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
+            applyLobbyBuffs(player);
             syncToolTiers(player);
             hideEditorsFrom(player);
             updateSidebarForPlayer(player);
@@ -3250,6 +3324,9 @@ public class GameSession {
     }
 
     private void updateSidebars() {
+        if (state == GameState.LOBBY) {
+            applyLobbyBuffsToLobbyPlayers();
+        }
         for (UUID playerId : assignments.keySet()) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
@@ -3730,6 +3807,9 @@ public class GameSession {
                 if (!isInArenaWorld(player.getWorld()) || player.getGameMode() == GameMode.SPECTATOR) {
                     continue;
                 }
+                if (hasTrapImmunity(entry.getKey())) {
+                    continue;
+                }
                 Location location = player.getLocation();
                 int dx = location.getBlockX() - base.x();
                 int dz = location.getBlockZ() - base.z();
@@ -4076,6 +4156,32 @@ public class GameSession {
                 false,
                 false
         ));
+    }
+
+    private void applyLobbyBuffsToLobbyPlayers() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!isInArenaWorld(player.getWorld()) || player.getGameMode() == GameMode.SPECTATOR) {
+                continue;
+            }
+            applyLobbyBuffs(player);
+        }
+    }
+
+    private void applyLobbyBuffs(Player player) {
+        if (player == null) {
+            return;
+        }
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
+        player.setExhaustion(0.0f);
+        player.addPotionEffect(new PotionEffect(
+                PotionEffectType.REGENERATION,
+                LOBBY_REGEN_DURATION_TICKS,
+                0,
+                false,
+                false,
+                false
+        ), true);
     }
 
     private void hideEditorFromParticipants(Player editor) {
