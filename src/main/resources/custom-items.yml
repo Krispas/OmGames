@@ -77,6 +77,10 @@ custom-items:
     type: BRIDGE_ZAPPER
     material: FLINT
     max-blocks: 10
+  portable_shopkeeper:
+    type: PORTABLE_SHOPKEEPER
+    material: VILLAGER_SPAWN_EGG
+    lifetime-seconds: 30
   garry:
     type: WARDEN
     material: WARDEN_SPAWN_EGG

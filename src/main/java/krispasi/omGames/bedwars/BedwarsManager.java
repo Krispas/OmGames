@@ -24,9 +24,11 @@ import org.bukkit.FireworkEffect;
 import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import krispasi.omGames.bedwars.gui.MapSelectMenu;
+import krispasi.omGames.bedwars.gui.ShopMenu;
 import krispasi.omGames.bedwars.gui.TeamAssignMenu;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.TeamColor;
+import krispasi.omGames.bedwars.shop.ShopCategoryType;
 
 /**
  * Service layer and coordinator for BedWars runtime.
@@ -161,6 +163,28 @@ public class BedwarsManager {
         GameSession session = new GameSession(this, arena);
         session.setStatsEnabled(statsEnabled);
         new TeamAssignMenu(this, session).open(player);
+    }
+
+    public void openQuickBuyEditor(Player player) {
+        if (player == null) {
+            return;
+        }
+        if (shopConfig == null) {
+            player.sendMessage(Component.text("Shop config is not loaded.", NamedTextColor.RED));
+            return;
+        }
+        Arena arena = arenas.values().stream().findFirst().orElse(null);
+        if (arena == null) {
+            player.sendMessage(Component.text("No arenas configured.", NamedTextColor.RED));
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        if (!quickBuyService.isEditing(playerId)) {
+            quickBuyService.toggleEditing(playerId);
+        }
+        quickBuyService.clearPendingSlot(playerId);
+        GameSession menuSession = new GameSession(this, arena);
+        new ShopMenu(menuSession, shopConfig, ShopCategoryType.QUICK_BUY, player).open(player);
     }
 
     public void startSession(Player initiator, GameSession session) {

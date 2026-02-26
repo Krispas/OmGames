@@ -159,6 +159,10 @@ public class GameSession {
     private static final int TRAP_FATIGUE_SECONDS = 10;
     private static final long REGEN_DELAY_MILLIS = 4000L;
     private static final long REGEN_INTERVAL_MILLIS = 3000L;
+    private static final double SUDDEN_DEATH_BORDER_TARGET_SIZE = 6.0;
+    private static final double WORLD_BORDER_DAMAGE_BUFFER = 0.0;
+    private static final double WORLD_BORDER_DAMAGE_AMOUNT = 2.0;
+    private static final int WORLD_BORDER_WARNING_DISTANCE = 1;
 
     private final BedwarsManager bedwarsManager;
     private final Arena arena;
@@ -206,6 +210,10 @@ public class GameSession {
     private UUID garryJrId;
     private BukkitTask garryRespawnTask;
     private boolean suddenDeathActive;
+    private boolean tier2Triggered;
+    private boolean tier3Triggered;
+    private boolean bedDestructionTriggered;
+    private boolean gameEndTriggered;
     private final Map<UUID, Long> lastCombatTimes = new HashMap<>();
     private final Map<UUID, UUID> lastDamagers = new HashMap<>();
     private final Map<UUID, Long> lastDamagerTimes = new HashMap<>();
@@ -504,6 +512,33 @@ public class GameSession {
         restoreBed(world, team, location);
         eliminatedTeams.remove(team);
         return true;
+    }
+
+    public String skipNextPhase() {
+        if (state != GameState.RUNNING) {
+            return null;
+        }
+        if (!tier2Triggered) {
+            triggerTierUpgrade(2);
+            return "Generators II";
+        }
+        if (!tier3Triggered) {
+            triggerTierUpgrade(3);
+            return "Generators III";
+        }
+        if (!bedDestructionTriggered) {
+            triggerBedDestructionEvent();
+            return "Beds Destroyed";
+        }
+        if (!suddenDeathActive) {
+            triggerSuddenDeath();
+            return "Sudden Death";
+        }
+        if (!gameEndTriggered) {
+            triggerGameEnd();
+            return "Game End";
+        }
+        return null;
     }
 
     public void addEditor(Player player) {
@@ -1645,16 +1680,36 @@ public class GameSession {
         scheduleGameEnd(events.getGameEndDelay());
     }
 
+    private void triggerTierUpgrade(int tier) {
+        if (state != GameState.RUNNING || generatorManager == null) {
+            return;
+        }
+        int clamped = Math.max(1, Math.min(3, tier));
+        if (clamped <= 1) {
+            return;
+        }
+        if (clamped == 2 && tier2Triggered) {
+            return;
+        }
+        if (clamped == 3 && tier3Triggered) {
+            return;
+        }
+        if (clamped >= 2) {
+            tier2Triggered = true;
+        }
+        if (clamped >= 3) {
+            tier3Triggered = true;
+        }
+        generatorManager.setDiamondTier(clamped);
+        generatorManager.setEmeraldTier(clamped);
+        generatorManager.refresh();
+        broadcast(Component.text("Generators " + toRoman(clamped) + "!", NamedTextColor.GOLD));
+    }
+
     private void scheduleTierUpgrade(int tier, int delaySeconds) {
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             safeRun("tierUpgrade", () -> {
-                if (state != GameState.RUNNING || generatorManager == null) {
-                    return;
-                }
-                generatorManager.setDiamondTier(tier);
-                generatorManager.setEmeraldTier(tier);
-                generatorManager.refresh();
-                broadcast(Component.text("Generators " + toRoman(tier) + "!", NamedTextColor.GOLD));
+                triggerTierUpgrade(tier);
             });
         }, delaySeconds * 20L);
         tasks.add(task);
@@ -1675,10 +1730,7 @@ public class GameSession {
     private void scheduleBedDestruction(int delaySeconds) {
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             safeRun("bedDestruction", () -> {
-                if (state != GameState.RUNNING) {
-                    return;
-                }
-                triggerBedDestruction();
+                triggerBedDestructionEvent();
             });
         }, delaySeconds * 20L);
         tasks.add(task);
@@ -1687,15 +1739,7 @@ public class GameSession {
     private void scheduleSuddenDeath(int delaySeconds) {
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             safeRun("suddenDeath", () -> {
-                if (state != GameState.RUNNING) {
-                    return;
-                }
-                suddenDeathActive = true;
-                despawnGarryWardens();
-                showTitleAll(Component.text("Sudden Death!", NamedTextColor.RED),
-                        Component.text("Final battle begins.", NamedTextColor.GRAY));
-                broadcast(Component.text("Sudden Death has begun!", NamedTextColor.RED));
-                startSuddenDeathBorderShrink();
+                triggerSuddenDeath();
             });
         }, delaySeconds * 20L);
         tasks.add(task);
@@ -1704,18 +1748,43 @@ public class GameSession {
     private void scheduleGameEnd(int delaySeconds) {
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             safeRun("gameEnd", () -> {
-                if (state != GameState.RUNNING) {
-                    return;
-                }
-                List<TeamColor> aliveTeams = getAliveTeams();
-                if (aliveTeams.size() == 1) {
-                    bedwarsManager.endSession(this, aliveTeams.get(0));
-                    return;
-                }
-                bedwarsManager.endSession(this, null);
+                triggerGameEnd();
             });
         }, delaySeconds * 20L);
         tasks.add(task);
+    }
+
+    private void triggerBedDestructionEvent() {
+        if (state != GameState.RUNNING || bedDestructionTriggered) {
+            return;
+        }
+        bedDestructionTriggered = true;
+        triggerBedDestruction();
+    }
+
+    private void triggerSuddenDeath() {
+        if (state != GameState.RUNNING || suddenDeathActive) {
+            return;
+        }
+        suddenDeathActive = true;
+        despawnGarryWardens();
+        showTitleAll(Component.text("Sudden Death!", NamedTextColor.RED),
+                Component.text("Final battle begins.", NamedTextColor.GRAY));
+        broadcast(Component.text("Sudden Death has begun!", NamedTextColor.RED));
+        startSuddenDeathBorderShrink();
+    }
+
+    private void triggerGameEnd() {
+        if (state != GameState.RUNNING || gameEndTriggered) {
+            return;
+        }
+        gameEndTriggered = true;
+        List<TeamColor> aliveTeams = getAliveTeams();
+        if (aliveTeams.size() == 1) {
+            bedwarsManager.endSession(this, aliveTeams.get(0));
+            return;
+        }
+        bedwarsManager.endSession(this, null);
     }
 
     private void startSuddenDeathBorderShrink() {
@@ -1729,9 +1798,12 @@ public class GameSession {
         EventSettings events = arena.getEventSettings();
         int remainingSeconds = Math.max(1, events.getGameEndDelay() - events.getSuddenDeathDelay());
         WorldBorder border = world.getWorldBorder();
-        double targetSize = 6.0;
+        double targetSize = SUDDEN_DEATH_BORDER_TARGET_SIZE;
         border.setCenter(center.x() + 0.5, center.z() + 0.5);
         border.setSize(Math.max(targetSize, 1.0), remainingSeconds);
+        border.setDamageBuffer(WORLD_BORDER_DAMAGE_BUFFER);
+        border.setDamageAmount(WORLD_BORDER_DAMAGE_AMOUNT);
+        border.setWarningDistance(WORLD_BORDER_WARNING_DISTANCE);
     }
 
     private void scheduleRespawn(Player player, TeamColor team) {
@@ -2113,6 +2185,9 @@ public class GameSession {
         double size = Math.max(sizeX, sizeZ) + 2.0;
         border.setCenter(centerX, centerZ);
         border.setSize(size);
+        border.setDamageBuffer(WORLD_BORDER_DAMAGE_BUFFER);
+        border.setDamageAmount(WORLD_BORDER_DAMAGE_AMOUNT);
+        border.setWarningDistance(WORLD_BORDER_WARNING_DISTANCE);
     }
 
     private void restoreWorldBorder() {
@@ -2239,6 +2314,10 @@ public class GameSession {
             garryRespawnTask = null;
         }
         suddenDeathActive = false;
+        tier2Triggered = false;
+        tier3Triggered = false;
+        bedDestructionTriggered = false;
+        gameEndTriggered = false;
     }
 
     public Set<String> getRotatingItemIds() {
@@ -3372,22 +3451,26 @@ public class GameSession {
                 ? (System.currentTimeMillis() - matchStartMillis) / 1000L
                 : 0L;
         krispasi.omGames.bedwars.model.EventSettings events = arena.getEventSettings();
-        if (elapsedSeconds < events.getTier2Delay()) {
-            return new EventInfo("Generators II", (int) (events.getTier2Delay() - elapsedSeconds));
+        if (!tier2Triggered) {
+            return new EventInfo("Generators II", remainingSeconds(events.getTier2Delay(), elapsedSeconds));
         }
-        if (elapsedSeconds < events.getTier3Delay()) {
-            return new EventInfo("Generators III", (int) (events.getTier3Delay() - elapsedSeconds));
+        if (!tier3Triggered) {
+            return new EventInfo("Generators III", remainingSeconds(events.getTier3Delay(), elapsedSeconds));
         }
-        if (elapsedSeconds < events.getBedDestructionDelay()) {
-            return new EventInfo("Beds Destroyed", (int) (events.getBedDestructionDelay() - elapsedSeconds));
+        if (!bedDestructionTriggered) {
+            return new EventInfo("Beds Destroyed", remainingSeconds(events.getBedDestructionDelay(), elapsedSeconds));
         }
-        if (elapsedSeconds < events.getSuddenDeathDelay()) {
-            return new EventInfo("Sudden Death", (int) (events.getSuddenDeathDelay() - elapsedSeconds));
+        if (!suddenDeathActive) {
+            return new EventInfo("Sudden Death", remainingSeconds(events.getSuddenDeathDelay(), elapsedSeconds));
         }
-        if (elapsedSeconds < events.getGameEndDelay()) {
-            return new EventInfo("Game End", (int) (events.getGameEndDelay() - elapsedSeconds));
+        if (!gameEndTriggered) {
+            return new EventInfo("Game End", remainingSeconds(events.getGameEndDelay(), elapsedSeconds));
         }
         return new EventInfo("Game End", 0);
+    }
+
+    private int remainingSeconds(int targetSeconds, long elapsedSeconds) {
+        return (int) Math.max(0L, (long) targetSeconds - elapsedSeconds);
     }
 
     private String formatTime(int totalSeconds) {

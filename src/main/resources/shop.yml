@@ -67,15 +67,11 @@ shop:
       icon: IRON_PICKAXE
       size: 54
       entries:
-        pickaxe_wood: 10
-        pickaxe_iron: 11
-        pickaxe_gold: 12
-        pickaxe_diamond: 13
-        axe_wood: 19
-        axe_stone: 20
-        axe_iron: 21
-        axe_diamond: 22
+        # One slot per tool type; tier upgrades are handled automatically.
+        pickaxe: 10
+        axe: 19
         shears: 28
+        shield: 29
     utility:
       title: "Utilities"
       icon: TNT
@@ -96,7 +92,6 @@ shop:
         water_bucket: 27
         crystal: 28
         happy_ghast: 29
-        shield: 30
         damage_potion_ii: 31
         damage_potion_i: 32
     miscellaneous:
@@ -105,469 +100,479 @@ shop:
       size: 54
       entries: {}
   items:
-    blocks:
-      wool:
-        material: WHITE_WOOL
-        amount: 16
-        cost:
-          material: IRON
-          amount: 4
-        team-color: true
-      hardened_clay:
-        material: SMOOTH_BASALT
-        amount: 16
-        cost:
-          material: IRON
-          amount: 12
-        display-name: "Smooth Basalt"
-      end_stone:
-        material: END_STONE
+    wool:
+      material: WHITE_WOOL
+      amount: 16
+      cost:
+        material: IRON
+        amount: 4
+      team-color: true
+      behavior: BLOCK
+    hardened_clay:
+      material: SMOOTH_BASALT
+      amount: 16
+      cost:
+        material: IRON
         amount: 12
-        cost:
-          material: IRON
-          amount: 24
-        display-name: "End Stone"
-      wood_planks:
-        material: OAK_PLANKS
+      display-name: "Smooth Basalt"
+      behavior: BLOCK
+    end_stone:
+      material: END_STONE
+      amount: 12
+      cost:
+        material: IRON
+        amount: 24
+      display-name: "End Stone"
+      behavior: BLOCK
+    wood_planks:
+      material: OAK_PLANKS
+      amount: 16
+      cost:
+        material: GOLD
+        amount: 4
+      display-name: "Wood Planks"
+      behavior: BLOCK
+    blast_glass:
+      material: GLASS
+      amount: 4
+      cost:
+        material: IRON
+        amount: 12
+      display-name: "Blast-Proof Glass"
+      behavior: BLOCK
+    creaking_heart:
+      material: creaking_heart
+      amount: 10
+      cost:
+        material: GOLD
         amount: 16
-        cost:
-          material: GOLD
-          amount: 4
-        display-name: "Wood Planks"
-      blast_glass:
-        material: GLASS
+      display-name: "Creaking Heart"
+      behavior: BLOCK
+    ancient_debris:
+      material: ANCIENT_DEBRIS
+      amount: 4
+      cost:
+        material: EMERALD
+        amount: 2
+      display-name: "Ancient Debris"
+      behavior: BLOCK
+    obsidian:
+      material: OBSIDIAN
+      amount: 4
+      cost:
+        material: EMERALD
         amount: 4
-        cost:
-          material: IRON
-          amount: 12
-        display-name: "Blast-Proof Glass"
-      creaking_heart:
-        material: creaking_heart
+      display-name: "Obsidian"
+      behavior: BLOCK
+    water_bucket:
+      material: WATER_BUCKET
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 1
+      behavior: UTILITY
+    stone_sword:
+      material: STONE_SWORD
+      amount: 1
+      cost:
+        material: IRON
         amount: 10
-        cost:
-          material: GOLD
-          amount: 16
-        display-name: "Creaking Heart"
-      ancient_debris:
-        material: ANCIENT_DEBRIS
+      display-name: "Stone Sword"
+      behavior: SWORD
+    iron_sword:
+      material: IRON_SWORD
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 7
+      display-name: "Iron Sword"
+      behavior: SWORD
+    diamond_sword:
+      material: DIAMOND_SWORD
+      amount: 1
+      cost:
+        material: EMERALD
         amount: 4
-        cost:
-          material: EMERALD
-          amount: 2
-        display-name: "Ancient Debris"
-      obsidian:
-        material: OBSIDIAN
-        amount: 4
-        cost:
-          material: EMERALD
-          amount: 4
-        display-name: "Obsidian"
-      water_bucket:
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 1
-    melee:
-      stone_sword:
-        material: STONE_SWORD
-        amount: 1
-        cost:
-          material: IRON
-          amount: 10
-        display-name: "Stone Sword"
-      iron_sword:
-        material: IRON_SWORD
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 7
-        display-name: "Iron Sword"
-      diamond_sword:
-        material: DIAMOND_SWORD
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 4
-        display-name: "Diamond Sword"
-      knockback_stick:
-        material: STICK
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 5
-        display-name: "Knockback Stick"
-        enchants:
-          KNOCKBACK: 1
-      mace:
-        material: MACE
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 8
-        display-name: "Mace"
-      netherite_spear:
-        material: NETHERITE_SPEAR
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 16
-        display-name: "Netherite Spear"
-      netherite_spear_lunging:
-        material: NETHERITE_SPEAR
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 4
-        display-name: "Netherite Spear (Lunging III, Sharpness V)"
-        enchants:
-          LUNGING: 3
-          SHARPNESS: 5
-    ranged:
-      bow:
-        material: BOW
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 12
-        tier: 1
-        display-name: "Bow"
-      bow_power:
-        material: BOW
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 12
-        tier: 2
-        display-name: "Bow (Power I)"
-        enchants:
-          POWER: 1
-      bow_power_punch:
-        material: BOW
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 24
-        tier: 3
-        display-name: "Bow (Power I, Punch I)"
-        enchants:
-          POWER: 1
-          PUNCH: 1
-      crossbow:
-        material: CROSSBOW
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 10
-        tier: 1
-        display-name: "Crossbow"
-      crossbow_quickcharge:
-        material: CROSSBOW
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 30
-        tier: 2
-        display-name: "Crossbow (Quick Charge II)"
-        enchants:
-          QUICK_CHARGE: 2
-      crossbow_multishot:
-        material: CROSSBOW
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 8
-        tier: 3
-        display-name: "Crossbow (Multishot, Quick Charge II)"
-        enchants:
-          MULTISHOT: 1
-          QUICK_CHARGE: 2
-      arrows:
-        material: ARROW
+      display-name: "Diamond Sword"
+      behavior: SWORD
+    knockback_stick:
+      material: STICK
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 5
+      display-name: "Knockback Stick"
+      behavior: SWORD
+      enchants:
+        KNOCKBACK: 1
+    mace:
+      material: MACE
+      amount: 1
+      cost:
+        material: EMERALD
         amount: 8
-        cost:
-          material: GOLD
-          amount: 2
-        display-name: "Arrows"
-      explosive_firework:
-        material: FIREWORK_ROCKET
+      display-name: "Mace"
+      behavior: SWORD
+    netherite_spear:
+      material: NETHERITE_SPEAR
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 16
+      display-name: "Netherite Spear"
+      behavior: SWORD
+    netherite_spear_lunging:
+      material: NETHERITE_SPEAR
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 4
+      display-name: "Netherite Spear (Lunging III, Sharpness V)"
+      behavior: SWORD
+      enchants:
+        LUNGING: 3
+        SHARPNESS: 5
+    bow:
+      material: BOW
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 12
+      tier: 1
+      display-name: "Bow"
+    bow_power:
+      material: BOW
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 12
+      tier: 2
+      display-name: "Bow (Power I)"
+      enchants:
+        POWER: 1
+    bow_power_punch:
+      material: BOW
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 24
+      tier: 3
+      display-name: "Bow (Power I, Punch I)"
+      enchants:
+        POWER: 1
+        PUNCH: 1
+    crossbow:
+      material: CROSSBOW
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 10
+      tier: 1
+      display-name: "Crossbow"
+    crossbow_quickcharge:
+      material: CROSSBOW
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 30
+      tier: 2
+      display-name: "Crossbow (Quick Charge II)"
+      enchants:
+        QUICK_CHARGE: 2
+    crossbow_multishot:
+      material: CROSSBOW
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 8
+      tier: 3
+      display-name: "Crossbow (Multishot, Quick Charge II)"
+      enchants:
+        MULTISHOT: 1
+        QUICK_CHARGE: 2
+    arrows:
+      material: ARROW
+      amount: 8
+      cost:
+        material: GOLD
+        amount: 2
+      display-name: "Arrows"
+    explosive_firework:
+      material: FIREWORK_ROCKET
+      amount: 3
+      cost:
+        material: GOLD
+        amount: 4
+      display-name: "Firework"
+      firework:
+        power: 1
+        effect:
+          type: BURST
+          colors: [RED, ORANGE]
+        explosion:
+          power: 3.5
+          damage: 6.0
+          knockback: 1.1
+    trident_loyalty_1:
+      material: TRIDENT
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 32
+      display-name: "Trident (Loyalty I)"
+      enchants:
+        LOYALTY: 1
+    trident_loyalty_3:
+      material: TRIDENT
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 4
+      display-name: "Trident (Loyalty III, Sharpness V)"
+      enchants:
+        LOYALTY: 3
+        SHARPNESS: 5
+    chainmail_armor:
+      material: CHAINMAIL_CHESTPLATE
+      amount: 1
+      cost:
+        material: IRON
+        amount: 40
+      tier: 1
+      display-name: "Chainmail Armor"
+    iron_armor:
+      material: IRON_CHESTPLATE
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 12
+      tier: 2
+      display-name: "Iron Armor"
+    diamond_armor:
+      material: DIAMOND_CHESTPLATE
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 6
+      tier: 3
+      display-name: "Diamond Armor"
+    pickaxe:
+      material: WOODEN_PICKAXE
+      amount: 1
+      cost:
+        material: IRON
+        amount: 10
+      tier: 1
+      display-name: "Wooden Pickaxe"
+    pickaxe_iron:
+      material: IRON_PICKAXE
+      amount: 1
+      cost:
+        material: IRON
+        amount: 10
+      tier: 2
+      display-name: "Iron Pickaxe"
+    pickaxe_gold:
+      material: GOLDEN_PICKAXE
+      amount: 1
+      cost:
+        material: GOLD
         amount: 3
-        cost:
-          material: GOLD
-          amount: 4
-        display-name: "Firework"
-        firework:
-          power: 1
-          effect:
-            type: BURST
-            colors: [RED, ORANGE]
-          explosion:
-            power: 3.5
-            damage: 6.0
-            knockback: 1.1
-      trident_loyalty_1:
-        material: TRIDENT
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 32
-        display-name: "Trident (Loyalty I)"
-        enchants:
-          LOYALTY: 1
-      trident_loyalty_3:
-        material: TRIDENT
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 4
-        display-name: "Trident (Loyalty III, Sharpness V)"
-        enchants:
-          LOYALTY: 3
-          SHARPNESS: 5
-    armor:
-      chainmail_armor:
-        material: CHAINMAIL_CHESTPLATE
-        amount: 1
-        cost:
-          material: IRON
-          amount: 40
-        tier: 1
-        display-name: "Chainmail Armor"
-      iron_armor:
-        material: IRON_CHESTPLATE
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 12
-        tier: 2
-        display-name: "Iron Armor"
-      diamond_armor:
-        material: DIAMOND_CHESTPLATE
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 6
-        tier: 3
-        display-name: "Diamond Armor"
-    tools:
-      pickaxe_wood:
-        material: WOODEN_PICKAXE
-        amount: 1
-        cost:
-          material: IRON
-          amount: 10
-        tier: 1
-        display-name: "Wooden Pickaxe"
-      pickaxe_iron:
-        material: IRON_PICKAXE
-        amount: 1
-        cost:
-          material: IRON
-          amount: 10
-        tier: 2
-        display-name: "Iron Pickaxe"
-      pickaxe_gold:
-        material: GOLDEN_PICKAXE
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 3
-        tier: 3
-        display-name: "Gold Pickaxe"
-      pickaxe_diamond:
-        material: DIAMOND_PICKAXE
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 6
-        tier: 4
-        display-name: "Diamond Pickaxe"
-      axe_wood:
-        material: WOODEN_AXE
-        amount: 1
-        cost:
-          material: IRON
-          amount: 10
-        tier: 1
-        display-name: "Wooden Axe"
-      axe_stone:
-        material: STONE_AXE
-        amount: 1
-        cost:
-          material: IRON
-          amount: 10
-        tier: 2
-        display-name: "Stone Axe"
-      axe_iron:
-        material: IRON_AXE
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 3
-        tier: 3
-        display-name: "Iron Axe"
-      axe_diamond:
-        material: DIAMOND_AXE
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 6
-        tier: 4
-        display-name: "Diamond Axe"
-      shears:
-        material: SHEARS
-        amount: 1
-        cost:
-          material: IRON
-          amount: 20
-        display-name: "Shears"
-    utility:
-      golden_apple:
-        material: GOLDEN_APPLE
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 3
-        display-name: "Golden Apple"
-      fireball:
-        material: FIRE_CHARGE
-        amount: 1
-        cost:
-          material: IRON
-          amount: 40
-        display-name: "Fireball"
-        custom-item: fireball
-      tnt:
-        material: TNT
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 4
-        display-name: "TNT"
-      ender_pearl:
-        material: ENDER_PEARL
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 4
-        display-name: "Ender Pearl"
-      invis_potion:
-        material: POTION
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 2
-        display-name: "Invisibility Potion"
-        potion-effects:
-          - "INVISIBILITY:1:30"
-      jump_potion:
-        material: POTION
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 1
-        display-name: "Jump Potion"
-        potion-effects:
-          - "JUMP:5:45"
-      speed_potion:
-        material: POTION
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 1
-        display-name: "Speed Potion"
-        potion-effects:
-          - "SPEED:2:45"
-      magic_milk:
-        material: MILK_BUCKET
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 4
-        display-name: "Magic Milk"
-      bridge_egg:
-        material: EGG
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 1
-        display-name: "Bridge Egg"
-        custom-item: bridge_egg
-      wind_charge:
-        material: WIND_CHARGE
+      tier: 3
+      display-name: "Gold Pickaxe"
+    pickaxe_diamond:
+      material: DIAMOND_PICKAXE
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 6
+      tier: 4
+      display-name: "Diamond Pickaxe"
+    axe:
+      material: WOODEN_AXE
+      amount: 1
+      cost:
+        material: IRON
+        amount: 10
+      tier: 1
+      display-name: "Wooden Axe"
+    axe_stone:
+      material: STONE_AXE
+      amount: 1
+      cost:
+        material: IRON
+        amount: 10
+      tier: 2
+      display-name: "Stone Axe"
+    axe_iron:
+      material: IRON_AXE
+      amount: 1
+      cost:
+        material: GOLD
         amount: 3
-        cost:
-          material: GOLD
-          amount: 4
-        display-name: "Wind Charge"
-      bed_bug:
-        material: SNOWBALL
-        amount: 1
-        cost:
-          material: IRON
-          amount: 40
-        display-name: "Bed Bug"
-        lore:
-          - "Spawns a silverfish"
-          - "to hunt enemy players."
-        custom-item: bed_bug
-      dream_defender:
-        material: IRON_GOLEM_SPAWN_EGG
-        amount: 1
-        cost:
-          material: IRON
-          amount: 120
-        display-name: "Dream Defender"
-        lore:
-          - "Summons an iron golem"
-          - "to defend your base."
-        custom-item: dream_defender
-      crystal:
-        material: END_CRYSTAL
-        amount: 1
-        cost:
-          material: EMERALD
-          amount: 4
-        display-name: "Explosive Crystal"
-        lore:
-          - "Place on any block."
-          - "Explodes when destroyed."
-        custom-item: crystal
-      happy_ghast:
-        material: HAPPY_GHAST_SPAWN_EGG
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 32
-        display-name: "Happy Ghast"
-        lore:
-          - "Summons a happy ghast."
-        custom-item: happy_ghast
-      shield:
-        material: SHIELD
-        amount: 1
-        cost:
-          material: GOLD
-          amount: 32
-        display-name: "Shield"
-        lore:
-          - "Permanent item."
-      damage_potion_ii:
-        material: SPLASH_POTION
+      tier: 3
+      display-name: "Iron Axe"
+    axe_diamond:
+      material: DIAMOND_AXE
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 6
+      tier: 4
+      display-name: "Diamond Axe"
+    shears:
+      material: SHEARS
+      amount: 1
+      cost:
+        material: IRON
+        amount: 20
+      display-name: "Shears"
+    golden_apple:
+      material: GOLDEN_APPLE
+      amount: 1
+      cost:
+        material: GOLD
         amount: 3
-        cost:
-          material: EMERALD
-          amount: 4
-        display-name: "Splash Potion of Harming II"
-        potion-effects:
-          - "INSTANT_DAMAGE:2:1"
-      damage_potion_i:
-        material: SPLASH_POTION
+      display-name: "Golden Apple"
+    fireball:
+      material: FIRE_CHARGE
+      amount: 1
+      cost:
+        material: IRON
+        amount: 40
+      display-name: "Fireball"
+      custom-item: fireball
+    tnt:
+      material: TNT
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 4
+      display-name: "TNT"
+    ender_pearl:
+      material: ENDER_PEARL
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 4
+      display-name: "Ender Pearl"
+    invis_potion:
+      material: POTION
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 2
+      display-name: "Invisibility Potion"
+      potion-effects:
+        - "INVISIBILITY:1:30"
+    jump_potion:
+      material: POTION
+      amount: 1
+      cost:
+        material: EMERALD
         amount: 1
-        cost:
-          material: GOLD
-          amount: 16
-        display-name: "Splash Potion of Harming"
-        potion-effects:
-          - "INSTANT_DAMAGE:1:1"
-    miscellaneous: {}
+      display-name: "Jump Potion"
+      potion-effects:
+        - "JUMP:5:45"
+    speed_potion:
+      material: POTION
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 1
+      display-name: "Speed Potion"
+      potion-effects:
+        - "SPEED:2:45"
+    magic_milk:
+      material: MILK_BUCKET
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 4
+      display-name: "Magic Milk"
+    bridge_egg:
+      material: EGG
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 1
+      display-name: "Bridge Egg"
+      custom-item: bridge_egg
+    wind_charge:
+      material: WIND_CHARGE
+      amount: 3
+      cost:
+        material: GOLD
+        amount: 4
+      display-name: "Wind Charge"
+    bed_bug:
+      material: SNOWBALL
+      amount: 1
+      cost:
+        material: IRON
+        amount: 40
+      display-name: "Bed Bug"
+      lore:
+        - "Spawns a silverfish"
+        - "to hunt enemy players."
+      custom-item: bed_bug
+    dream_defender:
+      material: IRON_GOLEM_SPAWN_EGG
+      amount: 1
+      cost:
+        material: IRON
+        amount: 120
+      display-name: "Dream Defender"
+      lore:
+        - "Summons an iron golem"
+        - "to defend your base."
+      custom-item: dream_defender
+    crystal:
+      material: END_CRYSTAL
+      amount: 1
+      cost:
+        material: EMERALD
+        amount: 4
+      display-name: "Explosive Crystal"
+      lore:
+        - "Place on any block."
+        - "Explodes when destroyed."
+      custom-item: crystal
+    happy_ghast:
+      material: HAPPY_GHAST_SPAWN_EGG
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 32
+      display-name: "Happy Ghast"
+      lore:
+        - "Summons a happy ghast."
+      custom-item: happy_ghast
+    shield:
+      material: SHIELD
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 32
+      display-name: "Shield"
+      lore:
+        - "Permanent item."
+    damage_potion_ii:
+      material: SPLASH_POTION
+      amount: 3
+      cost:
+        material: EMERALD
+        amount: 4
+      display-name: "Splash Potion of Harming II"
+      potion-effects:
+        - "INSTANT_DAMAGE:2:1"
+    damage_potion_i:
+      material: SPLASH_POTION
+      amount: 1
+      cost:
+        material: GOLD
+        amount: 16
+      display-name: "Splash Potion of Harming"
+      potion-effects:
+        - "INSTANT_DAMAGE:1:1"
 

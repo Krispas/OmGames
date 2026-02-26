@@ -5,8 +5,7 @@ api-version: '1.21'
 commands:
   bw:
     description: BedWars commands
-    usage: /bw start | /bw stop | /bw tp <arena> | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]
-    permission: omgames.bw.start
+    usage: /bw start | /bw stop | /bw quick_buy | /bw tp <arena> | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]
 permissions:
   omgames.bw.start:
     description: Allows opening the BedWars setup GUI

@@ -182,6 +182,8 @@ public class BedwarsListener implements Listener {
     private static final String BED_BUG_NAME = "Bed Bug";
     private static final String HAPPY_GHAST_NAME = "Happy Ghast";
     private static final String CREEPING_CREEPER_NAME = "Creeper";
+    private static final String PORTABLE_SHOPKEEPER_NAME = "Portable Shopkeeper";
+    private static final String PORTABLE_SHOPKEEPER_TAG = "bw_portable_shopkeeper";
     private final NamespacedKey customProjectileKey;
     private final NamespacedKey summonTeamKey;
     private final Map<UUID, BukkitTask> defenderTasks = new HashMap<>();
@@ -482,6 +484,9 @@ public class BedwarsListener implements Listener {
                 case BRIDGE_ZAPPER -> {
                     yield useBridgeZapper(player, session, custom, event);
                 }
+                case PORTABLE_SHOPKEEPER -> {
+                    yield spawnPortableShopkeeper(player, session, custom, event);
+                }
                 case WARDEN -> {
                     yield false;
                 }
@@ -590,6 +595,9 @@ public class BedwarsListener implements Listener {
         safeHandle("onEntityExplode", () -> {
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null || !session.isRunning()) {
+                if (bedwarsManager.isBedwarsWorld(event.getEntity().getWorld().getName())) {
+                    event.blockList().clear();
+                }
                 return;
             }
             if (!session.isInArenaWorld(event.getEntity().getWorld())) {
@@ -727,6 +735,9 @@ public class BedwarsListener implements Listener {
         safeHandle("onBlockExplode", () -> {
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null || !session.isRunning()) {
+                if (bedwarsManager.isBedwarsWorld(event.getBlock().getWorld().getName())) {
+                    event.blockList().clear();
+                }
                 return;
             }
             if (!session.isInArenaWorld(event.getBlock().getWorld())) {
@@ -932,10 +943,7 @@ public class BedwarsListener implements Listener {
             if (session == null) {
                 if (event.getEntity() instanceof Player victim
                         && bedwarsManager.isBedwarsWorld(victim.getWorld().getName())) {
-                    Player attacker = resolveAttacker(event);
-                    if (attacker != null) {
-                        event.setCancelled(true);
-                    }
+                    event.setCancelled(true);
                 }
                 return;
             }
@@ -1083,11 +1091,21 @@ public class BedwarsListener implements Listener {
                 return;
             }
             GameSession session = bedwarsManager.getActiveSession();
-            if (session == null || !session.isInArenaWorld(player.getWorld())) {
+            if (session == null) {
+                if (bedwarsManager.isBedwarsWorld(player.getWorld().getName())
+                        && event.getCause() != EntityDamageEvent.DamageCause.VOID) {
+                    event.setCancelled(true);
+                }
+                return;
+            }
+            if (!session.isInArenaWorld(player.getWorld())) {
                 return;
             }
             if (event.getCause() == EntityDamageEvent.DamageCause.VOID) {
-                if (!session.isRunning() || !session.isParticipant(player.getUniqueId())) {
+                if (!session.isRunning()) {
+                    return;
+                }
+                if (!session.isParticipant(player.getUniqueId())) {
                     event.setCancelled(true);
                     return;
                 }
@@ -1099,15 +1117,17 @@ public class BedwarsListener implements Listener {
                 event.setCancelled(true);
                 return;
             }
-            if (session.isParticipant(player.getUniqueId())) {
+            boolean participant = session.isParticipant(player.getUniqueId());
+            if (participant) {
+                if (event.getCause() == EntityDamageEvent.DamageCause.WORLD_BORDER) {
+                    session.recordDamage(player.getUniqueId());
+                    return;
+                }
                 event.setCancelled(true);
                 return;
             }
             if (session.hasRespawnProtection(player.getUniqueId())) {
                 event.setCancelled(true);
-            }
-            if (!event.isCancelled() && session.isParticipant(player.getUniqueId())) {
-                session.recordDamage(player.getUniqueId());
             }
         });
     }
@@ -1888,7 +1908,9 @@ public class BedwarsListener implements Listener {
                         }
                         containerContents.put(point, snapshot);
                     }
-                    block.setType(Material.RED_CONCRETE, false);
+                    if (shouldHighlightNukeBlock(block)) {
+                        block.setType(Material.RED_CONCRETE, false);
+                    }
                 }
             }
         }
@@ -1917,6 +1939,37 @@ public class BedwarsListener implements Listener {
             }
         }.runTaskTimer(bedwarsManager.getPlugin(), 0L, 20L);
         return true;
+    }
+
+    private boolean shouldHighlightNukeBlock(Block block) {
+        if (block == null) {
+            return false;
+        }
+        Material type = block.getType();
+        if (type.isAir() || type == Material.DIAMOND_BLOCK || type == Material.EMERALD_BLOCK) {
+            return false;
+        }
+        if (isExcludedNukeHighlightType(type)) {
+            return false;
+        }
+        if (!type.isOccluding()) {
+            return false;
+        }
+        World world = block.getWorld();
+        if (block.getY() < world.getMaxHeight() - 1) {
+            Block above = block.getRelative(org.bukkit.block.BlockFace.UP);
+            if (!above.getType().isAir()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isExcludedNukeHighlightType(Material type) {
+        String name = type.name();
+        return name.endsWith("_STAIRS")
+                || name.endsWith("_SLAB")
+                || name.endsWith("_BED");
     }
 
     private Block resolveTargetBlock(Player player, PlayerInteractEvent event) {
@@ -2341,6 +2394,53 @@ public class BedwarsListener implements Listener {
                 ? custom.getLifetimeSeconds()
                 : 180;
         scheduleSummonDespawn(entity, lifetimeSeconds);
+        return true;
+    }
+
+    private boolean spawnPortableShopkeeper(Player player,
+                                            GameSession session,
+                                            CustomItemDefinition custom,
+                                            PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return false;
+        }
+        Block clicked = event.getClickedBlock();
+        if (clicked == null) {
+            return false;
+        }
+        TeamColor team = session.getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        Block above = clicked.getRelative(org.bukkit.block.BlockFace.UP);
+        if (!above.getType().isAir()) {
+            return false;
+        }
+        BlockPoint point = new BlockPoint(above.getX(), above.getY(), above.getZ());
+        if (!session.isInsideMap(point)) {
+            player.sendMessage(Component.text("You cannot place a portable shopkeeper outside the map.", NamedTextColor.RED));
+            return false;
+        }
+        if (session.isPlacementBlocked(point)) {
+            player.sendMessage(Component.text("You cannot place a portable shopkeeper here.", NamedTextColor.RED));
+            return false;
+        }
+        Location spawn = clicked.getLocation().add(0.5, 1.0, 0.5);
+        Villager villager = clicked.getWorld().spawn(spawn, Villager.class, entity -> {
+            entity.setAI(false);
+            entity.setInvulnerable(true);
+            entity.setCollidable(false);
+            entity.setSilent(true);
+            entity.setPersistent(false);
+            entity.setRemoveWhenFarAway(true);
+            entity.addScoreboardTag(GameSession.ITEM_SHOP_TAG);
+            entity.addScoreboardTag(PORTABLE_SHOPKEEPER_TAG);
+            setSummonTeam(entity, team);
+        });
+        int lifetimeSeconds = custom != null && custom.getLifetimeSeconds() > 0
+                ? custom.getLifetimeSeconds()
+                : 30;
+        scheduleSummonDespawn(villager, lifetimeSeconds);
         return true;
     }
 
@@ -2934,6 +3034,9 @@ public class BedwarsListener implements Listener {
         if (entity.getScoreboardTags().contains(GameSession.CREEPING_CREEPER_TAG)) {
             return CREEPING_CREEPER_NAME;
         }
+        if (entity.getScoreboardTags().contains(PORTABLE_SHOPKEEPER_TAG)) {
+            return PORTABLE_SHOPKEEPER_NAME;
+        }
         if (entity.getScoreboardTags().contains(GameSession.GARRY_TAG)) {
             return "Garry";
         }
@@ -3018,6 +3121,7 @@ public class BedwarsListener implements Listener {
                 || entity.getScoreboardTags().contains(GameSession.DREAM_DEFENDER_TAG)
                 || entity.getScoreboardTags().contains(GameSession.HAPPY_GHAST_TAG)
                 || entity.getScoreboardTags().contains(GameSession.CREEPING_CREEPER_TAG)
+                || entity.getScoreboardTags().contains(PORTABLE_SHOPKEEPER_TAG)
                 || entity.getScoreboardTags().contains(GameSession.GARRY_TAG)
                 || entity.getScoreboardTags().contains(GameSession.GARRY_WIFE_TAG)
                 || entity.getScoreboardTags().contains(GameSession.GARRY_JR_TAG));
@@ -3038,6 +3142,9 @@ public class BedwarsListener implements Listener {
         }
         if (entity.getScoreboardTags().contains(GameSession.CREEPING_CREEPER_TAG)) {
             return getCustomItem("creeping_arrow");
+        }
+        if (entity.getScoreboardTags().contains(PORTABLE_SHOPKEEPER_TAG)) {
+            return getCustomItem("portable_shopkeeper");
         }
         if (entity.getScoreboardTags().contains(GameSession.GARRY_TAG)) {
             return getCustomItem("garry");

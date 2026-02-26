@@ -31,7 +31,3 @@ This is a Minecraft Bukkit/Spigot plugin named OmGames. The active gameplay modu
 - Setup flow changes should stay in `BedwarsSetupManager` and the config loader.
 - `bedwars.yml` uses mixed-case sections (`Spawns`, `Generators`, `Shops`, `Base_Generators`). The loader accepts case variants, but keep new edits consistent with the setup manager casing.
 - Avoid non-ASCII characters unless already present in the file being edited.
-
-## Notes
-- Maven project; shaded jar is produced and copied to a local server in `pom.xml`.
-- No test runner is configured in this repo.

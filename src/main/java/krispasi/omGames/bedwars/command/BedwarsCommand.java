@@ -56,6 +56,15 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             player.sendMessage(Component.text("Beds Broken: " + stats.getBedsBroken(), NamedTextColor.YELLOW));
             return true;
         }
+        if (args.length > 0 && args[0].equalsIgnoreCase("quick_buy")) {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session != null && session.isActive() && session.isParticipant(player.getUniqueId())) {
+                player.sendMessage(Component.text("You cannot edit Quick Buy while in a BedWars match.", NamedTextColor.RED));
+                return true;
+            }
+            bedwarsManager.openQuickBuyEditor(player);
+            return true;
+        }
         if (!sender.hasPermission("omgames.bw.start")
                 && !sender.hasPermission("omgames.bw.setup")
                 && !sender.hasPermission("omgames.bw.reload")) {
@@ -144,7 +153,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             if (args.length < 2) {
-                sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team> [player] | /bw game revive <team>", NamedTextColor.YELLOW));
+                sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team> [player] | /bw game revive <team> | /bw game skipphase", NamedTextColor.YELLOW));
                 return true;
             }
             String action = args[1].toLowerCase(Locale.ROOT);
@@ -203,7 +212,21 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Component.text(team.displayName() + " bed revived.", NamedTextColor.GREEN));
                 return true;
             }
-            sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team> [player] | /bw game revive <team>", NamedTextColor.YELLOW));
+            if (action.equals("skipphase")) {
+                GameSession session = bedwarsManager.getActiveSession();
+                if (session == null || !session.isActive()) {
+                    sender.sendMessage(Component.text("No active BedWars session.", NamedTextColor.RED));
+                    return true;
+                }
+                String phase = session.skipNextPhase();
+                if (phase == null) {
+                    sender.sendMessage(Component.text("No phase to skip.", NamedTextColor.YELLOW));
+                    return true;
+                }
+                sender.sendMessage(Component.text("Skipped to " + phase + ".", NamedTextColor.GREEN));
+                return true;
+            }
+            sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team> [player] | /bw game revive <team> | /bw game skipphase", NamedTextColor.YELLOW));
             return true;
         }
         if (args[0].equalsIgnoreCase("reload")) {
@@ -250,7 +273,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw out [player] | /bw game out [player] | /bw game join <team> [player] | /bw game revive <team> | /bw stats | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw out [player] | /bw game out [player] | /bw game join <team> [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -258,7 +281,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "test", "stop", "tp", "out", "game", "stats", "reload", "setup")
+            return Stream.of("start", "test", "stop", "tp", "out", "game", "quick_buy", "stats", "reload", "setup")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -277,7 +300,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("game")) {
             String input = args[1].toLowerCase(Locale.ROOT);
-            return Stream.of("out", "join", "revive")
+            return Stream.of("out", "join", "revive", "skipphase")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }

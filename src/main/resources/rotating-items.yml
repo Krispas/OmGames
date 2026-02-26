@@ -12,6 +12,7 @@ shop:
         bridge_builder: 14
         creeping_arrow: 15
         tactical_nuke: 16
+        portable_shopkeeper: 17
         bridge_zapper: 19
         thorns_upgrade: 28
         fire_aspect_upgrade: 29
@@ -107,6 +108,17 @@ shop:
         limit:
           scope: TEAM
           amount: 1
+      portable_shopkeeper:
+        material: VILLAGER_SPAWN_EGG
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 10
+        display-name: "Portable Shopkeeper"
+        lore:
+          - "Place to spawn an item shop"
+          - "for 30 seconds."
+        custom-item: portable_shopkeeper
       bridge_zapper:
         material: FLINT
         amount: 1
