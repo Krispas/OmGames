@@ -1567,12 +1567,8 @@ public class BedwarsListener implements Listener {
                 return;
             }
             if (session.isPendingRespawn(player.getUniqueId()) || session.isEliminated(player.getUniqueId())) {
-                World arenaWorld = session.getArena().getWorld();
-                Location lobby = arenaWorld != null ? new Location(arenaWorld, 0.0, 73.0, 0.0) : null;
-                if (lobby == null) {
-                    Location mapLobby = session.getArena().getMapLobbyLocation();
-                    lobby = mapLobby != null ? mapLobby : session.getArena().getLobbyLocation();
-                }
+                Location mapLobby = session.getArena().getMapLobbyLocation();
+                Location lobby = mapLobby != null ? mapLobby : session.getArena().getLobbyLocation();
                 if (lobby != null) {
                     event.setRespawnLocation(lobby);
                 }

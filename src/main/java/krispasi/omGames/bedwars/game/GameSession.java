@@ -1419,7 +1419,7 @@ public class GameSession {
         eliminatedPlayers.remove(targetId);
         respawnGracePlayers.add(targetId);
         setSpectator(target);
-        Location lobby = resolveMapLobbyLocation();
+        Location lobby = arena.getLobbyLocation();
         if (lobby != null) {
             target.teleport(lobby);
         }
@@ -1868,7 +1868,7 @@ public class GameSession {
             world.getBlockAt(point.x(), point.y(), point.z()).setType(Material.AIR, false);
         }
         restoreBeds();
-        Location lobby = resolveMapLobbyLocation();
+        Location lobby = arena.getLobbyLocation();
         for (UUID playerId : assignments.keySet()) {
             Player player = Bukkit.getPlayer(playerId);
             if (player == null) {
@@ -3382,10 +3382,6 @@ public class GameSession {
     }
 
     private Location resolveMapLobbyLocation() {
-        World world = arena.getWorld();
-        if (world != null) {
-            return new Location(world, 0.0, 73.0, 0.0);
-        }
         Location mapLobby = arena.getMapLobbyLocation();
         if (mapLobby != null) {
             return mapLobby;
