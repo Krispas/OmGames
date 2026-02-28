@@ -42,10 +42,6 @@ import krispasi.omGames.bedwars.shop.ShopCategoryType;
  */
 public class BedwarsManager {
     private static final int DEFAULT_CENTER_RADIUS = 32;
-    private static final double DEFAULT_GARRY_FAMILY_DAMAGE = 12.0;
-    private static final double DEFAULT_GARRY_FAMILY_HEALTH = 200.0;
-    private static final double DEFAULT_GARRY_FAMILY_RANGE = 32.0;
-    private static final double DEFAULT_GARRY_FAMILY_SPEED = 0.3;
     private final JavaPlugin plugin;
     private final QuickBuyService quickBuyService;
     private final BedwarsStatsService statsService;
@@ -54,10 +50,6 @@ public class BedwarsManager {
     private GameSession activeSession;
     private ShopConfig shopConfig = ShopConfig.empty();
     private CustomItemConfig customItemConfig = CustomItemConfig.empty();
-    private double garryFamilyDamage = DEFAULT_GARRY_FAMILY_DAMAGE;
-    private double garryFamilyHealth = DEFAULT_GARRY_FAMILY_HEALTH;
-    private double garryFamilyRange = DEFAULT_GARRY_FAMILY_RANGE;
-    private double garryFamilySpeed = DEFAULT_GARRY_FAMILY_SPEED;
 
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -95,16 +87,8 @@ public class BedwarsManager {
             migrateRotatingItemsConfig(rotatingFile);
             ShopConfig rotatingConfig = new ShopConfigLoader(rotatingFile, plugin.getLogger()).load();
             shopConfig = ShopConfig.merge(baseConfig, rotatingConfig);
-            garryFamilyDamage = loadGarryFamilyDamage(rotatingFile);
-            garryFamilyHealth = loadGarryFamilyHealth(rotatingFile);
-            garryFamilyRange = loadGarryFamilyRange(rotatingFile);
-            garryFamilySpeed = loadGarryFamilySpeed(rotatingFile);
         } else {
             shopConfig = baseConfig;
-            garryFamilyDamage = DEFAULT_GARRY_FAMILY_DAMAGE;
-            garryFamilyHealth = DEFAULT_GARRY_FAMILY_HEALTH;
-            garryFamilyRange = DEFAULT_GARRY_FAMILY_RANGE;
-            garryFamilySpeed = DEFAULT_GARRY_FAMILY_SPEED;
         }
         plugin.getLogger().info("Loaded BedWars shop config.");
     }
@@ -159,22 +143,6 @@ public class BedwarsManager {
 
     public BedwarsStatsService getStatsService() {
         return statsService;
-    }
-
-    public double getGarryFamilyDamage() {
-        return garryFamilyDamage;
-    }
-
-    public double getGarryFamilyHealth() {
-        return garryFamilyHealth;
-    }
-
-    public double getGarryFamilyRange() {
-        return garryFamilyRange;
-    }
-
-    public double getGarryFamilySpeed() {
-        return garryFamilySpeed;
     }
 
     public boolean isBedwarsWorld(String worldName) {
@@ -697,22 +665,7 @@ public class BedwarsManager {
         org.bukkit.configuration.file.YamlConfiguration config =
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
         boolean changed = false;
-        if (!config.isSet("settings.garry-family-damage")) {
-            config.set("settings.garry-family-damage", DEFAULT_GARRY_FAMILY_DAMAGE);
-            changed = true;
-        }
-        if (!config.isSet("settings.garry-family-health")) {
-            config.set("settings.garry-family-health", DEFAULT_GARRY_FAMILY_HEALTH);
-            changed = true;
-        }
-        if (!config.isSet("settings.garry-family-range")) {
-            config.set("settings.garry-family-range", DEFAULT_GARRY_FAMILY_RANGE);
-            changed = true;
-        }
-        if (!config.isSet("settings.garry-family-speed")) {
-            config.set("settings.garry-family-speed", DEFAULT_GARRY_FAMILY_SPEED);
-            changed = true;
-        }
+        changed |= pruneUnknownRotatingUpgrades(config);
         if (ensureShopItem(config, "totem_of_undying", "rotating", "TOTEM_OF_UNDYING", 1,
                 "EMERALD", 2, "UTILITY", "Totem of Undying")) {
             changed = true;
@@ -744,55 +697,58 @@ public class BedwarsManager {
         }
     }
 
-    private double loadGarryFamilyDamage(File rotatingFile) {
-        if (rotatingFile == null || !rotatingFile.exists()) {
-            return DEFAULT_GARRY_FAMILY_DAMAGE;
+    private boolean removePath(org.bukkit.configuration.file.YamlConfiguration config, String path) {
+        if (config == null || path == null || path.isBlank() || !config.contains(path)) {
+            return false;
         }
-        org.bukkit.configuration.file.YamlConfiguration config =
-                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(rotatingFile);
-        double configured = config.getDouble("settings.garry-family-damage", DEFAULT_GARRY_FAMILY_DAMAGE);
-        if (configured < 0.0) {
-            return DEFAULT_GARRY_FAMILY_DAMAGE;
-        }
-        return configured;
+        config.set(path, null);
+        return true;
     }
 
-    private double loadGarryFamilyHealth(File rotatingFile) {
-        if (rotatingFile == null || !rotatingFile.exists()) {
-            return DEFAULT_GARRY_FAMILY_HEALTH;
+    private boolean pruneUnknownRotatingUpgrades(org.bukkit.configuration.file.YamlConfiguration config) {
+        boolean changed = false;
+        java.util.Set<String> removeIds = new java.util.HashSet<>();
+        org.bukkit.configuration.ConfigurationSection grouped = config.getConfigurationSection("shop.items.rotating");
+        if (grouped != null) {
+            for (String id : grouped.getKeys(false)) {
+                org.bukkit.configuration.ConfigurationSection section = grouped.getConfigurationSection(id);
+                if (section != null && isUnknownOrLegacyUpgrade(section)) {
+                    removeIds.add(id);
+                }
+            }
         }
-        org.bukkit.configuration.file.YamlConfiguration config =
-                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(rotatingFile);
-        double configured = config.getDouble("settings.garry-family-health", DEFAULT_GARRY_FAMILY_HEALTH);
-        if (configured <= 0.0) {
-            return DEFAULT_GARRY_FAMILY_HEALTH;
+        org.bukkit.configuration.ConfigurationSection flat = config.getConfigurationSection("shop.items");
+        if (flat != null) {
+            for (String id : flat.getKeys(false)) {
+                org.bukkit.configuration.ConfigurationSection section = flat.getConfigurationSection(id);
+                if (section == null || !section.isSet("material")) {
+                    continue;
+                }
+                if (isUnknownOrLegacyUpgrade(section)) {
+                    removeIds.add(id);
+                }
+            }
         }
-        return configured;
+        for (String id : removeIds) {
+            changed |= removePath(config, "shop.items.rotating." + id);
+            changed |= removePath(config, "shop.items." + id);
+            changed |= removePath(config, "shop.categories.rotating.entries." + id);
+        }
+        return changed;
     }
 
-    private double loadGarryFamilyRange(File rotatingFile) {
-        if (rotatingFile == null || !rotatingFile.exists()) {
-            return DEFAULT_GARRY_FAMILY_RANGE;
+    private boolean isUnknownOrLegacyUpgrade(org.bukkit.configuration.ConfigurationSection section) {
+        if (section == null) {
+            return false;
         }
-        org.bukkit.configuration.file.YamlConfiguration config =
-                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(rotatingFile);
-        double configured = config.getDouble("settings.garry-family-range", DEFAULT_GARRY_FAMILY_RANGE);
-        if (configured <= 0.0) {
-            return DEFAULT_GARRY_FAMILY_RANGE;
+        String upgrade = section.getString("upgrade");
+        if (upgrade != null && !upgrade.isBlank()) {
+            try {
+                krispasi.omGames.bedwars.upgrade.TeamUpgradeType.valueOf(upgrade.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                return true;
+            }
         }
-        return configured;
-    }
-
-    private double loadGarryFamilySpeed(File rotatingFile) {
-        if (rotatingFile == null || !rotatingFile.exists()) {
-            return DEFAULT_GARRY_FAMILY_SPEED;
-        }
-        org.bukkit.configuration.file.YamlConfiguration config =
-                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(rotatingFile);
-        double configured = config.getDouble("settings.garry-family-speed", DEFAULT_GARRY_FAMILY_SPEED);
-        if (configured <= 0.0) {
-            return DEFAULT_GARRY_FAMILY_SPEED;
-        }
-        return configured;
+        return false;
     }
 }

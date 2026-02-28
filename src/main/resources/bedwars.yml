@@ -88,6 +88,7 @@ arenas:
     map-lobby: 952 120 1488
     corner_1: 787 22 1324
     corner_2: 1126 100 1624
+    base-radius: 21
 
     beds:
       red: 989 51 1372, 989 51 1373

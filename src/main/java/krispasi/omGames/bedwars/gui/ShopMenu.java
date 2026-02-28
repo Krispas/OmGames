@@ -349,9 +349,6 @@ public class ShopMenu implements InventoryHolder {
         if (type == null) {
             return item.createDisplayItem(team);
         }
-        if (type == TeamUpgradeType.GARRY) {
-            return buildGarryDisplay(type);
-        }
         int tier = session.getUpgradeTier(team, type);
         int maxTier = type.maxTier();
         boolean maxed = tier >= maxTier;
@@ -377,52 +374,6 @@ public class ShopMenu implements InventoryHolder {
         } else {
             lore.add(Component.text("Cost: " + type.nextCost(tier) + " Diamonds", NamedTextColor.YELLOW));
             lore.add(Component.text("Click to purchase", NamedTextColor.GRAY));
-        }
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
-        meta.lore(lore);
-        display.setItemMeta(meta);
-        return display;
-    }
-
-    private ItemStack buildGarryDisplay(TeamUpgradeType type) {
-        ItemStack display = new ItemStack(type.icon());
-        ItemMeta meta = display.getItemMeta();
-        String nextName = session.getGarryNextName();
-        int cost = session.getGarryNextCost();
-        boolean available = cost > 0;
-        boolean maxed = cost <= 0 && session.isGarryUnlocked()
-                && session.isGarryWifeAlive()
-                && session.isGarryJrAlive();
-        String title = nextName != null ? nextName : type.displayName();
-        meta.displayName(Component.text(title, maxed ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
-
-        java.util.List<Component> lore = new java.util.ArrayList<>();
-        for (String line : type.description()) {
-            lore.add(Component.text(line, NamedTextColor.GRAY));
-        }
-        lore.add(Component.text(" ", NamedTextColor.DARK_GRAY));
-        if (session.isGarryUnlocked()) {
-            String active = "Garry";
-            if (session.isGarryWifeAlive() && session.isGarryJrAlive()) {
-                active = "Garry, Wife, Jr.";
-            } else if (session.isGarryWifeAlive()) {
-                active = "Garry, Wife";
-            } else if (session.isGarryJrAlive()) {
-                active = "Garry, Jr.";
-            }
-            lore.add(Component.text("Active: " + active, NamedTextColor.GRAY));
-        } else {
-            lore.add(Component.text("Active: none", NamedTextColor.GRAY));
-        }
-        if (maxed) {
-            lore.add(Component.text("All wardens active", NamedTextColor.GREEN));
-            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
-            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
-        } else if (available) {
-            lore.add(Component.text("Cost: " + cost + " Diamonds", NamedTextColor.YELLOW));
-            lore.add(Component.text("Click to purchase", NamedTextColor.GRAY));
-        } else {
-            lore.add(Component.text("Not available", NamedTextColor.RED));
         }
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         meta.lore(lore);

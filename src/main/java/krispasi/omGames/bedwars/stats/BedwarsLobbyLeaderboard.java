@@ -35,7 +35,7 @@ public class BedwarsLobbyLeaderboard {
     private static final double NEAR_RADIUS_BLOCKS = 24.0;
     private static final double ANCHOR_X = 4.0;
     private static final double ANCHOR_Y = 73.0;
-    private static final double ANCHOR_Z = 1.0;
+    private static final double ANCHOR_Z = 3.0;
     private static final double DEPTH_OFFSET_X = -1.25;
     private static final double COLUMN_MIN_Z = -2.0;
     private static final double COLUMN_MID_Z = 1.0;

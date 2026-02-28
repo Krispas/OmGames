@@ -114,10 +114,13 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             if (args.length == 2 && args[1].equalsIgnoreCase("lobby")) {
-                World world = player.getWorld();
-                Location target = new Location(world, 0, 73, -1);
+                Location target = resolveBedwarsLobbyLocation();
+                if (target == null) {
+                    sender.sendMessage(Component.text("No BedWars world is loaded.", NamedTextColor.RED));
+                    return true;
+                }
                 player.teleport(target);
-                sender.sendMessage(Component.text("Teleported to lobby.", NamedTextColor.GREEN));
+                sender.sendMessage(Component.text("Teleported to BedWars lobby.", NamedTextColor.GREEN));
                 return true;
             }
             String arenaName = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).trim();
@@ -135,13 +138,16 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Component.text("World not loaded: " + arena.getWorldName(), NamedTextColor.RED));
                 return true;
             }
-            if (arena.getCenter() == null) {
-                sender.sendMessage(Component.text("Arena center not set: " + arena.getId(), NamedTextColor.RED));
+            Location target = resolveArenaLobbyLocation(arena);
+            if (target == null && arena.getCenter() != null) {
+                target = arena.getCenter().toLocation(world);
+            }
+            if (target == null) {
+                sender.sendMessage(Component.text("Arena teleport location not set: " + arena.getId(), NamedTextColor.RED));
                 return true;
             }
-            Location target = arena.getCenter().toLocation(world);
             player.teleport(target);
-            sender.sendMessage(Component.text("Teleported to center of " + arena.getId() + ".", NamedTextColor.GREEN));
+            sender.sendMessage(Component.text("Teleported to " + arena.getId() + " in " + world.getName() + ".", NamedTextColor.GREEN));
             return true;
         }
         if (args[0].equalsIgnoreCase("out")) {
@@ -437,10 +443,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         session.removeParticipant(target);
         target.getInventory().clear();
         target.setGameMode(GameMode.SPECTATOR);
-        Location spectate = session.getArena().getMapLobbyLocation();
-        if (spectate == null) {
-            spectate = session.getArena().getLobbyLocation();
-        }
+        Location spectate = resolveArenaLobbyLocation(session.getArena());
         if (spectate != null) {
             target.teleport(spectate);
         }
@@ -459,5 +462,41 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 || arg.equalsIgnoreCase("quick-buy")
                 || arg.equalsIgnoreCase("quck-buy")
                 || arg.equalsIgnoreCase("quck_buy");
+    }
+
+    private Location resolveBedwarsLobbyLocation() {
+        GameSession session = bedwarsManager.getActiveSession();
+        if (session != null && session.getArena() != null) {
+            Location activeLobby = resolveArenaLobbyLocation(session.getArena());
+            if (activeLobby != null) {
+                return activeLobby;
+            }
+        }
+        for (Arena arena : bedwarsManager.getArenas()) {
+            Location lobby = resolveArenaLobbyLocation(arena);
+            if (lobby != null) {
+                return lobby;
+            }
+        }
+        World bedwarsWorld = Bukkit.getWorld("bedwars");
+        if (bedwarsWorld != null) {
+            return new Location(bedwarsWorld, 0.0, 73.0, 0.0);
+        }
+        return null;
+    }
+
+    private Location resolveArenaLobbyLocation(Arena arena) {
+        if (arena == null) {
+            return null;
+        }
+        World world = arena.getWorld();
+        if (world != null) {
+            return new Location(world, 0.0, 73.0, 0.0);
+        }
+        Location mapLobby = arena.getMapLobbyLocation();
+        if (mapLobby != null) {
+            return mapLobby;
+        }
+        return arena.getLobbyLocation();
     }
 }

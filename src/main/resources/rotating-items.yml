@@ -1,9 +1,3 @@
-settings:
-  garry-family-damage: 12.0
-  garry-family-health: 200.0
-  garry-family-range: 32.0
-  garry-family-speed: 0.3
-
 shop:
   categories:
     rotating:
@@ -23,7 +17,6 @@ shop:
         bridge_zapper: 19
         thorns_upgrade: 28
         fire_aspect_upgrade: 29
-        garry_upgrade: 30
   items:
     rotating:
       respawn_beacon:
@@ -167,12 +160,3 @@ shop:
         display-name: "Fire Aspect"
         behavior: UPGRADE
         upgrade: FIRE_ASPECT
-      garry_upgrade:
-        material: WARDEN_SPAWN_EGG
-        amount: 1
-        cost:
-          material: DIAMOND
-          amount: 4
-        display-name: "Garry the Warden"
-        behavior: UPGRADE
-        upgrade: GARRY

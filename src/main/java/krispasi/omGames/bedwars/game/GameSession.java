@@ -104,9 +104,6 @@ public class GameSession {
     public static final String CRYSTAL_EXPLOSION_TAG = "bw_crystal_exploded";
     public static final String HAPPY_GHAST_TAG = "bw_happy_ghast";
     public static final String CREEPING_CREEPER_TAG = "bw_creeping_creeper";
-    public static final String GARRY_TAG = "bw_garry";
-    public static final String GARRY_WIFE_TAG = "bw_garry_wife";
-    public static final String GARRY_JR_TAG = "bw_garry_jr";
     private static final Set<Material> SWORD_MATERIALS = EnumSet.of(
             Material.WOODEN_SWORD,
             Material.STONE_SWORD,
@@ -155,8 +152,6 @@ public class GameSession {
     private static final int TRAP_CHECK_INTERVAL_TICKS = 20;
     private static final int TRAP_MAX_COUNT = 3;
     private static final int TRAP_BLINDNESS_SECONDS = 8;
-    private static final int GARRY_RESPAWN_SECONDS = 10;
-    private static final int DEFAULT_CENTER_RADIUS = 32;
     private static final int TRAP_SLOW_SECONDS = 8;
     private static final int TRAP_COUNTER_SECONDS = 15;
     private static final int TRAP_FATIGUE_SECONDS = 10;
@@ -208,13 +203,6 @@ public class GameSession {
     private final Map<UUID, Integer> axeTiers = new HashMap<>();
     private final Set<UUID> shearsUnlocked = new HashSet<>();
     private final Set<UUID> shieldUnlocked = new HashSet<>();
-    private boolean garryUnlocked;
-    private boolean garryWifeAlive;
-    private boolean garryJrAlive;
-    private UUID garryId;
-    private UUID garryWifeId;
-    private UUID garryJrId;
-    private BukkitTask garryRespawnTask;
     private boolean suddenDeathActive;
     private boolean tier2Triggered;
     private boolean tier3Triggered;
@@ -460,10 +448,7 @@ public class GameSession {
 
         if (state == GameState.LOBBY) {
             updateTeamsInMatch();
-            Location lobby = arena.getMapLobbyLocation();
-            if (lobby == null) {
-                lobby = arena.getLobbyLocation();
-            }
+            Location lobby = resolveMapLobbyLocation();
             if (lobby != null) {
                 player.teleport(lobby);
             }
@@ -847,9 +832,6 @@ public class GameSession {
             player.sendMessage(Component.text("This rotating upgrade is not available in this match.", NamedTextColor.RED));
             return false;
         }
-        if (type == TeamUpgradeType.GARRY) {
-            return handleGarryUpgradePurchase(player);
-        }
         TeamColor team = getTeam(player.getUniqueId());
         if (team == null) {
             return false;
@@ -903,253 +885,6 @@ public class GameSession {
         return true;
     }
 
-    public boolean isGarryUnlocked() {
-        return garryUnlocked;
-    }
-
-    public boolean isGarryWifeAlive() {
-        return garryWifeAlive;
-    }
-
-    public boolean isGarryJrAlive() {
-        return garryJrAlive;
-    }
-
-    public int getGarryNextCost() {
-        if (suddenDeathActive) {
-            return -1;
-        }
-        if (!garryUnlocked) {
-            return 4;
-        }
-        if (!garryWifeAlive) {
-            return garryJrAlive ? 8 : 6;
-        }
-        if (!garryJrAlive) {
-            return 8;
-        }
-        return -1;
-    }
-
-    public String getGarryNextName() {
-        if (suddenDeathActive) {
-            return "Garry (Disabled)";
-        }
-        if (!garryUnlocked) {
-            return "Garry";
-        }
-        if (!garryWifeAlive) {
-            return "Garry's Wife";
-        }
-        if (!garryJrAlive) {
-            return "Garry Jr.";
-        }
-        return "Garry";
-    }
-
-    private boolean handleGarryUpgradePurchase(Player player) {
-        if (suddenDeathActive) {
-            player.sendMessage(Component.text("Garry upgrades are disabled during Sudden Death.", NamedTextColor.RED));
-            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-            return false;
-        }
-        int cost = getGarryNextCost();
-        if (cost <= 0) {
-            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-            return false;
-        }
-        ShopCost shopCost = new ShopCost(Material.DIAMOND, cost);
-        if (!hasResources(player, shopCost)) {
-            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-            return false;
-        }
-        org.bukkit.entity.Warden warden;
-        String name;
-        if (!garryUnlocked) {
-            warden = spawnGarryWarden(GARRY_TAG, "Garry", "garry");
-            if (warden == null) {
-                player.sendMessage(Component.text("Garry cannot spawn here.", NamedTextColor.RED));
-                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-                return false;
-            }
-            garryUnlocked = true;
-            garryId = warden.getUniqueId();
-            name = "Garry";
-        } else if (!garryWifeAlive) {
-            warden = spawnGarryWarden(GARRY_WIFE_TAG, "Garry's Wife", "garry_wife");
-            if (warden == null) {
-                player.sendMessage(Component.text("Garry's Wife cannot spawn here.", NamedTextColor.RED));
-                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-                return false;
-            }
-            garryWifeAlive = true;
-            garryWifeId = warden.getUniqueId();
-            name = "Garry's Wife";
-        } else if (!garryJrAlive) {
-            warden = spawnGarryWarden(GARRY_JR_TAG, "Garry Jr.", "garry_jr");
-            if (warden == null) {
-                player.sendMessage(Component.text("Garry Jr. cannot spawn here.", NamedTextColor.RED));
-                player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-                return false;
-            }
-            garryJrAlive = true;
-            garryJrId = warden.getUniqueId();
-            name = "Garry Jr.";
-        } else {
-            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-            return false;
-        }
-        removeResources(player, shopCost);
-        broadcast(Component.text(player.getName(), NamedTextColor.YELLOW)
-                .append(Component.text(" summoned ", NamedTextColor.GRAY))
-                .append(Component.text(name, NamedTextColor.RED)));
-        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
-        return true;
-    }
-
-    public void handleGarryDeath(org.bukkit.entity.Entity entity, Player killer) {
-        if (entity == null) {
-            return;
-        }
-        String killerName = killer != null ? killer.getName() : "unknown";
-        if (entity.getScoreboardTags().contains(GARRY_TAG)) {
-            garryId = null;
-            if (!garryUnlocked || suddenDeathActive) {
-                return;
-            }
-            broadcast(Component.text("Garry has been killed by " + killerName
-                    + " and will respawn in " + GARRY_RESPAWN_SECONDS + "s.", NamedTextColor.RED));
-            scheduleGarryRespawn();
-            return;
-        }
-        if (entity.getScoreboardTags().contains(GARRY_WIFE_TAG)) {
-            garryWifeAlive = false;
-            garryWifeId = null;
-            broadcast(Component.text("Garry's Wife has been killed by " + killerName + ".", NamedTextColor.RED));
-            return;
-        }
-        if (entity.getScoreboardTags().contains(GARRY_JR_TAG)) {
-            garryJrAlive = false;
-            garryJrId = null;
-            broadcast(Component.text("Garry Jr. has been killed by " + killerName + ".", NamedTextColor.RED));
-        }
-    }
-
-    public void updateGarryFamilyHealthDisplay(org.bukkit.entity.Entity entity) {
-        if (!(entity instanceof LivingEntity living)) {
-            return;
-        }
-        String name = resolveGarryFamilyName(entity);
-        if (name == null) {
-            return;
-        }
-        double current = Math.max(0.0, living.getHealth());
-        double max = Math.max(0.0, living.getMaxHealth());
-        Component title = Component.text(name, NamedTextColor.RED)
-                .append(Component.newline())
-                .append(Component.text("Health: ", NamedTextColor.GRAY))
-                .append(Component.text(formatHealthValue(current), NamedTextColor.GREEN))
-                .append(Component.text("/", NamedTextColor.DARK_GRAY))
-                .append(Component.text(formatHealthValue(max), NamedTextColor.GREEN));
-        living.customName(title);
-        living.setCustomNameVisible(true);
-    }
-
-    private void scheduleGarryRespawn() {
-        if (garryRespawnTask != null) {
-            garryRespawnTask.cancel();
-        }
-        garryRespawnTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> safeRun("garryRespawn", () -> {
-            if (state != GameState.RUNNING || suddenDeathActive) {
-                return;
-            }
-            org.bukkit.entity.Warden warden = spawnGarryWarden(GARRY_TAG, "Garry", "garry");
-            if (warden != null) {
-                garryId = warden.getUniqueId();
-            }
-        }), GARRY_RESPAWN_SECONDS * 20L);
-    }
-
-    private void despawnGarryWardens() {
-        World world = arena.getWorld();
-        if (world == null) {
-            return;
-        }
-        for (org.bukkit.entity.Entity entity : world.getEntities()) {
-            if (entity.getScoreboardTags().contains(GARRY_TAG)
-                    || entity.getScoreboardTags().contains(GARRY_WIFE_TAG)
-                    || entity.getScoreboardTags().contains(GARRY_JR_TAG)) {
-                entity.remove();
-            }
-        }
-        garryId = null;
-        garryWifeId = null;
-        garryJrId = null;
-        garryWifeAlive = false;
-        garryJrAlive = false;
-        if (garryRespawnTask != null) {
-            garryRespawnTask.cancel();
-            garryRespawnTask = null;
-        }
-    }
-
-    private org.bukkit.entity.Warden spawnGarryWarden(String tag, String name, String customId) {
-        World world = arena.getWorld();
-        BlockPoint center = arena.getCenter();
-        if (world == null || center == null) {
-            return null;
-        }
-        Location spawn = center.toLocation(world);
-        spawn.setY(center.y() + 1.0);
-        org.bukkit.entity.Warden warden = world.spawn(spawn, org.bukkit.entity.Warden.class, entity -> {
-            entity.setRemoveWhenFarAway(false);
-            entity.customName(Component.text(name, NamedTextColor.RED));
-            entity.setCustomNameVisible(true);
-            entity.addScoreboardTag(tag);
-        });
-        CustomItemDefinition custom = bedwarsManager.getCustomItemConfig().getItem(customId);
-        applyCustomEntityStats(warden, custom);
-        applyGarryFamilyHealthOverride(warden);
-        applyGarryFamilyRangeOverride(warden);
-        applyGarryFamilySpeedOverride(warden);
-        updateGarryFamilyHealthDisplay(warden);
-        return warden;
-    }
-
-    private void applyGarryFamilyHealthOverride(org.bukkit.entity.Warden warden) {
-        if (warden == null) {
-            return;
-        }
-        double health = bedwarsManager.getGarryFamilyHealth();
-        if (health <= 0.0) {
-            return;
-        }
-        warden.setMaxHealth(health);
-        warden.setHealth(Math.min(health, warden.getMaxHealth()));
-    }
-
-    private void applyGarryFamilyRangeOverride(org.bukkit.entity.Warden warden) {
-        if (warden == null) {
-            return;
-        }
-        double range = bedwarsManager.getGarryFamilyRange();
-        if (range <= 0.0) {
-            return;
-        }
-        applyAttribute(warden, "GENERIC_FOLLOW_RANGE", range);
-    }
-
-    private void applyGarryFamilySpeedOverride(org.bukkit.entity.Warden warden) {
-        if (warden == null) {
-            return;
-        }
-        double speed = bedwarsManager.getGarryFamilySpeed();
-        if (speed <= 0.0) {
-            return;
-        }
-        applyAttribute(warden, "GENERIC_MOVEMENT_SPEED", speed);
-    }
-
     private void applyCustomEntityStats(LivingEntity entity, CustomItemDefinition custom) {
         if (entity == null || custom == null) {
             return;
@@ -1168,29 +903,6 @@ public class GameSession {
         if (range > 0.0) {
             applyAttribute(entity, "GENERIC_FOLLOW_RANGE", range);
         }
-    }
-
-    private String resolveGarryFamilyName(org.bukkit.entity.Entity entity) {
-        if (entity == null) {
-            return null;
-        }
-        if (entity.getScoreboardTags().contains(GARRY_TAG)) {
-            return "Garry";
-        }
-        if (entity.getScoreboardTags().contains(GARRY_WIFE_TAG)) {
-            return "Garry's Wife";
-        }
-        if (entity.getScoreboardTags().contains(GARRY_JR_TAG)) {
-            return "Garry Jr.";
-        }
-        return null;
-    }
-
-    private String formatHealthValue(double value) {
-        if (Math.abs(value - Math.rint(value)) < 0.05) {
-            return String.valueOf((int) Math.rint(value));
-        }
-        return String.format(Locale.ROOT, "%.1f", value);
     }
 
     private void applyAttribute(LivingEntity entity, String attributeName, double value) {
@@ -1707,7 +1419,7 @@ public class GameSession {
         eliminatedPlayers.remove(targetId);
         respawnGracePlayers.add(targetId);
         setSpectator(target);
-        Location lobby = arena.getLobbyLocation();
+        Location lobby = resolveMapLobbyLocation();
         if (lobby != null) {
             target.teleport(lobby);
         }
@@ -1923,7 +1635,6 @@ public class GameSession {
             return;
         }
         suddenDeathActive = true;
-        despawnGarryWardens();
         showTitleAll(Component.text("Sudden Death!", NamedTextColor.RED),
                 Component.text("Final battle begins.", NamedTextColor.GRAY));
         broadcast(Component.text("Sudden Death has begun!", NamedTextColor.RED));
@@ -2157,7 +1868,7 @@ public class GameSession {
             world.getBlockAt(point.x(), point.y(), point.z()).setType(Material.AIR, false);
         }
         restoreBeds();
-        Location lobby = arena.getLobbyLocation();
+        Location lobby = resolveMapLobbyLocation();
         for (UUID playerId : assignments.keySet()) {
             Player player = Bukkit.getPlayer(playerId);
             if (player == null) {
@@ -2403,10 +2114,7 @@ public class GameSession {
                     || entity.getScoreboardTags().contains(DREAM_DEFENDER_TAG)
                     || entity.getScoreboardTags().contains(CRYSTAL_TAG)
                     || entity.getScoreboardTags().contains(HAPPY_GHAST_TAG)
-                    || entity.getScoreboardTags().contains(CREEPING_CREEPER_TAG)
-                    || entity.getScoreboardTags().contains(GARRY_TAG)
-                    || entity.getScoreboardTags().contains(GARRY_WIFE_TAG)
-                    || entity.getScoreboardTags().contains(GARRY_JR_TAG)) {
+                    || entity.getScoreboardTags().contains(CREEPING_CREEPER_TAG)) {
                 entity.remove();
             }
         }
@@ -2484,16 +2192,6 @@ public class GameSession {
         lastRegenTimes.clear();
         trapImmunityEnds.clear();
         trapImmunityTasks.clear();
-        garryUnlocked = false;
-        garryWifeAlive = false;
-        garryJrAlive = false;
-        garryId = null;
-        garryWifeId = null;
-        garryJrId = null;
-        if (garryRespawnTask != null) {
-            garryRespawnTask.cancel();
-            garryRespawnTask = null;
-        }
         suddenDeathActive = false;
         tier2Triggered = false;
         tier3Triggered = false;
@@ -3401,10 +3099,7 @@ public class GameSession {
             return;
         }
         if (state == GameState.LOBBY) {
-            Location lobby = arena.getMapLobbyLocation();
-            if (lobby == null) {
-                lobby = arena.getLobbyLocation();
-            }
+            Location lobby = resolveMapLobbyLocation();
             if (lobby != null) {
                 player.teleport(lobby);
             }
@@ -3687,6 +3382,10 @@ public class GameSession {
     }
 
     private Location resolveMapLobbyLocation() {
+        World world = arena.getWorld();
+        if (world != null) {
+            return new Location(world, 0.0, 73.0, 0.0);
+        }
         Location mapLobby = arena.getMapLobbyLocation();
         if (mapLobby != null) {
             return mapLobby;
@@ -3911,139 +3610,6 @@ public class GameSession {
                 0L,
                 TRAP_CHECK_INTERVAL_TICKS);
         tasks.add(trapTask);
-        BukkitTask garryRadiusTask = plugin.getServer().getScheduler().runTaskTimer(plugin,
-                () -> safeRun("garryCenterRadius", this::enforceGarryCenterRadius),
-                0L,
-                10L);
-        tasks.add(garryRadiusTask);
-    }
-
-    private void enforceGarryCenterRadius() {
-        if (state != GameState.RUNNING) {
-            return;
-        }
-        World world = arena.getWorld();
-        BlockPoint center = arena.getCenter();
-        if (world == null || center == null) {
-            return;
-        }
-        int radius = resolveCenterRadius();
-        if (radius <= 0) {
-            return;
-        }
-        double radiusSquared = radius * radius;
-        double centerX = center.x() + 0.5;
-        double centerZ = center.z() + 0.5;
-        Location centerLocation = new Location(world, centerX, center.y() + 1.0, centerZ);
-        for (org.bukkit.entity.Entity entity : world.getEntities()) {
-            if (!(entity instanceof org.bukkit.entity.Warden warden)) {
-                continue;
-            }
-            if (!isGarryFamilyWarden(warden)) {
-                continue;
-            }
-            Location location = warden.getLocation();
-            double dx = location.getX() - centerX;
-            double dz = location.getZ() - centerZ;
-            double distanceSquared = dx * dx + dz * dz;
-            if (distanceSquared > radiusSquared) {
-                if (distanceSquared <= 0.0001) {
-                    warden.teleport(centerLocation);
-                } else {
-                    double distance = Math.sqrt(distanceSquared);
-                    double scale = Math.max(0.0, (radius - 0.2) / distance);
-                    double clampedX = centerX + dx * scale;
-                    double clampedZ = centerZ + dz * scale;
-                    Location clamped = new Location(world, clampedX, location.getY(), clampedZ,
-                            location.getYaw(), location.getPitch());
-                    warden.teleport(clamped);
-                }
-            }
-            LivingEntity currentTarget = warden.getTarget();
-            UUID currentTargetId = null;
-            if (currentTarget instanceof Player playerTarget && isCenterRadiusParticipant(playerTarget)) {
-                currentTargetId = playerTarget.getUniqueId();
-            }
-            Player randomTarget = pickRandomCenterRadiusParticipant(currentTargetId);
-            if (randomTarget == null && currentTargetId != null) {
-                randomTarget = Bukkit.getPlayer(currentTargetId);
-            }
-            warden.setTarget(randomTarget);
-            if (randomTarget == null) {
-                warden.setTarget(null);
-            }
-        }
-    }
-
-    private int resolveCenterRadius() {
-        int configured = arena.getCenterRadius();
-        return configured > 0 ? configured : DEFAULT_CENTER_RADIUS;
-    }
-
-    public boolean isInsideCenterRadius(Location location) {
-        if (location == null) {
-            return false;
-        }
-        World world = arena.getWorld();
-        BlockPoint center = arena.getCenter();
-        if (world == null || center == null || location.getWorld() == null || !world.equals(location.getWorld())) {
-            return false;
-        }
-        int radius = resolveCenterRadius();
-        if (radius <= 0) {
-            return true;
-        }
-        double centerX = center.x() + 0.5;
-        double centerZ = center.z() + 0.5;
-        double dx = location.getX() - centerX;
-        double dz = location.getZ() - centerZ;
-        return dx * dx + dz * dz <= (double) radius * radius;
-    }
-
-    public boolean isCenterRadiusParticipant(Player player) {
-        if (player == null || !isParticipant(player.getUniqueId())) {
-            return false;
-        }
-        if (!isInArenaWorld(player.getWorld()) || player.getGameMode() == GameMode.SPECTATOR) {
-            return false;
-        }
-        return isInsideCenterRadius(player.getLocation());
-    }
-
-    public Player pickRandomCenterRadiusParticipant() {
-        return pickRandomCenterRadiusParticipant(null);
-    }
-
-    public Player pickRandomCenterRadiusParticipant(UUID excludePlayerId) {
-        if (state != GameState.RUNNING) {
-            return null;
-        }
-        List<Player> candidates = new ArrayList<>();
-        for (UUID playerId : assignments.keySet()) {
-            if (excludePlayerId != null && excludePlayerId.equals(playerId)) {
-                continue;
-            }
-            Player candidate = Bukkit.getPlayer(playerId);
-            if (!isCenterRadiusParticipant(candidate)) {
-                continue;
-            }
-            candidates.add(candidate);
-        }
-        if (candidates.isEmpty() && excludePlayerId != null) {
-            return pickRandomCenterRadiusParticipant(null);
-        }
-        if (candidates.isEmpty()) {
-            return null;
-        }
-        Collections.shuffle(candidates);
-        return candidates.get(0);
-    }
-
-    private boolean isGarryFamilyWarden(org.bukkit.entity.Warden warden) {
-        return warden != null
-                && (warden.getScoreboardTags().contains(GARRY_TAG)
-                || warden.getScoreboardTags().contains(GARRY_WIFE_TAG)
-                || warden.getScoreboardTags().contains(GARRY_JR_TAG));
     }
 
     private void startRegenTask() {
