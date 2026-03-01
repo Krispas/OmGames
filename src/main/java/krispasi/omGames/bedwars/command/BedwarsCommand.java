@@ -151,11 +151,8 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args[0].equalsIgnoreCase("out")) {
-            if (!sender.hasPermission("omgames.bw.start")) {
-                sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
-                return true;
-            }
-            return handleGameOut(sender, player, args);
+            sender.sendMessage(Component.text("Use /bw game out [player].", NamedTextColor.YELLOW));
+            return true;
         }
         if (args[0].equalsIgnoreCase("game")) {
             if (!sender.hasPermission("omgames.bw.start")) {
@@ -293,7 +290,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw out [player] | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -301,7 +298,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "test", "stop", "tp", "out", "game", "quick_buy", "stats", "reload", "setup")
+            return Stream.of("start", "test", "stop", "tp", "game", "quick_buy", "stats", "reload", "setup")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -309,13 +306,6 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             String input = args[1].toLowerCase(Locale.ROOT);
             return Stream.of("start")
                     .filter(option -> option.startsWith(input))
-                    .toList();
-        }
-        if (args.length == 2 && args[0].equalsIgnoreCase("out")) {
-            String input = args[1].toLowerCase(Locale.ROOT);
-            return Bukkit.getOnlinePlayers().stream()
-                    .map(Player::getName)
-                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("game")) {

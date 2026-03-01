@@ -126,7 +126,6 @@ OP/admin subcommands (permission-gated):
 - `/bw test start`
 - `/bw stop`
 - `/bw tp <arena>|lobby`
-- `/bw out [player]`
 - `/bw game out [player]`
 - `/bw game spectate [player]`
 - `/bw game join <team|spectate> [player]`
