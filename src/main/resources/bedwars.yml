@@ -1,5 +1,5 @@
-leaderboard: 4 73 -1
-parkour-leaderboard: 6 73 -1
+leaderboard: 4 73 0
+parkour-leaderboard: -40 103 -10
 lobby-parkour:
   world: bedwars
   start: ""

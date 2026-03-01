@@ -13,6 +13,7 @@ import java.util.UUID;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.model.BlockPoint;
+import krispasi.omGames.bedwars.stats.BedwarsStatsService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.GameMode;
@@ -40,6 +41,8 @@ public class BedwarsLobbyParkour {
     private static final String CONFIG_START = "start";
     private static final String CONFIG_END = "end";
     private static final String CONFIG_CHECKPOINTS = "checkpoints";
+    private static final long PLATE_COOLDOWN_MILLIS = 800L;
+    private static final long CONTROL_ITEM_CHECKPOINT_LOCK_MILLIS = 3_000L;
     private static final int CONTROL_SLOT_EXIT = 7;
     private static final int CONTROL_SLOT_CHECKPOINT = 8;
     private static final String CONTROL_EXIT = "exit";
@@ -48,6 +51,8 @@ public class BedwarsLobbyParkour {
     private final BedwarsManager bedwarsManager;
     private final NamespacedKey controlItemKey;
     private final Map<UUID, RunState> runs = new HashMap<>();
+    private final Map<UUID, Map<BlockPoint, Long>> plateTriggerCooldowns = new HashMap<>();
+    private final Map<UUID, Long> checkpointLockUntil = new HashMap<>();
 
     private String worldName;
     private BlockPoint startPlate;
@@ -94,6 +99,20 @@ public class BedwarsLobbyParkour {
 
     public void shutdown() {
         runs.clear();
+        plateTriggerCooldowns.clear();
+        checkpointLockUntil.clear();
+    }
+
+    public List<ParkourTopEntry> getTopEntries(int limit) {
+        int cappedLimit = Math.max(1, limit);
+        List<BedwarsStatsService.TopParkourEntry> entries =
+                bedwarsManager.getStatsService().getTopParkourTimes(cappedLimit);
+        List<ParkourTopEntry> top = new ArrayList<>();
+        for (int i = 0; i < entries.size() && i < cappedLimit; i++) {
+            BedwarsStatsService.TopParkourEntry entry = entries.get(i);
+            top.add(new ParkourTopEntry(entry.playerId(), entry.timeMillis(), entry.checkpointUses()));
+        }
+        return top;
     }
 
     public String setStartPlate(Player player) {
@@ -163,10 +182,12 @@ public class BedwarsLobbyParkour {
             return true;
         }
         if (CONTROL_EXIT.equals(control)) {
+            applyCheckpointLock(player.getUniqueId());
             abortRun(player, run, true);
             return true;
         }
         if (CONTROL_CHECKPOINT.equals(control)) {
+            applyCheckpointLock(player.getUniqueId());
             teleportToLastCheckpoint(player, run);
             return true;
         }
@@ -186,15 +207,41 @@ public class BedwarsLobbyParkour {
                 && from.getBlockZ() == to.getBlockZ()) {
             return;
         }
-        Block steppedBlock = to.clone().subtract(0, 1, 0).getBlock();
-        if (!isPressurePlate(steppedBlock)) {
+        Block atFeet = to.getBlock();
+        Block below = to.clone().subtract(0, 1, 0).getBlock();
+        if (isPressurePlate(atFeet)) {
+            handlePlateStep(player, new BlockPoint(atFeet.getX(), atFeet.getY(), atFeet.getZ()));
+        }
+        if (isPressurePlate(below)) {
+            handlePlateStep(player, new BlockPoint(below.getX(), below.getY(), below.getZ()));
+        }
+    }
+
+    public void handlePlatePress(Player player, Block plateBlock) {
+        if (player == null || plateBlock == null) {
+            return;
+        }
+        if (!isPlayerInLobbyParkourContext(player)) {
+            return;
+        }
+        if (!isPressurePlate(plateBlock)) {
+            return;
+        }
+        handlePlateStep(player, new BlockPoint(plateBlock.getX(), plateBlock.getY(), plateBlock.getZ()));
+    }
+
+    private void handlePlateStep(Player player, BlockPoint steppedPoint) {
+        if (player == null || steppedPoint == null) {
             return;
         }
         if (!matchesParkourWorld(player.getWorld().getName())) {
             return;
         }
-        BlockPoint steppedPoint = new BlockPoint(steppedBlock.getX(), steppedBlock.getY(), steppedBlock.getZ());
         if (startPlate != null && steppedPoint.equals(startPlate)) {
+            if (isOnPlateCooldown(player.getUniqueId(), steppedPoint)) {
+                return;
+            }
+            markPlateTriggered(player.getUniqueId(), steppedPoint);
             startRun(player);
             return;
         }
@@ -204,9 +251,17 @@ public class BedwarsLobbyParkour {
         }
         Integer checkpointIndex = findCheckpointIndex(steppedPoint);
         if (checkpointIndex != null) {
+            if (isCheckpointLocked(player.getUniqueId())) {
+                return;
+            }
+            if (isOnPlateCooldown(player.getUniqueId(), steppedPoint)) {
+                return;
+            }
+            markPlateTriggered(player.getUniqueId(), steppedPoint);
             run.lastCheckpoint = checkpointPlates.get(checkpointIndex);
             run.lastCheckpointLabel = "checkpoint " + checkpointIndex;
             player.sendActionBar(Component.text("Checkpoint " + checkpointIndex + " reached.", NamedTextColor.GREEN));
+            player.sendMessage(Component.text("Checkpoint " + checkpointIndex + " reached.", NamedTextColor.GREEN));
             return;
         }
         if (endPlate != null && steppedPoint.equals(endPlate)) {
@@ -219,6 +274,8 @@ public class BedwarsLobbyParkour {
             return;
         }
         RunState run = runs.remove(player.getUniqueId());
+        plateTriggerCooldowns.remove(player.getUniqueId());
+        checkpointLockUntil.remove(player.getUniqueId());
         if (run == null) {
             return;
         }
@@ -246,14 +303,19 @@ public class BedwarsLobbyParkour {
 
     private void finishRun(Player player, RunState run) {
         runs.remove(player.getUniqueId());
+        plateTriggerCooldowns.remove(player.getUniqueId());
+        checkpointLockUntil.remove(player.getUniqueId());
         restoreControlSlots(player, run);
         long elapsed = Math.max(0L, System.currentTimeMillis() - run.startedAt);
+        bedwarsManager.getStatsService().recordParkourFinish(player.getUniqueId(), elapsed, run.checkpointUses);
         player.sendMessage(Component.text("Parkour finished in " + formatElapsed(elapsed) + ".", NamedTextColor.GOLD));
         player.sendMessage(Component.text("Checkpoints used: " + run.checkpointUses + ".", NamedTextColor.YELLOW));
     }
 
     private void abortRun(Player player, RunState run, boolean teleportToStart) {
         runs.remove(player.getUniqueId());
+        plateTriggerCooldowns.remove(player.getUniqueId());
+        checkpointLockUntil.remove(player.getUniqueId());
         restoreControlSlots(player, run);
         if (teleportToStart && startPlate != null) {
             Location start = toTeleportLocation(player, startPlate);
@@ -515,6 +577,53 @@ public class BedwarsLobbyParkour {
         return item != null ? item.clone() : null;
     }
 
+    private boolean isOnPlateCooldown(UUID playerId, BlockPoint point) {
+        if (playerId == null || point == null) {
+            return false;
+        }
+        Map<BlockPoint, Long> cooldowns = plateTriggerCooldowns.get(playerId);
+        if (cooldowns == null) {
+            return false;
+        }
+        Long lastTrigger = cooldowns.get(point);
+        if (lastTrigger == null) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        return now - lastTrigger < PLATE_COOLDOWN_MILLIS;
+    }
+
+    private void markPlateTriggered(UUID playerId, BlockPoint point) {
+        if (playerId == null || point == null) {
+            return;
+        }
+        plateTriggerCooldowns
+                .computeIfAbsent(playerId, ignored -> new HashMap<>())
+                .put(point, System.currentTimeMillis());
+    }
+
+    private void applyCheckpointLock(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        checkpointLockUntil.put(playerId, System.currentTimeMillis() + CONTROL_ITEM_CHECKPOINT_LOCK_MILLIS);
+    }
+
+    private boolean isCheckpointLocked(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
+        Long until = checkpointLockUntil.get(playerId);
+        if (until == null) {
+            return false;
+        }
+        if (System.currentTimeMillis() >= until) {
+            checkpointLockUntil.remove(playerId);
+            return false;
+        }
+        return true;
+    }
+
     private String formatElapsed(long elapsedMillis) {
         Duration duration = Duration.ofMillis(Math.max(0L, elapsedMillis));
         long minutes = duration.toMinutes();
@@ -533,5 +642,8 @@ public class BedwarsLobbyParkour {
         private int checkpointUses;
         private ItemStack exitSlotBackup;
         private ItemStack checkpointSlotBackup;
+    }
+
+    public record ParkourTopEntry(UUID playerId, long timeMillis, int checkpointUses) {
     }
 }

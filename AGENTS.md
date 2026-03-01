@@ -122,11 +122,12 @@ Public-use subcommands:
 - `/bw quick_buy` (also accepts `quick-buy`, and typo aliases `quck-buy`, `quck_buy`)
 
 OP/admin subcommands (permission-gated):
+- `/bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]`
 - `/bw start`
 - `/bw test start`
 - `/bw stop`
 - `/bw tp <arena>|lobby`
-- `/bw lobby parkou <start|checkpoin [x]|end>`
+- `/bw lobby parkour <start|checkpoint [x]|end>`
 - `/bw game out [player]`
 - `/bw game spectate [player]`
 - `/bw game join <team|spectate> [player]`
@@ -213,8 +214,10 @@ Table: `bedwars_stats`
 - `final_deaths INTEGER NOT NULL`
 - `games_played INTEGER NOT NULL`
 - `beds_broken INTEGER NOT NULL`
+- `parkour_best_time_ms INTEGER NOT NULL` (default `-1`)
+- `parkour_best_checkpoint_uses INTEGER NOT NULL` (default `0`)
 
-Service auto-adds missing columns for legacy DBs (`deaths`, `final_kills`, `final_deaths`).
+Service auto-adds missing columns for legacy DBs (`deaths`, `final_kills`, `final_deaths`, `parkour_best_time_ms`, `parkour_best_checkpoint_uses`).
 
 ## 10) Config Guide
 
@@ -539,6 +542,7 @@ Validation after setup/config edits:
 Validation for persistence:
 1. Quick-buy edits persist after reconnect/restart.
 2. Stats increment and leaderboard updates near anchor.
+3. Parkour finish best-time/checkpoint records persist to `bedwars-stats.db`.
 
 ## 16) Troubleshooting Quick Notes
 

@@ -1,17 +1,20 @@
 package krispasi.omGames.bedwars.command;
 
 import java.util.Arrays;
+import java.util.stream.Collectors;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
 import krispasi.omGames.bedwars.stats.BedwarsPlayerStats;
+import krispasi.omGames.bedwars.stats.BedwarsStatsService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -45,16 +48,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length > 0 && args[0].equalsIgnoreCase("stats")) {
-            BedwarsPlayerStats stats = bedwarsManager.getStatsService().getStats(player.getUniqueId());
-            player.sendMessage(Component.text("BedWars Stats", NamedTextColor.GOLD));
-            player.sendMessage(Component.text("Wins: " + stats.getWins(), NamedTextColor.YELLOW));
-            player.sendMessage(Component.text("Kills: " + stats.getKills(), NamedTextColor.YELLOW));
-            player.sendMessage(Component.text("Deaths: " + stats.getDeaths(), NamedTextColor.YELLOW));
-            player.sendMessage(Component.text("Final Kills: " + stats.getFinalKills(), NamedTextColor.YELLOW));
-            player.sendMessage(Component.text("Final Deaths: " + stats.getFinalDeaths(), NamedTextColor.YELLOW));
-            player.sendMessage(Component.text("Games Played: " + stats.getGamesPlayed(), NamedTextColor.YELLOW));
-            player.sendMessage(Component.text("Beds Broken: " + stats.getBedsBroken(), NamedTextColor.YELLOW));
-            return true;
+            return handleStatsCommand(sender, player, args);
         }
         if (args.length > 0 && isQuickBuyCommand(args[0])) {
             GameSession session = bedwarsManager.getActiveSession();
@@ -297,7 +291,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkou <start|checkpoin [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -309,24 +303,55 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
+        if (args.length == 2 && args[0].equalsIgnoreCase("stats")) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Stream.of("modify")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("stats") && args[1].equalsIgnoreCase("modify")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
+                    .toList();
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("stats") && args[1].equalsIgnoreCase("modify")) {
+            String input = args[3].toLowerCase(Locale.ROOT);
+            return bedwarsManager.getStatsService().getModifiableStatKeys().stream()
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 5 && args[0].equalsIgnoreCase("stats") && args[1].equalsIgnoreCase("modify")) {
+            String input = args[4].toLowerCase(Locale.ROOT);
+            return Stream.of("+", "-", "set", "+1", "-1", "add", "remove")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 6 && args[0].equalsIgnoreCase("stats") && args[1].equalsIgnoreCase("modify")) {
+            String input = args[5].toLowerCase(Locale.ROOT);
+            return Stream.of("1", "5", "10", "50", "100")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
         if (args.length == 2 && args[0].equalsIgnoreCase("lobby")) {
             String input = args[1].toLowerCase(Locale.ROOT);
-            return Stream.of("parkou")
+            return Stream.of("parkour")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
         if (args.length == 3
                 && args[0].equalsIgnoreCase("lobby")
-                && (args[1].equalsIgnoreCase("parkou") || args[1].equalsIgnoreCase("parkour"))) {
+                && args[1].equalsIgnoreCase("parkour")) {
             String input = args[2].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "checkpoin", "end")
+            return Stream.of("start", "checkpoint", "end")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
         if (args.length == 4
                 && args[0].equalsIgnoreCase("lobby")
-                && (args[1].equalsIgnoreCase("parkou") || args[1].equalsIgnoreCase("parkour"))
-                && (args[2].equalsIgnoreCase("checkpoin") || args[2].equalsIgnoreCase("checkpoint"))) {
+                && args[1].equalsIgnoreCase("parkour")
+                && args[2].equalsIgnoreCase("checkpoint")) {
             String input = args[3].toLowerCase(Locale.ROOT);
             return Stream.of("1", "2", "3", "4", "5", "6", "7", "8")
                     .filter(option -> option.startsWith(input))
@@ -425,6 +450,152 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         return bedwarsManager.getArena(trimmed);
     }
 
+    private boolean handleStatsCommand(CommandSender sender, Player player, String[] args) {
+        if (args.length >= 2 && args[1].equalsIgnoreCase("modify")) {
+            return handleStatsModifyCommand(sender, player, args);
+        }
+        if (args.length != 1) {
+            sender.sendMessage(Component.text("Usage: /bw stats | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        BedwarsPlayerStats stats = bedwarsManager.getStatsService().getStats(player.getUniqueId());
+        String bestTime = stats.getParkourBestTimeMillis() > 0L ? formatElapsed(stats.getParkourBestTimeMillis()) : "N/A";
+        player.sendMessage(Component.text("BedWars Stats", NamedTextColor.GOLD));
+        player.sendMessage(Component.text("Wins: " + stats.getWins(), NamedTextColor.YELLOW));
+        player.sendMessage(Component.text("Kills: " + stats.getKills(), NamedTextColor.YELLOW));
+        player.sendMessage(Component.text("Deaths: " + stats.getDeaths(), NamedTextColor.YELLOW));
+        player.sendMessage(Component.text("Final Kills: " + stats.getFinalKills(), NamedTextColor.YELLOW));
+        player.sendMessage(Component.text("Final Deaths: " + stats.getFinalDeaths(), NamedTextColor.YELLOW));
+        player.sendMessage(Component.text("Games Played: " + stats.getGamesPlayed(), NamedTextColor.YELLOW));
+        player.sendMessage(Component.text("Beds Broken: " + stats.getBedsBroken(), NamedTextColor.YELLOW));
+        player.sendMessage(Component.text("Parkour Best Time: " + bestTime, NamedTextColor.YELLOW));
+        player.sendMessage(Component.text("Parkour Best Checkpoint Uses: " + stats.getParkourBestCheckpointUses(), NamedTextColor.YELLOW));
+        return true;
+    }
+
+    private boolean handleStatsModifyCommand(CommandSender sender, Player player, String[] args) {
+        if (!player.isOp()) {
+            sender.sendMessage(Component.text("Only OP can use /bw stats modify.", NamedTextColor.RED));
+            return true;
+        }
+        if (args.length < 5) {
+            sender.sendMessage(Component.text("Usage: /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        String targetName = args[2];
+        OfflinePlayer target = Bukkit.getPlayerExact(targetName);
+        if (target == null) {
+            target = Bukkit.getOfflinePlayer(targetName);
+        }
+        if (target == null || target.getUniqueId() == null) {
+            sender.sendMessage(Component.text("Player not found: " + targetName, NamedTextColor.RED));
+            return true;
+        }
+        ParsedStatOperation parsed = parseStatOperation(args[4], args.length >= 6 ? args[5] : null);
+        if (parsed == null) {
+            sender.sendMessage(Component.text("Usage: /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        List<BedwarsStatsService.StatChange> changes = bedwarsManager.getStatsService()
+                .modifyStats(target.getUniqueId(), args[3], parsed.operation(), parsed.amount());
+        if (changes.isEmpty()) {
+            String supported = String.join(", ", bedwarsManager.getStatsService().getModifiableStatKeys());
+            sender.sendMessage(Component.text("Unknown stat. Available: " + supported, NamedTextColor.RED));
+            return true;
+        }
+        String summary = changes.stream()
+                .map(change -> change.statKey() + ": " + change.before() + " -> " + change.after())
+                .collect(Collectors.joining(", "));
+        String targetDisplayName = target.getName() != null ? target.getName() : targetName;
+        sender.sendMessage(Component.text("Updated stats for " + targetDisplayName + ": " + summary, NamedTextColor.GREEN));
+        if (target.isOnline() && target.getPlayer() != null && target.getPlayer() != player) {
+            target.getPlayer().sendMessage(Component.text("Your BedWars stats were updated by " + player.getName() + ".",
+                    NamedTextColor.YELLOW));
+        }
+        return true;
+    }
+
+    private ParsedStatOperation parseStatOperation(String operationToken, String amountToken) {
+        if (operationToken == null || operationToken.isBlank()) {
+            return null;
+        }
+        String token = operationToken.trim().toLowerCase(Locale.ROOT);
+        if (token.equals("set") || token.equals("=")) {
+            Long amount = parseLong(amountToken);
+            if (amount == null) {
+                return null;
+            }
+            return new ParsedStatOperation(BedwarsStatsService.StatOperation.SET, amount);
+        }
+        if (token.equals("+") || token.equals("add") || token.equals("plus")) {
+            Long amount = amountToken == null ? 1L : parseLong(amountToken);
+            if (amount == null) {
+                return null;
+            }
+            return new ParsedStatOperation(BedwarsStatsService.StatOperation.ADD, safeAbs(amount));
+        }
+        if (token.equals("-") || token.equals("remove") || token.equals("sub") || token.equals("subtract")) {
+            Long amount = amountToken == null ? 1L : parseLong(amountToken);
+            if (amount == null) {
+                return null;
+            }
+            return new ParsedStatOperation(BedwarsStatsService.StatOperation.SUBTRACT, safeAbs(amount));
+        }
+        if ((token.startsWith("+") || token.startsWith("-")) && token.length() > 1) {
+            BedwarsStatsService.StatOperation op = token.startsWith("-")
+                    ? BedwarsStatsService.StatOperation.SUBTRACT
+                    : BedwarsStatsService.StatOperation.ADD;
+            Long amount = parseLong(token.substring(1));
+            if (amount == null) {
+                return null;
+            }
+            if (amountToken != null) {
+                Long override = parseLong(amountToken);
+                if (override == null) {
+                    return null;
+                }
+                amount = override;
+            }
+            return new ParsedStatOperation(op, safeAbs(amount));
+        }
+        return null;
+    }
+
+    private Long parseLong(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(raw.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private long safeAbs(long value) {
+        if (value == Long.MIN_VALUE) {
+            return Long.MAX_VALUE;
+        }
+        return Math.abs(value);
+    }
+
+    private String formatElapsed(long elapsedMillis) {
+        long millis = Math.max(0L, elapsedMillis);
+        long minutes = millis / 60_000L;
+        long seconds = (millis % 60_000L) / 1_000L;
+        long ms = millis % 1_000L;
+        if (minutes > 0L) {
+            return String.format(Locale.ROOT, "%d:%02d.%03d", minutes, seconds, ms);
+        }
+        return String.format(Locale.ROOT, "%d.%03ds", seconds, ms);
+    }
+
+    private record ParsedStatOperation(BedwarsStatsService.StatOperation operation, long amount) {
+    }
+
     private boolean handleGameOut(CommandSender sender, Player caller, String[] args) {
         Player target = args.length >= 2 ? Bukkit.getPlayer(args[1]) : caller;
         if (target == null) {
@@ -517,12 +688,12 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleLobbyParkourCommand(CommandSender sender, Player player, String[] args) {
-        if (args.length < 2 || (!args[1].equalsIgnoreCase("parkou") && !args[1].equalsIgnoreCase("parkour"))) {
-            sender.sendMessage(Component.text("Usage: /bw lobby parkou <start|checkpoin [x]|end>", NamedTextColor.YELLOW));
+        if (args.length < 2 || !args[1].equalsIgnoreCase("parkour")) {
+            sender.sendMessage(Component.text("Usage: /bw lobby parkour <start|checkpoint [x]|end>", NamedTextColor.YELLOW));
             return true;
         }
         if (args.length < 3) {
-            sender.sendMessage(Component.text("Usage: /bw lobby parkou <start|checkpoin [x]|end>", NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Usage: /bw lobby parkour <start|checkpoint [x]|end>", NamedTextColor.YELLOW));
             return true;
         }
         String action = args[2].toLowerCase(Locale.ROOT);
@@ -531,7 +702,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             message = bedwarsManager.getLobbyParkour().setStartPlate(player);
         } else if (action.equals("end")) {
             message = bedwarsManager.getLobbyParkour().setEndPlate(player);
-        } else if (action.equals("checkpoin") || action.equals("checkpoint")) {
+        } else if (action.equals("checkpoint")) {
             Integer checkpoint = null;
             if (args.length >= 4) {
                 try {
@@ -547,7 +718,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
             message = bedwarsManager.getLobbyParkour().setCheckpointPlate(player, checkpoint);
         } else {
-            sender.sendMessage(Component.text("Usage: /bw lobby parkou <start|checkpoin [x]|end>", NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Usage: /bw lobby parkour <start|checkpoint [x]|end>", NamedTextColor.YELLOW));
             return true;
         }
         NamedTextColor color = message.toLowerCase(Locale.ROOT).startsWith("parkour")

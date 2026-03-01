@@ -11,6 +11,7 @@ import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
 import krispasi.omGames.bedwars.item.CustomItemConfigLoader;
 import krispasi.omGames.bedwars.lobby.BedwarsLobbyParkour;
+import krispasi.omGames.bedwars.lobby.BedwarsParkourLeaderboard;
 import krispasi.omGames.bedwars.shop.QuickBuyService;
 import krispasi.omGames.bedwars.stats.BedwarsLobbyLeaderboard;
 import krispasi.omGames.bedwars.stats.BedwarsStatsService;
@@ -53,6 +54,7 @@ public class BedwarsManager {
     private final BedwarsStatsService statsService;
     private final BedwarsLobbyLeaderboard lobbyLeaderboard;
     private final BedwarsLobbyParkour lobbyParkour;
+    private final BedwarsParkourLeaderboard parkourLeaderboard;
     private Map<String, Arena> arenas = Map.of();
     private GameSession activeSession;
     private ShopConfig shopConfig = ShopConfig.empty();
@@ -64,6 +66,7 @@ public class BedwarsManager {
         this.statsService = new BedwarsStatsService(plugin);
         this.lobbyLeaderboard = new BedwarsLobbyLeaderboard(plugin, statsService);
         this.lobbyParkour = new BedwarsLobbyParkour(this);
+        this.parkourLeaderboard = new BedwarsParkourLeaderboard(plugin, lobbyParkour);
     }
 
     public File getBedwarsDataFolder() {
@@ -84,6 +87,7 @@ public class BedwarsManager {
         BedwarsConfigLoader loader = new BedwarsConfigLoader(configFile, plugin.getLogger());
         arenas = loader.load();
         configureLobbyLeaderboard(configFile);
+        configureParkourLeaderboard(configFile);
         lobbyParkour.load(configFile);
         plugin.getLogger().info("Loaded " + arenas.size() + " BedWars arenas.");
     }
@@ -121,6 +125,7 @@ public class BedwarsManager {
 
     public void startLobbyLeaderboard() {
         lobbyLeaderboard.start();
+        parkourLeaderboard.start();
     }
 
     public Collection<Arena> getArenas() {
@@ -302,6 +307,7 @@ public class BedwarsManager {
             activeSession = null;
         }
         lobbyLeaderboard.stop();
+        parkourLeaderboard.stop();
         lobbyParkour.shutdown();
         quickBuyService.shutdown();
         statsService.shutdown();
@@ -744,6 +750,62 @@ public class BedwarsManager {
             worldName = resolveLeaderboardWorldFallback();
         }
         lobbyLeaderboard.configureAnchor(worldName, x, y, z);
+    }
+
+    private void configureParkourLeaderboard(File configFile) {
+        String worldName = null;
+        double x = DEFAULT_LEADERBOARD_X + 2.0;
+        double y = DEFAULT_LEADERBOARD_Y;
+        double z = DEFAULT_LEADERBOARD_Z;
+        if (configFile.exists()) {
+            YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+            ConfigurationSection section = config.getConfigurationSection("parkour-leaderboard");
+            if (section != null) {
+                String sectionWorld = section.getString("world");
+                if (sectionWorld != null && !sectionWorld.isBlank()) {
+                    worldName = sectionWorld.trim();
+                }
+                if (section.isSet("x") && section.isSet("y") && section.isSet("z")) {
+                    x = section.getDouble("x", x);
+                    y = section.getDouble("y", y);
+                    z = section.getDouble("z", z);
+                } else {
+                    String rawSection = section.getString("location");
+                    if (rawSection != null && !rawSection.isBlank()) {
+                        String parsedWorld = parseLeaderboardEntry(rawSection, worldName);
+                        if (parsedWorld != null) {
+                            worldName = parsedWorld;
+                        }
+                        double[] parsedCoords = parseLeaderboardCoordinates(rawSection);
+                        if (parsedCoords != null) {
+                            x = parsedCoords[0];
+                            y = parsedCoords[1];
+                            z = parsedCoords[2];
+                        }
+                    }
+                }
+            } else {
+                String raw = config.getString("parkour-leaderboard");
+                if (raw != null && !raw.isBlank()) {
+                    String parsedWorld = parseLeaderboardEntry(raw, null);
+                    if (parsedWorld != null) {
+                        worldName = parsedWorld;
+                    }
+                    double[] parsedCoords = parseLeaderboardCoordinates(raw);
+                    if (parsedCoords != null) {
+                        x = parsedCoords[0];
+                        y = parsedCoords[1];
+                        z = parsedCoords[2];
+                    } else {
+                        plugin.getLogger().warning("Invalid parkour-leaderboard location in bedwars.yml: " + raw);
+                    }
+                }
+            }
+        }
+        if (worldName == null || worldName.isBlank()) {
+            worldName = resolveLeaderboardWorldFallback();
+        }
+        parkourLeaderboard.configureAnchor(worldName, x, y, z);
     }
 
     private String parseLeaderboardEntry(String raw, String defaultWorld) {

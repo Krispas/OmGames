@@ -691,6 +691,20 @@ public class BedwarsListener implements Listener {
         });
     }
 
+    @EventHandler(ignoreCancelled = false)
+    public void onLobbyParkourPlatePress(PlayerInteractEvent event) {
+        safeHandle("onLobbyParkourPlatePress", () -> {
+            if (event.getAction() != Action.PHYSICAL) {
+                return;
+            }
+            Block clicked = event.getClickedBlock();
+            if (clicked == null) {
+                return;
+            }
+            bedwarsManager.getLobbyParkour().handlePlatePress(event.getPlayer(), clicked);
+        });
+    }
+
     @EventHandler(ignoreCancelled = true)
     public void onEntityExplode(EntityExplodeEvent event) {
         safeHandle("onEntityExplode", () -> {
