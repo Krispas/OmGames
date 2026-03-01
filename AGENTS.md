@@ -126,6 +126,7 @@ OP/admin subcommands (permission-gated):
 - `/bw test start`
 - `/bw stop`
 - `/bw tp <arena>|lobby`
+- `/bw lobby parkou <start|checkpoin [x]|end>`
 - `/bw game out [player]`
 - `/bw game spectate [player]`
 - `/bw game join <team|spectate> [player]`
@@ -221,6 +222,8 @@ Service auto-adds missing columns for legacy DBs (`deaths`, `final_kills`, `fina
 
 Root keys:
 - `leaderboard`
+- `parkour-leaderboard`
+- `lobby-parkour`
 - `arenas`
 
 Leaderboard accepted forms:

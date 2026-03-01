@@ -1,4 +1,10 @@
 leaderboard: 4 73 -1
+parkour-leaderboard: 6 73 -1
+lobby-parkour:
+  world: bedwars
+  start: ""
+  end: ""
+  checkpoints: {}
 arenas:
   bedwars_1:
     anti-build:

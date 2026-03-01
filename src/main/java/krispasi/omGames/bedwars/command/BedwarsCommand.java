@@ -150,6 +150,13 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Teleported to " + arena.getId() + " in " + world.getName() + ".", NamedTextColor.GREEN));
             return true;
         }
+        if (args[0].equalsIgnoreCase("lobby")) {
+            if (!sender.hasPermission("omgames.bw.start")) {
+                sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                return true;
+            }
+            return handleLobbyParkourCommand(sender, player, args);
+        }
         if (args[0].equalsIgnoreCase("out")) {
             sender.sendMessage(Component.text("Use /bw game out [player].", NamedTextColor.YELLOW));
             return true;
@@ -290,7 +297,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkou <start|checkpoin [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -298,7 +305,30 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "test", "stop", "tp", "game", "quick_buy", "stats", "reload", "setup")
+            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "quick_buy", "stats", "reload", "setup")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("lobby")) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Stream.of("parkou")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3
+                && args[0].equalsIgnoreCase("lobby")
+                && (args[1].equalsIgnoreCase("parkou") || args[1].equalsIgnoreCase("parkour"))) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return Stream.of("start", "checkpoin", "end")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 4
+                && args[0].equalsIgnoreCase("lobby")
+                && (args[1].equalsIgnoreCase("parkou") || args[1].equalsIgnoreCase("parkour"))
+                && (args[2].equalsIgnoreCase("checkpoin") || args[2].equalsIgnoreCase("checkpoint"))) {
+            String input = args[3].toLowerCase(Locale.ROOT);
+            return Stream.of("1", "2", "3", "4", "5", "6", "7", "8")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -484,5 +514,46 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             return mapLobby;
         }
         return arena.getLobbyLocation();
+    }
+
+    private boolean handleLobbyParkourCommand(CommandSender sender, Player player, String[] args) {
+        if (args.length < 2 || (!args[1].equalsIgnoreCase("parkou") && !args[1].equalsIgnoreCase("parkour"))) {
+            sender.sendMessage(Component.text("Usage: /bw lobby parkou <start|checkpoin [x]|end>", NamedTextColor.YELLOW));
+            return true;
+        }
+        if (args.length < 3) {
+            sender.sendMessage(Component.text("Usage: /bw lobby parkou <start|checkpoin [x]|end>", NamedTextColor.YELLOW));
+            return true;
+        }
+        String action = args[2].toLowerCase(Locale.ROOT);
+        String message;
+        if (action.equals("start")) {
+            message = bedwarsManager.getLobbyParkour().setStartPlate(player);
+        } else if (action.equals("end")) {
+            message = bedwarsManager.getLobbyParkour().setEndPlate(player);
+        } else if (action.equals("checkpoin") || action.equals("checkpoint")) {
+            Integer checkpoint = null;
+            if (args.length >= 4) {
+                try {
+                    checkpoint = Integer.parseInt(args[3]);
+                } catch (NumberFormatException ex) {
+                    sender.sendMessage(Component.text("Checkpoint index must be a number.", NamedTextColor.RED));
+                    return true;
+                }
+                if (checkpoint <= 0) {
+                    sender.sendMessage(Component.text("Checkpoint index must be greater than 0.", NamedTextColor.RED));
+                    return true;
+                }
+            }
+            message = bedwarsManager.getLobbyParkour().setCheckpointPlate(player, checkpoint);
+        } else {
+            sender.sendMessage(Component.text("Usage: /bw lobby parkou <start|checkpoin [x]|end>", NamedTextColor.YELLOW));
+            return true;
+        }
+        NamedTextColor color = message.toLowerCase(Locale.ROOT).startsWith("parkour")
+                ? NamedTextColor.GREEN
+                : NamedTextColor.RED;
+        sender.sendMessage(Component.text(message, color));
+        return true;
     }
 }

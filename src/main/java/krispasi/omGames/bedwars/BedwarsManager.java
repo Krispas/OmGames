@@ -10,6 +10,7 @@ import krispasi.omGames.bedwars.config.BedwarsConfigLoader;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
 import krispasi.omGames.bedwars.item.CustomItemConfigLoader;
+import krispasi.omGames.bedwars.lobby.BedwarsLobbyParkour;
 import krispasi.omGames.bedwars.shop.QuickBuyService;
 import krispasi.omGames.bedwars.stats.BedwarsLobbyLeaderboard;
 import krispasi.omGames.bedwars.stats.BedwarsStatsService;
@@ -51,6 +52,7 @@ public class BedwarsManager {
     private final QuickBuyService quickBuyService;
     private final BedwarsStatsService statsService;
     private final BedwarsLobbyLeaderboard lobbyLeaderboard;
+    private final BedwarsLobbyParkour lobbyParkour;
     private Map<String, Arena> arenas = Map.of();
     private GameSession activeSession;
     private ShopConfig shopConfig = ShopConfig.empty();
@@ -61,6 +63,7 @@ public class BedwarsManager {
         this.quickBuyService = new QuickBuyService(plugin);
         this.statsService = new BedwarsStatsService(plugin);
         this.lobbyLeaderboard = new BedwarsLobbyLeaderboard(plugin, statsService);
+        this.lobbyParkour = new BedwarsLobbyParkour(this);
     }
 
     public File getBedwarsDataFolder() {
@@ -81,6 +84,7 @@ public class BedwarsManager {
         BedwarsConfigLoader loader = new BedwarsConfigLoader(configFile, plugin.getLogger());
         arenas = loader.load();
         configureLobbyLeaderboard(configFile);
+        lobbyParkour.load(configFile);
         plugin.getLogger().info("Loaded " + arenas.size() + " BedWars arenas.");
     }
 
@@ -149,6 +153,10 @@ public class BedwarsManager {
 
     public BedwarsStatsService getStatsService() {
         return statsService;
+    }
+
+    public BedwarsLobbyParkour getLobbyParkour() {
+        return lobbyParkour;
     }
 
     public boolean isBedwarsWorld(String worldName) {
@@ -294,6 +302,7 @@ public class BedwarsManager {
             activeSession = null;
         }
         lobbyLeaderboard.stop();
+        lobbyParkour.shutdown();
         quickBuyService.shutdown();
         statsService.shutdown();
         clearDroppedItems();
@@ -629,20 +638,45 @@ public class BedwarsManager {
         }
         org.bukkit.configuration.file.YamlConfiguration config =
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
-        org.bukkit.configuration.ConfigurationSection arenasSection = config.getConfigurationSection("arenas");
-        if (arenasSection == null) {
-            return;
-        }
         boolean changed = false;
-        for (String arenaId : arenasSection.getKeys(false)) {
-            org.bukkit.configuration.ConfigurationSection arena = arenasSection.getConfigurationSection(arenaId);
-            if (arena == null) {
-                continue;
+        org.bukkit.configuration.ConfigurationSection arenasSection = config.getConfigurationSection("arenas");
+        if (arenasSection != null) {
+            for (String arenaId : arenasSection.getKeys(false)) {
+                org.bukkit.configuration.ConfigurationSection arena = arenasSection.getConfigurationSection(arenaId);
+                if (arena == null) {
+                    continue;
+                }
+                if (!arena.isSet("center-radius")) {
+                    arena.set("center-radius", DEFAULT_CENTER_RADIUS);
+                    changed = true;
+                }
             }
-            if (!arena.isSet("center-radius")) {
-                arena.set("center-radius", DEFAULT_CENTER_RADIUS);
-                changed = true;
-            }
+        }
+        if (!config.isSet("parkour-leaderboard")) {
+            config.set("parkour-leaderboard",
+                    DEFAULT_LEADERBOARD_X + " " + DEFAULT_LEADERBOARD_Y + " " + DEFAULT_LEADERBOARD_Z);
+            changed = true;
+        }
+        org.bukkit.configuration.ConfigurationSection parkour = config.getConfigurationSection("lobby-parkour");
+        if (parkour == null) {
+            parkour = config.createSection("lobby-parkour");
+            changed = true;
+        }
+        if (!parkour.isSet("world")) {
+            parkour.set("world", resolveLeaderboardWorldFallback());
+            changed = true;
+        }
+        if (!parkour.isSet("start")) {
+            parkour.set("start", "");
+            changed = true;
+        }
+        if (!parkour.isSet("end")) {
+            parkour.set("end", "");
+            changed = true;
+        }
+        if (!parkour.isConfigurationSection("checkpoints")) {
+            parkour.createSection("checkpoints");
+            changed = true;
         }
         if (!changed) {
             return;

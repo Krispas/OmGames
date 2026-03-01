@@ -435,6 +435,9 @@ public class BedwarsListener implements Listener {
             if (item == null) {
                 return;
             }
+            if (bedwarsManager.getLobbyParkour().handleInteract(event)) {
+                return;
+            }
             GameSession session = bedwarsManager.getActiveSession();
             if (session != null && session.isLobby() && session.isInArenaWorld(player.getWorld())) {
                 if (event.getHand() == EquipmentSlot.OFF_HAND) {
@@ -854,11 +857,13 @@ public class BedwarsListener implements Listener {
     public void onPlayerMove(PlayerMoveEvent event) {
         safeHandle("onPlayerMove", () -> {
             Player player = event.getPlayer();
+            Location from = event.getFrom();
+            Location to = event.getTo();
+            bedwarsManager.getLobbyParkour().handleMove(player, from, to);
             GameSession session = bedwarsManager.getActiveSession();
             if (isOutsideRunningBedwarsGame(player, session)) {
                 applyOutsideGameBedwarsBuffs(player);
             }
-            Location to = event.getTo();
             if (session == null || !session.isStarting()) {
                 return;
             }
@@ -868,7 +873,6 @@ public class BedwarsListener implements Listener {
             if (!session.isInArenaWorld(player.getWorld())) {
                 return;
             }
-            Location from = event.getFrom();
             if (to == null) {
                 return;
             }
@@ -1674,6 +1678,7 @@ public class BedwarsListener implements Listener {
     public void onPlayerQuit(PlayerQuitEvent event) {
         safeHandle("onPlayerQuit", () -> {
             GameSession session = bedwarsManager.getActiveSession();
+            bedwarsManager.getLobbyParkour().handleQuit(event.getPlayer());
             if (session == null) {
                 return;
             }
