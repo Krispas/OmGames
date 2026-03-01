@@ -1416,14 +1416,16 @@ public class GameSession {
             activator.sendMessage(Component.text("Your teammate must be online to respawn.", NamedTextColor.RED));
             return false;
         }
+        showTitleAll(
+                Component.empty()
+                        .append(team.displayComponent())
+                        .append(Component.text(" Used the Respawn Beacon.", NamedTextColor.WHITE)),
+                Component.empty()
+        );
         eliminatedPlayers.remove(targetId);
         respawnGracePlayers.add(targetId);
         setSpectator(target);
-        Location lobby = arena.getLobbyLocation();
-        if (lobby != null) {
-            target.teleport(lobby);
-        }
-        scheduleRespawn(target, team, delaySeconds, true);
+        scheduleRespawn(target, team, delaySeconds, true, true);
         return true;
     }
 
@@ -1678,6 +1680,14 @@ public class GameSession {
     }
 
     private void scheduleRespawn(Player player, TeamColor team, int delaySeconds, boolean allowRespawnAfterBedBreak) {
+        scheduleRespawn(player, team, delaySeconds, allowRespawnAfterBedBreak, false);
+    }
+
+    private void scheduleRespawn(Player player,
+                                 TeamColor team,
+                                 int delaySeconds,
+                                 boolean allowRespawnAfterBedBreak,
+                                 boolean beaconRevive) {
         Location spawn = arena.getSpawn(team);
         if (spawn == null) {
             return;
@@ -1691,7 +1701,11 @@ public class GameSession {
         if (existingCountdown != null) {
             existingCountdown.cancel();
         }
-        startRespawnCountdown(player, delaySeconds);
+        if (beaconRevive) {
+            startRespawnCountdown(player, delaySeconds, team, player.getName());
+        } else {
+            startRespawnCountdown(player, delaySeconds);
+        }
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> safeRun("respawn", () -> {
             boolean allowRespawn = allowRespawnAfterBedBreak || respawnGracePlayers.contains(playerId);
             if (state != GameState.RUNNING || (getBedState(team) == BedState.DESTROYED && !allowRespawn)) {
@@ -1720,6 +1734,10 @@ public class GameSession {
             plugin.getServer().getScheduler().runTaskLater(plugin,
                     () -> applyPermanentItemsWithShield(player, team),
                     1L);
+            if (beaconRevive) {
+                broadcast(Component.text(player.getName(), NamedTextColor.AQUA)
+                        .append(Component.text(" has been revived.", NamedTextColor.GREEN)));
+            }
         }), Math.max(0, delaySeconds) * 20L);
         respawnTasks.put(player.getUniqueId(), task);
         showTitle(player, Component.text("Respawning in " + delaySeconds, NamedTextColor.YELLOW), Component.empty());
@@ -3481,6 +3499,13 @@ public class GameSession {
     }
 
     private void startRespawnCountdown(Player player, int delaySeconds) {
+        startRespawnCountdown(player, delaySeconds, null, null);
+    }
+
+    private void startRespawnCountdown(Player player,
+                                       int delaySeconds,
+                                       TeamColor beaconTeam,
+                                       String revivedName) {
         BukkitTask task = new BukkitRunnable() {
             private int remaining = Math.max(0, delaySeconds);
 
@@ -3496,11 +3521,33 @@ public class GameSession {
                         return;
                     }
                     player.sendActionBar(Component.text("Respawning in " + remaining + "s", NamedTextColor.YELLOW));
+                    if (beaconTeam != null && revivedName != null && !revivedName.isBlank()) {
+                        sendBeaconRespawnTimerToTeam(player.getUniqueId(), beaconTeam, revivedName, remaining);
+                    }
                     remaining--;
                 });
             }
         }.runTaskTimer(plugin, 0L, 20L);
         respawnCountdownTasks.put(player.getUniqueId(), task);
+    }
+
+    private void sendBeaconRespawnTimerToTeam(UUID revivedPlayerId,
+                                              TeamColor team,
+                                              String revivedName,
+                                              int remainingSeconds) {
+        if (team == null || revivedName == null || revivedName.isBlank()) {
+            return;
+        }
+        Component timer = Component.text(revivedName + " respawns in " + remainingSeconds + "s", NamedTextColor.YELLOW);
+        for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
+            if (entry.getValue() != team || entry.getKey().equals(revivedPlayerId)) {
+                continue;
+            }
+            Player teammate = Bukkit.getPlayer(entry.getKey());
+            if (teammate != null && teammate.isOnline()) {
+                teammate.sendActionBar(timer);
+            }
+        }
     }
 
     private void cancelRespawnCountdown(UUID playerId) {

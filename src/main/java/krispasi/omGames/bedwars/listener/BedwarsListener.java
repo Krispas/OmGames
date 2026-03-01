@@ -196,6 +196,7 @@ public class BedwarsListener implements Listener {
     private static final String PORTABLE_SHOPKEEPER_TAG = "bw_portable_shopkeeper";
     private final NamespacedKey customProjectileKey;
     private final NamespacedKey summonTeamKey;
+    private final NamespacedKey happyGhastDriverKey;
     private final Map<UUID, BukkitTask> defenderTasks = new HashMap<>();
     private final Map<UUID, BukkitTask> summonNameTasks = new HashMap<>();
     private final Map<UUID, SummonNameplate> summonNameplates = new HashMap<>();
@@ -209,6 +210,7 @@ public class BedwarsListener implements Listener {
         this.bedwarsManager = bedwarsManager;
         this.customProjectileKey = new NamespacedKey(bedwarsManager.getPlugin(), "bw_custom_projectile");
         this.summonTeamKey = new NamespacedKey(bedwarsManager.getPlugin(), "bw_summon_team");
+        this.happyGhastDriverKey = new NamespacedKey(bedwarsManager.getPlugin(), "bw_happy_ghast_driver");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -1676,7 +1678,9 @@ public class BedwarsListener implements Listener {
                 return;
             }
             org.bukkit.entity.Entity vehicle = event.getPlayer().getVehicle();
-            if (vehicle instanceof LivingEntity living && isHappyGhast(living)) {
+            if (vehicle instanceof LivingEntity living
+                    && isHappyGhast(living)
+                    && isHappyGhastDriver(living, event.getPlayer())) {
                 living.remove();
                 cleanupSummonTracker(living.getUniqueId());
             }
@@ -1697,10 +1701,16 @@ public class BedwarsListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onEntityDismount(EntityDismountEvent event) {
         safeHandle("onEntityDismount", () -> {
+            if (!(event.getEntity() instanceof Player player)) {
+                return;
+            }
             if (!(event.getDismounted() instanceof LivingEntity living)) {
                 return;
             }
             if (!isHappyGhast(living)) {
+                return;
+            }
+            if (!isHappyGhastDriver(living, player)) {
                 return;
             }
             bedwarsManager.getPlugin().getServer().getScheduler().runTask(bedwarsManager.getPlugin(), () -> {
@@ -2756,6 +2766,7 @@ public class BedwarsListener implements Listener {
         entity.setCollidable(false);
         entity.addScoreboardTag(GameSession.HAPPY_GHAST_TAG);
         setSummonTeam(entity, team);
+        setHappyGhastDriver(entity, player.getUniqueId());
         entity.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
         applyHappyGhastHarness(entity, team);
         scheduleHappyGhastHarness(entity, team);
@@ -3475,6 +3486,29 @@ public class BedwarsListener implements Listener {
             return null;
         }
         return TeamColor.fromKey(key);
+    }
+
+    private void setHappyGhastDriver(org.bukkit.entity.Entity entity, UUID playerId) {
+        if (entity == null || playerId == null) {
+            return;
+        }
+        entity.getPersistentDataContainer().set(happyGhastDriverKey, PersistentDataType.STRING, playerId.toString());
+    }
+
+    private boolean isHappyGhastDriver(org.bukkit.entity.Entity entity, Player player) {
+        if (entity == null || player == null) {
+            return false;
+        }
+        String value = entity.getPersistentDataContainer().get(happyGhastDriverKey, PersistentDataType.STRING);
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        try {
+            UUID driverId = UUID.fromString(value);
+            return driverId.equals(player.getUniqueId());
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     private boolean isSummon(org.bukkit.entity.Entity entity) {
