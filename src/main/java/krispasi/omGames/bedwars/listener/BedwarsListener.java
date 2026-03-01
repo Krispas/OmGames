@@ -49,7 +49,9 @@ import org.bukkit.entity.SmallFireball;
 import org.bukkit.entity.Silverfish;
 import org.bukkit.entity.Snowball;
 import org.bukkit.entity.TNTPrimed;
+import org.bukkit.entity.Trident;
 import org.bukkit.entity.Villager;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -71,6 +73,7 @@ import org.bukkit.event.entity.EntityDismountEvent;
 import org.bukkit.event.entity.FireworkExplodeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
@@ -111,6 +114,7 @@ import org.bukkit.potion.PotionEffect;
 import java.lang.reflect.Method;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.EnumSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -195,6 +199,8 @@ public class BedwarsListener implements Listener {
     private final Map<UUID, BukkitTask> defenderTasks = new HashMap<>();
     private final Map<UUID, BukkitTask> summonNameTasks = new HashMap<>();
     private final Map<UUID, SummonNameplate> summonNameplates = new HashMap<>();
+    private final Map<UUID, BukkitTask> loyaltyTridentTasks = new HashMap<>();
+    private final Map<UUID, List<ItemStack>> pendingLoyaltyTridentReturns = new HashMap<>();
     private final Map<UUID, Long> fireballCooldowns = new HashMap<>();
     private final Map<UUID, Long> flamethrowerCooldowns = new HashMap<>();
     private final Map<UUID, Long> voidTotemFallProtection = new HashMap<>();
@@ -559,6 +565,32 @@ public class BedwarsListener implements Listener {
                 setSummonTeam(arrow, team);
             }
             arrow.setDamage(0.0);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onProjectileLaunch(ProjectileLaunchEvent event) {
+        safeHandle("onProjectileLaunch", () -> {
+            if (!(event.getEntity() instanceof Trident trident)) {
+                return;
+            }
+            if (!(trident.getShooter() instanceof Player owner)) {
+                return;
+            }
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            if (!session.isInArenaWorld(trident.getWorld())
+                    || !session.isParticipant(owner.getUniqueId())
+                    || !session.isInArenaWorld(owner.getWorld())) {
+                return;
+            }
+            ItemStack tridentItem = resolveThrownTridentItem(trident);
+            if (!hasLoyalty(tridentItem)) {
+                return;
+            }
+            startLoyaltyTridentVoidTracker(trident, owner.getUniqueId(), tridentItem);
         });
     }
 
@@ -1026,6 +1058,15 @@ public class BedwarsListener implements Listener {
                 if (!isSummon(event.getEntity())) {
                     return;
                 }
+                LivingEntity summonVictim = event.getEntity() instanceof LivingEntity living ? living : null;
+                Vector summonVelocityBeforeHit = null;
+                boolean suppressSummonKnockback = false;
+                if (isHappyGhast(event.getEntity())
+                        && summonVictim != null
+                        && (event.getDamager() instanceof Arrow || event.getDamager() instanceof Fireball)) {
+                    summonVelocityBeforeHit = summonVictim.getVelocity().clone();
+                    suppressSummonKnockback = true;
+                }
                 Player attacker = resolveAttacker(event);
                 if (attacker != null && session.isParticipant(attacker.getUniqueId())) {
                     TeamColor attackerTeam = session.getTeam(attacker.getUniqueId());
@@ -1033,6 +1074,17 @@ public class BedwarsListener implements Listener {
                     if (ownerTeam != null && ownerTeam == attackerTeam) {
                         event.setCancelled(true);
                     }
+                }
+                if (!event.isCancelled()
+                        && isHappyGhast(event.getEntity())
+                        && event.getDamager() instanceof Fireball fireball) {
+                    CustomItemDefinition definition = resolveCustomProjectile(fireball);
+                    if (isFireballCustom(definition)) {
+                        event.setDamage(Math.max(0.0, definition.getDamage()));
+                    }
+                }
+                if (!event.isCancelled() && suppressSummonKnockback) {
+                    restoreVelocityNextTick(summonVictim, summonVelocityBeforeHit);
                 }
                 return;
             }
@@ -1579,6 +1631,7 @@ public class BedwarsListener implements Listener {
                 bedwarsManager.getPlugin().getServer().getScheduler().runTask(bedwarsManager.getPlugin(),
                         () -> applyOutsideGameBedwarsBuffs(player));
             }
+            deliverPendingLoyaltyTridents(player);
         });
     }
 
@@ -1611,6 +1664,7 @@ public class BedwarsListener implements Listener {
             if (isOutsideRunningBedwarsGame(player, session)) {
                 applyOutsideGameBedwarsBuffs(player);
             }
+            deliverPendingLoyaltyTridents(player);
         });
     }
 
@@ -1803,6 +1857,22 @@ public class BedwarsListener implements Listener {
         }.runTask(bedwarsManager.getPlugin());
     }
 
+    private void restoreVelocityNextTick(LivingEntity entity, Vector velocity) {
+        if (entity == null || velocity == null) {
+            return;
+        }
+        Vector restored = velocity.clone();
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!entity.isValid() || entity.isDead()) {
+                    return;
+                }
+                entity.setVelocity(restored);
+            }
+        }.runTask(bedwarsManager.getPlugin());
+    }
+
     private boolean isSameCustomItemInMainHand(Player player, ItemStack usedItem) {
         ItemStack main = player.getInventory().getItemInMainHand();
         return matchesCustomItem(main, usedItem);
@@ -1814,6 +1884,116 @@ public class BedwarsListener implements Listener {
         fireball.setYield(custom.getYield());
         fireball.setVelocity(player.getLocation().getDirection().normalize().multiply(custom.getVelocity()));
         fireball.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
+    }
+
+    private void startLoyaltyTridentVoidTracker(Trident trident, UUID ownerId, ItemStack tridentItem) {
+        if (trident == null || ownerId == null || tridentItem == null || tridentItem.getType() == Material.AIR) {
+            return;
+        }
+        UUID tridentId = trident.getUniqueId();
+        cancelLoyaltyTridentTracker(tridentId);
+        BukkitTask task = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!trident.isValid() || trident.isDead()) {
+                    cancelLoyaltyTridentTracker(tridentId);
+                    return;
+                }
+                World world = trident.getWorld();
+                if (world == null) {
+                    cancelLoyaltyTridentTracker(tridentId);
+                    return;
+                }
+                if (trident.getLocation().getY() > world.getMinHeight() - 1.0) {
+                    return;
+                }
+                trident.remove();
+                Player owner = Bukkit.getPlayer(ownerId);
+                if (owner != null && owner.isOnline()) {
+                    returnLoyaltyTrident(owner, tridentItem.clone());
+                } else {
+                    queuePendingLoyaltyTrident(ownerId, tridentItem.clone());
+                }
+                cancelLoyaltyTridentTracker(tridentId);
+            }
+        }.runTaskTimer(bedwarsManager.getPlugin(), 1L, 1L);
+        loyaltyTridentTasks.put(tridentId, task);
+    }
+
+    private void cancelLoyaltyTridentTracker(UUID tridentId) {
+        if (tridentId == null) {
+            return;
+        }
+        BukkitTask task = loyaltyTridentTasks.remove(tridentId);
+        if (task != null) {
+            task.cancel();
+        }
+    }
+
+    private boolean hasLoyalty(ItemStack item) {
+        if (item == null || item.getType() != Material.TRIDENT) {
+            return false;
+        }
+        return item.getEnchantmentLevel(Enchantment.LOYALTY) > 0;
+    }
+
+    private ItemStack resolveThrownTridentItem(Trident trident) {
+        if (trident == null) {
+            return null;
+        }
+        try {
+            Method getItemStack = trident.getClass().getMethod("getItemStack");
+            Object value = getItemStack.invoke(trident);
+            if (value instanceof ItemStack stack) {
+                return stack.clone();
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+        try {
+            Method getItem = trident.getClass().getMethod("getItem");
+            Object value = getItem.invoke(trident);
+            if (value instanceof ItemStack stack) {
+                return stack.clone();
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+        return new ItemStack(Material.TRIDENT);
+    }
+
+    private void returnLoyaltyTrident(Player player, ItemStack tridentItem) {
+        if (player == null || tridentItem == null || tridentItem.getType() == Material.AIR) {
+            return;
+        }
+        Map<Integer, ItemStack> overflow = player.getInventory().addItem(tridentItem);
+        if (!overflow.isEmpty()) {
+            for (ItemStack stack : overflow.values()) {
+                if (stack == null || stack.getType() == Material.AIR) {
+                    continue;
+                }
+                player.getWorld().dropItemNaturally(player.getLocation(), stack);
+            }
+        }
+        player.playSound(player.getLocation(), Sound.ITEM_TRIDENT_RETURN, 1.0f, 1.0f);
+    }
+
+    private void queuePendingLoyaltyTrident(UUID ownerId, ItemStack tridentItem) {
+        if (ownerId == null || tridentItem == null || tridentItem.getType() == Material.AIR) {
+            return;
+        }
+        pendingLoyaltyTridentReturns.computeIfAbsent(ownerId, ignored -> new ArrayList<>()).add(tridentItem.clone());
+    }
+
+    private void deliverPendingLoyaltyTridents(Player player) {
+        if (player == null) {
+            return;
+        }
+        List<ItemStack> pending = pendingLoyaltyTridentReturns.remove(player.getUniqueId());
+        if (pending == null || pending.isEmpty()) {
+            return;
+        }
+        for (ItemStack tridentItem : pending) {
+            returnLoyaltyTrident(player, tridentItem);
+        }
     }
 
     private boolean canUseFireball(Player player) {
