@@ -2312,6 +2312,7 @@ public class BedwarsListener implements Listener {
                     cancel();
                     return;
                 }
+                broadcastNukeActionBar(session, remaining);
                 if (remaining <= NUKE_COUNTDOWN_CHAT_SECONDS) {
                     broadcastNukeCountdown(session, remaining, target.getLocation());
                 }
@@ -2373,7 +2374,7 @@ public class BedwarsListener implements Listener {
         if (session == null) {
             return;
         }
-        Component title = Component.text("Tactical Nuke Activated", NamedTextColor.RED);
+        Component title = Component.text("TACTICAL NUKE ACTIVATED", NamedTextColor.RED);
         Component subtitle = Component.text("Explosion in " + formatNukeTime(countdown), NamedTextColor.YELLOW);
         Title.Times times = Title.Times.times(java.time.Duration.ofMillis(200),
                 java.time.Duration.ofSeconds(3),
@@ -2384,6 +2385,19 @@ public class BedwarsListener implements Listener {
             if (target != null) {
                 target.showTitle(display);
                 target.sendMessage(Component.text("Tactical nuke activated.", NamedTextColor.RED));
+            }
+        }
+    }
+
+    private void broadcastNukeActionBar(GameSession session, int seconds) {
+        if (session == null) {
+            return;
+        }
+        Component message = Component.text("TACTICAL NUKE: " + seconds + "s", NamedTextColor.RED);
+        for (UUID playerId : session.getAssignments().keySet()) {
+            Player target = Bukkit.getPlayer(playerId);
+            if (target != null) {
+                target.sendActionBar(message);
             }
         }
     }
