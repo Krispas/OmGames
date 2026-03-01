@@ -23,6 +23,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Item;
 import org.bukkit.FireworkEffect;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import krispasi.omGames.bedwars.gui.MapSelectMenu;
@@ -42,6 +44,9 @@ import krispasi.omGames.bedwars.shop.ShopCategoryType;
  */
 public class BedwarsManager {
     private static final int DEFAULT_CENTER_RADIUS = 32;
+    private static final double DEFAULT_LEADERBOARD_X = 4.0;
+    private static final double DEFAULT_LEADERBOARD_Y = 73.0;
+    private static final double DEFAULT_LEADERBOARD_Z = -1.0;
     private final JavaPlugin plugin;
     private final QuickBuyService quickBuyService;
     private final BedwarsStatsService statsService;
@@ -75,6 +80,7 @@ public class BedwarsManager {
         migrateBedwarsConfig(configFile);
         BedwarsConfigLoader loader = new BedwarsConfigLoader(configFile, plugin.getLogger());
         arenas = loader.load();
+        configureLobbyLeaderboard(configFile);
         plugin.getLogger().info("Loaded " + arenas.size() + " BedWars arenas.");
     }
 
@@ -646,6 +652,116 @@ public class BedwarsManager {
         } catch (java.io.IOException ex) {
             plugin.getLogger().warning("Failed to update bedwars.yml: " + ex.getMessage());
         }
+    }
+
+    private void configureLobbyLeaderboard(File configFile) {
+        String worldName = null;
+        double x = DEFAULT_LEADERBOARD_X;
+        double y = DEFAULT_LEADERBOARD_Y;
+        double z = DEFAULT_LEADERBOARD_Z;
+
+        if (configFile.exists()) {
+            YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+            ConfigurationSection section = config.getConfigurationSection("leaderboard");
+            if (section != null) {
+                String sectionWorld = section.getString("world");
+                if (sectionWorld != null && !sectionWorld.isBlank()) {
+                    worldName = sectionWorld.trim();
+                }
+                if (section.isSet("x") && section.isSet("y") && section.isSet("z")) {
+                    x = section.getDouble("x", x);
+                    y = section.getDouble("y", y);
+                    z = section.getDouble("z", z);
+                } else {
+                    String rawSection = section.getString("location");
+                    if (rawSection != null && !rawSection.isBlank()) {
+                        String parsedWorld = parseLeaderboardEntry(rawSection, worldName);
+                        if (parsedWorld != null) {
+                            worldName = parsedWorld;
+                        }
+                        double[] parsedCoords = parseLeaderboardCoordinates(rawSection);
+                        if (parsedCoords != null) {
+                            x = parsedCoords[0];
+                            y = parsedCoords[1];
+                            z = parsedCoords[2];
+                        }
+                    }
+                }
+            } else {
+                String raw = config.getString("leaderboard");
+                if (raw != null && !raw.isBlank()) {
+                    String parsedWorld = parseLeaderboardEntry(raw, null);
+                    if (parsedWorld != null) {
+                        worldName = parsedWorld;
+                    }
+                    double[] parsedCoords = parseLeaderboardCoordinates(raw);
+                    if (parsedCoords != null) {
+                        x = parsedCoords[0];
+                        y = parsedCoords[1];
+                        z = parsedCoords[2];
+                    } else {
+                        plugin.getLogger().warning("Invalid leaderboard location in bedwars.yml: " + raw);
+                    }
+                }
+            }
+        }
+
+        if (worldName == null || worldName.isBlank()) {
+            worldName = resolveLeaderboardWorldFallback();
+        }
+        lobbyLeaderboard.configureAnchor(worldName, x, y, z);
+    }
+
+    private String parseLeaderboardEntry(String raw, String defaultWorld) {
+        if (raw == null || raw.isBlank()) {
+            return defaultWorld;
+        }
+        String[] parts = raw.trim().split("\\s+");
+        if (parts.length == 4) {
+            return parts[0];
+        }
+        return defaultWorld;
+    }
+
+    private double[] parseLeaderboardCoordinates(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String[] parts = raw.trim().split("\\s+");
+        int start = parts.length == 4 ? 1 : 0;
+        if (parts.length - start != 3) {
+            return null;
+        }
+        try {
+            return new double[]{
+                    Double.parseDouble(parts[start]),
+                    Double.parseDouble(parts[start + 1]),
+                    Double.parseDouble(parts[start + 2])
+            };
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private String resolveLeaderboardWorldFallback() {
+        World preferred = Bukkit.getWorld("bedwars");
+        if (preferred != null) {
+            return preferred.getName();
+        }
+        for (Arena arena : arenas.values()) {
+            World world = arena.getWorld();
+            if (world != null) {
+                return world.getName();
+            }
+            if (arena.getWorldName() != null && !arena.getWorldName().isBlank()) {
+                return arena.getWorldName();
+            }
+        }
+        World secondary = Bukkit.getWorld("bw");
+        if (secondary != null) {
+            return secondary.getName();
+        }
+        return null;
     }
 
     private boolean ensureCustomItemValue(org.bukkit.configuration.ConfigurationSection section,

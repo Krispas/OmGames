@@ -27,19 +27,19 @@ import org.bukkit.scheduler.BukkitTask;
  * while players are near the configured anchor location.</p>
  */
 public class BedwarsLobbyLeaderboard {
-    private static final String[] WORLD_NAMES = {"bw", "bedwars"};
+    private static final String[] FALLBACK_WORLD_NAMES = {"bw", "bedwars"};
     private static final String DISPLAY_TAG = "bw_lobby_leaderboard";
     private static final int TOP_LIMIT = 10;
     private static final long CHECK_INTERVAL_TICKS = 20L;
     private static final long REFRESH_INTERVAL_MILLIS = 15_000L;
     private static final double NEAR_RADIUS_BLOCKS = 24.0;
-    private static final double ANCHOR_X = 4.0;
-    private static final double ANCHOR_Y = 73.0;
-    private static final double ANCHOR_Z = 3.0;
+    private static final double DEFAULT_ANCHOR_X = 4.0;
+    private static final double DEFAULT_ANCHOR_Y = 73.0;
+    private static final double DEFAULT_ANCHOR_Z = -1.0;
     private static final double DEPTH_OFFSET_X = -1.25;
-    private static final double COLUMN_MIN_Z = -2.0;
-    private static final double COLUMN_MID_Z = 1.0;
-    private static final double COLUMN_MAX_Z = 4.0;
+    private static final double COLUMN_MIN_OFFSET_Z = -1.0;
+    private static final double COLUMN_MID_OFFSET_Z = 2.0;
+    private static final double COLUMN_MAX_OFFSET_Z = 5.0;
     private static final double HEIGHT_OFFSET = 3.2;
     private static final double LINE_SPACING = 0.28;
     private static final float BOARD_YAW = 90.0f;
@@ -48,6 +48,10 @@ public class BedwarsLobbyLeaderboard {
     private final BedwarsStatsService statsService;
     private final List<UUID> activeDisplays = new ArrayList<>();
     private final Map<UUID, String> nameCache = new HashMap<>();
+    private String anchorWorldName;
+    private double anchorX = DEFAULT_ANCHOR_X;
+    private double anchorY = DEFAULT_ANCHOR_Y;
+    private double anchorZ = DEFAULT_ANCHOR_Z;
     private BukkitTask task;
     private long lastRefreshMillis;
 
@@ -68,12 +72,19 @@ public class BedwarsLobbyLeaderboard {
             task.cancel();
             task = null;
         }
-        World world = resolveWorld();
-        if (world != null) {
-            removeAllDisplays(world);
-        } else {
-            activeDisplays.clear();
+        removeTrackedDisplays();
+        for (World world : Bukkit.getWorlds()) {
+            removeTaggedDisplays(world);
         }
+    }
+
+    public void configureAnchor(String worldName, double x, double y, double z) {
+        this.anchorWorldName = worldName == null || worldName.isBlank() ? null : worldName.trim();
+        this.anchorX = x;
+        this.anchorY = y;
+        this.anchorZ = z;
+        this.lastRefreshMillis = 0L;
+        removeTrackedDisplays();
     }
 
     private void tick() {
@@ -82,7 +93,7 @@ public class BedwarsLobbyLeaderboard {
             activeDisplays.clear();
             return;
         }
-        Location anchor = new Location(world, ANCHOR_X, ANCHOR_Y, ANCHOR_Z);
+        Location anchor = new Location(world, anchorX, anchorY, anchorZ);
         if (!hasNearbyPlayers(world, anchor)) {
             if (!activeDisplays.isEmpty()) {
                 removeAllDisplays(world);
@@ -100,8 +111,14 @@ public class BedwarsLobbyLeaderboard {
     }
 
     private World resolveWorld() {
-        for (String worldName : WORLD_NAMES) {
-            World world = Bukkit.getWorld(worldName);
+        if (anchorWorldName != null && !anchorWorldName.isBlank()) {
+            World world = Bukkit.getWorld(anchorWorldName);
+            if (world != null) {
+                return world;
+            }
+        }
+        for (String fallback : FALLBACK_WORLD_NAMES) {
+            World world = Bukkit.getWorld(fallback);
             if (world != null) {
                 return world;
             }
@@ -129,10 +146,10 @@ public class BedwarsLobbyLeaderboard {
         List<Component> finalKills = buildColumn("Lifetime Final Kills", statsService.getTopFinalKills(TOP_LIMIT));
         List<Component> beds = buildColumn("Lifetime Beds Broken", statsService.getTopBedsBroken(TOP_LIMIT));
 
-        double x = ANCHOR_X + DEPTH_OFFSET_X;
-        spawnColumn(world, new Location(world, x, anchor.getY(), COLUMN_MIN_Z), wins);
-        spawnColumn(world, new Location(world, x, anchor.getY(), COLUMN_MID_Z), finalKills);
-        spawnColumn(world, new Location(world, x, anchor.getY(), COLUMN_MAX_Z), beds);
+        double x = anchor.getX() + DEPTH_OFFSET_X;
+        spawnColumn(world, new Location(world, x, anchor.getY(), anchor.getZ() + COLUMN_MIN_OFFSET_Z), wins);
+        spawnColumn(world, new Location(world, x, anchor.getY(), anchor.getZ() + COLUMN_MID_OFFSET_Z), finalKills);
+        spawnColumn(world, new Location(world, x, anchor.getY(), anchor.getZ() + COLUMN_MAX_OFFSET_Z), beds);
     }
 
     private List<Component> buildColumn(String title, List<BedwarsStatsService.TopStatEntry> topEntries) {
@@ -180,6 +197,11 @@ public class BedwarsLobbyLeaderboard {
     }
 
     private void removeAllDisplays(World world) {
+        removeTrackedDisplays();
+        removeTaggedDisplays(world);
+    }
+
+    private void removeTrackedDisplays() {
         for (UUID id : activeDisplays) {
             Entity entity = Bukkit.getEntity(id);
             if (entity != null) {
@@ -187,7 +209,6 @@ public class BedwarsLobbyLeaderboard {
             }
         }
         activeDisplays.clear();
-        removeTaggedDisplays(world);
     }
 
     private void removeTaggedDisplays(World world) {
