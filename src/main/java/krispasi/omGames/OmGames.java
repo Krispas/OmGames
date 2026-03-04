@@ -18,11 +18,14 @@ import org.bukkit.plugin.java.JavaPlugin;
  * @see krispasi.omGames.bedwars.listener.BedwarsListener
  */
 public final class OmGames extends JavaPlugin {
+    private static OmGames instance;
     private BedwarsManager bedwarsManager;
     private BedwarsSetupManager setupManager;
 
     @Override
     public void onEnable() {
+        instance = this;
+
         ensureBedwarsConfig("bedwars.yml");
         ensureBedwarsConfig("shop.yml");
         ensureBedwarsConfig("rotating-items.yml");
@@ -84,6 +87,8 @@ public final class OmGames extends JavaPlugin {
             getLogger().warning("Failed to save Bedwars config " + name + ": " + ex.getMessage());
         }
     }
+
+    public static OmGames getInstance(){ return instance; }
 /*    private void setupBedwars() {
         WorldCreator creator = new WorldCreator("slumber");
         creator.environment(World.Environment.NORMAL);
