@@ -320,10 +320,15 @@ Item fields (common):
 - `tier`
 - `team-color`
 - `custom-item`
+- `knockback-bonus`
 - `limit.scope` (`PLAYER` or `TEAM`)
 - `limit.amount`
 - `enchants`
 - `potion-effects`
+
+`knockback-bonus` notes:
+- Optional decimal extra melee velocity applied by listener-side combat handling.
+- Intended for cases where vanilla enchant levels are too coarse (for example, approximating "Knockback 1.5").
 
 Special item fields:
 - Fireworks (`material: FIREWORK_ROCKET`):
@@ -570,6 +575,7 @@ Before finishing work:
 4. Runtime cleanup paths remain intact (tasks/entities/scoreboards).
 5. Command or setup UX text updated if behavior changed.
 6. Manual validation steps were run or explicitly called out as not run.
+7. `AGENTS.md` was updated if config schema, operational workflow, or project-specific agent rules changed.
 
 ## 18) Short Rule of Thumb
 
