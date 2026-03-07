@@ -239,7 +239,7 @@ shop:
       amount: 1
       cost:
         material: GOLD
-        amount: 12
+        amount: 6
       tier: 1
       display-name: "Bow"
     bow_power:

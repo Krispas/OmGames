@@ -42,7 +42,7 @@ public class BedwarsLobbyParkour {
     private static final String CONFIG_END = "end";
     private static final String CONFIG_CHECKPOINTS = "checkpoints";
     private static final long PLATE_COOLDOWN_MILLIS = 800L;
-    private static final long CONTROL_ITEM_CHECKPOINT_LOCK_MILLIS = 3_000L;
+    private static final long CONTROL_ITEM_PLATE_LOCK_MILLIS = 3_000L;
     private static final int CONTROL_SLOT_EXIT = 7;
     private static final int CONTROL_SLOT_CHECKPOINT = 8;
     private static final String CONTROL_EXIT = "exit";
@@ -52,7 +52,7 @@ public class BedwarsLobbyParkour {
     private final NamespacedKey controlItemKey;
     private final Map<UUID, RunState> runs = new HashMap<>();
     private final Map<UUID, Map<BlockPoint, Long>> plateTriggerCooldowns = new HashMap<>();
-    private final Map<UUID, Long> checkpointLockUntil = new HashMap<>();
+    private final Map<UUID, Long> plateLockUntil = new HashMap<>();
 
     private String worldName;
     private BlockPoint startPlate;
@@ -100,7 +100,7 @@ public class BedwarsLobbyParkour {
     public void shutdown() {
         runs.clear();
         plateTriggerCooldowns.clear();
-        checkpointLockUntil.clear();
+        plateLockUntil.clear();
     }
 
     public List<ParkourTopEntry> getTopEntries(int limit) {
@@ -182,12 +182,12 @@ public class BedwarsLobbyParkour {
             return true;
         }
         if (CONTROL_EXIT.equals(control)) {
-            applyCheckpointLock(player.getUniqueId());
+            applyPlateLock(player.getUniqueId());
             abortRun(player, run, true);
             return true;
         }
         if (CONTROL_CHECKPOINT.equals(control)) {
-            applyCheckpointLock(player.getUniqueId());
+            applyPlateLock(player.getUniqueId());
             teleportToLastCheckpoint(player, run);
             return true;
         }
@@ -237,6 +237,9 @@ public class BedwarsLobbyParkour {
         if (!matchesParkourWorld(player.getWorld().getName())) {
             return;
         }
+        if (isPlateLocked(player.getUniqueId())) {
+            return;
+        }
         if (startPlate != null && steppedPoint.equals(startPlate)) {
             if (isOnPlateCooldown(player.getUniqueId(), steppedPoint)) {
                 return;
@@ -251,9 +254,6 @@ public class BedwarsLobbyParkour {
         }
         Integer checkpointIndex = findCheckpointIndex(steppedPoint);
         if (checkpointIndex != null) {
-            if (isCheckpointLocked(player.getUniqueId())) {
-                return;
-            }
             if (isOnPlateCooldown(player.getUniqueId(), steppedPoint)) {
                 return;
             }
@@ -275,7 +275,7 @@ public class BedwarsLobbyParkour {
         }
         RunState run = runs.remove(player.getUniqueId());
         plateTriggerCooldowns.remove(player.getUniqueId());
-        checkpointLockUntil.remove(player.getUniqueId());
+        plateLockUntil.remove(player.getUniqueId());
         if (run == null) {
             return;
         }
@@ -304,7 +304,7 @@ public class BedwarsLobbyParkour {
     private void finishRun(Player player, RunState run) {
         runs.remove(player.getUniqueId());
         plateTriggerCooldowns.remove(player.getUniqueId());
-        checkpointLockUntil.remove(player.getUniqueId());
+        plateLockUntil.remove(player.getUniqueId());
         restoreControlSlots(player, run);
         long elapsed = Math.max(0L, System.currentTimeMillis() - run.startedAt);
         bedwarsManager.getStatsService().recordParkourFinish(player.getUniqueId(), elapsed, run.checkpointUses);
@@ -315,7 +315,7 @@ public class BedwarsLobbyParkour {
     private void abortRun(Player player, RunState run, boolean teleportToStart) {
         runs.remove(player.getUniqueId());
         plateTriggerCooldowns.remove(player.getUniqueId());
-        checkpointLockUntil.remove(player.getUniqueId());
+        plateLockUntil.remove(player.getUniqueId());
         restoreControlSlots(player, run);
         if (teleportToStart && startPlate != null) {
             Location start = toTeleportLocation(player, startPlate);
@@ -602,23 +602,23 @@ public class BedwarsLobbyParkour {
                 .put(point, System.currentTimeMillis());
     }
 
-    private void applyCheckpointLock(UUID playerId) {
+    private void applyPlateLock(UUID playerId) {
         if (playerId == null) {
             return;
         }
-        checkpointLockUntil.put(playerId, System.currentTimeMillis() + CONTROL_ITEM_CHECKPOINT_LOCK_MILLIS);
+        plateLockUntil.put(playerId, System.currentTimeMillis() + CONTROL_ITEM_PLATE_LOCK_MILLIS);
     }
 
-    private boolean isCheckpointLocked(UUID playerId) {
+    private boolean isPlateLocked(UUID playerId) {
         if (playerId == null) {
             return false;
         }
-        Long until = checkpointLockUntil.get(playerId);
+        Long until = plateLockUntil.get(playerId);
         if (until == null) {
             return false;
         }
         if (System.currentTimeMillis() >= until) {
-            checkpointLockUntil.remove(playerId);
+            plateLockUntil.remove(playerId);
             return false;
         }
         return true;
