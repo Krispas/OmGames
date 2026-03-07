@@ -217,20 +217,22 @@ shop:
       material: NETHERITE_SPEAR
       amount: 1
       cost:
-        material: GOLD
-        amount: 16
-      display-name: "Netherite Spear"
+        material: EMERALD
+        amount: 4
+      display-name: "Netherite Spear (Lunging III)"
       behavior: SWORD
+      enchants:
+        LUNGING: 3
     netherite_spear_lunging:
       material: NETHERITE_SPEAR
       amount: 1
       cost:
         material: EMERALD
         amount: 4
-      display-name: "Netherite Spear (Lunging III, Sharpness V)"
+      display-name: "Netherite Spear (Lunging I, Sharpness V)"
       behavior: SWORD
       enchants:
-        LUNGING: 3
+        LUNGING: 1
         SHARPNESS: 5
     bow:
       material: BOW
