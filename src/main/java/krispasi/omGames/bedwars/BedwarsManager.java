@@ -273,6 +273,7 @@ public class BedwarsManager {
         if (session != activeSession) {
             return;
         }
+        session.finalizePartyExpRewards(winner);
         Component message;
         if (winner != null) {
             message = Component.text("Team ", NamedTextColor.GOLD)

@@ -1609,6 +1609,9 @@ public class BedwarsListener implements Listener {
             }
             if (killerId != null && !killerId.equals(player.getUniqueId())) {
                 session.addKill(killerId);
+                if (finalDeath) {
+                    session.rewardFinalKill(killerId);
+                }
                 if (statsEnabled) {
                     bedwarsManager.getStatsService().addKill(killerId);
                     if (finalDeath) {
@@ -1712,7 +1715,7 @@ public class BedwarsListener implements Listener {
                     && session.isInArenaWorld(player.getWorld())) {
                 player.getInventory().clear();
             }
-            session.handlePlayerQuit(event.getPlayer().getUniqueId());
+            session.handlePlayerQuit(event.getPlayer());
             showArmorForPlayer(event.getPlayer(), session);
         });
     }

@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.Locale;
+import krispasi.omGames.OmVeinsAPI;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.generator.GeneratorInfo;
 import krispasi.omGames.bedwars.generator.GeneratorManager;
@@ -162,6 +163,15 @@ public class GameSession {
     private static final double WORLD_BORDER_DAMAGE_BUFFER = 0.0;
     private static final double WORLD_BORDER_DAMAGE_AMOUNT = 2.0;
     private static final int WORLD_BORDER_WARNING_DISTANCE = 1;
+    private static final int LONG_MATCH_PARTY_EXP_SECONDS = 8 * 60;
+    private static final int PARTY_EXP_LONG_MATCH = 50;
+    private static final int PARTY_EXP_BED_GONE_MATCH = 100;
+    private static final int PARTY_EXP_WIN = 100;
+    private static final int PARTY_EXP_SECOND_PLACE = 50;
+    private static final int PARTY_EXP_THIRD_PLACE = 25;
+    private static final int PARTY_EXP_KILL = 1;
+    private static final int PARTY_EXP_BED_BREAK = 10;
+    private static final int PARTY_EXP_FINAL_KILL = 5;
 
     private final BedwarsManager bedwarsManager;
     private final Arena arena;
@@ -174,6 +184,7 @@ public class GameSession {
     private final Set<UUID> frozenPlayers = new HashSet<>();
     private final Set<UUID> eliminatedPlayers = new HashSet<>();
     private final Set<TeamColor> eliminatedTeams = new HashSet<>();
+    private final List<TeamColor> eliminationOrder = new ArrayList<>();
     private final Set<UUID> pendingRespawns = new HashSet<>();
     private final Set<UUID> respawnGracePlayers = new HashSet<>();
     private final Map<UUID, BukkitTask> respawnTasks = new HashMap<>();
@@ -188,6 +199,7 @@ public class GameSession {
     private final List<String> manualRotatingItemIds = new ArrayList<>();
     private RotatingSelectionMode rotatingMode = RotatingSelectionMode.TWO_RANDOM;
     private final Map<UUID, Integer> killCounts = new HashMap<>();
+    private final Map<UUID, Integer> pendingPartyExp = new HashMap<>();
     private final Map<TeamColor, Map<String, Integer>> teamPurchaseCounts = new EnumMap<>(TeamColor.class);
     private final Map<UUID, Map<String, Integer>> playerPurchaseCounts = new HashMap<>();
     private final Set<UUID> editorPlayers = new HashSet<>();
@@ -232,6 +244,8 @@ public class GameSession {
     private Double previousBorderDamageBuffer;
     private Integer previousBorderWarningDistance;
     private boolean statsEnabled = true;
+    private int grantedMatchParticipationPartyExp;
+    private boolean partyExpUnavailableLogged;
 
     public GameSession(BedwarsManager bedwarsManager, Arena arena) {
         this.bedwarsManager = bedwarsManager;
@@ -358,10 +372,27 @@ public class GameSession {
             return;
         }
         killCounts.merge(playerId, 1, Integer::sum);
+        queuePartyExp(playerId, PARTY_EXP_KILL);
         Player player = Bukkit.getPlayer(playerId);
         if (player != null) {
             updateSidebarForPlayer(player);
         }
+    }
+
+    public void rewardFinalKill(UUID playerId) {
+        queuePartyExp(playerId, PARTY_EXP_FINAL_KILL);
+    }
+
+    public void finalizePartyExpRewards(TeamColor winner) {
+        if (!isPartyExpEnabled()) {
+            return;
+        }
+        finalizeMatchParticipationPartyExp();
+        queueFinalPlacementPartyExp(winner);
+        if (winner != null) {
+            queuePartyExpForTeam(winner, PARTY_EXP_WIN);
+        }
+        flushPendingPartyExpForOnlineParticipants();
     }
 
     public boolean isEditor(UUID playerId) {
@@ -501,6 +532,7 @@ public class GameSession {
         bedBlocks.put(location.foot(), team);
         restoreBed(world, team, location);
         eliminatedTeams.remove(team);
+        eliminationOrder.remove(team);
         return true;
     }
 
@@ -1350,6 +1382,9 @@ public class GameSession {
         if (statsEnabled && breaker != null && isParticipant(breaker.getUniqueId())) {
             bedwarsManager.getStatsService().addBedBroken(breaker.getUniqueId());
         }
+        if (breaker != null) {
+            queuePartyExp(breaker.getUniqueId(), PARTY_EXP_BED_BREAK);
+        }
         grantPendingRespawnGrace(team);
         destroyBed(team);
         broadcast(Component.text("The ", NamedTextColor.RED)
@@ -1543,6 +1578,7 @@ public class GameSession {
 
     private void scheduleGameEvents() {
         krispasi.omGames.bedwars.model.EventSettings events = arena.getEventSettings();
+        scheduleLongMatchPartyExp(LONG_MATCH_PARTY_EXP_SECONDS);
         scheduleTierUpgrade(2, events.getTier2Delay());
         scheduleTierUpgrade(3, events.getTier3Delay());
         scheduleBedDestruction(events.getBedDestructionDelay());
@@ -1606,6 +1642,22 @@ public class GameSession {
         tasks.add(task);
     }
 
+    private void scheduleLongMatchPartyExp(int delaySeconds) {
+        if (delaySeconds <= 0) {
+            updateMatchParticipationPartyExp(PARTY_EXP_LONG_MATCH);
+            return;
+        }
+        BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            safeRun("longMatchPartyExp", () -> {
+                if (state != GameState.RUNNING) {
+                    return;
+                }
+                updateMatchParticipationPartyExp(PARTY_EXP_LONG_MATCH);
+            });
+        }, delaySeconds * 20L);
+        tasks.add(task);
+    }
+
     private void scheduleSuddenDeath(int delaySeconds) {
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             safeRun("suddenDeath", () -> {
@@ -1629,6 +1681,7 @@ public class GameSession {
             return;
         }
         bedDestructionTriggered = true;
+        updateMatchParticipationPartyExp(PARTY_EXP_BED_GONE_MATCH);
         triggerBedDestruction();
     }
 
@@ -1773,6 +1826,8 @@ public class GameSession {
         }
         if (!isTeamAlive(team)) {
             eliminatedTeams.add(team);
+            eliminationOrder.remove(team);
+            eliminationOrder.add(team);
             broadcast(Component.text("Team ", NamedTextColor.RED)
                     .append(team.displayComponent())
                     .append(Component.text(" has been eliminated!", NamedTextColor.RED)));
@@ -2019,6 +2074,8 @@ public class GameSession {
     }
 
     private void stopInternal() {
+        finalizeMatchParticipationPartyExp();
+        flushPendingPartyExpForOnlineParticipants();
         state = GameState.ENDING;
         clearEditors();
         releaseForcedChunks();
@@ -2178,6 +2235,7 @@ public class GameSession {
         clearEditors();
         eliminatedPlayers.clear();
         eliminatedTeams.clear();
+        eliminationOrder.clear();
         placedBlocks.clear();
         placedBlockItems.clear();
         forcedChunks.clear();
@@ -2189,6 +2247,7 @@ public class GameSession {
         sidebarLines.clear();
         rotatingItemIds.clear();
         killCounts.clear();
+        pendingPartyExp.clear();
         teamPurchaseCounts.clear();
         playerPurchaseCounts.clear();
         respawnProtectionEnds.clear();
@@ -2215,6 +2274,8 @@ public class GameSession {
         tier3Triggered = false;
         bedDestructionTriggered = false;
         gameEndTriggered = false;
+        grantedMatchParticipationPartyExp = 0;
+        partyExpUnavailableLogged = false;
     }
 
     public Set<String> getRotatingItemIds() {
@@ -3097,7 +3158,11 @@ public class GameSession {
         updateSidebarForPlayer(player);
     }
 
-    public void handlePlayerQuit(UUID playerId) {
+    public void handlePlayerQuit(Player player) {
+        if (player == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
         cancelRespawnCountdown(playerId);
         removeRespawnProtection(playerId);
         clearTrapImmunity(playerId);
@@ -3105,6 +3170,7 @@ public class GameSession {
         if (task != null) {
             task.cancel();
         }
+        flushPendingPartyExp(player);
         restoreSidebar(playerId);
     }
 
@@ -3567,6 +3633,128 @@ public class GameSession {
                 Bukkit.getLogger().log(Level.SEVERE, "BedWars error in " + context, ex);
             }
         }
+    }
+
+    private boolean isPartyExpEnabled() {
+        return statsEnabled;
+    }
+
+    private void queuePartyExp(UUID playerId, int amount) {
+        if (!isPartyExpEnabled() || playerId == null || amount <= 0 || !isParticipant(playerId)) {
+            return;
+        }
+        pendingPartyExp.merge(playerId, amount, Integer::sum);
+    }
+
+    private void queuePartyExpForTeam(TeamColor team, int amount) {
+        if (team == null || amount <= 0) {
+            return;
+        }
+        for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
+            if (team == entry.getValue()) {
+                queuePartyExp(entry.getKey(), amount);
+            }
+        }
+    }
+
+    private void queuePartyExpForAllParticipants(int amount) {
+        if (amount <= 0) {
+            return;
+        }
+        for (UUID playerId : assignments.keySet()) {
+            queuePartyExp(playerId, amount);
+        }
+    }
+
+    private void updateMatchParticipationPartyExp(int targetAmount) {
+        if (!isPartyExpEnabled()) {
+            return;
+        }
+        int normalizedTarget = Math.max(0, targetAmount);
+        if (normalizedTarget <= grantedMatchParticipationPartyExp) {
+            return;
+        }
+        int delta = normalizedTarget - grantedMatchParticipationPartyExp;
+        grantedMatchParticipationPartyExp = normalizedTarget;
+        queuePartyExpForAllParticipants(delta);
+    }
+
+    private void finalizeMatchParticipationPartyExp() {
+        if (!isPartyExpEnabled()) {
+            return;
+        }
+        if (bedDestructionTriggered) {
+            updateMatchParticipationPartyExp(PARTY_EXP_BED_GONE_MATCH);
+            return;
+        }
+        if (matchStartMillis <= 0L) {
+            return;
+        }
+        long elapsedMillis = System.currentTimeMillis() - matchStartMillis;
+        if (elapsedMillis >= LONG_MATCH_PARTY_EXP_SECONDS * 1000L) {
+            updateMatchParticipationPartyExp(PARTY_EXP_LONG_MATCH);
+        }
+    }
+
+    private void queueFinalPlacementPartyExp(TeamColor winner) {
+        if (!isPartyExpEnabled()) {
+            return;
+        }
+        int totalTeams = teamsInMatch.size();
+        if (totalTeams < 3) {
+            return;
+        }
+        Map<TeamColor, Integer> placements = new EnumMap<>(TeamColor.class);
+        for (int i = 0; i < eliminationOrder.size(); i++) {
+            TeamColor team = eliminationOrder.get(i);
+            if (teamsInMatch.contains(team)) {
+                placements.put(team, totalTeams - i);
+            }
+        }
+        if (winner != null && teamsInMatch.contains(winner)) {
+            placements.put(winner, 1);
+        }
+        for (Map.Entry<TeamColor, Integer> entry : placements.entrySet()) {
+            int amount = 0;
+            if (entry.getValue() == 2) {
+                amount = PARTY_EXP_SECOND_PLACE;
+            } else if (entry.getValue() == 3 && totalTeams >= 4) {
+                amount = PARTY_EXP_THIRD_PLACE;
+            }
+            queuePartyExpForTeam(entry.getKey(), amount);
+        }
+    }
+
+    private void flushPendingPartyExpForOnlineParticipants() {
+        if (!isPartyExpEnabled()) {
+            return;
+        }
+        for (UUID playerId : assignments.keySet()) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.isOnline()) {
+                flushPendingPartyExp(player);
+            }
+        }
+    }
+
+    private void flushPendingPartyExp(Player player) {
+        if (!isPartyExpEnabled() || player == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        int amount = pendingPartyExp.getOrDefault(playerId, 0);
+        if (amount <= 0) {
+            return;
+        }
+        if (!OmVeinsAPI.isInitialized()) {
+            if (!partyExpUnavailableLogged) {
+                partyExpUnavailableLogged = true;
+                plugin.getLogger().warning("OmVeins API is not initialized. BedWars party EXP rewards are queued until it becomes available.");
+            }
+            return;
+        }
+        OmVeinsAPI.addPartyExp(player, amount);
+        pendingPartyExp.remove(playerId);
     }
 
     private void updateTeamsInMatch() {
