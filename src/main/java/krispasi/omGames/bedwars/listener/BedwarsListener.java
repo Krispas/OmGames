@@ -1098,13 +1098,8 @@ public class BedwarsListener implements Listener {
                         event.setCancelled(true);
                     }
                 }
-                if (!event.isCancelled()
-                        && isHappyGhast(event.getEntity())
-                        && event.getDamager() instanceof Fireball fireball) {
-                    CustomItemDefinition definition = resolveCustomProjectile(fireball);
-                    if (isFireballCustom(definition)) {
-                        event.setDamage(Math.max(0.0, definition.getDamage()));
-                    }
+                if (!event.isCancelled() && isHappyGhast(event.getEntity())) {
+                    applyHappyGhastProjectileDamage(event);
                 }
                 if (!event.isCancelled() && suppressSummonKnockback) {
                     restoreVelocityNextTick(summonVictim, summonVelocityBeforeHit);
@@ -1874,6 +1869,22 @@ public class BedwarsListener implements Listener {
                 victim.setVelocity(current.add(knockback));
             }
         }.runTask(bedwarsManager.getPlugin());
+    }
+
+    private void applyHappyGhastProjectileDamage(EntityDamageByEntityEvent event) {
+        if (event == null) {
+            return;
+        }
+        if (event.getDamager() instanceof Arrow arrow) {
+            event.setDamage(Math.max(0.0, arrow.getDamage()));
+            return;
+        }
+        if (event.getDamager() instanceof Fireball fireball) {
+            CustomItemDefinition definition = resolveCustomProjectile(fireball);
+            if (isFireballCustom(definition)) {
+                event.setDamage(Math.max(0.0, definition.getDamage()));
+            }
+        }
     }
 
     private void applyCustomMeleeKnockback(Player attacker, Player victim) {
