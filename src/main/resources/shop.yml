@@ -202,8 +202,9 @@ shop:
         amount: 5
       display-name: "Knockback Stick"
       behavior: SWORD
+      knockback-bonus: 0.2
       enchants:
-        KNOCKBACK: 2
+        KNOCKBACK: 1
     mace:
       material: MACE
       amount: 1

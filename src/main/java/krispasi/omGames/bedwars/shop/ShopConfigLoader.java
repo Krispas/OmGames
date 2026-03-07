@@ -133,6 +133,7 @@ public class ShopConfigLoader {
         List<String> lore = section.getStringList("lore");
         String customItemId = section.getString("custom-item");
         ShopItemLimit limit = parseLimit(section.getConfigurationSection("limit"));
+        double knockbackBonus = Math.max(0.0, section.getDouble("knockback-bonus", 0.0));
         Integer fireworkPower = null;
         FireworkEffect fireworkEffect = null;
         Double fireworkExplosionPower = null;
@@ -175,7 +176,7 @@ public class ShopConfigLoader {
         return new ShopItemDefinition(id, material, amount, cost, behavior, teamColor, tier,
                 enchants, potionEffects, displayName, lore, customItemId, upgradeType, limit,
                 fireworkPower, fireworkEffect, fireworkExplosionPower, fireworkExplosionDamage,
-                fireworkExplosionKnockback);
+                fireworkExplosionKnockback, knockbackBonus);
     }
 
     private ShopCost parseCost(ConfigurationSection section) {

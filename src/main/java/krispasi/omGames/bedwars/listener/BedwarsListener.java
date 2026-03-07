@@ -8,12 +8,15 @@ import krispasi.omGames.bedwars.item.CustomItemDefinition;
 import krispasi.omGames.bedwars.item.CustomItemType;
 import krispasi.omGames.bedwars.item.FireworkData;
 import krispasi.omGames.bedwars.item.LobbyControlItemData;
+import krispasi.omGames.bedwars.item.ShopItemData;
 import krispasi.omGames.bedwars.item.TeamSelectItemData;
 import krispasi.omGames.bedwars.model.BlockPoint;
 import krispasi.omGames.bedwars.model.BedLocation;
 import krispasi.omGames.bedwars.model.BedState;
 import krispasi.omGames.bedwars.model.ShopType;
 import krispasi.omGames.bedwars.model.TeamColor;
+import krispasi.omGames.bedwars.shop.ShopConfig;
+import krispasi.omGames.bedwars.shop.ShopItemDefinition;
 import krispasi.omGames.bedwars.gui.MapSelectMenu;
 import krispasi.omGames.bedwars.gui.RotatingItemMenu;
 import krispasi.omGames.bedwars.gui.ShopMenu;
@@ -1224,6 +1227,13 @@ public class BedwarsListener implements Listener {
             }
             if (!event.isCancelled()
                     && attacker != null
+                    && attacker.equals(event.getDamager())
+                    && session.isParticipant(attacker.getUniqueId())
+                    && session.isParticipant(victim.getUniqueId())) {
+                applyCustomMeleeKnockback(attacker, victim);
+            }
+            if (!event.isCancelled()
+                    && attacker != null
                     && session.isParticipant(attacker.getUniqueId())
                     && session.isParticipant(victim.getUniqueId())) {
                 TeamColor attackerTeam = session.getTeam(attacker.getUniqueId());
@@ -1864,6 +1874,50 @@ public class BedwarsListener implements Listener {
                 victim.setVelocity(current.add(knockback));
             }
         }.runTask(bedwarsManager.getPlugin());
+    }
+
+    private void applyCustomMeleeKnockback(Player attacker, Player victim) {
+        ShopItemDefinition definition = resolveHeldShopItem(attacker);
+        if (definition == null) {
+            return;
+        }
+        double bonus = definition.getKnockbackBonus();
+        if (bonus <= 0.0) {
+            return;
+        }
+        Vector direction = victim.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        direction.setY(0.0);
+        if (direction.lengthSquared() < 0.01) {
+            direction = attacker.getLocation().getDirection().setY(0.0);
+        }
+        if (direction.lengthSquared() < 0.01) {
+            return;
+        }
+        Vector extraKnockback = direction.normalize().multiply(bonus);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!victim.isOnline()) {
+                    return;
+                }
+                victim.setVelocity(victim.getVelocity().add(extraKnockback));
+            }
+        }.runTask(bedwarsManager.getPlugin());
+    }
+
+    private ShopItemDefinition resolveHeldShopItem(Player player) {
+        if (player == null) {
+            return null;
+        }
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return null;
+        }
+        String itemId = ShopItemData.getId(player.getInventory().getItemInMainHand());
+        if (itemId == null || itemId.isBlank()) {
+            return null;
+        }
+        return config.getItem(itemId);
     }
 
     private boolean isHappyGhastSummon(CustomItemDefinition summon, org.bukkit.entity.Entity summonEntity) {

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import krispasi.omGames.bedwars.item.CustomItemData;
 import krispasi.omGames.bedwars.item.FireworkData;
+import krispasi.omGames.bedwars.item.ShopItemData;
 import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
 import net.kyori.adventure.text.Component;
@@ -45,6 +46,7 @@ public class ShopItemDefinition {
     private final Double fireworkExplosionPower;
     private final Double fireworkExplosionDamage;
     private final Double fireworkExplosionKnockback;
+    private final double knockbackBonus;
 
     public ShopItemDefinition(String id,
                               Material material,
@@ -64,7 +66,8 @@ public class ShopItemDefinition {
                               FireworkEffect fireworkEffect,
                               Double fireworkExplosionPower,
                               Double fireworkExplosionDamage,
-                              Double fireworkExplosionKnockback) {
+                              Double fireworkExplosionKnockback,
+                              double knockbackBonus) {
         this.id = id;
         this.material = material;
         this.amount = amount;
@@ -84,6 +87,7 @@ public class ShopItemDefinition {
         this.fireworkExplosionPower = fireworkExplosionPower;
         this.fireworkExplosionDamage = fireworkExplosionDamage;
         this.fireworkExplosionKnockback = fireworkExplosionKnockback;
+        this.knockbackBonus = Math.max(0.0, knockbackBonus);
     }
 
     public String getId() {
@@ -128,6 +132,10 @@ public class ShopItemDefinition {
 
     public String getDisplayName() {
         return displayName;
+    }
+
+    public double getKnockbackBonus() {
+        return knockbackBonus;
     }
 
     public ItemStack createDisplayItem(TeamColor team) {
@@ -190,6 +198,7 @@ public class ShopItemDefinition {
             meta.lore(lines);
         }
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        ShopItemData.apply(meta, id);
         CustomItemData.apply(meta, customItemId);
         stack.setItemMeta(meta);
         return stack;
