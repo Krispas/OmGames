@@ -188,6 +188,7 @@ public class BedwarsListener implements Listener {
     private static final String HAPPY_GHAST_MOUNTED_TAG = "bw_happy_ghast_mounted";
     private static final long FIREBALL_COOLDOWN_MILLIS = 500L;
     private static final long FLAMETHROWER_COOLDOWN_MILLIS = 120L;
+    private static final long LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS = 1_000L;
     private static final long VOID_TOTEM_FALL_PROTECTION_MILLIS = 5_000L;
     private static final int NUKE_TARGET_DISTANCE = 512;
     private static final int NUKE_COUNTDOWN_CHAT_SECONDS = 15;
@@ -207,6 +208,7 @@ public class BedwarsListener implements Listener {
     private final Map<UUID, List<ItemStack>> pendingLoyaltyTridentReturns = new HashMap<>();
     private final Map<UUID, Long> fireballCooldowns = new HashMap<>();
     private final Map<UUID, Long> flamethrowerCooldowns = new HashMap<>();
+    private final Map<UUID, Long> lungingSpearMovementCooldowns = new HashMap<>();
     private final Map<UUID, Long> voidTotemFallProtection = new HashMap<>();
 
     public BedwarsListener(BedwarsManager bedwarsManager) {
@@ -473,6 +475,10 @@ public class BedwarsListener implements Listener {
                 return;
             }
             if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            if (rightClick && shouldBlockLungingSpearMovement(player, item, event)) {
+                event.setCancelled(true);
                 return;
             }
             CustomItemDefinition custom = resolveCustomItem(item);
@@ -1713,6 +1719,7 @@ public class BedwarsListener implements Listener {
             }
             fireballCooldowns.remove(event.getPlayer().getUniqueId());
             flamethrowerCooldowns.remove(event.getPlayer().getUniqueId());
+            lungingSpearMovementCooldowns.remove(event.getPlayer().getUniqueId());
             voidTotemFallProtection.remove(event.getPlayer().getUniqueId());
             Player player = event.getPlayer();
             if (session.isRunning()
@@ -2180,6 +2187,45 @@ public class BedwarsListener implements Listener {
         }
         flamethrowerCooldowns.put(player.getUniqueId(), now);
         return true;
+    }
+
+    private boolean shouldBlockLungingSpearMovement(Player player, ItemStack item, PlayerInteractEvent event) {
+        if (player == null || item == null || event == null) {
+            return false;
+        }
+        if (!isLungingMovementSpear(item)) {
+            return false;
+        }
+        if (!isLikelyItemUse(player, event)) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        long last = lungingSpearMovementCooldowns.getOrDefault(player.getUniqueId(), 0L);
+        if (now - last < LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS) {
+            player.sendActionBar(Component.text("Spear movement is cooling down.", NamedTextColor.RED));
+            return true;
+        }
+        lungingSpearMovementCooldowns.put(player.getUniqueId(), now);
+        return false;
+    }
+
+    private boolean isLungingMovementSpear(ItemStack item) {
+        String itemId = ShopItemData.getId(item);
+        return "netherite_spear".equalsIgnoreCase(itemId);
+    }
+
+    private boolean isLikelyItemUse(Player player, PlayerInteractEvent event) {
+        if (event.getAction() == Action.RIGHT_CLICK_AIR) {
+            return true;
+        }
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return false;
+        }
+        Block clicked = event.getClickedBlock();
+        if (clicked == null) {
+            return true;
+        }
+        return player.isSneaking() || !clicked.getType().isInteractable();
     }
 
     private void launchFlameProjectile(Player player, CustomItemDefinition custom) {
