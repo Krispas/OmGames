@@ -578,3 +578,9 @@ Before finishing work:
 - Prefer `BedwarsListener` for event plumbing.
 - Keep setup/config parser tolerant of legacy input.
 - Never leave scheduled tasks or spawned entities unmanaged at session end.
+
+
+## 19) OmVeinsAPI
+
+- DO NOT TOUCH THAT CODE in Omveins API.
+- Do not use this API during server startup!
