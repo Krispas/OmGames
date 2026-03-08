@@ -3,6 +3,8 @@
 ## 1) Purpose
 
 This document is the operational handbook for agents working in `OmGames`.
+Make sure u you understand the project's goals and architecture before contributing. 
+And u keep it up to date with the latest changes.
 Use it to decide where changes belong, how runtime state flows, and how to safely modify BedWars behavior without regressions.
 
 Primary goal: keep BedWars gameplay stable while enabling fast config-first iteration.
@@ -161,7 +163,7 @@ Important entrypoints:
 
 Operator/debug helpers:
 - `forceJoin(player, team)`
-- `reviveBed(team)`
+- `reviveBed(team)` (restores the bed and re-adds the team to `teamsInMatch` if needed)
 - `skipNextPhase()`
 - `addEditor/removeEditor`
 

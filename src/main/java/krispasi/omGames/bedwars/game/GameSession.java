@@ -575,15 +575,13 @@ public class GameSession {
         if (team == null) {
             return false;
         }
-        if (!teamsInMatch.contains(team)) {
-            return false;
-        }
-        if (getBedState(team) == BedState.ALIVE) {
-            return false;
-        }
         BedLocation location = arena.getBeds().get(team);
         World world = arena.getWorld();
         if (location == null || world == null) {
+            return false;
+        }
+        boolean addedToMatch = teamsInMatch.add(team);
+        if (!addedToMatch && getBedState(team) == BedState.ALIVE) {
             return false;
         }
         bedStates.put(team, BedState.ALIVE);
@@ -592,6 +590,9 @@ public class GameSession {
         restoreBed(world, team, location);
         eliminatedTeams.remove(team);
         eliminationOrder.remove(team);
+        initializeBaseCenters();
+        syncForgeTiers();
+        updateSidebars();
         return true;
     }
 
