@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.model.TeamColor;
+import krispasi.omGames.bedwars.shop.ShopItemDefinition;
 import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
 import krispasi.omGames.bedwars.upgrade.TrapType;
 import net.kyori.adventure.text.Component;
@@ -126,6 +127,7 @@ public class UpgradeShopMenu implements InventoryHolder {
     }
 
     private ItemStack buildUpgradeItem(TeamUpgradeType type) {
+        ShopItemDefinition rotatingDefinition = session.getRotatingUpgradeDefinition(type);
         if (!session.isRotatingUpgradeAvailable(type)) {
             ItemStack item = new ItemStack(type.icon());
             ItemMeta meta = item.getItemMeta();
@@ -136,6 +138,9 @@ public class UpgradeShopMenu implements InventoryHolder {
             }
             lore.add(Component.text(" ", NamedTextColor.DARK_GRAY));
             lore.add(Component.text("Not in rotation", NamedTextColor.RED));
+            if (rotatingDefinition != null && rotatingDefinition.isDisabledAfterSuddenDeath()) {
+                lore.add(Component.text("Disabled after sudden death", NamedTextColor.RED));
+            }
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
             meta.lore(lore);
             item.setItemMeta(meta);
@@ -167,6 +172,9 @@ public class UpgradeShopMenu implements InventoryHolder {
         } else {
             lore.add(Component.text("Cost: " + type.nextCost(tier) + " Diamonds", NamedTextColor.YELLOW));
             lore.add(Component.text("Click to purchase", NamedTextColor.GRAY));
+        }
+        if (rotatingDefinition != null && rotatingDefinition.isDisabledAfterSuddenDeath()) {
+            lore.add(Component.text("Disabled after sudden death", NamedTextColor.RED));
         }
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         meta.lore(lore);

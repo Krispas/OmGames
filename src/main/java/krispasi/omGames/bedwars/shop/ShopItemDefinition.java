@@ -47,6 +47,7 @@ public class ShopItemDefinition {
     private final Double fireworkExplosionDamage;
     private final Double fireworkExplosionKnockback;
     private final double knockbackBonus;
+    private final boolean disabledAfterSuddenDeath;
 
     public ShopItemDefinition(String id,
                               Material material,
@@ -67,7 +68,8 @@ public class ShopItemDefinition {
                               Double fireworkExplosionPower,
                               Double fireworkExplosionDamage,
                               Double fireworkExplosionKnockback,
-                              double knockbackBonus) {
+                              double knockbackBonus,
+                              boolean disabledAfterSuddenDeath) {
         this.id = id;
         this.material = material;
         this.amount = amount;
@@ -88,6 +90,7 @@ public class ShopItemDefinition {
         this.fireworkExplosionDamage = fireworkExplosionDamage;
         this.fireworkExplosionKnockback = fireworkExplosionKnockback;
         this.knockbackBonus = Math.max(0.0, knockbackBonus);
+        this.disabledAfterSuddenDeath = disabledAfterSuddenDeath;
     }
 
     public String getId() {
@@ -136,6 +139,10 @@ public class ShopItemDefinition {
 
     public double getKnockbackBonus() {
         return knockbackBonus;
+    }
+
+    public boolean isDisabledAfterSuddenDeath() {
+        return disabledAfterSuddenDeath;
     }
 
     public ItemStack createDisplayItem(TeamColor team) {
@@ -187,6 +194,9 @@ public class ShopItemDefinition {
             for (String line : lore) {
                 lines.add(Component.text(line));
             }
+        }
+        if (includeCost && disabledAfterSuddenDeath) {
+            lines.add(Component.text("Disabled after sudden death", NamedTextColor.RED));
         }
         if (includeCost && cost != null && cost.isValid()) {
             Component costLine = formatCost();

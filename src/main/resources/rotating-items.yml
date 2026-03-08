@@ -15,8 +15,14 @@ shop:
         totem_of_undying: 21
         portable_shopkeeper: 20
         bridge_zapper: 19
+    rotating_upgrades:
+      title: "Rotating Upgrades"
+      icon: ANVIL
+      size: 54
+      entries:
         thorns_upgrade: 28
         fire_aspect_upgrade: 29
+        scale_down_upgrade: 30
   items:
     rotating:
       respawn_beacon:
@@ -105,6 +111,7 @@ shop:
           - "Marks a target and"
           - "detonates in 1 minute."
         custom-item: tactical_nuke
+        disable-after-sudden-death: true
         limit:
           scope: TEAM
           amount: 1
@@ -160,3 +167,12 @@ shop:
         display-name: "Fire Aspect"
         behavior: UPGRADE
         upgrade: FIRE_ASPECT
+      scale_down_upgrade:
+        material: SPYGLASS
+        amount: 1
+        cost:
+          material: DIAMOND
+          amount: 2
+        display-name: "Scale Down"
+        behavior: UPGRADE
+        upgrade: SCALE_DOWN

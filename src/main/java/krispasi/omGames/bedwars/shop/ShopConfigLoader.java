@@ -134,6 +134,7 @@ public class ShopConfigLoader {
         String customItemId = section.getString("custom-item");
         ShopItemLimit limit = parseLimit(section.getConfigurationSection("limit"));
         double knockbackBonus = Math.max(0.0, section.getDouble("knockback-bonus", 0.0));
+        boolean disabledAfterSuddenDeath = section.getBoolean("disable-after-sudden-death", false);
         Integer fireworkPower = null;
         FireworkEffect fireworkEffect = null;
         Double fireworkExplosionPower = null;
@@ -176,7 +177,7 @@ public class ShopConfigLoader {
         return new ShopItemDefinition(id, material, amount, cost, behavior, teamColor, tier,
                 enchants, potionEffects, displayName, lore, customItemId, upgradeType, limit,
                 fireworkPower, fireworkEffect, fireworkExplosionPower, fireworkExplosionDamage,
-                fireworkExplosionKnockback, knockbackBonus);
+                fireworkExplosionKnockback, knockbackBonus, disabledAfterSuddenDeath);
     }
 
     private ShopCost parseCost(ConfigurationSection section) {
@@ -276,7 +277,7 @@ public class ShopConfigLoader {
             case "ranged" -> ShopItemBehavior.UTILITY;
             case "armor" -> ShopItemBehavior.ARMOR;
             case "tools" -> ShopItemBehavior.UTILITY;
-            case "utility", "miscellaneous", "rotating" -> ShopItemBehavior.UTILITY;
+            case "utility", "miscellaneous", "rotating", "rotating_upgrades" -> ShopItemBehavior.UTILITY;
             default -> null;
         };
     }

@@ -23,8 +23,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 /**
- * Inventory UI for choosing which rotating items are active for a match.
- * <p>Lets admins toggle up to two rotating items, used when the session is in manual mode.</p>
+ * Inventory UI for choosing which rotation entries are active for a match.
+ * <p>Lets admins toggle up to two rotating items/upgrades when the session is in manual mode.</p>
  */
 public class RotatingItemMenu implements InventoryHolder {
     private static final int INVENTORY_SIZE = 54;
@@ -39,7 +39,7 @@ public class RotatingItemMenu implements InventoryHolder {
         this.session = session;
         this.viewerId = viewer.getUniqueId();
         this.inventory = Bukkit.createInventory(this, INVENTORY_SIZE,
-                Component.text("Rotating Items", NamedTextColor.GOLD));
+                Component.text("Rotation", NamedTextColor.GOLD));
         build();
     }
 
@@ -78,7 +78,7 @@ public class RotatingItemMenu implements InventoryHolder {
         session.setRotatingMode(GameSession.RotatingSelectionMode.MANUAL);
         boolean changed = session.toggleManualRotatingItem(itemId);
         if (!changed) {
-            player.sendMessage(Component.text("You can only select 2 rotating items.", NamedTextColor.RED));
+            player.sendMessage(Component.text("You can only select 2 rotation entries.", NamedTextColor.RED));
         }
         build();
     }

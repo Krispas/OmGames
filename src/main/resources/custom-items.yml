@@ -44,7 +44,7 @@ custom-items:
   sniper_bolt:
     type: FIREBALL
     material: FIRE_CHARGE
-    velocity: 3.0
+    velocity: 10.0
     yield: 2.0
     incendiary: false
     damage: 4.0

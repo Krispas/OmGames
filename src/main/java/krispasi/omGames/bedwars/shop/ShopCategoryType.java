@@ -17,6 +17,7 @@ public enum ShopCategoryType {
     TOOLS("tools", "Tools"),
     UTILITY("utility", "Utility"),
     ROTATING("rotating", "Rotating Items"),
+    ROTATING_UPGRADES("rotating_upgrades", "Rotating Upgrades"),
     MISCELLANEOUS("miscellaneous", "Miscellaneous");
 
     private static final List<ShopCategoryType> ORDERED = List.of(

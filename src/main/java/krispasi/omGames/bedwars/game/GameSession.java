@@ -105,6 +105,9 @@ public class GameSession {
     public static final String CRYSTAL_EXPLOSION_TAG = "bw_crystal_exploded";
     public static final String HAPPY_GHAST_TAG = "bw_happy_ghast";
     public static final String CREEPING_CREEPER_TAG = "bw_creeping_creeper";
+    private static final double DEFAULT_PLAYER_SCALE = 1.0;
+    private static final double SCALE_DOWN_TIER_ONE = 0.9;
+    private static final double SCALE_DOWN_TIER_TWO = 0.8;
     private static final Set<Material> SWORD_MATERIALS = EnumSet.of(
             Material.WOODEN_SWORD,
             Material.STONE_SWORD,
@@ -938,17 +941,7 @@ public class GameSession {
     }
 
     private void applyAttribute(LivingEntity entity, String attributeName, double value) {
-        if (entity == null || attributeName == null || attributeName.isBlank()) {
-            return;
-        }
-        try {
-            org.bukkit.attribute.Attribute attribute = org.bukkit.attribute.Attribute.valueOf(attributeName);
-            org.bukkit.attribute.AttributeInstance instance = entity.getAttribute(attribute);
-            if (instance != null) {
-                instance.setBaseValue(value);
-            }
-        } catch (IllegalArgumentException ignored) {
-        }
+        setAttributeBaseValue(entity, attributeName, value);
     }
 
     private boolean canPurchaseLimitedItem(Player player, ShopItemDefinition item) {
@@ -2350,18 +2343,23 @@ public class GameSession {
         if (config == null) {
             return List.of();
         }
-        krispasi.omGames.bedwars.shop.ShopCategory category = config.getCategory(ShopCategoryType.ROTATING);
-        if (category == null || category.getEntries().isEmpty()) {
-            return List.of();
-        }
         List<String> candidates = new ArrayList<>();
+        addRotatingCandidates(candidates, config.getCategory(ShopCategoryType.ROTATING));
+        addRotatingCandidates(candidates, config.getCategory(ShopCategoryType.ROTATING_UPGRADES));
+        return candidates;
+    }
+
+    private void addRotatingCandidates(List<String> candidates,
+                                       krispasi.omGames.bedwars.shop.ShopCategory category) {
+        if (category == null || category.getEntries().isEmpty()) {
+            return;
+        }
         for (String id : category.getEntries().values()) {
             String normalized = normalizeItemId(id);
             if (normalized != null && !candidates.contains(normalized)) {
                 candidates.add(normalized);
             }
         }
-        return candidates;
     }
 
     public boolean isRotatingItemAvailable(ShopItemDefinition item) {
@@ -2380,7 +2378,7 @@ public class GameSession {
         if (!rotating) {
             return true;
         }
-        if (suddenDeathActive) {
+        if (suddenDeathActive && item.isDisabledAfterSuddenDeath()) {
             return false;
         }
         if (rotatingItemIds.isEmpty()) {
@@ -2397,7 +2395,11 @@ public class GameSession {
         if (config == null) {
             return true;
         }
-        krispasi.omGames.bedwars.shop.ShopCategory category = config.getCategory(ShopCategoryType.ROTATING);
+        krispasi.omGames.bedwars.shop.ShopCategory category = config.getCategory(ShopCategoryType.ROTATING_UPGRADES);
+        if ((category == null || category.getEntries().isEmpty())
+                && config.getCategory(ShopCategoryType.ROTATING) != null) {
+            category = config.getCategory(ShopCategoryType.ROTATING);
+        }
         if (category == null || category.getEntries().isEmpty()) {
             return true;
         }
@@ -2412,13 +2414,48 @@ public class GameSession {
             }
             hasRotating = true;
             if (rotatingItemIds.isEmpty() || rotatingItemIds.contains(definition.getId())) {
-                if (suddenDeathActive) {
+                if (suddenDeathActive && definition.isDisabledAfterSuddenDeath()) {
                     return false;
                 }
                 return true;
             }
         }
         return !hasRotating;
+    }
+
+    public ShopItemDefinition getRotatingUpgradeDefinition(TeamUpgradeType type) {
+        if (type == null) {
+            return null;
+        }
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return null;
+        }
+        ShopItemDefinition definition = findRotatingUpgradeDefinition(config,
+                config.getCategory(ShopCategoryType.ROTATING_UPGRADES),
+                type);
+        if (definition != null) {
+            return definition;
+        }
+        return findRotatingUpgradeDefinition(config, config.getCategory(ShopCategoryType.ROTATING), type);
+    }
+
+    private ShopItemDefinition findRotatingUpgradeDefinition(ShopConfig config,
+                                                             krispasi.omGames.bedwars.shop.ShopCategory category,
+                                                             TeamUpgradeType type) {
+        if (config == null || category == null || type == null) {
+            return null;
+        }
+        for (String id : category.getEntries().values()) {
+            ShopItemDefinition definition = config.getItem(id);
+            if (definition == null || definition.getBehavior() != ShopItemBehavior.UPGRADE) {
+                continue;
+            }
+            if (definition.getUpgradeType() == type) {
+                return definition;
+            }
+        }
+        return null;
     }
 
     private void rollRotatingItems() {
@@ -2450,8 +2487,7 @@ public class GameSession {
         if (config == null) {
             return;
         }
-        krispasi.omGames.bedwars.shop.ShopCategory category = config.getCategory(ShopCategoryType.ROTATING);
-        if (category == null || category.getEntries().isEmpty()) {
+        if (getRotatingCandidateIds().isEmpty()) {
             return;
         }
         List<String> names = new ArrayList<>();
@@ -2459,11 +2495,11 @@ public class GameSession {
             names.add(resolveRotatingItemName(id, config.getItem(id)));
         }
         if (names.isEmpty()) {
-            broadcast(Component.text("Rotating Items: none", NamedTextColor.GRAY));
+            broadcast(Component.text("Rotation: none", NamedTextColor.GRAY));
             return;
         }
         names.sort(String.CASE_INSENSITIVE_ORDER);
-        broadcast(Component.text("Rotating Items: ", NamedTextColor.AQUA)
+        broadcast(Component.text("Rotation: ", NamedTextColor.AQUA)
                 .append(Component.text(String.join(", ", names), NamedTextColor.YELLOW)));
     }
 
@@ -3170,6 +3206,7 @@ public class GameSession {
         if (task != null) {
             task.cancel();
         }
+        clearUpgradeEffects(player);
         flushPendingPartyExp(player);
         restoreSidebar(playerId);
     }
@@ -4145,6 +4182,7 @@ public class GameSession {
         if (upgrades.getTier(TeamUpgradeType.FIRE_ASPECT) > 0) {
             applyFireAspect(player);
         }
+        applyScale(player, resolveScaleDownValue(upgrades.getTier(TeamUpgradeType.SCALE_DOWN)));
     }
 
     private void applyProtection(Player player, int level) {
@@ -4243,6 +4281,40 @@ public class GameSession {
         applyEnchantment(player, ATTACK_MATERIALS, Enchantment.FIRE_ASPECT, 1);
     }
 
+    private void applyScale(Player player, double scale) {
+        if (player == null) {
+            return;
+        }
+        if (!setAttributeBaseValue(player, "SCALE", scale)) {
+            setAttributeBaseValue(player, "GENERIC_SCALE", scale);
+        }
+    }
+
+    private double resolveScaleDownValue(int tier) {
+        return switch (tier) {
+            case 1 -> SCALE_DOWN_TIER_ONE;
+            case 2 -> SCALE_DOWN_TIER_TWO;
+            default -> DEFAULT_PLAYER_SCALE;
+        };
+    }
+
+    private boolean setAttributeBaseValue(LivingEntity entity, String attributeName, double value) {
+        if (entity == null || attributeName == null || attributeName.isBlank()) {
+            return false;
+        }
+        try {
+            org.bukkit.attribute.Attribute attribute = org.bukkit.attribute.Attribute.valueOf(attributeName);
+            org.bukkit.attribute.AttributeInstance instance = entity.getAttribute(attribute);
+            if (instance == null) {
+                return false;
+            }
+            instance.setBaseValue(value);
+            return true;
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
     private void applyEnchantment(Player player, Set<Material> materials, Enchantment enchantment, int level) {
         ItemStack[] contents = player.getInventory().getStorageContents();
         boolean changed = false;
@@ -4294,6 +4366,7 @@ public class GameSession {
         player.removePotionEffect(PotionEffectType.BLINDNESS);
         player.removePotionEffect(PotionEffectType.SLOWNESS);
         player.removePotionEffect(PotionEffectType.MINING_FATIGUE);
+        applyScale(player, DEFAULT_PLAYER_SCALE);
     }
 
     private void applyEditorInvisibility(Player player) {

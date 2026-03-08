@@ -20,6 +20,8 @@ public enum TeamUpgradeType {
             List.of("Thorns on team armor.")),
     FIRE_ASPECT("Fire Aspect", Material.BLAZE_POWDER, new int[]{4},
             List.of("Fire Aspect I on team weapons.")),
+    SCALE_DOWN("Scale Down", Material.SPYGLASS, new int[]{2, 4},
+            List.of("Shrink your team to 90% and 80% size.")),
     FORGE("Forge", Material.FURNACE, new int[]{2, 4, 6, 8},
             List.of("Upgrade your base generator.")),
     HEAL_POOL("Heal Pool", Material.BEACON, new int[]{1},

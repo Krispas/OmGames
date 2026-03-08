@@ -375,6 +375,9 @@ public class ShopMenu implements InventoryHolder {
             lore.add(Component.text("Cost: " + type.nextCost(tier) + " Diamonds", NamedTextColor.YELLOW));
             lore.add(Component.text("Click to purchase", NamedTextColor.GRAY));
         }
+        if (item.isDisabledAfterSuddenDeath()) {
+            lore.add(Component.text("Disabled after sudden death", NamedTextColor.RED));
+        }
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         meta.lore(lore);
         display.setItemMeta(meta);

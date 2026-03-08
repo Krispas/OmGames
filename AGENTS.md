@@ -321,6 +321,7 @@ Item fields (common):
 - `team-color`
 - `custom-item`
 - `knockback-bonus`
+- `disable-after-sudden-death`
 - `limit.scope` (`PLAYER` or `TEAM`)
 - `limit.amount`
 - `enchants`
@@ -357,11 +358,25 @@ Behavior inference can be derived from category/material if omitted.
 
 Same schema as `shop.yml` and merged into the base shop config at load.
 
+Category split:
+- `shop.categories.rotating`
+  - rotating item-shop entries only
+- `shop.categories.rotating_upgrades`
+  - rotating team-upgrade entries used by upgrade availability/rotation selection
+  - not intended as a normal item-shop tab
+
+Rotating item field notes:
+- `disable-after-sudden-death`
+  - optional boolean on rotating entries
+  - if `true`, the entry is unavailable once sudden death starts
+  - item displays should show a red lore warning
+
 Merge behavior:
 - `ShopConfig.merge(base, rotating)`
 - Rotating categories/items augment base shop entries.
 
 Migration behavior in manager:
+- separates legacy mixed rotating upgrade entries into `rotating_upgrades`
 - prunes invalid legacy rotating upgrades
 - ensures `totem_of_undying` exists with default lore + limit
 

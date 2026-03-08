@@ -879,11 +879,17 @@ public class BedwarsManager {
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
         boolean changed = false;
         changed |= pruneUnknownRotatingUpgrades(config);
+        changed |= splitRotatingUpgradeEntries(config);
         if (ensureShopItem(config, "totem_of_undying", "rotating", "TOTEM_OF_UNDYING", 1,
                 "EMERALD", 2, "UTILITY", "Totem of Undying")) {
             changed = true;
         }
         changed |= ensureShopEntry(config, "rotating", "totem_of_undying", 17);
+        if (ensureShopItem(config, "scale_down_upgrade", "rotating", "SPYGLASS", 1,
+                "DIAMOND", 2, "UPGRADE", "Scale Down")) {
+            changed = true;
+        }
+        changed |= ensureShopEntry(config, "rotating_upgrades", "scale_down_upgrade", 30);
         org.bukkit.configuration.ConfigurationSection totem =
                 findItemSection(config, "totem_of_undying", "rotating");
         if (totem != null) {
@@ -900,6 +906,20 @@ public class BedwarsManager {
                 changed = true;
             }
         }
+        org.bukkit.configuration.ConfigurationSection tacticalNuke =
+                findItemSection(config, "tactical_nuke", "rotating");
+        if (tacticalNuke != null && !tacticalNuke.isSet("disable-after-sudden-death")) {
+            tacticalNuke.set("disable-after-sudden-death", true);
+            changed = true;
+        }
+        org.bukkit.configuration.ConfigurationSection scaleDown =
+                findItemSection(config, "scale_down_upgrade", "rotating");
+        if (scaleDown != null) {
+            if (!"SCALE_DOWN".equalsIgnoreCase(scaleDown.getString("upgrade", ""))) {
+                scaleDown.set("upgrade", "SCALE_DOWN");
+                changed = true;
+            }
+        }
         if (!changed) {
             return;
         }
@@ -908,6 +928,57 @@ public class BedwarsManager {
         } catch (java.io.IOException ex) {
             plugin.getLogger().warning("Failed to update rotating-items.yml: " + ex.getMessage());
         }
+    }
+
+    private boolean splitRotatingUpgradeEntries(org.bukkit.configuration.file.YamlConfiguration config) {
+        boolean changed = ensureCategory(config, "rotating_upgrades", "Rotating Upgrades", "ANVIL", 54);
+        org.bukkit.configuration.ConfigurationSection rotatingEntries =
+                config.getConfigurationSection("shop.categories.rotating.entries");
+        if (rotatingEntries == null) {
+            return changed;
+        }
+        org.bukkit.configuration.ConfigurationSection upgradeEntries =
+                config.getConfigurationSection("shop.categories.rotating_upgrades.entries");
+        if (upgradeEntries == null) {
+            upgradeEntries = config.createSection("shop.categories.rotating_upgrades.entries");
+            changed = true;
+        }
+        int upgradeCategorySize = config.getInt("shop.categories.rotating_upgrades.size", 54);
+        java.util.List<String> rotatingIds = new java.util.ArrayList<>(rotatingEntries.getKeys(false));
+        for (String id : rotatingIds) {
+            if (!isRotatingUpgradeEntry(config, id)) {
+                continue;
+            }
+            int desiredSlot = rotatingEntries.getInt(id, -1);
+            if (!upgradeEntries.isSet(id)) {
+                int targetSlot = desiredSlot >= 0 && desiredSlot < upgradeCategorySize
+                        && !isSlotUsed(upgradeEntries, desiredSlot)
+                        ? desiredSlot
+                        : findFirstFreeSlot(upgradeEntries, upgradeCategorySize);
+                if (targetSlot >= 0) {
+                    upgradeEntries.set(id, targetSlot);
+                }
+            }
+            rotatingEntries.set(id, null);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private boolean isRotatingUpgradeEntry(org.bukkit.configuration.file.YamlConfiguration config, String itemId) {
+        org.bukkit.configuration.ConfigurationSection item = findItemSection(config, itemId, "rotating");
+        if (item == null) {
+            item = findItemSection(config, itemId, null);
+        }
+        if (item == null) {
+            return false;
+        }
+        String upgrade = item.getString("upgrade");
+        if (upgrade != null && !upgrade.isBlank()) {
+            return true;
+        }
+        String behavior = item.getString("behavior");
+        return behavior != null && behavior.equalsIgnoreCase("UPGRADE");
     }
 
     private boolean removePath(org.bukkit.configuration.file.YamlConfiguration config, String path) {
@@ -946,6 +1017,7 @@ public class BedwarsManager {
             changed |= removePath(config, "shop.items.rotating." + id);
             changed |= removePath(config, "shop.items." + id);
             changed |= removePath(config, "shop.categories.rotating.entries." + id);
+            changed |= removePath(config, "shop.categories.rotating_upgrades.entries." + id);
         }
         return changed;
     }
