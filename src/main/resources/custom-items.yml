@@ -86,3 +86,11 @@ custom-items:
     type: MAGIC_MILK
     material: MILK_BUCKET
     lifetime-seconds: 30
+  abyssal_rift:
+    type: ABYSSAL_RIFT
+    material: ECHO_SHARD
+    health: 30
+    range: 10
+  elytra_strike:
+    type: ELYTRA_STRIKE
+    material: ELYTRA

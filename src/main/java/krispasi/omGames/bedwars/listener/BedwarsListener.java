@@ -520,6 +520,12 @@ public class BedwarsListener implements Listener {
                 case HAPPY_GHAST -> {
                     yield spawnHappyGhast(player, session, custom, event);
                 }
+                case ABYSSAL_RIFT -> {
+                    if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+                        yield false;
+                    }
+                    yield session.deployAbyssalRift(player, custom, event.getClickedBlock());
+                }
                 case RESPAWN_BEACON -> {
                     yield activateRespawnBeacon(player, session, custom);
                 }
@@ -541,6 +547,9 @@ public class BedwarsListener implements Listener {
                 }
                 case PORTABLE_SHOPKEEPER -> {
                     yield spawnPortableShopkeeper(player, session, custom, event);
+                }
+                case ELYTRA_STRIKE -> {
+                    yield false;
                 }
                 case MAGIC_MILK -> {
                     yield false;
@@ -887,6 +896,9 @@ public class BedwarsListener implements Listener {
             if (isOutsideRunningBedwarsGame(player, session)) {
                 applyOutsideGameBedwarsBuffs(player);
             }
+            if (session != null) {
+                session.handleElytraStrikeMovement(player);
+            }
             if (session == null || !session.isStarting()) {
                 return;
             }
@@ -1084,6 +1096,13 @@ public class BedwarsListener implements Listener {
                 if (!session.isInArenaWorld(event.getEntity().getWorld())) {
                     return;
                 }
+                if (session.isAbyssalRiftEntity(event.getEntity())) {
+                    Player attacker = resolveAttacker(event);
+                    if (session.damageAbyssalRift(event.getEntity(), attacker, event.getFinalDamage())) {
+                        event.setCancelled(true);
+                    }
+                    return;
+                }
                 if (!isSummon(event.getEntity())) {
                     return;
                 }
@@ -1262,6 +1281,12 @@ public class BedwarsListener implements Listener {
                     return;
                 }
                 if (!session.isInArenaWorld(event.getEntity().getWorld())) {
+                    return;
+                }
+                if (session.isAbyssalRiftEntity(event.getEntity())) {
+                    if (session.damageAbyssalRift(event.getEntity(), null, event.getFinalDamage())) {
+                        event.setCancelled(true);
+                    }
                     return;
                 }
                 return;
@@ -1610,6 +1635,7 @@ public class BedwarsListener implements Listener {
             boolean finalDeath = false;
             boolean statsEnabled = session.isStatsEnabled();
             if (participant) {
+                event.getDrops().removeIf(session::isActiveElytraStrikeItem);
                 TeamColor team = session.getTeam(player.getUniqueId());
                 finalDeath = team != null && session.getBedState(team) == BedState.DESTROYED;
                 if (statsEnabled) {

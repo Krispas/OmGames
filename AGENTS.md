@@ -430,11 +430,22 @@ Supported `type` values:
 - `BRIDGE_ZAPPER`
 - `PORTABLE_SHOPKEEPER`
 - `MAGIC_MILK`
+- `ABYSSAL_RIFT`
+- `ELYTRA_STRIKE`
 
 Loader validation notes:
 - `bridge-width` coerced to odd and minimum 1.
 - `max-blocks` clamped to non-negative default behavior.
 - IDs normalized to lowercase.
+
+Behavior notes:
+- `ABYSSAL_RIFT`
+  - deploys a fixed `Interaction` hitbox plus `ItemDisplay`
+  - default display model is hardcoded to `om:rift1`
+  - `health` and `range` drive the deployable stats
+- `ELYTRA_STRIKE`
+  - intended as an instant-purchase effect, not a held right-click item
+  - equips a temporary Elytra, teleports above team spawn, and cleans up on landing/quit/death/session end
 
 ## 11) Setup Workflow (`/bw setup`)
 

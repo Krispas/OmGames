@@ -638,6 +638,24 @@ public class BedwarsManager {
         changed |= ensureCustomItemValue(magicMilk, "type", "MAGIC_MILK");
         changed |= ensureCustomItemValue(magicMilk, "material", "MILK_BUCKET");
         changed |= ensureCustomItemValue(magicMilk, "lifetime-seconds", 30);
+        org.bukkit.configuration.ConfigurationSection abyssalRift =
+                customItems.getConfigurationSection("abyssal_rift");
+        if (abyssalRift == null) {
+            abyssalRift = customItems.createSection("abyssal_rift");
+            changed = true;
+        }
+        changed |= ensureCustomItemValue(abyssalRift, "type", "ABYSSAL_RIFT");
+        changed |= ensureCustomItemValue(abyssalRift, "material", "ECHO_SHARD");
+        changed |= ensureCustomItemValue(abyssalRift, "health", 30);
+        changed |= ensureCustomItemValue(abyssalRift, "range", 10);
+        org.bukkit.configuration.ConfigurationSection elytraStrike =
+                customItems.getConfigurationSection("elytra_strike");
+        if (elytraStrike == null) {
+            elytraStrike = customItems.createSection("elytra_strike");
+            changed = true;
+        }
+        changed |= ensureCustomItemValue(elytraStrike, "type", "ELYTRA_STRIKE");
+        changed |= ensureCustomItemValue(elytraStrike, "material", "ELYTRA");
         if (!changed) {
             return;
         }
@@ -950,6 +968,16 @@ public class BedwarsManager {
             changed = true;
         }
         changed |= ensureShopEntry(config, "rotating_upgrades", "scale_down_upgrade", 30);
+        if (ensureShopItem(config, "abyssal_rift", "rotating", "ECHO_SHARD", 1,
+                "EMERALD", 4, "UTILITY", "Abyssal Rift")) {
+            changed = true;
+        }
+        changed |= ensureShopEntry(config, "rotating", "abyssal_rift", 22);
+        if (ensureShopItem(config, "elytra", "rotating", "ELYTRA", 1,
+                "EMERALD", 6, "UTILITY", "Elytra")) {
+            changed = true;
+        }
+        changed |= ensureShopEntry(config, "rotating", "elytra", 23);
         org.bukkit.configuration.ConfigurationSection totem =
                 findItemSection(config, "totem_of_undying", "rotating");
         if (totem != null) {
@@ -977,6 +1005,30 @@ public class BedwarsManager {
         if (scaleDown != null) {
             if (!"SCALE_DOWN".equalsIgnoreCase(scaleDown.getString("upgrade", ""))) {
                 scaleDown.set("upgrade", "SCALE_DOWN");
+                changed = true;
+            }
+        }
+        org.bukkit.configuration.ConfigurationSection abyssalRift =
+                findItemSection(config, "abyssal_rift", "rotating");
+        if (abyssalRift != null) {
+            if (!abyssalRift.isSet("lore")) {
+                abyssalRift.set("lore", List.of("Deploy a 10-block aura.", "Buffs allies and weakens enemies."));
+                changed = true;
+            }
+            if (!"abyssal_rift".equalsIgnoreCase(abyssalRift.getString("custom-item", ""))) {
+                abyssalRift.set("custom-item", "abyssal_rift");
+                changed = true;
+            }
+        }
+        org.bukkit.configuration.ConfigurationSection elytra =
+                findItemSection(config, "elytra", "rotating");
+        if (elytra != null) {
+            if (!elytra.isSet("lore")) {
+                elytra.set("lore", List.of("Launch 300 blocks above", "your spawn for an airstrike."));
+                changed = true;
+            }
+            if (!"elytra_strike".equalsIgnoreCase(elytra.getString("custom-item", ""))) {
+                elytra.set("custom-item", "elytra_strike");
                 changed = true;
             }
         }

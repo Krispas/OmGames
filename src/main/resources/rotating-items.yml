@@ -15,6 +15,8 @@ shop:
         totem_of_undying: 21
         portable_shopkeeper: 20
         bridge_zapper: 19
+        abyssal_rift: 22
+        elytra: 23
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -149,6 +151,28 @@ shop:
         lore:
           - "Destroys 10 bridge blocks."
         custom-item: bridge_zapper
+      abyssal_rift:
+        material: ECHO_SHARD
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Abyssal Rift"
+        lore:
+          - "Deploy a 10-block aura."
+          - "Buffs allies and weakens enemies."
+        custom-item: abyssal_rift
+      elytra:
+        material: ELYTRA
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 6
+        display-name: "Elytra"
+        lore:
+          - "Launch 300 blocks above"
+          - "your spawn for an airstrike."
+        custom-item: elytra_strike
       thorns_upgrade:
         material: CACTUS
         amount: 1

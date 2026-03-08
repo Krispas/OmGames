@@ -35,6 +35,7 @@ import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.item.TeamSelectItemData;
 import krispasi.omGames.bedwars.item.CustomItemData;
 import krispasi.omGames.bedwars.item.CustomItemDefinition;
+import krispasi.omGames.bedwars.item.CustomItemType;
 import krispasi.omGames.bedwars.shop.ShopConfig;
 import krispasi.omGames.bedwars.shop.ShopCost;
 import krispasi.omGames.bedwars.shop.ShopCategoryType;
@@ -56,6 +57,7 @@ import org.bukkit.GameMode;
 import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
@@ -66,6 +68,10 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.Container;
 import org.bukkit.block.data.type.Bed;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.Display;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Interaction;
+import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Villager;
@@ -84,6 +90,10 @@ import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
+import org.bukkit.util.Transformation;
+import org.bukkit.util.Vector;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 /**
  * Runtime state machine for a single BedWars match.
@@ -111,6 +121,9 @@ public class GameSession {
     public static final String CRYSTAL_EXPLOSION_TAG = "bw_crystal_exploded";
     public static final String HAPPY_GHAST_TAG = "bw_happy_ghast";
     public static final String CREEPING_CREEPER_TAG = "bw_creeping_creeper";
+    public static final String ABYSSAL_RIFT_TAG = "bw_abyssal_rift";
+    public static final String ABYSSAL_RIFT_DISPLAY_TAG = "bw_abyssal_rift_display";
+    public static final String ELYTRA_STRIKE_ACTIVE_ITEM_ID = "elytra_strike_active";
     private static final double DEFAULT_PLAYER_SCALE = 1.0;
     private static final double SCALE_DOWN_TIER_ONE = 0.9;
     private static final double SCALE_DOWN_TIER_TWO = 0.8;
@@ -119,6 +132,15 @@ public class GameSession {
     private static final double BLOOD_MOON_HEALTH_MULTIPLIER = 0.5;
     private static final double MOON_BIG_JUMP_MULTIPLIER = 5.0;
     private static final double BLOOD_MOON_LIFESTEAL_RATIO = 0.25;
+    private static final int ABYSSAL_RIFT_AURA_INTERVAL_TICKS = 20;
+    private static final int ABYSSAL_RIFT_EFFECT_DURATION_TICKS = 40;
+    private static final float ABYSSAL_RIFT_HITBOX_WIDTH = 1.0f;
+    private static final float ABYSSAL_RIFT_HITBOX_HEIGHT = 2.0f;
+    private static final double ABYSSAL_RIFT_DISPLAY_Y_OFFSET = 1.5;
+    private static final int ELYTRA_STRIKE_ALTITUDE = 300;
+    private static final int ELYTRA_STRIKE_REGEN_DURATION_TICKS = 20;
+    private static final int ELYTRA_STRIKE_REGEN_AMPLIFIER = 9;
+    private static final NamespacedKey ABYSSAL_RIFT_ITEM_MODEL = new NamespacedKey("om", "rift1");
     private static final Set<String> IN_THIS_ECONOMY_BANNED_ITEMS = Set.of(
             "fireball",
             "bed_bug",
@@ -227,6 +249,9 @@ public class GameSession {
     private final Set<String> rotatingItemIds = new HashSet<>();
     private final List<String> manualRotatingItemIds = new ArrayList<>();
     private RotatingSelectionMode rotatingMode = RotatingSelectionMode.TWO_RANDOM;
+    private final Map<UUID, AbyssalRiftState> abyssalRifts = new HashMap<>();
+    private final Map<UUID, UUID> abyssalRiftEntityLinks = new HashMap<>();
+    private final Map<UUID, ElytraStrikeState> activeElytraStrikes = new HashMap<>();
     private final Map<UUID, Integer> killCounts = new HashMap<>();
     private final Map<UUID, Integer> pendingPartyExp = new HashMap<>();
     private final Map<TeamColor, Map<String, Integer>> teamPurchaseCounts = new EnumMap<>(TeamColor.class);
@@ -1124,8 +1149,14 @@ public class GameSession {
     private boolean applyPurchase(Player player, ShopItemDefinition item) {
         TeamColor team = getTeam(player.getUniqueId());
         ShopItemBehavior behavior = item.getBehavior();
+        CustomItemDefinition custom = resolveCustomPurchaseDefinition(item);
         return switch (behavior) {
             case BLOCK, UTILITY, POTION -> {
+                if (behavior == ShopItemBehavior.UTILITY
+                        && custom != null
+                        && custom.getType() == CustomItemType.ELYTRA_STRIKE) {
+                    yield activateElytraStrike(player, custom);
+                }
                 giveItem(player, createPurchaseItem(item, team));
                 if (behavior == ShopItemBehavior.UTILITY
                         && team != null
@@ -1167,6 +1198,17 @@ public class GameSession {
             case SHIELD -> applyShield(player);
             case UPGRADE -> handleUpgradePurchaseInternal(player, item.getUpgradeType());
         };
+    }
+
+    private CustomItemDefinition resolveCustomPurchaseDefinition(ShopItemDefinition item) {
+        if (item == null) {
+            return null;
+        }
+        String customId = item.getCustomItemId();
+        if (customId == null || customId.isBlank()) {
+            return null;
+        }
+        return bedwarsManager.getCustomItemConfig().getItem(customId);
     }
 
     private ItemStack createPurchaseItem(ShopItemDefinition item, TeamColor team) {
@@ -1245,6 +1287,401 @@ public class GameSession {
             lore.add(line);
         }
         meta.lore(lore);
+    }
+
+    private boolean activateElytraStrike(Player player, CustomItemDefinition custom) {
+        if (player == null || custom == null || !isRunning() || !isParticipant(player.getUniqueId())) {
+            return false;
+        }
+        if (activeElytraStrikes.containsKey(player.getUniqueId())) {
+            player.sendMessage(Component.text("You are already in an airstrike.", NamedTextColor.RED));
+            return false;
+        }
+        TeamColor team = getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        Location spawn = arena.getSpawn(team);
+        if (spawn == null || spawn.getWorld() == null) {
+            return false;
+        }
+        ItemStack previousChestplate = player.getInventory().getChestplate();
+        activeElytraStrikes.put(player.getUniqueId(),
+                new ElytraStrikeState(previousChestplate != null ? previousChestplate.clone() : null,
+                        player.getAllowFlight(),
+                        player.isFlying()));
+
+        player.getInventory().setChestplate(createActiveElytraChestplate());
+        player.setAllowFlight(true);
+        player.setFlying(false);
+
+        Location target = spawn.clone();
+        target.setYaw(player.getLocation().getYaw());
+        target.setPitch(player.getLocation().getPitch());
+        double maxY = spawn.getWorld().getMaxHeight() - 5.0;
+        target.setY(Math.max(spawn.getY(), Math.min(maxY, spawn.getY() + ELYTRA_STRIKE_ALTITUDE)));
+        if (!player.teleport(target)) {
+            clearElytraStrike(player, true, false);
+            return false;
+        }
+
+        Vector launchVelocity = target.getDirection().normalize().multiply(1.35);
+        if (launchVelocity.lengthSquared() <= 0.0001) {
+            launchVelocity = new Vector(0.0, -0.35, 0.0);
+        } else if (launchVelocity.getY() > -0.25) {
+            launchVelocity.setY(-0.25);
+        }
+        Vector finalLaunchVelocity = launchVelocity;
+        UUID playerId = player.getUniqueId();
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            Player online = Bukkit.getPlayer(playerId);
+            if (online == null || !online.isOnline() || !activeElytraStrikes.containsKey(playerId)) {
+                return;
+            }
+            online.setGliding(true);
+            online.setVelocity(finalLaunchVelocity);
+        });
+        broadcast(Component.text("airstrike incoming!", NamedTextColor.RED));
+        return true;
+    }
+
+    public void handleElytraStrikeMovement(Player player) {
+        if (player == null) {
+            return;
+        }
+        if (!activeElytraStrikes.containsKey(player.getUniqueId())) {
+            return;
+        }
+        if (!isRunning()
+                || !isParticipant(player.getUniqueId())
+                || !isInArenaWorld(player.getWorld())
+                || player.getGameMode() == GameMode.SPECTATOR) {
+            clearElytraStrike(player, false, false);
+            return;
+        }
+        if (player.isOnGround()) {
+            clearElytraStrike(player, true, true);
+        }
+    }
+
+    public boolean isActiveElytraStrikeItem(ItemStack item) {
+        return ELYTRA_STRIKE_ACTIVE_ITEM_ID.equalsIgnoreCase(CustomItemData.getId(item));
+    }
+
+    private void clearAllElytraStrikes(boolean restoreChestplate) {
+        for (UUID playerId : new ArrayList<>(activeElytraStrikes.keySet())) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null) {
+                activeElytraStrikes.remove(playerId);
+                continue;
+            }
+            clearElytraStrike(player, restoreChestplate, false);
+        }
+    }
+
+    private void clearElytraStrike(Player player, boolean restoreChestplate, boolean grantLandingRegen) {
+        if (player == null) {
+            return;
+        }
+        ElytraStrikeState state = activeElytraStrikes.remove(player.getUniqueId());
+        removeItemsByCustomId(player, ELYTRA_STRIKE_ACTIVE_ITEM_ID);
+        if (isActiveElytraStrikeItem(player.getInventory().getChestplate())) {
+            player.getInventory().setChestplate(null);
+        }
+        if (restoreChestplate && state != null) {
+            player.getInventory().setChestplate(state.previousChestplate() != null
+                    ? state.previousChestplate().clone()
+                    : null);
+        }
+        if (state != null && player.getGameMode() != GameMode.SPECTATOR) {
+            player.setAllowFlight(state.previousAllowFlight());
+            player.setFlying(state.previousFlying());
+        }
+        player.setGliding(false);
+        if (grantLandingRegen
+                && isRunning()
+                && isParticipant(player.getUniqueId())
+                && isInArenaWorld(player.getWorld())
+                && player.getGameMode() != GameMode.SPECTATOR) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,
+                    ELYTRA_STRIKE_REGEN_DURATION_TICKS,
+                    ELYTRA_STRIKE_REGEN_AMPLIFIER,
+                    true,
+                    false,
+                    true));
+        }
+        player.updateInventory();
+    }
+
+    private ItemStack createActiveElytraChestplate() {
+        ItemStack elytra = new ItemStack(Material.ELYTRA);
+        ItemMeta meta = elytra.getItemMeta();
+        meta.displayName(Component.text("Airstrike Elytra", NamedTextColor.AQUA));
+        meta.setUnbreakable(true);
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_UNBREAKABLE);
+        CustomItemData.apply(meta, ELYTRA_STRIKE_ACTIVE_ITEM_ID);
+        elytra.setItemMeta(meta);
+        return elytra;
+    }
+
+    private void removeItemsByCustomId(Player player, String customId) {
+        if (player == null || customId == null || customId.isBlank()) {
+            return;
+        }
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (customId.equalsIgnoreCase(CustomItemData.getId(item))) {
+                contents[i] = null;
+            }
+        }
+        player.getInventory().setStorageContents(contents);
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (customId.equalsIgnoreCase(CustomItemData.getId(offhand))) {
+            player.getInventory().setItemInOffHand(null);
+        }
+    }
+
+    public boolean deployAbyssalRift(Player player, CustomItemDefinition custom, Block clickedBlock) {
+        if (player == null
+                || custom == null
+                || clickedBlock == null
+                || !isRunning()
+                || !isParticipant(player.getUniqueId())) {
+            return false;
+        }
+        TeamColor team = getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        Block firstAir = clickedBlock.getRelative(org.bukkit.block.BlockFace.UP);
+        Block secondAir = firstAir.getRelative(org.bukkit.block.BlockFace.UP);
+        if (!firstAir.getType().isAir() || !secondAir.getType().isAir()) {
+            player.sendMessage(Component.text("You cannot place an abyssal rift here.", NamedTextColor.RED));
+            return false;
+        }
+        BlockPoint firstPoint = new BlockPoint(firstAir.getX(), firstAir.getY(), firstAir.getZ());
+        BlockPoint secondPoint = new BlockPoint(secondAir.getX(), secondAir.getY(), secondAir.getZ());
+        if (!isInsideMap(firstPoint) || !isInsideMap(secondPoint)) {
+            player.sendMessage(Component.text("You cannot place an abyssal rift outside the map.", NamedTextColor.RED));
+            return false;
+        }
+        if (isPlacementBlocked(firstPoint) || isPlacementBlocked(secondPoint)) {
+            player.sendMessage(Component.text("You cannot place an abyssal rift here.", NamedTextColor.RED));
+            return false;
+        }
+        Location base = clickedBlock.getLocation().add(0.5, 1.0, 0.5);
+        World world = base.getWorld();
+        if (world == null) {
+            return false;
+        }
+        Interaction interaction = world.spawn(base, Interaction.class, entity -> {
+            entity.setPersistent(false);
+            entity.setInvulnerable(false);
+            entity.setGravity(false);
+            entity.setInteractionWidth(ABYSSAL_RIFT_HITBOX_WIDTH);
+            entity.setInteractionHeight(ABYSSAL_RIFT_HITBOX_HEIGHT);
+            entity.setResponsive(true);
+            entity.addScoreboardTag(ABYSSAL_RIFT_TAG);
+        });
+        ItemDisplay display = world.spawn(base, ItemDisplay.class, entity -> {
+            entity.setPersistent(false);
+            entity.setInvulnerable(true);
+            entity.setGravity(false);
+            entity.addScoreboardTag(ABYSSAL_RIFT_DISPLAY_TAG);
+            entity.setBillboard(Display.Billboard.FIXED);
+            entity.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
+            entity.setShadowRadius(0.0f);
+            entity.setShadowStrength(0.0f);
+            entity.setDisplayWidth(1.0f);
+            entity.setDisplayHeight(2.0f);
+            entity.setTransformation(new Transformation(
+                    new Vector3f(0.0f, (float) ABYSSAL_RIFT_DISPLAY_Y_OFFSET, 0.0f),
+                    new Quaternionf(),
+                    new Vector3f(1.0f, 1.0f, 1.0f),
+                    new Quaternionf()));
+            entity.setItemStack(createAbyssalRiftDisplayItem(custom));
+        });
+        double health = custom.getHealth() > 0.0 ? custom.getHealth() : 30.0;
+        double radius = custom.getRange() > 0.0 ? custom.getRange() : 10.0;
+        AbyssalRiftState state = new AbyssalRiftState(interaction.getUniqueId(), display.getUniqueId(), team, health, radius);
+        abyssalRifts.put(interaction.getUniqueId(), state);
+        abyssalRiftEntityLinks.put(interaction.getUniqueId(), interaction.getUniqueId());
+        abyssalRiftEntityLinks.put(display.getUniqueId(), interaction.getUniqueId());
+        BukkitTask task = new BukkitRunnable() {
+            @Override
+            public void run() {
+                tickAbyssalRift(interaction.getUniqueId());
+            }
+        }.runTaskTimer(plugin, 0L, ABYSSAL_RIFT_AURA_INTERVAL_TICKS);
+        state.setAuraTask(task);
+        player.playSound(base, Sound.BLOCK_RESPAWN_ANCHOR_SET_SPAWN, 0.8f, 1.4f);
+        return true;
+    }
+
+    public boolean isAbyssalRiftEntity(Entity entity) {
+        return resolveAbyssalRiftId(entity) != null;
+    }
+
+    public boolean damageAbyssalRift(Entity entity, Player attacker, double damage) {
+        UUID interactionId = resolveAbyssalRiftId(entity);
+        if (interactionId == null) {
+            return false;
+        }
+        AbyssalRiftState state = abyssalRifts.get(interactionId);
+        if (state == null) {
+            return false;
+        }
+        if (attacker != null) {
+            if (!isParticipant(attacker.getUniqueId()) || !isInArenaWorld(attacker.getWorld())) {
+                return true;
+            }
+            TeamColor attackerTeam = getTeam(attacker.getUniqueId());
+            if (attackerTeam != null && attackerTeam == state.team()) {
+                return true;
+            }
+        }
+        double appliedDamage = Math.max(0.0, damage);
+        if (appliedDamage <= 0.0) {
+            return true;
+        }
+        state.damage(appliedDamage);
+        Interaction interaction = getAbyssalRiftInteraction(interactionId);
+        if (interaction != null && interaction.getWorld() != null) {
+            interaction.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                    interaction.getLocation().add(0.0, 1.0, 0.0),
+                    8,
+                    0.25,
+                    0.25,
+                    0.25,
+                    0.0);
+        }
+        if (state.health() <= 0.0) {
+            destroyAbyssalRift(interactionId, true);
+        }
+        return true;
+    }
+
+    private UUID resolveAbyssalRiftId(Entity entity) {
+        if (entity == null) {
+            return null;
+        }
+        return abyssalRiftEntityLinks.get(entity.getUniqueId());
+    }
+
+    private void tickAbyssalRift(UUID interactionId) {
+        AbyssalRiftState state = abyssalRifts.get(interactionId);
+        if (state == null) {
+            return;
+        }
+        Interaction interaction = getAbyssalRiftInteraction(interactionId);
+        ItemDisplay display = getAbyssalRiftDisplay(state.displayId());
+        if (!isRunning()
+                || interaction == null
+                || display == null
+                || !interaction.isValid()
+                || !display.isValid()) {
+            destroyAbyssalRift(interactionId, false);
+            return;
+        }
+        Location center = interaction.getLocation();
+        double radiusSquared = state.radius() * state.radius();
+        for (UUID playerId : assignments.keySet()) {
+            Player candidate = Bukkit.getPlayer(playerId);
+            if (candidate == null
+                    || !candidate.isOnline()
+                    || !isInArenaWorld(candidate.getWorld())
+                    || candidate.getGameMode() == GameMode.SPECTATOR) {
+                continue;
+            }
+            if (candidate.getLocation().distanceSquared(center) > radiusSquared) {
+                continue;
+            }
+            TeamColor candidateTeam = getTeam(playerId);
+            if (candidateTeam == null) {
+                continue;
+            }
+            if (candidateTeam == state.team()) {
+                applyAuraEffect(candidate, PotionEffectType.STRENGTH, 0);
+                applyAuraEffect(candidate, PotionEffectType.SPEED, 0);
+            } else {
+                applyAuraEffect(candidate, PotionEffectType.WEAKNESS, 0);
+                applyAuraEffect(candidate, PotionEffectType.SLOWNESS, 0);
+            }
+        }
+    }
+
+    private void applyAuraEffect(Player player, PotionEffectType type, int amplifier) {
+        if (player == null || type == null) {
+            return;
+        }
+        PotionEffect current = player.getPotionEffect(type);
+        if (current != null && current.getAmplifier() > amplifier) {
+            return;
+        }
+        if (current != null
+                && current.getAmplifier() == amplifier
+                && current.getDuration() > ABYSSAL_RIFT_EFFECT_DURATION_TICKS / 2) {
+            return;
+        }
+        player.addPotionEffect(new PotionEffect(type,
+                ABYSSAL_RIFT_EFFECT_DURATION_TICKS,
+                amplifier,
+                true,
+                false,
+                true));
+    }
+
+    private ItemStack createAbyssalRiftDisplayItem(CustomItemDefinition custom) {
+        ItemStack stack = new ItemStack(custom.getMaterial());
+        ItemMeta meta = stack.getItemMeta();
+        meta.setItemModel(ABYSSAL_RIFT_ITEM_MODEL);
+        meta.displayName(Component.text("Abyssal Rift", NamedTextColor.DARK_AQUA));
+        meta.setHideTooltip(true);
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    private Interaction getAbyssalRiftInteraction(UUID entityId) {
+        Entity entity = entityId != null ? Bukkit.getEntity(entityId) : null;
+        return entity instanceof Interaction interaction ? interaction : null;
+    }
+
+    private ItemDisplay getAbyssalRiftDisplay(UUID entityId) {
+        Entity entity = entityId != null ? Bukkit.getEntity(entityId) : null;
+        return entity instanceof ItemDisplay display ? display : null;
+    }
+
+    private void clearAbyssalRifts() {
+        for (UUID interactionId : new ArrayList<>(abyssalRifts.keySet())) {
+            destroyAbyssalRift(interactionId, false);
+        }
+    }
+
+    private void destroyAbyssalRift(UUID interactionId, boolean playEffects) {
+        AbyssalRiftState state = abyssalRifts.remove(interactionId);
+        if (state == null) {
+            return;
+        }
+        abyssalRiftEntityLinks.remove(interactionId);
+        abyssalRiftEntityLinks.remove(state.displayId());
+        if (state.auraTask() != null) {
+            state.auraTask().cancel();
+        }
+        ItemDisplay display = getAbyssalRiftDisplay(state.displayId());
+        if (display != null) {
+            display.remove();
+        }
+        Interaction interaction = getAbyssalRiftInteraction(interactionId);
+        if (interaction != null) {
+            Location location = interaction.getLocation().add(0.0, 1.0, 0.0);
+            World world = interaction.getWorld();
+            interaction.remove();
+            if (playEffects && world != null) {
+                world.spawnParticle(Particle.SMOKE, location, 16, 0.2, 0.3, 0.2, 0.01);
+                world.playSound(location, Sound.BLOCK_RESPAWN_ANCHOR_DEPLETE, 0.8f, 0.8f);
+            }
+        }
     }
 
     public void startLobby(JavaPlugin plugin, Player initiator, int lobbySeconds) {
@@ -1383,6 +1820,7 @@ public class GameSession {
         if (!isRunning() || !isParticipant(player.getUniqueId())) {
             return;
         }
+        clearElytraStrike(player, false, false);
         clearCombat(player.getUniqueId());
         clearTrapImmunity(player.getUniqueId());
         removeRespawnProtection(player.getUniqueId());
@@ -2341,6 +2779,8 @@ public class GameSession {
         finalizeMatchParticipationPartyExp();
         flushPendingPartyExpForOnlineParticipants();
         state = GameState.ENDING;
+        clearAllElytraStrikes(false);
+        clearAbyssalRifts();
         clearEditors();
         releaseForcedChunks();
         restoreWorldBorder();
@@ -2454,7 +2894,9 @@ public class GameSession {
                     || entity.getScoreboardTags().contains(DREAM_DEFENDER_TAG)
                     || entity.getScoreboardTags().contains(CRYSTAL_TAG)
                     || entity.getScoreboardTags().contains(HAPPY_GHAST_TAG)
-                    || entity.getScoreboardTags().contains(CREEPING_CREEPER_TAG)) {
+                    || entity.getScoreboardTags().contains(CREEPING_CREEPER_TAG)
+                    || entity.getScoreboardTags().contains(ABYSSAL_RIFT_TAG)
+                    || entity.getScoreboardTags().contains(ABYSSAL_RIFT_DISPLAY_TAG)) {
                 entity.remove();
             }
         }
@@ -2511,6 +2953,9 @@ public class GameSession {
         activeScoreboards.clear();
         sidebarLines.clear();
         rotatingItemIds.clear();
+        abyssalRifts.clear();
+        abyssalRiftEntityLinks.clear();
+        activeElytraStrikes.clear();
         killCounts.clear();
         pendingPartyExp.clear();
         teamPurchaseCounts.clear();
@@ -3518,6 +3963,7 @@ public class GameSession {
 
     public void handleWorldChange(Player player) {
         if (!isInArenaWorld(player.getWorld())) {
+            clearElytraStrike(player, false, false);
             clearUpgradeEffects(player);
         } else if (isParticipant(player.getUniqueId())) {
             applyTeamUpgrades(player, getTeam(player.getUniqueId()));
@@ -3537,6 +3983,7 @@ public class GameSession {
         if (task != null) {
             task.cancel();
         }
+        clearElytraStrike(player, false, false);
         clearUpgradeEffects(player);
         flushPendingPartyExp(player);
         restoreSidebar(playerId);
@@ -5022,5 +5469,59 @@ public class GameSession {
             case 3 -> "III";
             default -> String.valueOf(tier);
         };
+    }
+
+    private static final class AbyssalRiftState {
+        private final UUID interactionId;
+        private final UUID displayId;
+        private final TeamColor team;
+        private double health;
+        private final double radius;
+        private BukkitTask auraTask;
+
+        private AbyssalRiftState(UUID interactionId, UUID displayId, TeamColor team, double health, double radius) {
+            this.interactionId = interactionId;
+            this.displayId = displayId;
+            this.team = team;
+            this.health = health;
+            this.radius = radius;
+        }
+
+        private UUID interactionId() {
+            return interactionId;
+        }
+
+        private UUID displayId() {
+            return displayId;
+        }
+
+        private TeamColor team() {
+            return team;
+        }
+
+        private double health() {
+            return health;
+        }
+
+        private double radius() {
+            return radius;
+        }
+
+        private BukkitTask auraTask() {
+            return auraTask;
+        }
+
+        private void setAuraTask(BukkitTask auraTask) {
+            this.auraTask = auraTask;
+        }
+
+        private void damage(double amount) {
+            health -= amount;
+        }
+    }
+
+    private record ElytraStrikeState(ItemStack previousChestplate,
+                                     boolean previousAllowFlight,
+                                     boolean previousFlying) {
     }
 }
