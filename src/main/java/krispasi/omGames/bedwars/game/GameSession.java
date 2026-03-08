@@ -13,8 +13,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.Locale;
+import java.util.concurrent.ThreadLocalRandom;
 import krispasi.omGames.OmVeinsAPI;
 import krispasi.omGames.bedwars.BedwarsManager;
+import krispasi.omGames.bedwars.event.BedwarsMatchEventConfig;
+import krispasi.omGames.bedwars.event.BedwarsMatchEventType;
 import krispasi.omGames.bedwars.generator.GeneratorInfo;
 import krispasi.omGames.bedwars.generator.GeneratorManager;
 import krispasi.omGames.bedwars.generator.GeneratorType;
@@ -48,9 +51,12 @@ import net.kyori.adventure.title.Title;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Color;
 import org.bukkit.GameMode;
+import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
@@ -108,6 +114,26 @@ public class GameSession {
     private static final double DEFAULT_PLAYER_SCALE = 1.0;
     private static final double SCALE_DOWN_TIER_ONE = 0.9;
     private static final double SCALE_DOWN_TIER_TWO = 0.8;
+    private static final double APRIL_FOOLS_SCALE_MULTIPLIER = 0.1;
+    private static final double LONG_ARMS_RANGE_BONUS = 10.0;
+    private static final double BLOOD_MOON_HEALTH_MULTIPLIER = 0.5;
+    private static final double MOON_BIG_JUMP_MULTIPLIER = 5.0;
+    private static final double BLOOD_MOON_LIFESTEAL_RATIO = 0.25;
+    private static final Set<String> IN_THIS_ECONOMY_BANNED_ITEMS = Set.of(
+            "fireball",
+            "bed_bug",
+            "dream_defender"
+    );
+    private static final List<TeamUpgradeType> BENEVOLENT_UPGRADE_POOL = List.of(
+            TeamUpgradeType.PROTECTION,
+            TeamUpgradeType.SHARPNESS,
+            TeamUpgradeType.HASTE,
+            TeamUpgradeType.FEATHER_FALLING,
+            TeamUpgradeType.THORNS,
+            TeamUpgradeType.FIRE_ASPECT,
+            TeamUpgradeType.FORGE,
+            TeamUpgradeType.HEAL_POOL
+    );
     private static final Set<Material> SWORD_MATERIALS = EnumSet.of(
             Material.WOODEN_SWORD,
             Material.STONE_SWORD,
@@ -218,6 +244,7 @@ public class GameSession {
     private final Map<UUID, Integer> axeTiers = new HashMap<>();
     private final Set<UUID> shearsUnlocked = new HashSet<>();
     private final Set<UUID> shieldUnlocked = new HashSet<>();
+    private final List<TeamUpgradeType> benevolentEventUpgrades = new ArrayList<>();
     private boolean suddenDeathActive;
     private boolean tier2Triggered;
     private boolean tier3Triggered;
@@ -249,6 +276,10 @@ public class GameSession {
     private boolean statsEnabled = true;
     private int grantedMatchParticipationPartyExp;
     private boolean partyExpUnavailableLogged;
+    private boolean matchEventRollEnabled = true;
+    private BedwarsMatchEventType activeMatchEvent;
+    private Long previousWorldTime;
+    private Boolean previousDaylightCycle;
 
     public GameSession(BedwarsManager bedwarsManager, Arena arena) {
         this.bedwarsManager = bedwarsManager;
@@ -819,6 +850,11 @@ public class GameSession {
         if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
             return false;
         }
+        if (item != null && isShopItemBlockedByMatchEvent(item)) {
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            player.sendMessage(Component.text("This item is disabled by the current match event.", NamedTextColor.RED));
+            return false;
+        }
         if (!isRotatingItemAvailable(item)) {
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             player.sendMessage(Component.text("This rotating item is not available in this match.", NamedTextColor.RED));
@@ -849,6 +885,13 @@ public class GameSession {
         }
         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
         return true;
+    }
+
+    private boolean isShopItemBlockedByMatchEvent(ShopItemDefinition item) {
+        if (item == null || activeMatchEvent != BedwarsMatchEventType.IN_THIS_ECONOMY) {
+            return false;
+        }
+        return IN_THIS_ECONOMY_BANNED_ITEMS.contains(item.getId());
     }
 
     public boolean handleUpgradePurchase(Player player, TeamUpgradeType type) {
@@ -1127,9 +1170,28 @@ public class GameSession {
     }
 
     private ItemStack createPurchaseItem(ShopItemDefinition item, TeamColor team) {
-        ItemStack stack = item.createPurchaseItem(team);
+        ItemStack stack = createEventAdjustedPurchaseItem(item, team);
         applyCustomItemMetadata(stack, item);
         return stack;
+    }
+
+    private ItemStack createEventAdjustedPurchaseItem(ShopItemDefinition item, TeamColor team) {
+        if (item == null) {
+            return null;
+        }
+        if (activeMatchEvent == BedwarsMatchEventType.APRIL_FOOLS
+                && "bedrock".equalsIgnoreCase(item.getId())) {
+            ItemStack stack = new ItemStack(Material.BARRIER, Math.max(1, item.getAmount()));
+            ItemMeta meta = stack.getItemMeta();
+            meta.displayName(Component.text("Barrier", NamedTextColor.RED));
+            meta.lore(List.of(
+                    Component.text("April Fools.", NamedTextColor.RED),
+                    Component.text("The bedrock was fake.", NamedTextColor.GRAY)
+            ));
+            stack.setItemMeta(meta);
+            return stack;
+        }
+        return item.createPurchaseItem(team);
     }
 
     private void applyCustomItemMetadata(ItemStack item, ShopItemDefinition definition) {
@@ -1242,10 +1304,13 @@ public class GameSession {
         prepareWorld();
         updateTeamsInMatch();
         initializeTeamUpgrades();
+        rollMatchEvent();
+        applyPreMatchEventSetup();
         initializeBaseCenters();
         initializeBeds();
         applyBedLayout();
         rollRotatingItems();
+        applyMatchEventRotatingOverrides();
         spawnShops();
         startCountdownRemaining = Math.max(0, countdownSeconds);
 
@@ -1566,6 +1631,9 @@ public class GameSession {
         startUpgradeTasks();
         startRegenTask();
         scheduleGameEvents();
+        applyMatchEventToParticipants();
+        startMatchEventTasks();
+        announceMatchEvent();
         announceCurrentRotatingItems();
     }
 
@@ -1577,6 +1645,209 @@ public class GameSession {
         scheduleBedDestruction(events.getBedDestructionDelay());
         scheduleSuddenDeath(events.getSuddenDeathDelay());
         scheduleGameEnd(events.getGameEndDelay());
+    }
+
+    private void rollMatchEvent() {
+        activeMatchEvent = null;
+        benevolentEventUpgrades.clear();
+        if (!matchEventRollEnabled) {
+            return;
+        }
+        BedwarsMatchEventConfig config = bedwarsManager.getMatchEventConfig();
+        if (config == null || !config.isEnabled() || !config.hasEligibleEvents()) {
+            return;
+        }
+        double roll = ThreadLocalRandom.current().nextDouble(100.0);
+        if (roll >= config.chancePercent()) {
+            return;
+        }
+        activeMatchEvent = pickWeightedMatchEvent(config);
+    }
+
+    private BedwarsMatchEventType pickWeightedMatchEvent(BedwarsMatchEventConfig config) {
+        if (config == null) {
+            return null;
+        }
+        int totalWeight = 0;
+        for (BedwarsMatchEventType type : BedwarsMatchEventType.values()) {
+            totalWeight += Math.max(0, config.weight(type));
+        }
+        if (totalWeight <= 0) {
+            return null;
+        }
+        int roll = ThreadLocalRandom.current().nextInt(totalWeight);
+        int current = 0;
+        for (BedwarsMatchEventType type : BedwarsMatchEventType.values()) {
+            current += Math.max(0, config.weight(type));
+            if (roll < current) {
+                return type;
+            }
+        }
+        return null;
+    }
+
+    private void applyPreMatchEventSetup() {
+        if (activeMatchEvent != BedwarsMatchEventType.BENEVOLENT_UPGRADES) {
+            return;
+        }
+        List<TeamUpgradeType> pool = new ArrayList<>(BENEVOLENT_UPGRADE_POOL);
+        Collections.shuffle(pool);
+        int count = Math.min(3, pool.size());
+        for (int i = 0; i < count; i++) {
+            TeamUpgradeType type = pool.get(i);
+            benevolentEventUpgrades.add(type);
+            for (TeamColor team : teamsInMatch) {
+                getUpgradeState(team).setTier(type, type.maxTier());
+            }
+        }
+    }
+
+    private void applyMatchEventRotatingOverrides() {
+        if (activeMatchEvent != BedwarsMatchEventType.APRIL_FOOLS) {
+            return;
+        }
+        String bedrockId = normalizeItemId("bedrock");
+        if (bedrockId == null || !isRotatingCandidate(bedrockId)) {
+            return;
+        }
+        int target = rotatingMode == RotatingSelectionMode.ONE_RANDOM ? 1 : 2;
+        java.util.LinkedHashSet<String> adjusted = new java.util.LinkedHashSet<>();
+        adjusted.add(bedrockId);
+        for (String id : rotatingItemIds) {
+            if (adjusted.size() >= target) {
+                break;
+            }
+            if (!bedrockId.equals(id)) {
+                adjusted.add(id);
+            }
+        }
+        if (adjusted.size() < target) {
+            for (String candidate : getRotatingCandidateIds()) {
+                if (adjusted.size() >= target) {
+                    break;
+                }
+                if (!bedrockId.equals(candidate)) {
+                    adjusted.add(candidate);
+                }
+            }
+        }
+        rotatingItemIds.clear();
+        rotatingItemIds.addAll(adjusted);
+    }
+
+    private void applyMatchEventToParticipants() {
+        if (activeMatchEvent == null) {
+            return;
+        }
+        for (UUID playerId : assignments.keySet()) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null) {
+                continue;
+            }
+            applyTeamUpgrades(player, assignments.get(playerId));
+        }
+    }
+
+    private void startMatchEventTasks() {
+        if (activeMatchEvent == null || plugin == null) {
+            return;
+        }
+        if (activeMatchEvent == BedwarsMatchEventType.BLOOD_MOON) {
+            prepareBloodMoonWorld();
+            BukkitTask task = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+                World world = arena.getWorld();
+                if (world == null) {
+                    return;
+                }
+                world.setTime(18000L);
+                Particle.DustOptions dust = new Particle.DustOptions(Color.fromRGB(200, 20, 20), 1.2f);
+                for (UUID playerId : assignments.keySet()) {
+                    Player player = Bukkit.getPlayer(playerId);
+                    if (player == null || !isInArenaWorld(player.getWorld()) || player.getGameMode() == GameMode.SPECTATOR) {
+                        continue;
+                    }
+                    Location location = player.getLocation().add(0, 1.0, 0);
+                    world.spawnParticle(Particle.DUST, location, 10, 0.45, 0.7, 0.45, 0.01, dust);
+                }
+            }, 0L, 20L);
+            tasks.add(task);
+            return;
+        }
+        if (activeMatchEvent == BedwarsMatchEventType.APRIL_FOOLS) {
+            BukkitTask task = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+                World world = arena.getWorld();
+                if (world == null) {
+                    return;
+                }
+                for (UUID playerId : assignments.keySet()) {
+                    Player player = Bukkit.getPlayer(playerId);
+                    if (player == null || !isInArenaWorld(player.getWorld()) || player.getGameMode() == GameMode.SPECTATOR) {
+                        continue;
+                    }
+                    world.spawnParticle(Particle.NOTE,
+                            player.getLocation().add(0, 1.0, 0),
+                            6,
+                            0.35,
+                            0.5,
+                            0.35,
+                            1.0);
+                }
+            }, 20L, 20L);
+            tasks.add(task);
+        }
+    }
+
+    private void prepareBloodMoonWorld() {
+        World world = arena.getWorld();
+        if (world == null) {
+            return;
+        }
+        if (previousWorldTime == null) {
+            previousWorldTime = world.getTime();
+        }
+        if (previousDaylightCycle == null) {
+            previousDaylightCycle = world.getGameRuleValue(GameRule.DO_DAYLIGHT_CYCLE);
+        }
+        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+        world.setTime(18000L);
+    }
+
+    private void restoreMatchEventWorldState() {
+        World world = arena.getWorld();
+        if (world == null) {
+            previousWorldTime = null;
+            previousDaylightCycle = null;
+            return;
+        }
+        if (previousDaylightCycle != null) {
+            world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, previousDaylightCycle);
+        }
+        if (previousWorldTime != null) {
+            world.setTime(previousWorldTime);
+        }
+        previousWorldTime = null;
+        previousDaylightCycle = null;
+    }
+
+    private void announceMatchEvent() {
+        if (activeMatchEvent == null || plugin == null) {
+            return;
+        }
+        broadcast(Component.text("Match Event: ", NamedTextColor.AQUA)
+                .append(Component.text(activeMatchEvent.displayName(), NamedTextColor.YELLOW)));
+        if (activeMatchEvent == BedwarsMatchEventType.BENEVOLENT_UPGRADES && !benevolentEventUpgrades.isEmpty()) {
+            List<String> upgrades = new ArrayList<>();
+            for (TeamUpgradeType type : benevolentEventUpgrades) {
+                upgrades.add(type.tierName(type.maxTier()));
+            }
+            broadcast(Component.text("Rolled Upgrades: ", NamedTextColor.GRAY)
+                    .append(Component.text(String.join(", ", upgrades), NamedTextColor.GREEN)));
+        }
+        BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () ->
+                        showTitleAll(Component.text(activeMatchEvent.displayName(), NamedTextColor.GOLD),
+                                Component.text(activeMatchEvent.subtitle(), NamedTextColor.GRAY)),
+                10L);
+        tasks.add(task);
     }
 
     private void triggerTierUpgrade(int tier) {
@@ -2073,6 +2344,7 @@ public class GameSession {
         clearEditors();
         releaseForcedChunks();
         restoreWorldBorder();
+        restoreMatchEventWorldState();
         despawnShops();
         despawnSummons();
         closeFakeEnderChests();
@@ -2260,6 +2532,7 @@ public class GameSession {
         lastDamagerTimes.clear();
         lastDamageTimes.clear();
         lastRegenTimes.clear();
+        benevolentEventUpgrades.clear();
         trapImmunityEnds.clear();
         trapImmunityTasks.clear();
         suddenDeathActive = false;
@@ -2269,6 +2542,9 @@ public class GameSession {
         gameEndTriggered = false;
         grantedMatchParticipationPartyExp = 0;
         partyExpUnavailableLogged = false;
+        activeMatchEvent = null;
+        previousWorldTime = null;
+        previousDaylightCycle = null;
     }
 
     public Set<String> getRotatingItemIds() {
@@ -2277,6 +2553,61 @@ public class GameSession {
 
     public RotatingSelectionMode getRotatingMode() {
         return rotatingMode;
+    }
+
+    public boolean isMatchEventRollEnabled() {
+        return matchEventRollEnabled;
+    }
+
+    public void setMatchEventRollEnabled(boolean enabled) {
+        matchEventRollEnabled = enabled;
+    }
+
+    public boolean toggleMatchEventRollEnabled() {
+        matchEventRollEnabled = !matchEventRollEnabled;
+        return matchEventRollEnabled;
+    }
+
+    public BedwarsMatchEventType getActiveMatchEvent() {
+        return activeMatchEvent;
+    }
+
+    public int adjustGeneratedResourceAmount(Material material, int baseAmount) {
+        int amount = Math.max(0, baseAmount);
+        if (amount <= 0 || activeMatchEvent != BedwarsMatchEventType.IN_THIS_ECONOMY || material == null) {
+            return amount;
+        }
+        return switch (material) {
+            case DIAMOND, EMERALD -> 0;
+            case GOLD_INGOT -> {
+                int halved = amount / 2;
+                if ((amount & 1) == 1 && ThreadLocalRandom.current().nextBoolean()) {
+                    halved++;
+                }
+                yield Math.max(0, halved);
+            }
+            case IRON_INGOT -> Math.max(0, amount * 2);
+            default -> amount;
+        };
+    }
+
+    public void handleMatchEventDamage(Player attacker, Player victim, double finalDamage) {
+        if (attacker == null || victim == null || finalDamage <= 0.0) {
+            return;
+        }
+        if (activeMatchEvent != BedwarsMatchEventType.BLOOD_MOON) {
+            return;
+        }
+        TeamColor attackerTeam = getTeam(attacker.getUniqueId());
+        TeamColor victimTeam = getTeam(victim.getUniqueId());
+        if (attackerTeam == null || victimTeam == null || attackerTeam == victimTeam) {
+            return;
+        }
+        double healAmount = finalDamage * BLOOD_MOON_LIFESTEAL_RATIO;
+        if (healAmount <= 0.0) {
+            return;
+        }
+        attacker.setHealth(Math.min(attacker.getMaxHealth(), attacker.getHealth() + healAmount));
     }
 
     public void setRotatingMode(RotatingSelectionMode mode) {
@@ -4182,7 +4513,8 @@ public class GameSession {
         if (upgrades.getTier(TeamUpgradeType.FIRE_ASPECT) > 0) {
             applyFireAspect(player);
         }
-        applyScale(player, resolveScaleDownValue(upgrades.getTier(TeamUpgradeType.SCALE_DOWN)));
+        applyMatchEventEffects(player);
+        applyScale(player, resolveEffectiveScale(upgrades.getTier(TeamUpgradeType.SCALE_DOWN)));
     }
 
     private void applyProtection(Player player, int level) {
@@ -4281,6 +4613,54 @@ public class GameSession {
         applyEnchantment(player, ATTACK_MATERIALS, Enchantment.FIRE_ASPECT, 1);
     }
 
+    private void applyMatchEventEffects(Player player) {
+        if (player == null || activeMatchEvent == null) {
+            return;
+        }
+        switch (activeMatchEvent) {
+            case SPEEDRUN -> player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
+                    Integer.MAX_VALUE,
+                    1,
+                    true,
+                    false,
+                    true));
+            case LONG_ARMS -> setAttributeToDefaultPlus(player, LONG_ARMS_RANGE_BONUS,
+                    "BLOCK_INTERACTION_RANGE",
+                    "PLAYER_BLOCK_INTERACTION_RANGE");
+            case MOON_BIG -> {
+                boolean jumpApplied = setAttributeToDefaultMultiplier(player, MOON_BIG_JUMP_MULTIPLIER,
+                        "JUMP_STRENGTH",
+                        "GENERIC_JUMP_STRENGTH");
+                if (!jumpApplied) {
+                    setAttributeToDefaultMultiplier(player, 0.6, "GRAVITY", "GENERIC_GRAVITY");
+                }
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,
+                        Integer.MAX_VALUE,
+                        1,
+                        true,
+                        false,
+                        true));
+            }
+            case BLOOD_MOON -> {
+                setAttributeToDefaultMultiplier(player, BLOOD_MOON_HEALTH_MULTIPLIER,
+                        "MAX_HEALTH",
+                        "GENERIC_MAX_HEALTH");
+                PotionEffectType resistance = resolvePotionEffectType("RESISTANCE", "DAMAGE_RESISTANCE");
+                if (resistance != null) {
+                    player.addPotionEffect(new PotionEffect(resistance,
+                            Integer.MAX_VALUE,
+                            1,
+                            true,
+                            false,
+                            true));
+                }
+                player.setHealth(Math.min(player.getHealth(), player.getMaxHealth()));
+            }
+            default -> {
+            }
+        }
+    }
+
     private void applyScale(Player player, double scale) {
         if (player == null) {
             return;
@@ -4298,6 +4678,16 @@ public class GameSession {
         };
     }
 
+    private double resolveEffectiveScale(int scaleDownTier) {
+        return resolveScaleDownValue(scaleDownTier) * resolveMatchEventScaleMultiplier();
+    }
+
+    private double resolveMatchEventScaleMultiplier() {
+        return activeMatchEvent == BedwarsMatchEventType.APRIL_FOOLS
+                ? APRIL_FOOLS_SCALE_MULTIPLIER
+                : DEFAULT_PLAYER_SCALE;
+    }
+
     private boolean setAttributeBaseValue(LivingEntity entity, String attributeName, double value) {
         if (entity == null || attributeName == null || attributeName.isBlank()) {
             return false;
@@ -4313,6 +4703,67 @@ public class GameSession {
         } catch (IllegalArgumentException ignored) {
             return false;
         }
+    }
+
+    private boolean setAttributeToDefaultPlus(LivingEntity entity, double bonus, String... attributeNames) {
+        org.bukkit.attribute.AttributeInstance instance = resolveAttributeInstance(entity, attributeNames);
+        if (instance == null) {
+            return false;
+        }
+        instance.setBaseValue(instance.getDefaultValue() + bonus);
+        return true;
+    }
+
+    private boolean setAttributeToDefaultMultiplier(LivingEntity entity, double multiplier, String... attributeNames) {
+        org.bukkit.attribute.AttributeInstance instance = resolveAttributeInstance(entity, attributeNames);
+        if (instance == null) {
+            return false;
+        }
+        instance.setBaseValue(instance.getDefaultValue() * multiplier);
+        return true;
+    }
+
+    private void resetAttributeToDefault(LivingEntity entity, String... attributeNames) {
+        org.bukkit.attribute.AttributeInstance instance = resolveAttributeInstance(entity, attributeNames);
+        if (instance != null) {
+            instance.setBaseValue(instance.getDefaultValue());
+        }
+    }
+
+    private org.bukkit.attribute.AttributeInstance resolveAttributeInstance(LivingEntity entity, String... attributeNames) {
+        if (entity == null || attributeNames == null) {
+            return null;
+        }
+        for (String attributeName : attributeNames) {
+            if (attributeName == null || attributeName.isBlank()) {
+                continue;
+            }
+            try {
+                org.bukkit.attribute.Attribute attribute = org.bukkit.attribute.Attribute.valueOf(attributeName);
+                org.bukkit.attribute.AttributeInstance instance = entity.getAttribute(attribute);
+                if (instance != null) {
+                    return instance;
+                }
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return null;
+    }
+
+    private PotionEffectType resolvePotionEffectType(String... names) {
+        if (names == null) {
+            return null;
+        }
+        for (String name : names) {
+            if (name == null || name.isBlank()) {
+                continue;
+            }
+            PotionEffectType type = PotionEffectType.getByName(name);
+            if (type != null) {
+                return type;
+            }
+        }
+        return null;
     }
 
     private void applyEnchantment(Player player, Set<Material> materials, Enchantment enchantment, int level) {
@@ -4366,7 +4817,17 @@ public class GameSession {
         player.removePotionEffect(PotionEffectType.BLINDNESS);
         player.removePotionEffect(PotionEffectType.SLOWNESS);
         player.removePotionEffect(PotionEffectType.MINING_FATIGUE);
+        player.removePotionEffect(PotionEffectType.SLOW_FALLING);
+        PotionEffectType resistance = resolvePotionEffectType("RESISTANCE", "DAMAGE_RESISTANCE");
+        if (resistance != null) {
+            player.removePotionEffect(resistance);
+        }
+        resetAttributeToDefault(player, "BLOCK_INTERACTION_RANGE", "PLAYER_BLOCK_INTERACTION_RANGE");
+        resetAttributeToDefault(player, "JUMP_STRENGTH", "GENERIC_JUMP_STRENGTH");
+        resetAttributeToDefault(player, "GRAVITY", "GENERIC_GRAVITY");
+        resetAttributeToDefault(player, "MAX_HEALTH", "GENERIC_MAX_HEALTH");
         applyScale(player, DEFAULT_PLAYER_SCALE);
+        player.setHealth(Math.min(player.getHealth(), player.getMaxHealth()));
     }
 
     private void applyEditorInvisibility(Player player) {

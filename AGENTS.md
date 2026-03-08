@@ -226,6 +226,7 @@ Service auto-adds missing columns for legacy DBs (`deaths`, `final_kills`, `fina
 Root keys:
 - `leaderboard`
 - `parkour-leaderboard`
+- `match-events`
 - `lobby-parkour`
 - `arenas`
 
@@ -294,6 +295,20 @@ Shop keys:
 - `bed-destruction`
 - `sudden-death`
 - `game-end`
+
+`match-events` fields:
+- `enabled`
+- `chance-percent`
+- `events.<event-id>.weight`
+
+Supported `match-events.events` ids:
+- `speedrun`
+- `benevolent-upgrades`
+- `long-arms`
+- `moon-big`
+- `blood-moon`
+- `in-this-economy`
+- `april-fools`
 
 ### 10.2 `shop.yml`
 
@@ -530,6 +545,12 @@ Do not scatter BedWars rules into `OmGames` main plugin class.
 1. Edit `bedwars.yml -> arenas.<id>.event-times`.
 2. Values are seconds.
 3. Start test match and verify phase broadcasts and state transitions.
+
+### 14.5a Tune weighted match events
+
+1. Edit `bedwars.yml -> match-events`.
+2. Set `enabled`, `chance-percent`, and per-event `weight`.
+3. Start a match from the team-assign menu and verify the prestart event toggle + start title.
 
 ### 14.6 Add or repair arena setup
 

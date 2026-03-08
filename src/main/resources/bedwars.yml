@@ -1,5 +1,23 @@
 leaderboard: 4 73 0
 parkour-leaderboard: -40 103 -10
+match-events:
+  enabled: true
+  chance-percent: 40
+  events:
+    speedrun:
+      weight: 3
+    benevolent-upgrades:
+      weight: 3
+    long-arms:
+      weight: 3
+    moon-big:
+      weight: 3
+    blood-moon:
+      weight: 2
+    in-this-economy:
+      weight: 3
+    april-fools:
+      weight: 1
 lobby-parkour:
   world: bedwars
   start: ""

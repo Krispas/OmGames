@@ -1241,6 +1241,7 @@ public class BedwarsListener implements Listener {
                 TeamColor victimTeam = session.getTeam(victim.getUniqueId());
                 if (attackerTeam != null && victimTeam != null && attackerTeam != victimTeam) {
                     session.recordCombat(attacker.getUniqueId(), victim.getUniqueId());
+                    session.handleMatchEventDamage(attacker, victim, event.getFinalDamage());
                 }
             }
             if (!event.isCancelled() && session.isParticipant(victim.getUniqueId())) {

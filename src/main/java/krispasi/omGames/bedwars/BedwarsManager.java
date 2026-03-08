@@ -2,11 +2,14 @@ package krispasi.omGames.bedwars;
 
 import java.io.File;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import krispasi.omGames.bedwars.config.BedwarsConfigLoader;
+import krispasi.omGames.bedwars.event.BedwarsMatchEventConfig;
+import krispasi.omGames.bedwars.event.BedwarsMatchEventType;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
 import krispasi.omGames.bedwars.item.CustomItemConfigLoader;
@@ -59,6 +62,7 @@ public class BedwarsManager {
     private GameSession activeSession;
     private ShopConfig shopConfig = ShopConfig.empty();
     private CustomItemConfig customItemConfig = CustomItemConfig.empty();
+    private BedwarsMatchEventConfig matchEventConfig = BedwarsMatchEventConfig.defaults();
 
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -86,6 +90,7 @@ public class BedwarsManager {
         migrateBedwarsConfig(configFile);
         BedwarsConfigLoader loader = new BedwarsConfigLoader(configFile, plugin.getLogger());
         arenas = loader.load();
+        matchEventConfig = loadMatchEventConfig(configFile);
         configureLobbyLeaderboard(configFile);
         configureParkourLeaderboard(configFile);
         lobbyParkour.load(configFile);
@@ -150,6 +155,10 @@ public class BedwarsManager {
 
     public CustomItemConfig getCustomItemConfig() {
         return customItemConfig;
+    }
+
+    public BedwarsMatchEventConfig getMatchEventConfig() {
+        return matchEventConfig;
     }
 
     public QuickBuyService getQuickBuyService() {
@@ -685,6 +694,32 @@ public class BedwarsManager {
             parkour.createSection("checkpoints");
             changed = true;
         }
+        org.bukkit.configuration.ConfigurationSection matchEvents = config.getConfigurationSection("match-events");
+        if (matchEvents == null) {
+            matchEvents = config.createSection("match-events");
+            changed = true;
+        }
+        if (!matchEvents.isSet("enabled")) {
+            matchEvents.set("enabled", true);
+            changed = true;
+        }
+        if (!matchEvents.isSet("chance-percent")) {
+            matchEvents.set("chance-percent", 40.0);
+            changed = true;
+        }
+        org.bukkit.configuration.ConfigurationSection eventsSection =
+                matchEvents.getConfigurationSection("events");
+        if (eventsSection == null) {
+            eventsSection = matchEvents.createSection("events");
+            changed = true;
+        }
+        for (BedwarsMatchEventType type : BedwarsMatchEventType.values()) {
+            String path = type.key() + ".weight";
+            if (!eventsSection.isSet(path)) {
+                eventsSection.set(path, type.defaultWeight());
+                changed = true;
+            }
+        }
         if (!changed) {
             return;
         }
@@ -693,6 +728,31 @@ public class BedwarsManager {
         } catch (java.io.IOException ex) {
             plugin.getLogger().warning("Failed to update bedwars.yml: " + ex.getMessage());
         }
+    }
+
+    private BedwarsMatchEventConfig loadMatchEventConfig(File configFile) {
+        if (!configFile.exists()) {
+            return BedwarsMatchEventConfig.defaults();
+        }
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+        ConfigurationSection section = config.getConfigurationSection("match-events");
+        if (section == null) {
+            return BedwarsMatchEventConfig.defaults();
+        }
+        boolean enabled = section.getBoolean("enabled", true);
+        double chancePercent = section.getDouble("chance-percent", 40.0);
+        EnumMap<BedwarsMatchEventType, Integer> weights = new EnumMap<>(BedwarsMatchEventType.class);
+        ConfigurationSection events = section.getConfigurationSection("events");
+        if (events != null) {
+            for (String key : events.getKeys(false)) {
+                BedwarsMatchEventType type = BedwarsMatchEventType.fromKey(key);
+                if (type == null) {
+                    continue;
+                }
+                weights.put(type, Math.max(0, events.getInt(key + ".weight", type.defaultWeight())));
+            }
+        }
+        return new BedwarsMatchEventConfig(enabled, chancePercent, weights);
     }
 
     private void configureLobbyLeaderboard(File configFile) {

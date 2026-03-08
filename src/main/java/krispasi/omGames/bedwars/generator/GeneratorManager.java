@@ -140,11 +140,14 @@ public class GeneratorManager {
             if (world == null) {
                 return;
             }
+            int spawnAmount = session.adjustGeneratedResourceAmount(material, amount);
+            if (spawnAmount <= 0) {
+                return;
+            }
             Location dropLocation = point.toLocation(world).add(0, 0.1, 0);
             if (countNearbyItems(dropLocation, material, 1.5) >= cap) {
                 return;
             }
-            int spawnAmount = Math.max(1, amount);
             Item item = world.dropItem(dropLocation, new ItemStack(material, spawnAmount));
             item.setVelocity(new Vector(0, 0, 0));
             trackedDrops.put(item.getUniqueId(), System.currentTimeMillis());
@@ -158,17 +161,21 @@ public class GeneratorManager {
             if (world == null) {
                 return;
             }
+            int spawnAmount = session.adjustGeneratedResourceAmount(material, amount);
+            if (spawnAmount <= 0) {
+                return;
+            }
             Location dropLocation = generator.location().toLocation(world).add(0, 0.1, 0);
             List<Player> recipients = findForgeRecipients(generator, dropLocation);
             if (!recipients.isEmpty()) {
-                giveToRecipients(recipients, material, amount);
-                dropVisualItem(world, dropLocation, new ItemStack(material, Math.max(1, amount)));
+                giveToRecipients(recipients, material, spawnAmount);
+                dropVisualItem(world, dropLocation, new ItemStack(material, spawnAmount));
                 return;
             }
             if (countNearbyItems(dropLocation, material, 1.5) >= cap) {
                 return;
             }
-            dropTrackedItem(world, dropLocation, new ItemStack(material, Math.max(1, amount)));
+            dropTrackedItem(world, dropLocation, new ItemStack(material, spawnAmount));
         }, 0L, intervalTicks);
         tasks.add(task);
     }
@@ -181,11 +188,14 @@ public class GeneratorManager {
                 return;
             }
             updateNextDrop(generator.key());
+            int spawnAmount = session.adjustGeneratedResourceAmount(material, amount);
+            if (spawnAmount <= 0) {
+                return;
+            }
             Location dropLocation = generator.location().toLocation(world).add(0, 0.1, 0);
             if (countNearbyItems(dropLocation, material, 1.5) >= cap) {
                 return;
             }
-            int spawnAmount = Math.max(1, amount);
             Item item = world.dropItem(dropLocation, new ItemStack(material, spawnAmount));
             item.setVelocity(new Vector(0, 0, 0));
             trackedDrops.put(item.getUniqueId(), System.currentTimeMillis());

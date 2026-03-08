@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import krispasi.omGames.bedwars.BedwarsManager;
+import krispasi.omGames.bedwars.event.BedwarsMatchEventConfig;
+import krispasi.omGames.bedwars.event.BedwarsMatchEventType;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.model.TeamColor;
 import net.kyori.adventure.text.Component;
@@ -34,6 +36,7 @@ public class TeamAssignMenu implements InventoryHolder {
     private static final int RANDOM_SLOT = SETTINGS_ROW_START;
     private static final int TEAM_PICK_SLOT = SETTINGS_ROW_START + 1;
     private static final int ROTATING_SLOT = SETTINGS_ROW_START + 2;
+    private static final int EVENTS_SLOT = SETTINGS_ROW_START + 3;
     private static final int PAUSE_SLOT = SETTINGS_ROW_START + 7;
     private static final int SKIP_SLOT = SETTINGS_ROW_START + 8;
 
@@ -106,6 +109,15 @@ public class TeamAssignMenu implements InventoryHolder {
             }
             return;
         }
+        if (slot == EVENTS_SLOT) {
+            BedwarsMatchEventConfig config = bedwarsManager.getMatchEventConfig();
+            if (config == null || !config.isEnabled() || !config.hasEligibleEvents()) {
+                return;
+            }
+            session.toggleMatchEventRollEnabled();
+            refresh();
+            return;
+        }
         if (slot == PAUSE_SLOT && session.isLobby()) {
             session.toggleLobbyCountdownPause();
             refresh();
@@ -155,6 +167,7 @@ public class TeamAssignMenu implements InventoryHolder {
         inventory.setItem(RANDOM_SLOT, buildRandomItem());
         inventory.setItem(TEAM_PICK_SLOT, buildTeamPickItem());
         inventory.setItem(ROTATING_SLOT, buildRotatingItem());
+        inventory.setItem(EVENTS_SLOT, buildEventsItem());
         if (session.isLobby()) {
             inventory.setItem(PAUSE_SLOT, buildPauseItem());
             inventory.setItem(SKIP_SLOT, buildSkipItem());
@@ -308,6 +321,31 @@ public class TeamAssignMenu implements InventoryHolder {
         return item;
     }
 
+    private ItemStack buildEventsItem() {
+        BedwarsMatchEventConfig config = bedwarsManager.getMatchEventConfig();
+        boolean globallyEnabled = config != null && config.isEnabled() && config.hasEligibleEvents();
+        boolean enabled = globallyEnabled && session.isMatchEventRollEnabled();
+        ItemStack item = new ItemStack(enabled ? Material.AMETHYST_SHARD : Material.BARRIER);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(Component.text("Game Events", enabled ? NamedTextColor.GREEN : NamedTextColor.RED));
+        List<Component> lore = new ArrayList<>();
+        if (!globallyEnabled) {
+            lore.add(Component.text("Disabled in bedwars.yml", NamedTextColor.RED));
+        } else {
+            lore.add(Component.text("Chance: " + formatChance(config.chancePercent()), NamedTextColor.GRAY));
+            lore.add(Component.text(enabled ? "Enabled for this match" : "Disabled for this match",
+                    enabled ? NamedTextColor.GREEN : NamedTextColor.RED));
+        }
+        BedwarsMatchEventType active = session.getActiveMatchEvent();
+        if (active != null) {
+            lore.add(Component.text("Rolled: " + active.displayName(), NamedTextColor.YELLOW));
+        }
+        lore.add(Component.text("Left click: toggle", NamedTextColor.GRAY));
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
     private String formatRotatingMode(GameSession.RotatingSelectionMode mode) {
         return switch (mode) {
             case ONE_RANDOM -> "One Random";
@@ -335,6 +373,13 @@ public class TeamAssignMenu implements InventoryHolder {
             }
         }
         return id;
+    }
+
+    private String formatChance(double chancePercent) {
+        if (Math.abs(chancePercent - Math.rint(chancePercent)) < 0.0001) {
+            return (int) Math.rint(chancePercent) + "%";
+        }
+        return String.format(java.util.Locale.US, "%.1f%%", chancePercent);
     }
 
     private String formatMaterialName(Material material) {
