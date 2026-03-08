@@ -1211,11 +1211,6 @@ public class GameSession {
         CustomItemDefinition custom = resolveCustomPurchaseDefinition(item);
         return switch (behavior) {
             case BLOCK, UTILITY, POTION -> {
-                if (behavior == ShopItemBehavior.UTILITY
-                        && custom != null
-                        && custom.getType() == CustomItemType.ELYTRA_STRIKE) {
-                    yield activateElytraStrike(player, custom);
-                }
                 giveItem(player, createPurchaseItem(item, team));
                 if (behavior == ShopItemBehavior.UTILITY
                         && team != null
@@ -1348,7 +1343,7 @@ public class GameSession {
         meta.lore(lore);
     }
 
-    private boolean activateElytraStrike(Player player, CustomItemDefinition custom) {
+    public boolean activateElytraStrike(Player player, CustomItemDefinition custom) {
         if (player == null || custom == null || !isRunning() || !isParticipant(player.getUniqueId())) {
             return false;
         }
@@ -4311,6 +4306,7 @@ public class GameSession {
             return;
         }
         UUID playerId = player.getUniqueId();
+        TeamColor team = getTeam(playerId);
         cancelRespawnCountdown(playerId);
         removeRespawnProtection(playerId);
         clearTrapImmunity(playerId);
@@ -4321,6 +4317,14 @@ public class GameSession {
         clearElytraStrike(player, false, false);
         clearUpgradeEffects(player);
         flushPendingPartyExp(player);
+        if (state == GameState.RUNNING
+                && team != null
+                && isParticipant(playerId)
+                && getBedState(team) == BedState.DESTROYED) {
+            removeParticipant(player);
+            checkTeamEliminated(team);
+            return;
+        }
         restoreSidebar(playerId);
     }
 

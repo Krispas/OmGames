@@ -570,7 +570,7 @@ public class BedwarsListener implements Listener {
                     yield spawnPortableShopkeeper(player, session, custom, event);
                 }
                 case ELYTRA_STRIKE -> {
-                    yield false;
+                    yield session.activateElytraStrike(player, custom);
                 }
                 case MAGIC_MILK -> {
                     yield false;
@@ -1144,10 +1144,11 @@ public class BedwarsListener implements Listener {
                         event.setCancelled(true);
                     }
                 }
+                boolean handledHappyGhastProjectile = false;
                 if (!event.isCancelled() && isHappyGhast(event.getEntity())) {
-                    applyHappyGhastProjectileDamage(event);
+                    handledHappyGhastProjectile = applyHappyGhastProjectileDamage(event);
                 }
-                if (!event.isCancelled() && suppressSummonKnockback) {
+                if ((handledHappyGhastProjectile || !event.isCancelled()) && suppressSummonKnockback) {
                     restoreVelocityNextTick(summonVictim, summonVelocityBeforeHit);
                 }
                 return;
@@ -1919,20 +1920,34 @@ public class BedwarsListener implements Listener {
         }.runTask(bedwarsManager.getPlugin());
     }
 
-    private void applyHappyGhastProjectileDamage(EntityDamageByEntityEvent event) {
-        if (event == null) {
-            return;
+    private boolean applyHappyGhastProjectileDamage(EntityDamageByEntityEvent event) {
+        if (event == null || !(event.getEntity() instanceof LivingEntity target) || target.isDead()) {
+            return false;
         }
+        double damage = 0.0;
         if (event.getDamager() instanceof Arrow arrow) {
-            event.setDamage(Math.max(0.0, arrow.getDamage()));
-            return;
-        }
-        if (event.getDamager() instanceof Fireball fireball) {
+            damage = Math.max(0.0, arrow.getDamage());
+        } else if (event.getDamager() instanceof Fireball fireball) {
             CustomItemDefinition definition = resolveCustomProjectile(fireball);
             if (isFireballCustom(definition)) {
-                event.setDamage(Math.max(0.0, definition.getDamage()));
+                damage = Math.max(0.0, definition.getDamage());
             }
         }
+        if (damage <= 0.0) {
+            return false;
+        }
+        event.setCancelled(true);
+        double currentHealth = Math.max(0.0, target.getHealth());
+        double newHealth = Math.max(0.0, currentHealth - damage);
+        target.setHealth(newHealth);
+        target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                target.getLocation().add(0.0, target.getHeight() * 0.5, 0.0),
+                6,
+                0.25,
+                0.25,
+                0.25,
+                0.0);
+        return true;
     }
 
     private boolean isHappyGhastSummon(CustomItemDefinition summon, org.bukkit.entity.Entity summonEntity) {
@@ -2387,7 +2402,7 @@ public class BedwarsListener implements Listener {
         }
         direction.normalize();
         Vector right = new Vector(-direction.getZ(), 0, direction.getX());
-        Location origin = player.getLocation().getBlock().getLocation();
+        Location origin = player.getLocation().getBlock().getLocation().subtract(0.0, 1.0, 0.0);
         Material blockType = Material.END_STONE;
         ItemStack record = new ItemStack(blockType);
         new BukkitRunnable() {
