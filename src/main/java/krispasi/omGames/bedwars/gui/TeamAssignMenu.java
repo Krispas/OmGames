@@ -111,11 +111,18 @@ public class TeamAssignMenu implements InventoryHolder {
         }
         if (slot == EVENTS_SLOT) {
             BedwarsMatchEventConfig config = bedwarsManager.getMatchEventConfig();
-            if (config == null || !config.isEnabled() || !config.hasEligibleEvents()) {
+            if (config == null || !config.isEnabled()) {
                 return;
             }
-            session.toggleMatchEventRollEnabled();
-            refresh();
+            if (event.isLeftClick()) {
+                session.toggleMatchEventRollEnabled();
+                refresh();
+                return;
+            }
+            if (event.isRightClick()) {
+                new EventSelectMenu(session, player).open(player);
+                return;
+            }
             return;
         }
         if (slot == PAUSE_SLOT && session.isLobby()) {
@@ -323,8 +330,9 @@ public class TeamAssignMenu implements InventoryHolder {
 
     private ItemStack buildEventsItem() {
         BedwarsMatchEventConfig config = bedwarsManager.getMatchEventConfig();
-        boolean globallyEnabled = config != null && config.isEnabled() && config.hasEligibleEvents();
+        boolean globallyEnabled = config != null && config.isEnabled();
         boolean enabled = globallyEnabled && session.isMatchEventRollEnabled();
+        BedwarsMatchEventType forced = session.getForcedMatchEvent();
         ItemStack item = new ItemStack(enabled ? Material.AMETHYST_SHARD : Material.BARRIER);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text("Game Events", enabled ? NamedTextColor.GREEN : NamedTextColor.RED));
@@ -332,15 +340,26 @@ public class TeamAssignMenu implements InventoryHolder {
         if (!globallyEnabled) {
             lore.add(Component.text("Disabled in bedwars.yml", NamedTextColor.RED));
         } else {
-            lore.add(Component.text("Chance: " + formatChance(config.chancePercent()), NamedTextColor.GRAY));
             lore.add(Component.text(enabled ? "Enabled for this match" : "Disabled for this match",
                     enabled ? NamedTextColor.GREEN : NamedTextColor.RED));
+            if (forced != null) {
+                lore.add(Component.text("Mode: Forced - " + forced.displayName(), NamedTextColor.YELLOW));
+            } else if (config.hasEligibleEvents()) {
+                lore.add(Component.text("Mode: Auto random", NamedTextColor.GRAY));
+                lore.add(Component.text("Chance: " + formatChance(config.chancePercent()), NamedTextColor.DARK_GRAY));
+            } else {
+                lore.add(Component.text("Mode: Auto pool empty", NamedTextColor.RED));
+                lore.add(Component.text("Right click to force an event", NamedTextColor.DARK_GRAY));
+            }
         }
         BedwarsMatchEventType active = session.getActiveMatchEvent();
         if (active != null) {
             lore.add(Component.text("Rolled: " + active.displayName(), NamedTextColor.YELLOW));
         }
         lore.add(Component.text("Left click: toggle", NamedTextColor.GRAY));
+        if (globallyEnabled) {
+            lore.add(Component.text("Right click: choose event", NamedTextColor.DARK_GRAY));
+        }
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;

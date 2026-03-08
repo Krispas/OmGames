@@ -302,6 +302,7 @@ public class GameSession {
     private int grantedMatchParticipationPartyExp;
     private boolean partyExpUnavailableLogged;
     private boolean matchEventRollEnabled = true;
+    private BedwarsMatchEventType forcedMatchEvent;
     private BedwarsMatchEventType activeMatchEvent;
     private Long previousWorldTime;
     private Boolean previousDaylightCycle;
@@ -2092,6 +2093,10 @@ public class GameSession {
         if (!matchEventRollEnabled) {
             return;
         }
+        if (forcedMatchEvent != null) {
+            activeMatchEvent = forcedMatchEvent;
+            return;
+        }
         BedwarsMatchEventConfig config = bedwarsManager.getMatchEventConfig();
         if (config == null || !config.isEnabled() || !config.hasEligibleEvents()) {
             return;
@@ -2988,6 +2993,7 @@ public class GameSession {
         gameEndTriggered = false;
         grantedMatchParticipationPartyExp = 0;
         partyExpUnavailableLogged = false;
+        forcedMatchEvent = null;
         activeMatchEvent = null;
         previousWorldTime = null;
         previousDaylightCycle = null;
@@ -3012,6 +3018,17 @@ public class GameSession {
     public boolean toggleMatchEventRollEnabled() {
         matchEventRollEnabled = !matchEventRollEnabled;
         return matchEventRollEnabled;
+    }
+
+    public BedwarsMatchEventType getForcedMatchEvent() {
+        return forcedMatchEvent;
+    }
+
+    public void setForcedMatchEvent(BedwarsMatchEventType forcedMatchEvent) {
+        this.forcedMatchEvent = forcedMatchEvent;
+        if (forcedMatchEvent != null) {
+            matchEventRollEnabled = true;
+        }
     }
 
     public BedwarsMatchEventType getActiveMatchEvent() {

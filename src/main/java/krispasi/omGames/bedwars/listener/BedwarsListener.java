@@ -18,6 +18,7 @@ import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.shop.ShopConfig;
 import krispasi.omGames.bedwars.shop.ShopItemDefinition;
 import krispasi.omGames.bedwars.gui.MapSelectMenu;
+import krispasi.omGames.bedwars.gui.EventSelectMenu;
 import krispasi.omGames.bedwars.gui.RotatingItemMenu;
 import krispasi.omGames.bedwars.gui.ShopMenu;
 import krispasi.omGames.bedwars.gui.TeamAssignMenu;
@@ -236,6 +237,15 @@ public class BedwarsListener implements Listener {
                     return;
                 }
                 menu.handleClick(event);
+                return;
+            }
+            if (topInventory.getHolder() instanceof EventSelectMenu menu) {
+                if (event.getRawSlot() >= topInventory.getSize()) {
+                    event.setCancelled(true);
+                    return;
+                }
+                menu.handleClick(event);
+                return;
             }
             if (topInventory.getHolder() instanceof RotatingItemMenu menu) {
                 if (event.getRawSlot() >= topInventory.getSize()) {
@@ -302,6 +312,7 @@ public class BedwarsListener implements Listener {
             Inventory topInventory = event.getView().getTopInventory();
             if (topInventory.getHolder() instanceof MapSelectMenu
                     || topInventory.getHolder() instanceof TeamAssignMenu
+                    || topInventory.getHolder() instanceof EventSelectMenu
                     || topInventory.getHolder() instanceof RotatingItemMenu
                     || topInventory.getHolder() instanceof ShopMenu
                     || topInventory.getHolder() instanceof UpgradeShopMenu) {

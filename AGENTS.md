@@ -563,7 +563,10 @@ Do not scatter BedWars rules into `OmGames` main plugin class.
 
 1. Edit `bedwars.yml -> match-events`.
 2. Set `enabled`, `chance-percent`, and per-event `weight`.
-3. Start a match from the team-assign menu and verify the prestart event toggle + start title.
+3. In the team-assign menu:
+   - left-click `Game Events` to enable or disable events for that match
+   - right-click `Game Events` to force a specific event or return to `Auto Random`
+4. Start a match and verify the prestart event state + start title.
 
 ### 14.6 Add or repair arena setup
 
