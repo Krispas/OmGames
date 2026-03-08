@@ -85,6 +85,7 @@ shop:
         speed_potion: 34
         magic_milk: 19
         bridge_egg: 22
+        tower_chest: 23
         wind_charge: 21
         bed_bug: 29
         dream_defender: 28
@@ -320,7 +321,7 @@ shop:
       amount: 1
       cost:
         material: GOLD
-        amount: 32
+        amount: 12
       display-name: "Trident (Loyalty I)"
       enchants:
         LOYALTY: 1
@@ -503,6 +504,17 @@ shop:
         amount: 1
       display-name: "Bridge Egg"
       custom-item: bridge_egg
+    tower_chest:
+      material: CHEST
+      amount: 1
+      cost:
+        material: IRON
+        amount: 24
+      display-name: "Tower Chest"
+      lore:
+        - "Place on the ground to build"
+        - "a wool tower with a ladder."
+      custom-item: tower_chest
     wind_charge:
       material: WIND_CHARGE
       amount: 3

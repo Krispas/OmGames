@@ -551,6 +551,12 @@ public class BedwarsListener implements Listener {
                 case BRIDGE_BUILDER -> {
                     yield useBridgeBuilder(player, session, custom);
                 }
+                case TOWER_CHEST -> {
+                    if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+                        yield false;
+                    }
+                    yield session.deployTowerChest(player, event.getClickedBlock(), event.getBlockFace());
+                }
                 case CREEPING_ARROW -> {
                     yield false;
                 }

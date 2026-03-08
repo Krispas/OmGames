@@ -64,8 +64,10 @@ import org.bukkit.World;
 import org.bukkit.WorldBorder;
 import org.bukkit.Chunk;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Container;
+import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.type.Bed;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Display;
@@ -144,7 +146,64 @@ public class GameSession {
     private static final int ELYTRA_STRIKE_ALTITUDE = 300;
     private static final int ELYTRA_STRIKE_REGEN_DURATION_TICKS = 20;
     private static final int ELYTRA_STRIKE_REGEN_AMPLIFIER = 9;
+    private static final long TOWER_CHEST_TEMP_CHEST_TICKS = 8L;
     private static final NamespacedKey ABYSSAL_RIFT_ITEM_MODEL = new NamespacedKey("om", "rift1");
+    private static final String[][] TOWER_CHEST_LAYERS = new String[][]{
+            {
+                    "0000000",
+                    "00xxx00",
+                    "0x0L0x0",
+                    "0x0C0x0",
+                    "0x000x0",
+                    "00x0x00",
+                    "0000000"
+            },
+            {
+                    "0000000",
+                    "00xxx00",
+                    "0x0L0x0",
+                    "0x000x0",
+                    "0x000x0",
+                    "00x0x00",
+                    "0000000"
+            },
+            {
+                    "0000000",
+                    "00xxx00",
+                    "0x0L0x0",
+                    "0x000x0",
+                    "0x000x0",
+                    "00xxx00",
+                    "0000000"
+            },
+            {
+                    "0x0x0x0",
+                    "xxxxxxx",
+                    "0xxLxx0",
+                    "xxxxxxx",
+                    "0xxxxx0",
+                    "xxxxxxx",
+                    "0x0x0x0"
+            },
+            {
+                    "0xxxxx0",
+                    "x00000x",
+                    "x00000x",
+                    "x00000x",
+                    "x00000x",
+                    "x00000x",
+                    "0xxxxx0"
+            },
+            {
+                    "0x0x0x0",
+                    "x00000x",
+                    "0000000",
+                    "x00000x",
+                    "0000000",
+                    "x00000x",
+                    "0x0x0x0"
+            }
+    };
     private static final Set<String> IN_THIS_ECONOMY_BANNED_ITEMS = Set.of(
             "fireball",
             "bed_bug",
@@ -1533,6 +1592,153 @@ public class GameSession {
         state.setAuraTask(task);
         player.playSound(base, Sound.BLOCK_RESPAWN_ANCHOR_SET_SPAWN, 0.8f, 1.4f);
         return true;
+    }
+
+    public boolean deployTowerChest(Player player, Block clickedBlock, BlockFace clickedFace) {
+        if (player == null
+                || clickedBlock == null
+                || clickedFace != BlockFace.UP
+                || !isRunning()
+                || !isParticipant(player.getUniqueId())) {
+            return false;
+        }
+        TeamColor team = getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        Block origin = clickedBlock.getRelative(BlockFace.UP);
+        World world = origin.getWorld();
+        if (world == null) {
+            return false;
+        }
+        BlockFace forward = resolveTowerChestForward(player);
+        BlockFace right = rotateClockwise(forward);
+        boolean outsideMap = false;
+        for (int layer = 0; layer < TOWER_CHEST_LAYERS.length; layer++) {
+            String[] rows = TOWER_CHEST_LAYERS[layer];
+            for (int row = 0; row < rows.length; row++) {
+                String pattern = rows[row];
+                for (int column = 0; column < pattern.length(); column++) {
+                    char cell = pattern.charAt(column);
+                    if (cell == '0') {
+                        continue;
+                    }
+                    Block target = resolveTowerChestBlock(origin, forward, right, layer, row, column);
+                    BlockPoint point = new BlockPoint(target.getX(), target.getY(), target.getZ());
+                    if (!isInsideMap(point)) {
+                        outsideMap = true;
+                        continue;
+                    }
+                    if (isPlacementBlocked(point) || !target.getType().isAir()) {
+                        player.sendMessage(Component.text("You cannot place a tower chest here.", NamedTextColor.RED));
+                        return false;
+                    }
+                }
+            }
+        }
+        if (outsideMap) {
+            player.sendMessage(Component.text("You cannot place a tower chest outside the map.", NamedTextColor.RED));
+            return false;
+        }
+        placeTemporaryTowerChest(origin, forward);
+        ItemStack woolDrop = new ItemStack(team.wool());
+        ItemStack ladderDrop = new ItemStack(Material.LADDER);
+        for (int layer = 0; layer < TOWER_CHEST_LAYERS.length; layer++) {
+            String[] rows = TOWER_CHEST_LAYERS[layer];
+            for (int row = 0; row < rows.length; row++) {
+                String pattern = rows[row];
+                for (int column = 0; column < pattern.length(); column++) {
+                    if (pattern.charAt(column) != 'x') {
+                        continue;
+                    }
+                    Block target = resolveTowerChestBlock(origin, forward, right, layer, row, column);
+                    target.setType(team.wool(), false);
+                    recordPlacedBlock(new BlockPoint(target.getX(), target.getY(), target.getZ()), woolDrop);
+                }
+            }
+        }
+        for (int layer = 0; layer < TOWER_CHEST_LAYERS.length; layer++) {
+            String[] rows = TOWER_CHEST_LAYERS[layer];
+            for (int row = 0; row < rows.length; row++) {
+                String pattern = rows[row];
+                for (int column = 0; column < pattern.length(); column++) {
+                    if (pattern.charAt(column) != 'L') {
+                        continue;
+                    }
+                    Block target = resolveTowerChestBlock(origin, forward, right, layer, row, column);
+                    target.setType(Material.LADDER, false);
+                    if (target.getBlockData() instanceof Directional directional) {
+                        directional.setFacing(forward);
+                        target.setBlockData(directional, false);
+                    }
+                    recordPlacedBlock(new BlockPoint(target.getX(), target.getY(), target.getZ()), ladderDrop);
+                }
+            }
+        }
+        world.playSound(origin.getLocation().add(0.5, 0.5, 0.5), Sound.BLOCK_WOOD_PLACE, 1.0f, 0.9f);
+        return true;
+    }
+
+    private void placeTemporaryTowerChest(Block origin, BlockFace forward) {
+        if (origin == null) {
+            return;
+        }
+        origin.setType(Material.CHEST, false);
+        if (origin.getBlockData() instanceof Directional directional) {
+            directional.setFacing(forward);
+            origin.setBlockData(directional, false);
+        }
+        if (plugin == null) {
+            origin.setType(Material.AIR, false);
+            return;
+        }
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (origin.getType() == Material.CHEST) {
+                origin.setType(Material.AIR, false);
+                origin.getWorld().playSound(origin.getLocation().add(0.5, 0.5, 0.5),
+                        Sound.BLOCK_WOOD_BREAK,
+                        0.8f,
+                        1.1f);
+            }
+        }, TOWER_CHEST_TEMP_CHEST_TICKS);
+    }
+
+    private Block resolveTowerChestBlock(Block origin,
+                                         BlockFace forward,
+                                         BlockFace right,
+                                         int layer,
+                                         int row,
+                                         int column) {
+        int localRight = column - 3;
+        int localForward = row - 3;
+        int x = origin.getX() + right.getModX() * localRight + forward.getModX() * localForward;
+        int y = origin.getY() + layer;
+        int z = origin.getZ() + right.getModZ() * localRight + forward.getModZ() * localForward;
+        return origin.getWorld().getBlockAt(x, y, z);
+    }
+
+    private BlockFace resolveTowerChestForward(Player player) {
+        if (player == null) {
+            return BlockFace.SOUTH;
+        }
+        Vector direction = player.getLocation().getDirection();
+        if (Math.abs(direction.getX()) >= Math.abs(direction.getZ())) {
+            return direction.getX() >= 0.0 ? BlockFace.EAST : BlockFace.WEST;
+        }
+        return direction.getZ() >= 0.0 ? BlockFace.SOUTH : BlockFace.NORTH;
+    }
+
+    private BlockFace rotateClockwise(BlockFace face) {
+        if (face == null) {
+            return BlockFace.WEST;
+        }
+        return switch (face) {
+            case NORTH -> BlockFace.EAST;
+            case EAST -> BlockFace.SOUTH;
+            case SOUTH -> BlockFace.WEST;
+            case WEST -> BlockFace.NORTH;
+            default -> BlockFace.WEST;
+        };
     }
 
     public boolean isAbyssalRiftEntity(Entity entity) {
@@ -5235,7 +5441,7 @@ public class GameSession {
                             false,
                             true));
                 }
-                player.setHealth(Math.min(player.getHealth(), player.getMaxHealth()));
+                clampPlayerHealthToMax(player);
             }
             default -> {
             }
@@ -5399,6 +5605,9 @@ public class GameSession {
     }
 
     private void clearUpgradeEffects(Player player) {
+        if (player == null) {
+            return;
+        }
         player.removePotionEffect(PotionEffectType.HASTE);
         player.removePotionEffect(PotionEffectType.REGENERATION);
         player.removePotionEffect(PotionEffectType.SPEED);
@@ -5416,7 +5625,18 @@ public class GameSession {
         resetAttributeToDefault(player, "GRAVITY", "GENERIC_GRAVITY");
         resetAttributeToDefault(player, "MAX_HEALTH", "GENERIC_MAX_HEALTH");
         applyScale(player, DEFAULT_PLAYER_SCALE);
-        player.setHealth(Math.min(player.getHealth(), player.getMaxHealth()));
+        clampPlayerHealthToMax(player);
+    }
+
+    private void clampPlayerHealthToMax(Player player) {
+        if (player == null || player.isDead()) {
+            return;
+        }
+        double currentHealth = player.getHealth();
+        if (currentHealth <= 0.0) {
+            return;
+        }
+        player.setHealth(Math.min(currentHealth, player.getMaxHealth()));
     }
 
     private void applyEditorInvisibility(Player player) {

@@ -95,3 +95,6 @@ custom-items:
   elytra_strike:
     type: ELYTRA_STRIKE
     material: ELYTRA
+  tower_chest:
+    type: TOWER_CHEST
+    material: CHEST

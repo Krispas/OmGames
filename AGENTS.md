@@ -357,6 +357,7 @@ Supported `type` values:
 - `MAGIC_MILK`
 - `ABYSSAL_RIFT`
 - `ELYTRA_STRIKE`
+- `TOWER_CHEST`
 
 Behavior notes:
 - `FLAMETHROWER`
@@ -370,6 +371,9 @@ Behavior notes:
 - `ELYTRA_STRIKE`
   - instant effect purchase
   - equips temporary Elytra, teleports above team spawn, and cleans up on landing/death/quit/session end
+- `TOWER_CHEST`
+  - chest deployable that builds a fixed wool tower aligned to player facing
+  - uses team wool plus placed ladders and removes the center chest shortly after placement
 
 ### 2.9 Match Event Workflow
 

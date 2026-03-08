@@ -20,7 +20,8 @@ public enum CustomItemType {
     PORTABLE_SHOPKEEPER(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 30, -1.0, -1.0, -1.0, 0),
     MAGIC_MILK(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 30, -1.0, -1.0, -1.0, 0),
     ABYSSAL_RIFT(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, 30.0, -1.0, 10.0, 0),
-    ELYTRA_STRIKE(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0);
+    ELYTRA_STRIKE(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0),
+    TOWER_CHEST(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0);
 
     private final double defaultVelocity;
     private final float defaultYield;
