@@ -20,9 +20,13 @@ match-events:
       weight: 1
 lobby-parkour:
   world: bedwars
-  start: ""
-  end: ""
-  checkpoints: {}
+  start: -9 73 12
+  checkpoints:
+    '1': -15 79 -16
+    '2': 17 91 20
+    '3': 25 96 20
+    '4': -19 90 -19
+  end: -47 100 -10
 arenas:
   bedwars_1:
     anti-build:

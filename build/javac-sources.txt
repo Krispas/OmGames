@@ -11,6 +11,7 @@ C:\Code\Java\OmGames\src\main\java\krispasi\omGames\bedwars\generator\GeneratorI
 C:\Code\Java\OmGames\src\main\java\krispasi\omGames\bedwars\generator\GeneratorManager.java
 C:\Code\Java\OmGames\src\main\java\krispasi\omGames\bedwars\generator\GeneratorSettings.java
 C:\Code\Java\OmGames\src\main\java\krispasi\omGames\bedwars\generator\GeneratorType.java
+C:\Code\Java\OmGames\src\main\java\krispasi\omGames\bedwars\gui\EventSelectMenu.java
 C:\Code\Java\OmGames\src\main\java\krispasi\omGames\bedwars\gui\MapSelectMenu.java
 C:\Code\Java\OmGames\src\main\java\krispasi\omGames\bedwars\gui\RotatingItemMenu.java
 C:\Code\Java\OmGames\src\main\java\krispasi\omGames\bedwars\gui\ShopMenu.java

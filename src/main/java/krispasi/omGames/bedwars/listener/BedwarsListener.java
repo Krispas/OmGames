@@ -189,6 +189,10 @@ public class BedwarsListener implements Listener {
     private static final String HAPPY_GHAST_MOUNTED_TAG = "bw_happy_ghast_mounted";
     private static final long FIREBALL_COOLDOWN_MILLIS = 500L;
     private static final long FLAMETHROWER_COOLDOWN_MILLIS = 120L;
+    private static final double FLAMETHROWER_DEFAULT_RANGE = 6.0;
+    private static final double FLAMETHROWER_DEFAULT_SPREAD = 0.6;
+    private static final double FLAMETHROWER_HALF_ANGLE_DEGREES = 38.0;
+    private static final int FLAMETHROWER_FIRE_TICKS = 60;
     private static final long LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS = 1_000L;
     private static final long VOID_TOTEM_FALL_PROTECTION_MILLIS = 5_000L;
     private static final int NUKE_TARGET_DISTANCE = 512;
@@ -1109,7 +1113,7 @@ public class BedwarsListener implements Listener {
                 }
                 if (session.isAbyssalRiftEntity(event.getEntity())) {
                     Player attacker = resolveAttacker(event);
-                    if (session.damageAbyssalRift(event.getEntity(), attacker, event.getFinalDamage())) {
+                    if (session.damageAbyssalRift(event.getEntity(), attacker, resolveAbyssalRiftDamage(event))) {
                         event.setCancelled(true);
                     }
                     return;
@@ -1258,13 +1262,6 @@ public class BedwarsListener implements Listener {
             }
             if (!event.isCancelled()
                     && attacker != null
-                    && attacker.equals(event.getDamager())
-                    && session.isParticipant(attacker.getUniqueId())
-                    && session.isParticipant(victim.getUniqueId())) {
-                applyCustomMeleeKnockback(attacker, victim);
-            }
-            if (!event.isCancelled()
-                    && attacker != null
                     && session.isParticipant(attacker.getUniqueId())
                     && session.isParticipant(victim.getUniqueId())) {
                 TeamColor attackerTeam = session.getTeam(attacker.getUniqueId());
@@ -1295,7 +1292,7 @@ public class BedwarsListener implements Listener {
                     return;
                 }
                 if (session.isAbyssalRiftEntity(event.getEntity())) {
-                    if (session.damageAbyssalRift(event.getEntity(), null, event.getFinalDamage())) {
+                    if (session.damageAbyssalRift(event.getEntity(), null, resolveAbyssalRiftDamage(event))) {
                         event.setCancelled(true);
                     }
                     return;
@@ -1932,50 +1929,6 @@ public class BedwarsListener implements Listener {
         }
     }
 
-    private void applyCustomMeleeKnockback(Player attacker, Player victim) {
-        ShopItemDefinition definition = resolveHeldShopItem(attacker);
-        if (definition == null) {
-            return;
-        }
-        double bonus = definition.getKnockbackBonus();
-        if (bonus <= 0.0) {
-            return;
-        }
-        Vector direction = victim.getLocation().toVector().subtract(attacker.getLocation().toVector());
-        direction.setY(0.0);
-        if (direction.lengthSquared() < 0.01) {
-            direction = attacker.getLocation().getDirection().setY(0.0);
-        }
-        if (direction.lengthSquared() < 0.01) {
-            return;
-        }
-        Vector extraKnockback = direction.normalize().multiply(bonus);
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (!victim.isOnline()) {
-                    return;
-                }
-                victim.setVelocity(victim.getVelocity().add(extraKnockback));
-            }
-        }.runTask(bedwarsManager.getPlugin());
-    }
-
-    private ShopItemDefinition resolveHeldShopItem(Player player) {
-        if (player == null) {
-            return null;
-        }
-        ShopConfig config = bedwarsManager.getShopConfig();
-        if (config == null) {
-            return null;
-        }
-        String itemId = ShopItemData.getId(player.getInventory().getItemInMainHand());
-        if (itemId == null || itemId.isBlank()) {
-            return null;
-        }
-        return config.getItem(itemId);
-    }
-
     private boolean isHappyGhastSummon(CustomItemDefinition summon, org.bukkit.entity.Entity summonEntity) {
         if (summon != null && summon.getType() == CustomItemType.HAPPY_GHAST) {
             return true;
@@ -2155,8 +2108,7 @@ public class BedwarsListener implements Listener {
         if (definition == null) {
             return false;
         }
-        return definition.getType() == CustomItemType.FIREBALL
-                || definition.getType() == CustomItemType.FLAMETHROWER;
+        return definition.getType() == CustomItemType.FIREBALL;
     }
 
     private boolean activateRespawnBeacon(Player player, GameSession session, CustomItemDefinition custom) {
@@ -2197,7 +2149,7 @@ public class BedwarsListener implements Listener {
         if (uses <= 0) {
             return false;
         }
-        launchFlameProjectile(player, custom);
+        sprayFlamethrower(player, session, custom);
         uses--;
         if (uses <= 0) {
             setItemInHand(player, hand, null);
@@ -2266,12 +2218,146 @@ public class BedwarsListener implements Listener {
         return player.isSneaking() || !clicked.getType().isInteractable();
     }
 
-    private void launchFlameProjectile(Player player, CustomItemDefinition custom) {
-        Fireball fireball = player.launchProjectile(SmallFireball.class);
-        fireball.setIsIncendiary(false);
-        fireball.setYield(custom.getYield());
-        fireball.setVelocity(player.getLocation().getDirection().normalize().multiply(custom.getVelocity()));
-        fireball.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
+    private void sprayFlamethrower(Player player, GameSession session, CustomItemDefinition custom) {
+        if (player == null || session == null || custom == null) {
+            return;
+        }
+        double range = custom.getRange() > 0.0 ? custom.getRange() : FLAMETHROWER_DEFAULT_RANGE;
+        double spread = custom.getYield() > 0.0 ? custom.getYield() : FLAMETHROWER_DEFAULT_SPREAD;
+        spawnFlamethrowerParticles(player, range, spread);
+        damageFlamethrowerCone(player, session, custom, range);
+    }
+
+    private void spawnFlamethrowerParticles(Player player, double range, double spread) {
+        if (player == null) {
+            return;
+        }
+        World world = player.getWorld();
+        Location eye = player.getEyeLocation();
+        Vector forward = eye.getDirection().normalize();
+        Vector right = forward.clone().crossProduct(new Vector(0.0, 1.0, 0.0));
+        if (right.lengthSquared() < 0.001) {
+            right = new Vector(1.0, 0.0, 0.0);
+        }
+        right.normalize();
+        Vector up = right.clone().crossProduct(forward).normalize();
+        int rings = Math.max(8, (int) Math.ceil(range / 0.5));
+        for (int i = 1; i <= rings; i++) {
+            double distance = (range * i) / rings;
+            double radius = Math.max(0.18, distance * spread * 0.35);
+            Location center = eye.clone().add(forward.clone().multiply(distance));
+            world.spawnParticle(Particle.FLAME,
+                    center,
+                    4,
+                    radius * 0.35,
+                    radius * 0.2,
+                    radius * 0.35,
+                    0.01);
+            world.spawnParticle(Particle.SMOKE,
+                    center,
+                    2,
+                    radius * 0.35,
+                    radius * 0.2,
+                    radius * 0.35,
+                    0.0);
+            for (int point = 0; point < 6; point++) {
+                double angle = (Math.PI * 2.0 * point) / 6.0;
+                Vector offset = right.clone().multiply(Math.cos(angle) * radius)
+                        .add(up.clone().multiply(Math.sin(angle) * radius * 0.55));
+                world.spawnParticle(Particle.FLAME, center.clone().add(offset), 1, 0.0, 0.0, 0.0, 0.0);
+            }
+        }
+        world.playSound(player.getLocation(), Sound.ITEM_FIRECHARGE_USE, 0.7f, 1.2f);
+    }
+
+    private void damageFlamethrowerCone(Player player,
+                                        GameSession session,
+                                        CustomItemDefinition custom,
+                                        double range) {
+        Location eye = player.getEyeLocation();
+        Vector forward = eye.getDirection().normalize();
+        double minDot = Math.cos(Math.toRadians(FLAMETHROWER_HALF_ANGLE_DEGREES));
+        TeamColor attackerTeam = session.getTeam(player.getUniqueId());
+        Location searchCenter = eye.clone().add(forward.clone().multiply(range * 0.5));
+        for (org.bukkit.entity.Entity raw : player.getWorld().getNearbyEntities(searchCenter, range, range, range)) {
+            if (!(raw instanceof LivingEntity target) || target.equals(player) || !target.isValid()) {
+                continue;
+            }
+            if (!isValidFlamethrowerTarget(session, attackerTeam, target)) {
+                continue;
+            }
+            if (!isInsideFlamethrowerCone(eye, forward, target, range, minDot)) {
+                continue;
+            }
+            if (!player.hasLineOfSight(target)) {
+                continue;
+            }
+            target.setFireTicks(Math.max(target.getFireTicks(), FLAMETHROWER_FIRE_TICKS));
+            if (custom.getDamage() > 0.0) {
+                target.damage(custom.getDamage(), player);
+            }
+            applyFlamethrowerKnockback(target, forward, custom.getKnockback());
+        }
+    }
+
+    private boolean isValidFlamethrowerTarget(GameSession session,
+                                              TeamColor attackerTeam,
+                                              LivingEntity target) {
+        if (session == null || target == null) {
+            return false;
+        }
+        if (target instanceof Player victim) {
+            if (!session.isParticipant(victim.getUniqueId())
+                    || victim.getGameMode() == org.bukkit.GameMode.SPECTATOR
+                    || session.hasRespawnProtection(victim.getUniqueId())) {
+                return false;
+            }
+            TeamColor victimTeam = session.getTeam(victim.getUniqueId());
+            return attackerTeam == null || victimTeam == null || attackerTeam != victimTeam;
+        }
+        if (!isSummon(target)) {
+            return false;
+        }
+        TeamColor ownerTeam = getSummonTeam(target);
+        return attackerTeam == null || ownerTeam == null || attackerTeam != ownerTeam;
+    }
+
+    private boolean isInsideFlamethrowerCone(Location eye,
+                                             Vector forward,
+                                             LivingEntity target,
+                                             double range,
+                                             double minDot) {
+        if (eye == null || forward == null || target == null) {
+            return false;
+        }
+        Location targetLocation = target.getLocation().add(0.0, target.getHeight() * 0.5, 0.0);
+        Vector toTarget = targetLocation.toVector().subtract(eye.toVector());
+        double distance = toTarget.length();
+        if (distance <= 0.01 || distance > range) {
+            return false;
+        }
+        Vector normalized = toTarget.multiply(1.0 / distance);
+        return normalized.dot(forward) >= minDot;
+    }
+
+    private void applyFlamethrowerKnockback(LivingEntity target, Vector forward, double amount) {
+        if (target == null || forward == null || amount <= 0.0) {
+            return;
+        }
+        Vector push = forward.clone().setY(0.0);
+        if (push.lengthSquared() < 0.001) {
+            return;
+        }
+        Vector velocity = push.normalize().multiply(amount).setY(0.08);
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!target.isValid()) {
+                    return;
+                }
+                target.setVelocity(target.getVelocity().add(velocity));
+            }
+        }.runTask(bedwarsManager.getPlugin());
     }
 
     private boolean useBridgeBuilder(Player player, GameSession session, CustomItemDefinition custom) {
@@ -4407,6 +4493,25 @@ public class BedwarsListener implements Listener {
             return player;
         }
         return null;
+    }
+
+    private double resolveAbyssalRiftDamage(EntityDamageEvent event) {
+        if (event == null) {
+            return 0.0;
+        }
+        double damage = Math.max(event.getFinalDamage(), event.getDamage());
+        if (damage > 0.0) {
+            return damage;
+        }
+        if (event instanceof EntityDamageByEntityEvent byEntity) {
+            if (byEntity.getDamager() instanceof Player) {
+                return 1.0;
+            }
+            if (byEntity.getDamager() instanceof Projectile) {
+                return 1.0;
+            }
+        }
+        return 0.0;
     }
 
     private void safeHandle(String context, Runnable action) {

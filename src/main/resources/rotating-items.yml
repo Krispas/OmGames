@@ -161,6 +161,9 @@ shop:
         lore:
           - "Deploy a 10-block aura."
           - "Buffs allies and weakens enemies."
+        limit:
+          scope: TEAM
+          amount: 4
         custom-item: abyssal_rift
       elytra:
         material: ELYTRA

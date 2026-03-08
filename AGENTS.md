@@ -1,130 +1,152 @@
 # AGENTS.md
 
-## 1) Purpose
+## 1) Repo Rules
 
-This document is the operational handbook for agents working in `OmGames`.
-Make sure u you understand the project's goals and architecture before contributing. 
-And u keep it up to date with the latest changes.
-Use it to decide where changes belong, how runtime state flows, and how to safely modify BedWars behavior without regressions.
+### 1.1 Purpose
 
-Primary goal: keep BedWars gameplay stable while enabling fast config-first iteration.
+This file is the operational handbook for agents working in `OmGames`.
+Update `AGENTS.md` if project-specific workflow or schema changed.
+Read it before changing code. Keep it updated when project-specific workflow, config schema, or runtime rules change.
 
-## 2) Project Snapshot
+Primary goal: keep BedWars stable while allowing fast config-first iteration.
+
+### 1.2 Project Snapshot
 
 - Project type: Bukkit/Paper plugin
-- Active game mode: BedWars
 - Main package: `krispasi.omGames`
+- Active game mode: BedWars
 - Java target: 21
 - API target: Paper `1.21.11-R0.1-SNAPSHOT`
 - Build tool: Maven (`mvn clean package`)
 - Plugin main class: `krispasi.omGames.OmGames`
 - Bukkit command root: `/bw`
 
-## 3) Top-Level Layout
+### 1.3 Global Rules
+
+- Prefer config edits over Java changes when the change is balance or content tuning.
+- Do not add automatic config or file migration logic.
+- If defaults need to change, update the resource files in `src/main/resources/`.
+- If an existing server config needs the new defaults, the expected workflow is to delete that file and let the plugin recreate it.
+- Do not touch `OmVeinsAPI`.
+- Do not use `OmVeinsAPI` during server startup.
+
+## 2) BedWars
+
+### 2.1 Top-Level Layout
 
 - `src/main/java/krispasi/omGames/OmGames.java`
   - Plugin bootstrap and shutdown.
-  - Ensures BedWars config files exist in plugin data folder.
-  - Loads managers/services and registers command + listener.
+  - Ensures BedWars config files exist in the plugin data folder.
+  - Loads managers/services and registers the command and listener.
 
 - `src/main/java/krispasi/omGames/bedwars/BedwarsManager.java`
   - BedWars service coordinator.
-  - Loads arenas/shop/custom items/stat services/quick buy.
-  - Owns active `GameSession` lifecycle.
-  - Applies config migrations for `bedwars.yml`, `shop.yml`, `rotating-items.yml`, and `custom-items.yml`.
+  - Loads arenas, shop config, custom items, stats, quick-buy, and leaderboards.
+  - Owns the single active `GameSession`.
 
 - `src/main/java/krispasi/omGames/bedwars/game/GameSession.java`
-  - Match state machine and in-game rules.
-  - Team assignment, generators, respawns, beds, upgrades, traps.
-  - Shop purchase behavior, rotating items, world border, scoreboard.
+  - Match state machine and main BedWars rules owner.
+  - Handles gameplay, rotating items, match events, upgrades, beds, respawns, and scoreboards.
 
 - `src/main/java/krispasi/omGames/bedwars/listener/BedwarsListener.java`
-  - Main event listener for BedWars.
-  - Handles GUI clicks, combat checks, block rules, custom item interactions, projectile logic, death/respawn hooks, and anti-exploit controls.
+  - BedWars event plumbing.
+  - Handles Bukkit events and delegates actual game rules into `GameSession`.
 
 - `src/main/java/krispasi/omGames/bedwars/setup/BedwarsSetupManager.java`
-  - `/bw setup` authoring workflow.
+  - `/bw setup` workflow.
   - Writes arena metadata back to `bedwars.yml`.
 
 - `src/main/java/krispasi/omGames/bedwars/config/BedwarsConfigLoader.java`
-  - Parser/validator for `bedwars.yml` arena model.
+  - Parser/validator for `bedwars.yml`.
 
 - `src/main/java/krispasi/omGames/bedwars/shop/*`
-  - Shop model, loader, quick-buy persistence, purchase behaviors.
+  - Shop model, loader, quick-buy persistence, purchase behavior.
 
 - `src/main/java/krispasi/omGames/bedwars/item/*`
-  - Custom item model/loader and item metadata carriers.
+  - Custom item model, loader, and item metadata.
 
 - `src/main/java/krispasi/omGames/bedwars/stats/*`
-  - Player stat persistence + lobby leaderboard display.
+  - BedWars stat persistence and lobby leaderboard display.
+
+- `src/main/java/krispasi/omGames/bedwars/lobby/BedwarsLobbyParkour.java`
+  - Lobby parkour runtime.
+  - Tracks checkpoints, control items, and next-target guidance.
 
 - `src/main/resources/*.yml`
-  - Default embedded configs copied to plugin data folder on first run.
+  - Default configs copied into the plugin data folder on first run.
 
-## 4) Runtime Lifecycle
+### 2.2 Runtime Lifecycle
 
-### 4.1 onEnable Boot Sequence (`OmGames`)
+#### 2.2.1 onEnable
 
-1. Ensure/migrate configs into `<pluginData>/Bedwars/`:
+1. Ensure these files exist inside `plugins/OmGames/Bedwars/`:
    - `bedwars.yml`
    - `shop.yml`
    - `rotating-items.yml`
    - `custom-items.yml`
 2. Construct `BedwarsManager`.
-3. Load runtime data:
+3. Load:
    - arenas
    - custom items
-   - shop config (including rotating merge)
-   - quick buy DB
+   - shop config
+   - rotating config merge
+   - quick-buy DB
    - stats DB
-4. Start lobby leaderboard ticker.
+4. Start lobby and parkour leaderboards.
 5. Construct `BedwarsSetupManager`.
-6. Register `/bw` executor/tab completer.
+6. Register `/bw`.
 7. Register `BedwarsListener`.
 
-### 4.2 onDisable
+#### 2.2.2 onDisable
 
 - `BedwarsManager.shutdown()`:
   - stops active session
-  - stops leaderboard
-  - closes quick-buy DB
-  - closes stats DB
+  - stops leaderboards
+  - shuts down quick-buy DB
+  - shuts down stats DB
   - clears dropped items in loaded arena worlds
 
-## 5) BedWars Service Ownership (Who Owns What)
+### 2.3 Ownership Rules
 
 - `BedwarsManager` owns:
-  - arena catalog (`Map<String, Arena>`)
+  - arena catalog
   - active `GameSession`
-  - loaded `ShopConfig`
-  - loaded `CustomItemConfig`
+  - `ShopConfig`
+  - `CustomItemConfig`
   - `QuickBuyService`
   - `BedwarsStatsService`
-  - `BedwarsLobbyLeaderboard`
+  - lobby/parkour leaderboards
 
-- `GameSession` owns match-scoped runtime data:
-  - assignments, eliminated players/teams
-  - bed states and tracked bed blocks
+- `GameSession` owns match-scoped runtime:
+  - assignments
+  - eliminated players and teams
+  - beds and bed blocks
   - placed blocks and rollback items
-  - respawn timers/protection
+  - respawns and respawn protection
   - combat tags
-  - team upgrades/traps
-  - shop NPC tracking
-  - scoreboard lifecycle
-  - rotating item selection state
+  - team upgrades and traps
+  - shop NPCs
+  - sidebar/scoreboard state
+  - rotating selection
+  - match events
 
-- `BedwarsListener` should delegate to `GameSession` for game logic whenever possible.
+- `BedwarsListener` should stay as Bukkit event translation and call into `GameSession` for rules.
 
-## 6) Command Surface (`/bw`)
+- `BedwarsLobbyParkour` owns lobby parkour runtime:
+  - active run state
+  - checkpoint progression
+  - temporary hotbar control items
+  - direction compass target updates
+
+### 2.4 Command Surface
 
 Implemented in `BedwarsCommand`.
 
-Public-use subcommands:
+Public subcommands:
 - `/bw stats`
-- `/bw quick_buy` (also accepts `quick-buy`, and typo aliases `quck-buy`, `quck_buy`)
+- `/bw quick_buy`
 
-OP/admin subcommands (permission-gated):
-- `/bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]`
+Admin subcommands:
 - `/bw start`
 - `/bw test start`
 - `/bw stop`
@@ -138,15 +160,14 @@ OP/admin subcommands (permission-gated):
 - `/bw reload`
 - `/bw setup new <arena>`
 - `/bw setup <arena> [key]`
+- `/bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]`
 
 Permissions declared in `plugin.yml`:
 - `omgames.bw.start`
 - `omgames.bw.setup`
 - `omgames.bw.reload`
 
-Note: command implementation currently includes subcommands not fully reflected in `plugin.yml` usage text.
-
-## 7) GameSession State Machine
+### 2.5 GameSession State Machine
 
 `GameState` values:
 - `IDLE`
@@ -161,11 +182,12 @@ Important entrypoints:
 - `start(plugin, initiator, countdownSeconds)`
 - `stop()`
 
-Operator/debug helpers:
+Operator helpers:
 - `forceJoin(player, team)`
-- `reviveBed(team)` (restores the bed and re-adds the team to `teamsInMatch` if needed)
+- `reviveBed(team)`
 - `skipNextPhase()`
-- `addEditor/removeEditor`
+- `addEditor(player)`
+- `removeEditor(player)`
 
 High-signal rule APIs:
 - `handlePlayerDeath`
@@ -176,9 +198,9 @@ High-signal rule APIs:
 - `handlePlayerQuit`
 - `handlePlayerJoin`
 
-## 8) Data Folder Layout (Runtime)
+### 2.6 Runtime Data Layout
 
-All BedWars files live in:
+BedWars runtime files live in:
 - `plugins/OmGames/Bedwars/`
 
 Files:
@@ -189,12 +211,11 @@ Files:
 - `quickbuy.db`
 - `bedwars-stats.db`
 
-Legacy migration behavior:
-- If old files exist at `plugins/OmGames/<name>.yml`, they are moved into `plugins/OmGames/Bedwars/<name>.yml` on startup.
+No automatic config/file migration is expected.
 
-## 9) SQLite Schemas
+### 2.7 SQLite
 
-### 9.1 quickbuy.db (`QuickBuyService`)
+#### 2.7.1 `quickbuy.db`
 
 Table: `quick_buy`
 - `player_uuid TEXT NOT NULL`
@@ -205,7 +226,7 @@ Table: `quick_buy`
 Special marker:
 - `__empty__` means intentional empty quick-buy slot.
 
-### 9.2 bedwars-stats.db (`BedwarsStatsService`)
+#### 2.7.2 `bedwars-stats.db`
 
 Table: `bedwars_stats`
 - `player_uuid TEXT PRIMARY KEY`
@@ -216,14 +237,12 @@ Table: `bedwars_stats`
 - `final_deaths INTEGER NOT NULL`
 - `games_played INTEGER NOT NULL`
 - `beds_broken INTEGER NOT NULL`
-- `parkour_best_time_ms INTEGER NOT NULL` (default `-1`)
-- `parkour_best_checkpoint_uses INTEGER NOT NULL` (default `0`)
+- `parkour_best_time_ms INTEGER NOT NULL`
+- `parkour_best_checkpoint_uses INTEGER NOT NULL`
 
-Service auto-adds missing columns for legacy DBs (`deaths`, `final_kills`, `final_deaths`, `parkour_best_time_ms`, `parkour_best_checkpoint_uses`).
+### 2.8 Config Guide
 
-## 10) Config Guide
-
-## 10.1 `bedwars.yml`
+#### 2.8.1 `bedwars.yml`
 
 Root keys:
 - `leaderboard`
@@ -232,78 +251,12 @@ Root keys:
 - `lobby-parkour`
 - `arenas`
 
-Leaderboard accepted forms:
-- Flat string: `"world x y z"` or `"x y z"`
-- Section:
-  - `leaderboard.world`
-  - `leaderboard.x`
-  - `leaderboard.y`
-  - `leaderboard.z`
-  - optional `leaderboard.location` fallback parser
-
-Arena keys (canonical):
-- `world`
-- `center`
-- `center-radius`
-- `game-lobby`
-- `map-lobby`
-- `corner_1`
-- `corner_2`
-- `base-radius`
-- `anti-build.base-generator-radius`
-- `anti-build.advanced-generator-radius`
-- `beds`
-- `Generators` or `generators`
-- `Base_Generators` (canonical setup output)
-- `Spawns` (canonical setup output)
-- `Shops` (canonical setup output)
-- `generator-settings`
-- `event-times`
-
-Arena string formats:
-- Block point: `x y z`
-- Bed pair: `headX headY headZ, footX footY footZ`
-- Shop location: `x y z yaw`
-  - yaw supports numeric or cardinal (`NORTH`, `SOUTH`, `EAST`, `WEST`, and short forms)
-
-Generator naming conventions:
-- Base: `base_gen_<team>` (also tolerant of some legacy aliases)
-- Diamond: `diamond_1`, `diamond_2`, ...
-- Emerald: `emerald_1`, `emerald_2`, ...
-
-Spawn keys:
-- `base_<team>` under `Spawns`
-
-Shop keys:
-- Under `Shops.<team>.main`
-- Under `Shops.<team>.upgrades`
-
-`generator-settings` expected list lengths:
-- `base-forge.iron.intervals-seconds`: 5
-- `base-forge.iron.amounts`: 5
-- `base-forge.iron.caps`: 5
-- `base-forge.gold.intervals-seconds`: 5
-- `base-forge.gold.amounts`: 5
-- `base-forge.gold.caps`: 5
-- `base-forge.emerald.intervals-seconds`: 5
-- `base-forge.emerald.amounts`: 5
-- `base-forge.emerald.caps`: 5
-- `diamond.intervals-seconds`: 3
-- `emerald.intervals-seconds`: 3
-
-`event-times` fields (seconds):
-- `tier-2`
-- `tier-3`
-- `bed-destruction`
-- `sudden-death`
-- `game-end`
-
 `match-events` fields:
 - `enabled`
 - `chance-percent`
 - `events.<event-id>.weight`
 
-Supported `match-events.events` ids:
+Supported event ids:
 - `speedrun`
 - `benevolent-upgrades`
 - `long-arms`
@@ -312,21 +265,20 @@ Supported `match-events.events` ids:
 - `in-this-economy`
 - `april-fools`
 
-### 10.2 `shop.yml`
+Arena timing fields:
+- `event-times.tier-2`
+- `event-times.tier-3`
+- `event-times.bed-destruction`
+- `event-times.sudden-death`
+- `event-times.game-end`
 
-Root: `shop`
+#### 2.8.2 `shop.yml`
 
-Sections:
+Root:
 - `shop.categories`
 - `shop.items`
 
-Category fields:
-- `title`
-- `icon`
-- `size` (normalized to 9..54 and multiple of 9)
-- `entries` (`itemId: slot`)
-
-Item fields (common):
+Common item fields:
 - `material`
 - `amount`
 - `cost.material`
@@ -339,69 +291,40 @@ Item fields (common):
 - `custom-item`
 - `knockback-bonus`
 - `disable-after-sudden-death`
-- `limit.scope` (`PLAYER` or `TEAM`)
+- `limit.scope`
 - `limit.amount`
 - `enchants`
 - `potion-effects`
 
-`knockback-bonus` notes:
-- Optional decimal extra melee velocity applied by listener-side combat handling.
-- Intended for cases where vanilla enchant levels are too coarse (for example, approximating "Knockback 1.5").
+Notes:
+- `knockback-bonus` adds an `ATTACK_KNOCKBACK` item attribute modifier on the held weapon.
+- Use config changes for shop balancing first.
 
-Special item fields:
-- Fireworks (`material: FIREWORK_ROCKET`):
-  - `firework.power`
-  - `firework.effect.type`
-  - `firework.effect.colors`
-  - `firework.effect.fade-colors`
-  - `firework.effect.flicker`
-  - `firework.effect.trail`
-  - `firework.explosion.power`
-  - `firework.explosion.damage`
-  - `firework.explosion.knockback`
+#### 2.8.3 `rotating-items.yml`
 
-Position override support:
-- item-local:
-  - `position.line`
-  - `position.column` (or typo fallback `position.collum`)
+Same schema as `shop.yml`.
 
-Material aliases normalized by loader:
-- `GOLD` -> `GOLD_INGOT`
-- `IRON` -> `IRON_INGOT`
-
-Behavior inference can be derived from category/material if omitted.
-
-### 10.3 `rotating-items.yml`
-
-Same schema as `shop.yml` and merged into the base shop config at load.
-
-Category split:
+Categories:
 - `shop.categories.rotating`
-  - rotating item-shop entries only
+  - rotating shop items
 - `shop.categories.rotating_upgrades`
-  - rotating team-upgrade entries used by upgrade availability/rotation selection
-  - not intended as a normal item-shop tab
+  - rotating team upgrades
+  - not meant to be a normal visible shop tab
 
-Rotating item field notes:
-- `disable-after-sudden-death`
-  - optional boolean on rotating entries
-  - if `true`, the entry is unavailable once sudden death starts
-  - item displays should show a red lore warning
+Rotating item notes:
+- `disable-after-sudden-death: true`
+  - blocks that entry after sudden death
+  - UI should show a red warning lore
 
 Merge behavior:
 - `ShopConfig.merge(base, rotating)`
-- Rotating categories/items augment base shop entries.
 
-Migration behavior in manager:
-- separates legacy mixed rotating upgrade entries into `rotating_upgrades`
-- prunes invalid legacy rotating upgrades
-- ensures `totem_of_undying` exists with default lore + limit
+#### 2.8.4 `custom-items.yml`
 
-### 10.4 `custom-items.yml`
+Root:
+- `custom-items`
 
-Root: `custom-items`
-
-Definition fields:
+Common definition fields:
 - `type`
 - `material`
 - `velocity`
@@ -435,35 +358,38 @@ Supported `type` values:
 - `ABYSSAL_RIFT`
 - `ELYTRA_STRIKE`
 
-Loader validation notes:
-- `bridge-width` coerced to odd and minimum 1.
-- `max-blocks` clamped to non-negative default behavior.
-- IDs normalized to lowercase.
-
 Behavior notes:
+- `FLAMETHROWER`
+  - cone attack in front of the player
+  - uses particles for the area preview and directly damages/ignites targets in the cone
 - `ABYSSAL_RIFT`
-  - deploys a fixed `Interaction` hitbox plus `ItemDisplay`
-  - default display model is hardcoded to `om:rift1`
-  - `health` and `range` drive the deployable stats
+  - fixed deployable aura
+  - uses model `om:rift1`
+  - has separate hitbox/display/nameplate entities
+  - health/range come from config
 - `ELYTRA_STRIKE`
-  - intended as an instant-purchase effect, not a held right-click item
-  - equips a temporary Elytra, teleports above team spawn, and cleans up on landing/quit/death/session end
+  - instant effect purchase
+  - equips temporary Elytra, teleports above team spawn, and cleans up on landing/death/quit/session end
 
-## 11) Setup Workflow (`/bw setup`)
+### 2.9 Match Event Workflow
+
+Prestart event control lives in the team-assign menu:
+- left-click `Game Events` to enable or disable events for that match
+- right-click `Game Events` to force a specific event or switch back to `Auto Random`
+
+Forced event selection is prestart-only state and should not be conflated with the runtime `activeMatchEvent`.
+
+### 2.10 Setup Workflow
 
 Manager: `BedwarsSetupManager`
 
 Create arena:
 - `/bw setup new <arenaId>`
-- seeds default sections for all teams and generator/event defaults
 
 Status:
-- `/bw setup <arenaId>` prints missing/completed keys
+- `/bw setup <arenaId>`
 
-Apply key:
-- `/bw setup <arenaId> <key>`
-
-Accepted key families include:
+Apply keys:
 - `world`
 - `center`
 - `center-radius <int>`
@@ -482,163 +408,99 @@ Accepted key families include:
 - `generator.diamond.<n>`
 - `generator.emerald.<n>`
 
-Bed setup behavior:
-- First call stores one bed block position.
-- Second call stores paired block.
-- If player is standing on actual bed block, setup auto-detects head/foot and writes both immediately.
+### 2.11 Placement Rules
 
-## 12) Code Placement Rules (Critical)
+Put changes here:
+- match rules and lifecycle -> `GameSession`
+- event plumbing -> `BedwarsListener`
+- setup command behavior -> `BedwarsSetupManager`
+- `bedwars.yml` parsing -> `BedwarsConfigLoader`
+- shop parsing/model -> `shop/*`
+- custom item parsing/model -> `item/*`
 
-Config-first preference:
-- If balance/item tuning can be done in YAML, edit YAML instead of Java.
+Do not push BedWars rules into `OmGames`.
 
-Where to put gameplay logic:
-- Match rules and lifecycle -> `GameSession`
-- Event gating and Bukkit event translation -> `BedwarsListener`
-- Setup command behavior -> `BedwarsSetupManager`
-- Parsing and backward compatibility for `bedwars.yml` -> `BedwarsConfigLoader`
-- Shop parsing/behavior metadata -> `shop/*`
-- Custom item config parsing -> `item/*`
+### 2.12 High-Risk Invariants
 
-Do not scatter BedWars rules into `OmGames` main plugin class.
+- Only one active `GameSession` should exist at a time.
+- `stop()` cleanup must remove tasks, entities, sidebars, displays, and match-only state.
+- Team lookup is case-insensitive through `TeamColor.fromKey`, but config keys should stay canonical lowercase.
+- Keep BedWars config parsing tolerant of legacy casing and aliases where the loaders already support them.
+- Shop + rotating config are both active after reload because of merge behavior.
+- If stats are disabled for a session, progression/wins should not be awarded.
 
-## 13) High-Risk Areas and Invariants
+### 2.13 Common Recipes
 
-- Active session ownership:
-  - Only one active `GameSession` should exist in `BedwarsManager`.
-  - Starting a new session stops previous session first.
+#### 2.13.1 Rebalance a shop item
 
-- Session stop safety:
-  - Ensure every created task/entity/scoreboard state is cleaned on `stop()`.
+1. Edit `shop.yml`.
+2. Confirm category entry slot exists.
+3. `/bw reload`
+4. Test the purchase path in game.
 
-- Team keys:
-  - Team lookup is case-insensitive by `TeamColor.fromKey`, but config should remain canonical lowercase keys (`red`, `blue`, etc).
+#### 2.13.2 Add a rotating item
 
-- Config casing:
-  - Loader accepts casing variants (`Spawns`/`spawns`, `Generators`/`generators`, `Base_Generators` variants).
-  - Keep newly written keys consistent with setup manager canonical names.
+1. Add the item to `rotating-items.yml`.
+2. Add the category entry under `shop.categories.rotating.entries`.
+3. If needed, add a linked custom item in `custom-items.yml`.
+4. `/bw reload`
+5. Validate in the rotating shop tab.
 
-- Shop/rotating merge:
-  - Changes to `shop.yml` and `rotating-items.yml` are both active after reload.
+#### 2.13.3 Tune a custom item
 
-- Stats writes:
-  - Winning team gets wins only when stats are enabled for the session.
+1. Edit `custom-items.yml`.
+2. Keep the same `type` unless behavior is intentionally changing.
+3. `/bw reload`
+4. Test spawn, impact, cleanup, and edge cases.
 
-## 14) Typical Change Recipes
-
-### 14.1 Rebalance a shop item
-
-1. Edit `shop.yml` (`shop.items.<id>` cost/amount/lore/behavior).
-2. Ensure category entry exists under `shop.categories.<category>.entries`.
-3. Reload via `/bw reload`.
-4. Verify purchase, price, and inventory behavior in-game.
-
-### 14.2 Add a rotating item
-
-1. Add item under `rotating-items.yml -> shop.items.rotating.<id>`.
-2. Add slot under `shop.categories.rotating.entries.<id>`.
-3. If custom behavior needed, define `custom-item` and ensure matching definition exists in `custom-items.yml`.
-4. `/bw reload`, then open rotating category and validate.
-
-### 14.3 Tune custom item physics/damage
-
-1. Edit `custom-items.yml` definition.
-2. Keep `type` unchanged unless behavior class intentionally changes.
-3. `/bw reload`.
-4. Validate projectile spawn, impact, cooldown interactions, and edge cases (void, world change, death cleanup).
-
-### 14.4 Modify generator pacing
-
-1. Edit `bedwars.yml -> arenas.<id>.generator-settings`.
-2. Preserve expected list lengths.
-3. Reload and verify spawn cadence in live match.
-
-### 14.5 Change respawn or event timing
-
-1. Edit `bedwars.yml -> arenas.<id>.event-times`.
-2. Values are seconds.
-3. Start test match and verify phase broadcasts and state transitions.
-
-### 14.5a Tune weighted match events
+#### 2.13.4 Tune match events
 
 1. Edit `bedwars.yml -> match-events`.
-2. Set `enabled`, `chance-percent`, and per-event `weight`.
-3. In the team-assign menu:
-   - left-click `Game Events` to enable or disable events for that match
-   - right-click `Game Events` to force a specific event or return to `Auto Random`
-4. Start a match and verify the prestart event state + start title.
+2. Adjust `enabled`, `chance-percent`, and weights.
+3. Start a match from the team menu.
+4. Verify toggle, force-select, title, and event effects.
 
-### 14.6 Add or repair arena setup
+### 2.14 Validation
 
-1. Use `/bw setup new <arena>` if new.
-2. Fill required points with `/bw setup <arena> <key>`.
-3. Confirm all teams have bed/spawn/base generator/shop entries.
-4. Use `/bw tp <arena>` and run a dry match.
-
-## 15) Build and Validation
-
-Build:
-- `mvn clean package`
-
-Minimal validation pass after gameplay edits:
+After gameplay edits:
 1. Plugin starts without stack traces.
-2. `/bw start` map select opens.
-3. Team assignment or team pick starts match.
-4. Beds break and elimination logic behaves correctly.
-5. Shop purchase paths work (quick-buy + category + upgrades).
-6. At least one custom item used successfully.
-7. `/bw reload` works mid-server without corrupting session manager state.
-8. `/bw stop` fully cleans up runtime artifacts.
+2. `/bw start` opens map select.
+3. Team setup starts a match correctly.
+4. Beds, elimination, respawns, and phase changes still work.
+5. Shop purchase paths work.
+6. At least one custom item works.
+7. `/bw reload` still works.
+8. `/bw stop` cleans everything up.
 
-Validation after setup/config edits:
-1. `bedwars.yml` loads all intended arenas.
-2. Teleport (`/bw tp <arena>`) lands in expected lobby/center fallback.
-3. Shops face expected direction using yaw/cardinal strings.
-4. Generator locations and anti-build radius are honored.
+After config edits:
+1. Relevant file reloads without warnings.
+2. Config-driven items/upgrades/events appear where expected.
+3. Existing runtime flows still behave correctly.
 
-Validation for persistence:
-1. Quick-buy edits persist after reconnect/restart.
-2. Stats increment and leaderboard updates near anchor.
-3. Parkour finish best-time/checkpoint records persist to `bedwars-stats.db`.
+### 2.15 Troubleshooting
 
-## 16) Troubleshooting Quick Notes
+- `No arenas configured`
+  - invalid or missing `arenas` section in `bedwars.yml`
 
-- "No arenas configured":
-  - `bedwars.yml` missing/invalid `arenas` section or parse failures.
+- `World not loaded`
+  - arena world exists in config but is not loaded on the server
 
-- "World not loaded":
-  - arena world name exists in config but world is not loaded by server.
+- shop item missing
+  - missing category entry, invalid material, or loader dropped the entry
 
-- Shop item not visible:
-  - missing category entry slot, invalid material, or parsed item dropped by loader warning.
+- custom item not working
+  - missing `custom-item` link or missing matching definition in `custom-items.yml`
 
-- Custom item not firing:
-  - missing `custom-item` link on shop item, or missing matching id in `custom-items.yml`.
+- forced event not applying
+  - verify the match was started from the same prestart session where the force selection was made
+  - verify events are not disabled for that match
 
-- Leaderboard not visible:
-  - no nearby non-spectator players, anchor world not resolved, or no stats rows yet.
+### 2.16 Contributor Checklist
 
-## 17) Contributor Checklist for Agents
-
-Before finishing work:
-1. Change is in correct ownership file.
-2. No hardcoded balance values were added when config can own them.
-3. Backward compatibility preserved for existing config casing/aliases where relevant.
-4. Runtime cleanup paths remain intact (tasks/entities/scoreboards).
-5. Command or setup UX text updated if behavior changed.
-6. Manual validation steps were run or explicitly called out as not run.
-7. `AGENTS.md` was updated if config schema, operational workflow, or project-specific agent rules changed.
-
-## 18) Short Rule of Thumb
-
-- Prefer config edits for tuning.
-- Prefer `GameSession` for rules.
-- Prefer `BedwarsListener` for event plumbing.
-- Keep setup/config parser tolerant of legacy input.
-- Never leave scheduled tasks or spawned entities unmanaged at session end.
-
-
-## 19) OmVeinsAPI
-
-- DO NOT TOUCH THAT CODE in Omveins API.
-- Do not use this API during server startup!
+Before finishing:
+1. Put the change in the correct ownership file.
+2. Prefer config over Java for tuning.
+3. Do not add migration logic.
+4. Preserve cleanup paths.
+5. Update command or UI text if behavior changed.
+6. Run validation or explicitly state what was not run.

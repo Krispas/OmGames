@@ -10,9 +10,13 @@ import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.FireworkEffect;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -206,6 +210,14 @@ public class ShopItemDefinition {
         }
         if (!lines.isEmpty()) {
             meta.lore(lines);
+        }
+        if (!includeCost && knockbackBonus > 0.0) {
+            meta.addAttributeModifier(Attribute.ATTACK_KNOCKBACK,
+                    new AttributeModifier(
+                            new NamespacedKey("omgames", "attack_knockback_" + id.toLowerCase(java.util.Locale.ROOT)),
+                            knockbackBonus,
+                            AttributeModifier.Operation.ADD_NUMBER,
+                            EquipmentSlotGroup.MAINHAND));
         }
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         ShopItemData.apply(meta, id);

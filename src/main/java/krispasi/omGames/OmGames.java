@@ -68,16 +68,6 @@ public final class OmGames extends JavaPlugin {
         if (target.exists()) {
             return;
         }
-        java.io.File legacy = new java.io.File(dataFolder, name);
-        if (legacy.exists()) {
-            try {
-                java.nio.file.Files.move(legacy.toPath(), target.toPath(),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                return;
-            } catch (java.io.IOException ex) {
-                getLogger().warning("Failed to move " + name + " into Bedwars/: " + ex.getMessage());
-            }
-        }
         try (java.io.InputStream input = getResource(name)) {
             if (input == null) {
                 return;

@@ -72,6 +72,7 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Villager;
@@ -123,20 +124,23 @@ public class GameSession {
     public static final String CREEPING_CREEPER_TAG = "bw_creeping_creeper";
     public static final String ABYSSAL_RIFT_TAG = "bw_abyssal_rift";
     public static final String ABYSSAL_RIFT_DISPLAY_TAG = "bw_abyssal_rift_display";
+    public static final String ABYSSAL_RIFT_NAME_TAG = "bw_abyssal_rift_nameplate";
     public static final String ELYTRA_STRIKE_ACTIVE_ITEM_ID = "elytra_strike_active";
     private static final double DEFAULT_PLAYER_SCALE = 1.0;
     private static final double SCALE_DOWN_TIER_ONE = 0.9;
     private static final double SCALE_DOWN_TIER_TWO = 0.8;
-    private static final double APRIL_FOOLS_SCALE_MULTIPLIER = 0.1;
+    private static final double APRIL_FOOLS_SCALE_MULTIPLIER = 0.5;
     private static final double LONG_ARMS_RANGE_BONUS = 10.0;
     private static final double BLOOD_MOON_HEALTH_MULTIPLIER = 0.5;
     private static final double MOON_BIG_JUMP_MULTIPLIER = 2.5;
-    private static final double BLOOD_MOON_LIFESTEAL_RATIO = 0.25;
+    private static final double BLOOD_MOON_LIFESTEAL_RATIO = 1.0;
     private static final int ABYSSAL_RIFT_AURA_INTERVAL_TICKS = 20;
     private static final int ABYSSAL_RIFT_EFFECT_DURATION_TICKS = 40;
     private static final float ABYSSAL_RIFT_HITBOX_WIDTH = 1.0f;
     private static final float ABYSSAL_RIFT_HITBOX_HEIGHT = 2.0f;
     private static final double ABYSSAL_RIFT_DISPLAY_Y_OFFSET = 1.5;
+    private static final double ABYSSAL_RIFT_NAME_Y_OFFSET = 2.35;
+    private static final double ABYSSAL_RIFT_HEALTH_Y_OFFSET = 2.1;
     private static final int ELYTRA_STRIKE_ALTITUDE = 300;
     private static final int ELYTRA_STRIKE_REGEN_DURATION_TICKS = 20;
     private static final int ELYTRA_STRIKE_REGEN_AMPLIFIER = 9;
@@ -1488,11 +1492,11 @@ public class GameSession {
         });
         ItemDisplay display = world.spawn(base, ItemDisplay.class, entity -> {
             entity.setPersistent(false);
-            entity.setInvulnerable(true);
+            entity.setInvulnerable(false);
             entity.setGravity(false);
             entity.addScoreboardTag(ABYSSAL_RIFT_DISPLAY_TAG);
             entity.setBillboard(Display.Billboard.FIXED);
-            entity.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
+            entity.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
             entity.setShadowRadius(0.0f);
             entity.setShadowStrength(0.0f);
             entity.setDisplayWidth(1.0f);
@@ -1506,10 +1510,20 @@ public class GameSession {
         });
         double health = custom.getHealth() > 0.0 ? custom.getHealth() : 30.0;
         double radius = custom.getRange() > 0.0 ? custom.getRange() : 10.0;
-        AbyssalRiftState state = new AbyssalRiftState(interaction.getUniqueId(), display.getUniqueId(), team, health, radius);
+        ArmorStand titleStand = spawnAbyssalRiftNameStand(base.clone().add(0.0, ABYSSAL_RIFT_NAME_Y_OFFSET, 0.0));
+        ArmorStand healthStand = spawnAbyssalRiftNameStand(base.clone().add(0.0, ABYSSAL_RIFT_HEALTH_Y_OFFSET, 0.0));
+        AbyssalRiftState state = new AbyssalRiftState(interaction.getUniqueId(),
+                display.getUniqueId(),
+                titleStand != null ? titleStand.getUniqueId() : null,
+                healthStand != null ? healthStand.getUniqueId() : null,
+                team,
+                health,
+                health,
+                radius);
         abyssalRifts.put(interaction.getUniqueId(), state);
         abyssalRiftEntityLinks.put(interaction.getUniqueId(), interaction.getUniqueId());
         abyssalRiftEntityLinks.put(display.getUniqueId(), interaction.getUniqueId());
+        updateAbyssalRiftNameplate(state);
         BukkitTask task = new BukkitRunnable() {
             @Override
             public void run() {
@@ -1557,7 +1571,9 @@ public class GameSession {
                     0.25,
                     0.25,
                     0.0);
+            interaction.getWorld().playSound(interaction.getLocation(), Sound.ENTITY_ARMOR_STAND_HIT, 0.7f, 0.8f);
         }
+        updateAbyssalRiftNameplate(state);
         if (state.health() <= 0.0) {
             destroyAbyssalRift(interactionId, true);
         }
@@ -1586,6 +1602,7 @@ public class GameSession {
             destroyAbyssalRift(interactionId, false);
             return;
         }
+        updateAbyssalRiftNameplate(state);
         Location center = interaction.getLocation();
         double radiusSquared = state.radius() * state.radius();
         for (UUID playerId : assignments.keySet()) {
@@ -1644,6 +1661,66 @@ public class GameSession {
         return stack;
     }
 
+    private ArmorStand spawnAbyssalRiftNameStand(Location location) {
+        if (location == null || location.getWorld() == null) {
+            return null;
+        }
+        return location.getWorld().spawn(location, ArmorStand.class, stand -> {
+            stand.setInvisible(true);
+            stand.setMarker(true);
+            stand.setSmall(true);
+            stand.setGravity(false);
+            stand.setCustomNameVisible(true);
+            stand.setInvulnerable(true);
+            stand.setCollidable(false);
+            stand.addScoreboardTag(ABYSSAL_RIFT_NAME_TAG);
+        });
+    }
+
+    private void updateAbyssalRiftNameplate(AbyssalRiftState state) {
+        if (state == null) {
+            return;
+        }
+        Interaction interaction = getAbyssalRiftInteraction(state.interactionId());
+        if (interaction == null) {
+            return;
+        }
+        ArmorStand titleStand = getAbyssalRiftNameStand(state.titleStandId());
+        ArmorStand healthStand = getAbyssalRiftNameStand(state.healthStandId());
+        Location base = interaction.getLocation();
+        if (titleStand != null) {
+            titleStand.teleport(base.clone().add(0.0, ABYSSAL_RIFT_NAME_Y_OFFSET, 0.0));
+            titleStand.customName(Component.text("Abyssal Rift", NamedTextColor.DARK_AQUA));
+        }
+        if (healthStand != null) {
+            healthStand.teleport(base.clone().add(0.0, ABYSSAL_RIFT_HEALTH_Y_OFFSET, 0.0));
+            healthStand.customName(Component.text(formatAbyssalRiftHealth(state), healthColor(state)));
+        }
+    }
+
+    private String formatAbyssalRiftHealth(AbyssalRiftState state) {
+        if (state == null) {
+            return "0 HP";
+        }
+        int current = (int) Math.ceil(Math.max(0.0, state.health()));
+        int max = (int) Math.ceil(Math.max(0.0, state.maxHealth()));
+        return current + "/" + max + " HP";
+    }
+
+    private NamedTextColor healthColor(AbyssalRiftState state) {
+        if (state == null || state.maxHealth() <= 0.0) {
+            return NamedTextColor.RED;
+        }
+        double ratio = Math.max(0.0, state.health()) / state.maxHealth();
+        if (ratio > 0.66) {
+            return NamedTextColor.GREEN;
+        }
+        if (ratio > 0.33) {
+            return NamedTextColor.YELLOW;
+        }
+        return NamedTextColor.RED;
+    }
+
     private Interaction getAbyssalRiftInteraction(UUID entityId) {
         Entity entity = entityId != null ? Bukkit.getEntity(entityId) : null;
         return entity instanceof Interaction interaction ? interaction : null;
@@ -1652,6 +1729,11 @@ public class GameSession {
     private ItemDisplay getAbyssalRiftDisplay(UUID entityId) {
         Entity entity = entityId != null ? Bukkit.getEntity(entityId) : null;
         return entity instanceof ItemDisplay display ? display : null;
+    }
+
+    private ArmorStand getAbyssalRiftNameStand(UUID entityId) {
+        Entity entity = entityId != null ? Bukkit.getEntity(entityId) : null;
+        return entity instanceof ArmorStand stand ? stand : null;
     }
 
     private void clearAbyssalRifts() {
@@ -1669,6 +1751,14 @@ public class GameSession {
         abyssalRiftEntityLinks.remove(state.displayId());
         if (state.auraTask() != null) {
             state.auraTask().cancel();
+        }
+        ArmorStand titleStand = getAbyssalRiftNameStand(state.titleStandId());
+        if (titleStand != null) {
+            titleStand.remove();
+        }
+        ArmorStand healthStand = getAbyssalRiftNameStand(state.healthStandId());
+        if (healthStand != null) {
+            healthStand.remove();
         }
         ItemDisplay display = getAbyssalRiftDisplay(state.displayId());
         if (display != null) {
@@ -2902,7 +2992,8 @@ public class GameSession {
                     || entity.getScoreboardTags().contains(HAPPY_GHAST_TAG)
                     || entity.getScoreboardTags().contains(CREEPING_CREEPER_TAG)
                     || entity.getScoreboardTags().contains(ABYSSAL_RIFT_TAG)
-                    || entity.getScoreboardTags().contains(ABYSSAL_RIFT_DISPLAY_TAG)) {
+                    || entity.getScoreboardTags().contains(ABYSSAL_RIFT_DISPLAY_TAG)
+                    || entity.getScoreboardTags().contains(ABYSSAL_RIFT_NAME_TAG)) {
                 entity.remove();
             }
         }
@@ -3069,7 +3160,33 @@ public class GameSession {
         if (healAmount <= 0.0) {
             return;
         }
-        attacker.setHealth(Math.min(attacker.getMaxHealth(), attacker.getHealth() + healAmount));
+        if (plugin == null) {
+            healBloodMoonAttacker(attacker, healAmount);
+            return;
+        }
+        plugin.getServer().getScheduler().runTask(plugin, () -> healBloodMoonAttacker(attacker, healAmount));
+    }
+
+    private void healBloodMoonAttacker(Player attacker, double healAmount) {
+        if (attacker == null || healAmount <= 0.0 || !attacker.isOnline()) {
+            return;
+        }
+        if (!isParticipant(attacker.getUniqueId()) || !isInArenaWorld(attacker.getWorld())) {
+            return;
+        }
+        double currentHealth = attacker.getHealth();
+        double newHealth = Math.min(attacker.getMaxHealth(), currentHealth + healAmount);
+        if (newHealth <= currentHealth) {
+            return;
+        }
+        attacker.setHealth(newHealth);
+        attacker.getWorld().spawnParticle(Particle.HEART,
+                attacker.getLocation().add(0.0, 1.0, 0.0),
+                2,
+                0.25,
+                0.35,
+                0.25,
+                0.0);
     }
 
     public void setRotatingMode(RotatingSelectionMode mode) {
@@ -5129,9 +5246,14 @@ public class GameSession {
         if (player == null) {
             return;
         }
-        if (!setAttributeBaseValue(player, "SCALE", scale)) {
-            setAttributeBaseValue(player, "GENERIC_SCALE", scale);
+        org.bukkit.attribute.AttributeInstance instance = resolveAttributeInstance(player, "SCALE", "GENERIC_SCALE");
+        if (instance == null) {
+            return;
         }
+        for (org.bukkit.attribute.AttributeModifier modifier : new ArrayList<>(instance.getModifiers())) {
+            instance.removeModifier(modifier);
+        }
+        instance.setBaseValue(scale);
     }
 
     private double resolveScaleDownValue(int tier) {
@@ -5143,7 +5265,10 @@ public class GameSession {
     }
 
     private double resolveEffectiveScale(int scaleDownTier) {
-        return resolveScaleDownValue(scaleDownTier) * resolveMatchEventScaleMultiplier();
+        if (activeMatchEvent == BedwarsMatchEventType.APRIL_FOOLS) {
+            return APRIL_FOOLS_SCALE_MULTIPLIER;
+        }
+        return resolveScaleDownValue(scaleDownTier);
     }
 
     private double resolveMatchEventScaleMultiplier() {
@@ -5491,16 +5616,29 @@ public class GameSession {
     private static final class AbyssalRiftState {
         private final UUID interactionId;
         private final UUID displayId;
+        private final UUID titleStandId;
+        private final UUID healthStandId;
         private final TeamColor team;
         private double health;
+        private final double maxHealth;
         private final double radius;
         private BukkitTask auraTask;
 
-        private AbyssalRiftState(UUID interactionId, UUID displayId, TeamColor team, double health, double radius) {
+        private AbyssalRiftState(UUID interactionId,
+                                 UUID displayId,
+                                 UUID titleStandId,
+                                 UUID healthStandId,
+                                 TeamColor team,
+                                 double health,
+                                 double maxHealth,
+                                 double radius) {
             this.interactionId = interactionId;
             this.displayId = displayId;
+            this.titleStandId = titleStandId;
+            this.healthStandId = healthStandId;
             this.team = team;
             this.health = health;
+            this.maxHealth = maxHealth;
             this.radius = radius;
         }
 
@@ -5512,12 +5650,24 @@ public class GameSession {
             return displayId;
         }
 
+        private UUID titleStandId() {
+            return titleStandId;
+        }
+
+        private UUID healthStandId() {
+            return healthStandId;
+        }
+
         private TeamColor team() {
             return team;
         }
 
         private double health() {
             return health;
+        }
+
+        private double maxHealth() {
+            return maxHealth;
         }
 
         private double radius() {

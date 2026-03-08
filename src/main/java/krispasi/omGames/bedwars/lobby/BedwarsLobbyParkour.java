@@ -43,8 +43,10 @@ public class BedwarsLobbyParkour {
     private static final String CONFIG_CHECKPOINTS = "checkpoints";
     private static final long PLATE_COOLDOWN_MILLIS = 800L;
     private static final long CONTROL_ITEM_PLATE_LOCK_MILLIS = 3_000L;
+    private static final int CONTROL_SLOT_DIRECTION = 6;
     private static final int CONTROL_SLOT_EXIT = 7;
     private static final int CONTROL_SLOT_CHECKPOINT = 8;
+    private static final String CONTROL_DIRECTION = "direction";
     private static final String CONTROL_EXIT = "exit";
     private static final String CONTROL_CHECKPOINT = "checkpoint";
 
@@ -260,7 +262,9 @@ public class BedwarsLobbyParkour {
             markPlateTriggered(player.getUniqueId(), steppedPoint);
             run.lastCheckpoint = checkpointPlates.get(checkpointIndex);
             run.lastCheckpointLabel = "checkpoint " + checkpointIndex;
-            player.sendActionBar(Component.text("Checkpoint " + checkpointIndex + " reached.", NamedTextColor.GREEN));
+            run.lastCheckpointIndex = checkpointIndex;
+            updateDirectionTarget(player, run);
+            sendNextObjectiveHint(player, run);
             player.sendMessage(Component.text("Checkpoint " + checkpointIndex + " reached.", NamedTextColor.GREEN));
             return;
         }
@@ -291,12 +295,17 @@ public class BedwarsLobbyParkour {
         run.startedAt = System.currentTimeMillis();
         run.lastCheckpoint = startPlate;
         run.lastCheckpointLabel = "start";
+        run.compassTargetBackup = cloneLocation(player.getCompassTarget());
+        run.directionSlotBackup = cloneItem(player.getInventory().getItem(CONTROL_SLOT_DIRECTION));
         run.exitSlotBackup = cloneItem(player.getInventory().getItem(CONTROL_SLOT_EXIT));
         run.checkpointSlotBackup = cloneItem(player.getInventory().getItem(CONTROL_SLOT_CHECKPOINT));
+        player.getInventory().setItem(CONTROL_SLOT_DIRECTION, createDirectionControlItem("Next Target"));
         player.getInventory().setItem(CONTROL_SLOT_EXIT, createExitControlItem());
         player.getInventory().setItem(CONTROL_SLOT_CHECKPOINT, createCheckpointControlItem());
         runs.put(player.getUniqueId(), run);
+        updateDirectionTarget(player, run);
         player.sendMessage(Component.text("Parkour started! Reach the end plate.", NamedTextColor.AQUA));
+        sendNextObjectiveHint(player, run);
         player.sendMessage(Component.text("Gold ingot: end run and return to start. Iron ingot: teleport to last checkpoint.",
                 NamedTextColor.GRAY));
     }
@@ -339,6 +348,8 @@ public class BedwarsLobbyParkour {
         }
         run.checkpointUses++;
         player.teleport(target);
+        updateDirectionTarget(player, run);
+        sendNextObjectiveHint(player, run);
         player.sendMessage(Component.text(
                 "Teleported to " + run.lastCheckpointLabel + ". Checkpoints used: " + run.checkpointUses + ".",
                 NamedTextColor.YELLOW));
@@ -363,6 +374,22 @@ public class BedwarsLobbyParkour {
             lore.add(Component.text("and return to start.", NamedTextColor.GRAY));
             meta.lore(lore);
             tagControl(meta, CONTROL_EXIT);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private ItemStack createDirectionControlItem(String targetLabel) {
+        ItemStack item = new ItemStack(Material.COMPASS);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            String label = targetLabel == null || targetLabel.isBlank() ? "Next Target" : targetLabel;
+            meta.displayName(Component.text(label, NamedTextColor.AQUA));
+            List<Component> lore = new ArrayList<>();
+            lore.add(Component.text("Points to your next", NamedTextColor.GRAY));
+            lore.add(Component.text("checkpoint or finish plate.", NamedTextColor.GRAY));
+            meta.lore(lore);
+            tagControl(meta, CONTROL_DIRECTION);
             item.setItemMeta(meta);
         }
         return item;
@@ -408,8 +435,12 @@ public class BedwarsLobbyParkour {
             return;
         }
         removeControlItems(player);
+        player.getInventory().setItem(CONTROL_SLOT_DIRECTION, cloneItem(run.directionSlotBackup));
         player.getInventory().setItem(CONTROL_SLOT_EXIT, cloneItem(run.exitSlotBackup));
         player.getInventory().setItem(CONTROL_SLOT_CHECKPOINT, cloneItem(run.checkpointSlotBackup));
+        if (run.compassTargetBackup != null) {
+            player.setCompassTarget(run.compassTargetBackup);
+        }
     }
 
     private void removeControlItems(Player player) {
@@ -452,6 +483,62 @@ public class BedwarsLobbyParkour {
                 .max(Comparator.naturalOrder())
                 .map(value -> value + 1)
                 .orElse(1);
+    }
+
+    private Integer nextCheckpointIndexAfter(Integer checkpointIndex) {
+        return checkpointPlates.keySet().stream()
+                .filter(index -> checkpointIndex == null || index > checkpointIndex)
+                .min(Comparator.naturalOrder())
+                .orElse(null);
+    }
+
+    private void updateDirectionTarget(Player player, RunState run) {
+        if (player == null || run == null) {
+            return;
+        }
+        ParkourObjective objective = resolveNextObjective(run);
+        if (objective == null) {
+            player.getInventory().setItem(CONTROL_SLOT_DIRECTION, createDirectionControlItem("No Target"));
+            return;
+        }
+        Location target = toCompassLocation(player, objective.point());
+        if (target != null) {
+            player.setCompassTarget(target);
+        }
+        player.getInventory().setItem(CONTROL_SLOT_DIRECTION, createDirectionControlItem(objective.label()));
+    }
+
+    private void sendNextObjectiveHint(Player player, RunState run) {
+        if (player == null || run == null) {
+            return;
+        }
+        ParkourObjective objective = resolveNextObjective(run);
+        if (objective == null) {
+            return;
+        }
+        Location target = toCompassLocation(player, objective.point());
+        if (target == null) {
+            return;
+        }
+        int blocks = (int) Math.round(player.getLocation().distance(target));
+        player.sendActionBar(Component.text("Next: " + objective.label() + " (" + blocks + "m)", NamedTextColor.AQUA));
+    }
+
+    private ParkourObjective resolveNextObjective(RunState run) {
+        if (run == null) {
+            return null;
+        }
+        Integer checkpointIndex = nextCheckpointIndexAfter(run.lastCheckpointIndex);
+        if (checkpointIndex != null) {
+            BlockPoint point = checkpointPlates.get(checkpointIndex);
+            if (point != null) {
+                return new ParkourObjective(point, "Checkpoint " + checkpointIndex);
+            }
+        }
+        if (endPlate != null) {
+            return new ParkourObjective(endPlate, "Finish");
+        }
+        return null;
     }
 
     private boolean saveConfig() {
@@ -580,6 +667,21 @@ public class BedwarsLobbyParkour {
         return item != null ? item.clone() : null;
     }
 
+    private Location cloneLocation(Location location) {
+        return location != null ? location.clone() : null;
+    }
+
+    private Location toCompassLocation(Player player, BlockPoint point) {
+        if (player == null || point == null) {
+            return null;
+        }
+        Location target = point.toLocation(player.getWorld());
+        target.setX(target.getX() + 0.5);
+        target.setY(target.getY() + 0.5);
+        target.setZ(target.getZ() + 0.5);
+        return target;
+    }
+
     private boolean isOnPlateCooldown(UUID playerId, BlockPoint point) {
         if (playerId == null || point == null) {
             return false;
@@ -642,9 +744,15 @@ public class BedwarsLobbyParkour {
         private long startedAt;
         private BlockPoint lastCheckpoint;
         private String lastCheckpointLabel;
+        private Integer lastCheckpointIndex;
         private int checkpointUses;
+        private Location compassTargetBackup;
+        private ItemStack directionSlotBackup;
         private ItemStack exitSlotBackup;
         private ItemStack checkpointSlotBackup;
+    }
+
+    private record ParkourObjective(BlockPoint point, String label) {
     }
 
     public record ParkourTopEntry(UUID playerId, long timeMillis, int checkpointUses) {
