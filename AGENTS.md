@@ -251,6 +251,10 @@ Root keys:
 - `lobby-parkour`
 - `arenas`
 
+`parkour-leaderboard` world fallback:
+- if no explicit world is set on `parkour-leaderboard`, use `lobby-parkour.world` first
+- only then fall back to the generic BedWars leaderboard world resolution
+
 `match-events` fields:
 - `enabled`
 - `chance-percent`

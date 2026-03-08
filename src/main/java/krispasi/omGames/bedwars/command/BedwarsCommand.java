@@ -638,6 +638,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         if (spectate != null) {
             target.teleport(spectate);
         }
+        session.refreshSidebar(target);
         sender.sendMessage(Component.text("Set " + target.getName() + " to spectator.", NamedTextColor.YELLOW));
         if (target != caller) {
             target.sendMessage(Component.text("You were set to spectator.", NamedTextColor.YELLOW));

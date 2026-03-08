@@ -154,7 +154,6 @@ public class GameSession {
                     "00xxx00",
                     "0x0L0x0",
                     "0x0C0x0",
-                    "0x000x0",
                     "00x0x00",
                     "0000000"
             },
@@ -163,7 +162,6 @@ public class GameSession {
                     "00xxx00",
                     "0x0L0x0",
                     "0x000x0",
-                    "0x000x0",
                     "00x0x00",
                     "0000000"
             },
@@ -171,7 +169,6 @@ public class GameSession {
                     "0000000",
                     "00xxx00",
                     "0x0L0x0",
-                    "0x000x0",
                     "0x000x0",
                     "00xxx00",
                     "0000000"
@@ -180,7 +177,6 @@ public class GameSession {
                     "0x0x0x0",
                     "xxxxxxx",
                     "0xxLxx0",
-                    "xxxxxxx",
                     "0xxxxx0",
                     "xxxxxxx",
                     "0x0x0x0"
@@ -191,14 +187,12 @@ public class GameSession {
                     "x00000x",
                     "x00000x",
                     "x00000x",
-                    "x00000x",
                     "0xxxxx0"
             },
             {
                     "0x0x0x0",
                     "x00000x",
                     "0000000",
-                    "x00000x",
                     "0000000",
                     "x00000x",
                     "0x0x0x0"
@@ -1611,7 +1605,7 @@ public class GameSession {
         if (world == null) {
             return false;
         }
-        BlockFace forward = resolveTowerChestForward(player);
+        BlockFace forward = resolveTowerChestForward(player).getOppositeFace();
         BlockFace right = rotateClockwise(forward);
         boolean outsideMap = false;
         for (int layer = 0; layer < TOWER_CHEST_LAYERS.length; layer++) {
@@ -3771,6 +3765,7 @@ public class GameSession {
         player.setAllowFlight(true);
         player.setFlying(true);
         clearUpgradeEffects(player);
+        updateSidebarForPlayer(player);
     }
 
     public boolean hasRespawnProtection(UUID playerId) {
@@ -4444,20 +4439,46 @@ public class GameSession {
     }
 
     private void updateSidebars() {
+        Set<UUID> updated = new HashSet<>();
         if (state == GameState.LOBBY) {
             applyLobbyBuffsToLobbyPlayers();
         }
         for (UUID playerId : assignments.keySet()) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
+                updated.add(playerId);
                 updateSidebarForPlayer(player);
+            }
+        }
+        World world = arena.getWorld();
+        if (world != null) {
+            for (Player player : world.getPlayers()) {
+                UUID playerId = player.getUniqueId();
+                if (!updated.add(playerId)) {
+                    continue;
+                }
+                updateSidebarForPlayer(player);
+            }
+        }
+        for (UUID playerId : new HashSet<>(activeScoreboards.keySet())) {
+            if (!updated.add(playerId)) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                updateSidebarForPlayer(player);
+            } else {
+                restoreSidebar(playerId);
             }
         }
     }
 
     private void updateSidebarForPlayer(Player player) {
+        if (player == null) {
+            return;
+        }
         UUID playerId = player.getUniqueId();
-        if (!isActive() || !isParticipant(playerId) || !isInArenaWorld(player.getWorld())) {
+        if (!shouldShowSidebar(player)) {
             restoreSidebar(playerId);
             return;
         }
@@ -4473,6 +4494,24 @@ public class GameSession {
         updateTeamColors(scoreboard);
         updateSidebarLines(player, scoreboard);
         updateBelowNameHealth(scoreboard);
+    }
+
+    public void refreshSidebar(Player player) {
+        updateSidebarForPlayer(player);
+    }
+
+    private boolean shouldShowSidebar(Player player) {
+        if (player == null || !isActive() || !isInArenaWorld(player.getWorld())) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        return isParticipant(playerId) || isSessionSpectator(player);
+    }
+
+    private boolean isSessionSpectator(Player player) {
+        return player != null
+                && player.getGameMode() == GameMode.SPECTATOR
+                && !isEditor(player.getUniqueId());
     }
 
     private void restoreSidebar(UUID playerId) {

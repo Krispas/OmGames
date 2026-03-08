@@ -480,9 +480,28 @@ public class BedwarsManager {
             }
         }
         if (worldName == null || worldName.isBlank()) {
+            worldName = resolveLobbyParkourWorld(configFile);
+        }
+        if (worldName == null || worldName.isBlank()) {
             worldName = resolveLeaderboardWorldFallback();
         }
         parkourLeaderboard.configureAnchor(worldName, x, y, z);
+    }
+
+    private String resolveLobbyParkourWorld(File configFile) {
+        if (configFile == null || !configFile.exists()) {
+            return null;
+        }
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+        ConfigurationSection section = config.getConfigurationSection("lobby-parkour");
+        if (section == null) {
+            return null;
+        }
+        String worldName = section.getString("world");
+        if (worldName == null || worldName.isBlank()) {
+            return null;
+        }
+        return worldName.trim();
     }
 
     private String parseLeaderboardEntry(String raw, String defaultWorld) {
