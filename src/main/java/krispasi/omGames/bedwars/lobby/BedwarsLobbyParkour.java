@@ -315,9 +315,12 @@ public class BedwarsLobbyParkour {
     private void abortRun(Player player, RunState run, boolean teleportToStart) {
         runs.remove(player.getUniqueId());
         plateTriggerCooldowns.remove(player.getUniqueId());
-        plateLockUntil.remove(player.getUniqueId());
+        if (!teleportToStart) {
+            plateLockUntil.remove(player.getUniqueId());
+        }
         restoreControlSlots(player, run);
         if (teleportToStart && startPlate != null) {
+            applyPlateLock(player.getUniqueId());
             Location start = toTeleportLocation(player, startPlate);
             if (start != null) {
                 player.teleport(start);

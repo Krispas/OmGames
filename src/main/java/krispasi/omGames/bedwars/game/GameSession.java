@@ -130,7 +130,7 @@ public class GameSession {
     private static final double APRIL_FOOLS_SCALE_MULTIPLIER = 0.1;
     private static final double LONG_ARMS_RANGE_BONUS = 10.0;
     private static final double BLOOD_MOON_HEALTH_MULTIPLIER = 0.5;
-    private static final double MOON_BIG_JUMP_MULTIPLIER = 5.0;
+    private static final double MOON_BIG_JUMP_MULTIPLIER = 2.5;
     private static final double BLOOD_MOON_LIFESTEAL_RATIO = 0.25;
     private static final int ABYSSAL_RIFT_AURA_INTERVAL_TICKS = 20;
     private static final int ABYSSAL_RIFT_EFFECT_DURATION_TICKS = 40;
@@ -2993,7 +2993,6 @@ public class GameSession {
         gameEndTriggered = false;
         grantedMatchParticipationPartyExp = 0;
         partyExpUnavailableLogged = false;
-        forcedMatchEvent = null;
         activeMatchEvent = null;
         previousWorldTime = null;
         previousDaylightCycle = null;
