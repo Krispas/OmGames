@@ -4,7 +4,15 @@ import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.command.BedwarsCommand;
 import krispasi.omGames.bedwars.listener.BedwarsListener;
 import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
-import org.bukkit.*;
+import krispasi.omGames.egghunt.EggHuntCommand;
+import krispasi.omGames.egghunt.EggHuntListener;
+import krispasi.omGames.egghunt.EggHuntManager;
+import org.bukkit.Difficulty;
+import org.bukkit.GameRules;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.WorldCreator;
+import org.bukkit.WorldType;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -21,6 +29,7 @@ public final class OmGames extends JavaPlugin {
     private static OmGames instance;
     private BedwarsManager bedwarsManager;
     private BedwarsSetupManager setupManager;
+    private EggHuntManager eggHuntManager;
 
     @Override
     public void onEnable() {
@@ -39,6 +48,8 @@ public final class OmGames extends JavaPlugin {
         bedwarsManager.loadStats();
         bedwarsManager.startLobbyLeaderboard();
         setupManager = new BedwarsSetupManager(this, bedwarsManager);
+        eggHuntManager = new EggHuntManager(this);
+        eggHuntManager.load();
 
         PluginCommand command = getCommand("bw");
         if (command != null) {
@@ -46,13 +57,23 @@ public final class OmGames extends JavaPlugin {
             command.setExecutor(executor);
             command.setTabCompleter(executor);
         }
+        PluginCommand eggHuntCommand = getCommand("egghunt");
+        if (eggHuntCommand != null) {
+            EggHuntCommand executor = new EggHuntCommand(eggHuntManager);
+            eggHuntCommand.setExecutor(executor);
+            eggHuntCommand.setTabCompleter(executor);
+        }
 
         getServer().getPluginManager().registerEvents(new BedwarsListener(bedwarsManager), this);
+        getServer().getPluginManager().registerEvents(new EggHuntListener(eggHuntManager), this);
         //setupBedwars();
     }
 
     @Override
     public void onDisable() {
+        if (eggHuntManager != null) {
+            eggHuntManager.shutdown();
+        }
         if (bedwarsManager != null) {
             bedwarsManager.shutdown();
         }

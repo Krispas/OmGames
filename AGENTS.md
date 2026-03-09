@@ -512,3 +512,32 @@ Before finishing:
 4. Preserve cleanup paths.
 5. Update command or UI text if behavior changed.
 6. Run validation or explicitly state what was not run.
+
+## 3) Egg Hunt
+
+### 3.1 Top-Level Layout
+
+- `src/main/java/krispasi/omGames/egghunt/*`
+  - Temporary Egg Hunt event implementation.
+  - Owns `/egghunt`, persistent egg point storage, runtime timer/countdown, item displays, and sidebar scoreboard.
+
+### 3.2 Command Surface
+
+Egg Hunt admin subcommands:
+- `/egghunt add`
+- `/egghunt prepare`
+- `/egghunt timer <seconds>`
+- `/egghunt start`
+- `/egghunt clear`
+
+### 3.3 Runtime Data Layout
+
+Egg Hunt runtime files live in:
+- `plugins/OmGames/EggHunt/`
+
+Files:
+- `egghunt.yml`
+
+`egghunt.yml` keys:
+- `timer-seconds`
+- `points`

@@ -6,6 +6,9 @@ commands:
   bw:
     description: BedWars commands
     usage: /bw start | /bw stop | /bw quick_buy | /bw stats | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]
+  egghunt:
+    description: Egg Hunt event commands
+    usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt clear
 permissions:
   omgames.bw.start:
     description: Allows opening the BedWars setup GUI
@@ -15,4 +18,7 @@ permissions:
     default: op
   omgames.bw.reload:
     description: Allows reloading BedWars configs via /bw reload
+    default: op
+  omgames.egghunt.manage:
+    description: Allows managing the Egg Hunt event via /egghunt
     default: op
