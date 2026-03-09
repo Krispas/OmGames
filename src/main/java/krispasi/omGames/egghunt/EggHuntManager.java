@@ -26,6 +26,8 @@ import org.bukkit.scoreboard.Scoreboard;
 public class EggHuntManager {
     private static final int DEFAULT_TIMER_SECONDS = 180;
     private static final double START_RADIUS = 50.0;
+    private static final double MAX_EGG_DISTANCE = 1000.0;
+    private static final double MAX_EGG_DISTANCE_SQUARED = MAX_EGG_DISTANCE * MAX_EGG_DISTANCE;
     private static final String SIDEBAR_OBJECTIVE_ID = "egghunt";
 
     public record Result(boolean success, String message) {
@@ -36,6 +38,9 @@ public class EggHuntManager {
         COUNTDOWN,
         RUNNING,
         FINISHED
+    }
+
+    record SpawnPointSelection(List<EggHuntPoint> points, int skippedCount) {
     }
 
     private final JavaPlugin plugin;
@@ -146,13 +151,19 @@ public class EggHuntManager {
             return new Result(false, "Only a player in a loaded world can start Egg Hunt.");
         }
 
+        Location startLocation = initiator.getLocation().clone();
         List<EggHuntPoint> worldPoints = getPointsForWorld(initiator.getWorld());
         if (worldPoints.isEmpty()) {
             return new Result(false, "No Egg Hunt points are saved in this world.");
         }
+        SpawnPointSelection selection = selectSpawnablePoints(worldPoints, startLocation);
+        if (selection.points().isEmpty()) {
+            return new Result(false, "No Egg Hunt points are currently spawnable. Points in unloaded chunks or farther than "
+                    + (int) MAX_EGG_DISTANCE + " blocks from the start are skipped.");
+        }
 
         List<Player> participants = initiator.getWorld().getPlayers().stream()
-                .filter(player -> player.getLocation().distanceSquared(initiator.getLocation()) <= START_RADIUS * START_RADIUS)
+                .filter(player -> player.getLocation().distanceSquared(startLocation) <= START_RADIUS * START_RADIUS)
                 .toList();
         if (participants.isEmpty()) {
             return new Result(false, "No players were found within 50 blocks.");
@@ -165,20 +176,25 @@ public class EggHuntManager {
 
         sidebarNames.clear();
         sidebarScores.clear();
-        sidebarEggsRemaining = worldPoints.size();
+        sidebarEggsRemaining = selection.points().size();
         sidebarDisplaySeconds = timerSeconds;
         activeSession = new EggHuntSession(
                 this,
-                initiator.getLocation().clone(),
+                startLocation,
                 participants,
-                worldPoints,
+                selection.points(),
                 timerSeconds
         );
         activeSession.start();
         refreshSidebar();
 
-        return new Result(true, "Egg Hunt countdown started for " + participants.size()
-                + " players with " + worldPoints.size() + " eggs.");
+        String message = "Egg Hunt countdown started for " + participants.size()
+                + " players with " + selection.points().size() + " eggs.";
+        if (selection.skippedCount() > 0) {
+            message += " Skipped " + selection.skippedCount()
+                    + " points in unloaded chunks or beyond " + (int) MAX_EGG_DISTANCE + " blocks.";
+        }
+        return new Result(true, message);
     }
 
     public Result clearSidebar() {
@@ -435,6 +451,38 @@ public class EggHuntManager {
         return savedPoints.stream()
                 .filter(point -> point.worldName().equalsIgnoreCase(world.getName()))
                 .toList();
+    }
+
+    SpawnPointSelection selectSpawnablePoints(List<EggHuntPoint> points, Location startLocation) {
+        if (points.isEmpty() || startLocation == null || startLocation.getWorld() == null) {
+            return new SpawnPointSelection(List.of(), points.size());
+        }
+        List<EggHuntPoint> filteredPoints = new ArrayList<>();
+        for (EggHuntPoint point : points) {
+            if (!isSpawnablePoint(point, startLocation)) {
+                continue;
+            }
+            filteredPoints.add(point);
+        }
+        return new SpawnPointSelection(filteredPoints, points.size() - filteredPoints.size());
+    }
+
+    boolean isSpawnablePoint(EggHuntPoint point, Location startLocation) {
+        if (point == null || startLocation == null) {
+            return false;
+        }
+        World world = startLocation.getWorld();
+        if (world == null || !point.worldName().equalsIgnoreCase(world.getName())) {
+            return false;
+        }
+        double dx = point.x() - startLocation.getX();
+        double dz = point.z() - startLocation.getZ();
+        if ((dx * dx) + (dz * dz) > MAX_EGG_DISTANCE_SQUARED) {
+            return false;
+        }
+        int chunkX = Location.locToBlock(point.x()) >> 4;
+        int chunkZ = Location.locToBlock(point.z()) >> 4;
+        return world.isChunkLoaded(chunkX, chunkZ);
     }
 
     private File getDataFolder() {

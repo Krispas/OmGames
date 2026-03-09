@@ -157,6 +157,10 @@ public class EggHuntSession {
         state = State.RUNNING;
         spawnEggDisplays();
         manager.syncSidebar(this);
+        if (activeEggs.isEmpty()) {
+            finish();
+            return;
+        }
 
         eggTask = new BukkitRunnable() {
             @Override
@@ -216,6 +220,9 @@ public class EggHuntSession {
     private void spawnEggDisplays() {
         activeEggs.clear();
         for (EggHuntPoint point : eggPoints) {
+            if (!manager.isSpawnablePoint(point, startLocation)) {
+                continue;
+            }
             Location location = point.toLocation();
             if (location == null || location.getWorld() == null) {
                 continue;
