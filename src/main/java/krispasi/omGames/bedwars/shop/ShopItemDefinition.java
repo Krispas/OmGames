@@ -233,6 +233,9 @@ public class ShopItemDefinition {
         if (material.name().endsWith("_WOOL")) {
             return team.wool();
         }
+        if (material.name().endsWith("_BED")) {
+            return team.bed();
+        }
         return material;
     }
 

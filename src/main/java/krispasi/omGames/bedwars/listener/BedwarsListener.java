@@ -36,6 +36,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.Container;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Openable;
+import org.bukkit.block.data.type.Bed;
 import org.bukkit.Particle;
 import org.bukkit.Particle.DustOptions;
 import org.bukkit.entity.Egg;
@@ -203,6 +204,7 @@ public class BedwarsListener implements Listener {
     private static final String CREEPING_CREEPER_NAME = "Creeper";
     private static final String PORTABLE_SHOPKEEPER_NAME = "Portable Shopkeeper";
     private static final String PORTABLE_SHOPKEEPER_TAG = "bw_portable_shopkeeper";
+    private static final String PLACEABLE_BED_ITEM_ID = "placeable_bed";
     private final NamespacedKey customProjectileKey;
     private final NamespacedKey summonTeamKey;
     private final NamespacedKey happyGhastDriverKey;
@@ -969,6 +971,9 @@ public class BedwarsListener implements Listener {
                 event.setCancelled(true);
                 return;
             }
+            if (event instanceof BlockMultiPlaceEvent) {
+                return;
+            }
             Block block = event.getBlockPlaced();
             BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
             if (!session.isInsideMap(point)) {
@@ -991,6 +996,13 @@ public class BedwarsListener implements Listener {
                 });
                 player.getWorld().playSound(spawn, org.bukkit.Sound.ENTITY_TNT_PRIMED, 1.0f, 1.0f);
                 consumeSingleItem(player, event.getHand());
+                return;
+            }
+            if (isPlaceableBedItem(event.getItemInHand())) {
+                BedLocation location = resolvePlacedBedLocation(block);
+                if (location == null || !session.placeTeamBed(player, location)) {
+                    event.setCancelled(true);
+                }
                 return;
             }
             session.recordPlacedBlock(point, event.getItemInHand());
@@ -1040,6 +1052,13 @@ public class BedwarsListener implements Listener {
                 }
             }
             ItemStack placedItem = event.getItemInHand();
+            if (isPlaceableBedItem(placedItem)) {
+                BedLocation location = resolvePlacedBedLocation(event.getBlockPlaced());
+                if (location == null || !session.placeTeamBed(player, location)) {
+                    event.setCancelled(true);
+                }
+                return;
+            }
             for (org.bukkit.block.BlockState state : event.getReplacedBlockStates()) {
                 Block block = state.getBlock();
                 session.recordPlacedBlock(new BlockPoint(block.getX(), block.getY(), block.getZ()), placedItem);
@@ -2128,6 +2147,38 @@ public class BedwarsListener implements Listener {
         return true;
     }
 
+    private boolean isPlaceableBedItem(ItemStack item) {
+        return PLACEABLE_BED_ITEM_ID.equalsIgnoreCase(ShopItemData.getId(item));
+    }
+
+    private BedLocation resolvePlacedBedLocation(Block block) {
+        if (block == null) {
+            return null;
+        }
+        if (!(block.getBlockData() instanceof Bed bedData)) {
+            return null;
+        }
+        org.bukkit.block.BlockFace facing = bedData.getFacing();
+        Block headBlock;
+        Block footBlock;
+        if (bedData.getPart() == Bed.Part.HEAD) {
+            headBlock = block;
+            footBlock = block.getRelative(facing.getOppositeFace());
+        } else {
+            footBlock = block;
+            headBlock = block.getRelative(facing);
+        }
+        if (!(headBlock.getBlockData() instanceof Bed headData) || headData.getPart() != Bed.Part.HEAD) {
+            return null;
+        }
+        if (!(footBlock.getBlockData() instanceof Bed footData) || footData.getPart() != Bed.Part.FOOT) {
+            return null;
+        }
+        return new BedLocation(
+                new BlockPoint(headBlock.getX(), headBlock.getY(), headBlock.getZ()),
+                new BlockPoint(footBlock.getX(), footBlock.getY(), footBlock.getZ()));
+    }
+
     private boolean isFireballCustom(CustomItemDefinition definition) {
         if (definition == null) {
             return false;
@@ -2144,7 +2195,10 @@ public class BedwarsListener implements Listener {
             TeamColor team = session.getTeam(player.getUniqueId());
             Location origin = player.getLocation();
             if (team != null) {
-                BedLocation bed = session.getArena().getBeds().get(team);
+                BedLocation bed = session.getActiveBedLocation(team);
+                if (bed == null) {
+                    bed = session.getArena().getBeds().get(team);
+                }
                 World world = session.getArena().getWorld();
                 if (bed != null && world != null) {
                     origin = bed.head().toLocation(world);

@@ -12,6 +12,7 @@ shop:
         bridge_builder: 14
         creeping_arrow: 15
         tactical_nuke: 16
+        placeable_bed: 18
         totem_of_undying: 21
         portable_shopkeeper: 20
         bridge_zapper: 19
@@ -113,6 +114,21 @@ shop:
           - "Marks a target and"
           - "detonates in 1 minute."
         custom-item: tactical_nuke
+        disable-after-sudden-death: true
+        limit:
+          scope: TEAM
+          amount: 1
+      placeable_bed:
+        material: RED_BED
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 32
+        display-name: "Rebuilt Bed"
+        lore:
+          - "Place after your bed is gone."
+          - "Revives dead teammates."
+        team-color: true
         disable-after-sudden-death: true
         limit:
           scope: TEAM

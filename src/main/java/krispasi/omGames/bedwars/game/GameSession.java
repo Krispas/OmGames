@@ -293,6 +293,7 @@ public class GameSession {
     private final Arena arena;
     private final Map<UUID, TeamColor> assignments = new HashMap<>();
     private final Map<TeamColor, BedState> bedStates = new EnumMap<>(TeamColor.class);
+    private final Map<TeamColor, BedLocation> activeBedLocations = new EnumMap<>(TeamColor.class);
     private final Map<BlockPoint, TeamColor> bedBlocks = new HashMap<>();
     private final Set<BlockPoint> placedBlocks = new HashSet<>();
     private final Map<BlockPoint, ItemStack> placedBlockItems = new HashMap<>();
@@ -650,15 +651,60 @@ public class GameSession {
         if (!addedToMatch && getBedState(team) == BedState.ALIVE) {
             return false;
         }
-        bedStates.put(team, BedState.ALIVE);
-        bedBlocks.put(location.head(), team);
-        bedBlocks.put(location.foot(), team);
+        BedLocation previous = clearTrackedBed(team);
+        if (previous != null && !previous.equals(location)) {
+            removeBedBlocks(previous);
+        }
+        setBedAlive(team, location);
         restoreBed(world, team, location);
         eliminatedTeams.remove(team);
         eliminationOrder.remove(team);
         initializeBaseCenters();
         syncForgeTiers();
         updateSidebars();
+        return true;
+    }
+
+    public boolean placeTeamBed(Player player, BedLocation location) {
+        if (player == null || location == null || !isRunning() || !isParticipant(player.getUniqueId())) {
+            return false;
+        }
+        TeamColor team = getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        if (suddenDeathActive) {
+            player.sendMessage(Component.text("This bed is disabled after sudden death.", NamedTextColor.RED));
+            return false;
+        }
+        if (getBedState(team) == BedState.ALIVE) {
+            player.sendMessage(Component.text("Your team already has a bed.", NamedTextColor.RED));
+            return false;
+        }
+        if (!isInsideMap(location.head()) || !isInsideMap(location.foot())) {
+            player.sendMessage(Component.text("You cannot place your bed outside the map.", NamedTextColor.RED));
+            return false;
+        }
+        if (isPlacementBlocked(location.head()) || isPlacementBlocked(location.foot())) {
+            player.sendMessage(Component.text("You cannot place your bed here.", NamedTextColor.RED));
+            return false;
+        }
+        teamsInMatch.add(team);
+        BedLocation previous = clearTrackedBed(team);
+        if (previous != null && !previous.equals(location)) {
+            removeBedBlocks(previous);
+        }
+        setBedAlive(team, location);
+        eliminatedTeams.remove(team);
+        eliminationOrder.remove(team);
+        reviveEliminatedTeammates(team);
+        initializeBaseCenters();
+        syncForgeTiers();
+        updateSidebars();
+        broadcast(Component.text("The ", NamedTextColor.GREEN)
+                .append(team.displayComponent())
+                .append(Component.text(" team rebuilt their bed. Respawns are back online.", NamedTextColor.GREEN)));
+        playSoundToParticipants(Sound.BLOCK_RESPAWN_ANCHOR_SET_SPAWN, 1.0f, 1.2f);
         return true;
     }
 
@@ -821,6 +867,10 @@ public class GameSession {
 
     public BedState getBedState(TeamColor team) {
         return bedStates.getOrDefault(team, BedState.DESTROYED);
+    }
+
+    public BedLocation getActiveBedLocation(TeamColor team) {
+        return activeBedLocations.get(team);
     }
 
     public TeamColor getBedOwner(BlockPoint point) {
@@ -2691,10 +2741,31 @@ public class GameSession {
             return;
         }
         suddenDeathActive = true;
-        showTitleAll(Component.text("Sudden Death!", NamedTextColor.RED),
-                Component.text("Final battle begins.", NamedTextColor.GRAY));
-        broadcast(Component.text("Sudden Death has begun!", NamedTextColor.RED));
+        boolean destroyedBeds = false;
+        for (TeamColor team : teamsInMatch) {
+            if (getBedState(team) == BedState.ALIVE) {
+                destroyBed(team);
+                destroyedBeds = true;
+            }
+        }
+        if (destroyedBeds) {
+            updateSidebars();
+        }
+        Component subtitle = destroyedBeds
+                ? Component.text("Remaining beds were destroyed.", NamedTextColor.GRAY)
+                : Component.text("Final battle begins.", NamedTextColor.GRAY);
+        showTitleAll(Component.text("Sudden Death!", NamedTextColor.RED), subtitle);
+        if (destroyedBeds) {
+            broadcast(Component.text("Sudden Death has begun! Any remaining beds were destroyed.", NamedTextColor.RED));
+        } else {
+            broadcast(Component.text("Sudden Death has begun!", NamedTextColor.RED));
+        }
         startSuddenDeathBorderShrink();
+        if (destroyedBeds) {
+            for (TeamColor team : teamsInMatch) {
+                checkTeamEliminated(team);
+            }
+        }
     }
 
     private void triggerGameEnd() {
@@ -2879,27 +2950,101 @@ public class GameSession {
 
     private void initializeBeds() {
         bedStates.clear();
+        activeBedLocations.clear();
         bedBlocks.clear();
         for (Map.Entry<TeamColor, BedLocation> entry : arena.getBeds().entrySet()) {
             if (!teamsInMatch.contains(entry.getKey())) {
                 continue;
             }
-            bedStates.put(entry.getKey(), BedState.ALIVE);
-            bedBlocks.put(entry.getValue().head(), entry.getKey());
-            bedBlocks.put(entry.getValue().foot(), entry.getKey());
+            setBedAlive(entry.getKey(), entry.getValue());
         }
     }
 
     private void destroyBed(TeamColor team) {
         bedStates.put(team, BedState.DESTROYED);
         removeHealPoolEffects(team);
-        BedLocation location = arena.getBeds().get(team);
+        BedLocation location = clearTrackedBed(team);
         if (location == null) {
             return;
         }
+        removeBedBlocks(location);
+    }
+
+    private void setBedAlive(TeamColor team, BedLocation location) {
+        if (team == null || location == null) {
+            return;
+        }
+        bedStates.put(team, BedState.ALIVE);
+        activeBedLocations.put(team, location);
+        bedBlocks.put(location.head(), team);
+        bedBlocks.put(location.foot(), team);
+    }
+
+    private BedLocation clearTrackedBed(TeamColor team) {
+        if (team == null) {
+            return null;
+        }
+        BedLocation location = activeBedLocations.remove(team);
+        if (location == null) {
+            return null;
+        }
         bedBlocks.remove(location.head());
         bedBlocks.remove(location.foot());
-        removeBedBlocks(location);
+        return location;
+    }
+
+    private void reviveEliminatedTeammates(TeamColor team) {
+        if (team == null) {
+            return;
+        }
+        Location spawn = arena.getSpawn(team);
+        for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
+            if (entry.getValue() != team) {
+                continue;
+            }
+            UUID playerId = entry.getKey();
+            if (!eliminatedPlayers.remove(playerId)) {
+                continue;
+            }
+            pendingRespawns.remove(playerId);
+            respawnGracePlayers.remove(playerId);
+            cancelRespawnCountdown(playerId);
+            BukkitTask respawnTask = respawnTasks.remove(playerId);
+            if (respawnTask != null) {
+                respawnTask.cancel();
+            }
+            Player teammate = Bukkit.getPlayer(playerId);
+            if (teammate != null && teammate.isOnline()) {
+                restoreRevivedTeammate(teammate, team, spawn);
+            }
+        }
+    }
+
+    private void restoreRevivedTeammate(Player player, TeamColor team, Location spawn) {
+        if (player == null || team == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        clearCombat(playerId);
+        clearTrapImmunity(playerId);
+        removeRespawnProtection(playerId);
+        if (spawn != null) {
+            player.teleport(spawn);
+        }
+        player.setGameMode(GameMode.SURVIVAL);
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        player.getInventory().clear();
+        giveStarterKit(player, team);
+        applyPermanentItemsWithShield(player, team);
+        player.setFireTicks(0);
+        player.setFallDistance(0.0f);
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
+        player.setHealth(Math.max(1.0, player.getMaxHealth()));
+        grantRespawnProtection(player);
+        hideEditorsFrom(player);
+        updateSidebarForPlayer(player);
     }
 
     private void removeBedBlocks(BedLocation location) {
@@ -2938,6 +3083,7 @@ public class GameSession {
         clearDroppedItems(world);
         clearContainerInventories(world);
         despawnShops();
+        removeActivePlacedBeds();
         for (BlockPoint point : placedBlocks) {
             world.getBlockAt(point.x(), point.y(), point.z()).setType(Material.AIR, false);
         }
@@ -2969,6 +3115,19 @@ public class GameSession {
         }
         for (Map.Entry<TeamColor, BedLocation> entry : arena.getBeds().entrySet()) {
             restoreBed(world, entry.getKey(), entry.getValue());
+        }
+    }
+
+    private void removeActivePlacedBeds() {
+        for (Map.Entry<TeamColor, BedLocation> entry : activeBedLocations.entrySet()) {
+            BedLocation activeLocation = entry.getValue();
+            if (activeLocation == null) {
+                continue;
+            }
+            BedLocation originalLocation = arena.getBeds().get(entry.getKey());
+            if (!activeLocation.equals(originalLocation)) {
+                removeBedBlocks(activeLocation);
+            }
         }
     }
 
@@ -3247,6 +3406,7 @@ public class GameSession {
         placedBlockItems.clear();
         forcedChunks.clear();
         bedStates.clear();
+        activeBedLocations.clear();
         bedBlocks.clear();
         fakeEnderChests.clear();
         previousScoreboards.clear();
