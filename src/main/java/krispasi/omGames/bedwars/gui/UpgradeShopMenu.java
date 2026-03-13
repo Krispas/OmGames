@@ -124,6 +124,10 @@ public class UpgradeShopMenu implements InventoryHolder {
     }
 
     private void setTrap(int slot, TrapType trap) {
+        if (!session.isRotatingTrapAvailable(trap)) {
+            inventory.setItem(slot, new ItemStack(Material.AIR));
+            return;
+        }
         inventory.setItem(slot, buildTrapItem(trap));
         trapSlots.put(slot, trap);
     }
@@ -185,8 +189,10 @@ public class UpgradeShopMenu implements InventoryHolder {
     }
 
     private ItemStack buildTrapItem(TrapType trap) {
-        int cost = session.getTrapCost(team);
-        boolean full = cost < 0;
+        ShopItemDefinition rotatingDefinition = session.getRotatingTrapDefinition(trap);
+        int cost = session.getTrapCost(team, trap);
+        boolean full = session.getActiveTraps(team).size() >= 3;
+        boolean purchased = session.hasPurchasedTrap(team, trap) && trap.oneTimePurchase();
         ItemStack item = new ItemStack(trap.icon());
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(trap.displayName(), NamedTextColor.YELLOW));
@@ -195,12 +201,20 @@ public class UpgradeShopMenu implements InventoryHolder {
         for (String line : trap.description()) {
             lore.add(Component.text(line, NamedTextColor.GRAY));
         }
+        if (trap.oneTimePurchase()) {
+            lore.add(Component.text("Once per game.", NamedTextColor.GRAY));
+        }
         lore.add(Component.text(" ", NamedTextColor.DARK_GRAY));
-        if (full) {
+        if (purchased) {
+            lore.add(Component.text("Purchase limit reached", NamedTextColor.RED));
+        } else if (full) {
             lore.add(Component.text("No trap slots available", NamedTextColor.RED));
         } else {
             lore.add(Component.text("Cost: " + cost + " Diamonds", NamedTextColor.YELLOW));
             lore.add(Component.text("Triggers in your base", NamedTextColor.GRAY));
+        }
+        if (rotatingDefinition != null && rotatingDefinition.isDisabledAfterSuddenDeath()) {
+            lore.add(Component.text("Disabled after sudden death", NamedTextColor.RED));
         }
         lore.add(Component.text("Traps: " + session.getActiveTraps(team).size() + "/3", NamedTextColor.GRAY));
         String queue = formatTrapQueue(session.getActiveTraps(team));

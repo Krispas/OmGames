@@ -26,6 +26,7 @@ shop:
         thorns_upgrade: 28
         fire_aspect_upgrade: 29
         scale_down_upgrade: 30
+        illusion_trap: 31
   items:
     rotating:
       respawn_beacon:
@@ -219,3 +220,15 @@ shop:
         display-name: "Scale Down"
         behavior: UPGRADE
         upgrade: SCALE_DOWN
+      illusion_trap:
+        material: END_PORTAL_FRAME
+        amount: 1
+        cost:
+          material: DIAMOND
+          amount: 3
+        display-name: "Illusion Trap"
+        lore:
+          - "Warps nearby enemies"
+          - "back to their base."
+          - "Once per game."
+        behavior: UPGRADE

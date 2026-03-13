@@ -331,6 +331,9 @@ Rotating item notes:
 - match runtime always rolls `2` rotating items plus `1` rotating upgrade when candidates exist
 - manual prestart rotation selection can choose any subset of rotating items and upgrades
 - if `shop.categories.rotating_upgrades` has no upgrade entries, rotating-upgrade selection falls back to upgrade entries found under `shop.categories.rotating`
+- rotating trap entries also live under `rotating_upgrades`
+  - keep `behavior: UPGRADE`
+  - trap behavior and purchase rules still live in Java trap handling, not `TeamUpgradeType`
 
 Merge behavior:
 - `ShopConfig.merge(base, rotating)`
@@ -480,6 +483,7 @@ If the entry is a rotating team upgrade:
 - prefer `shop.categories.rotating_upgrades.entries`
 - auto rotation expects `1` rotating upgrade per match alongside `2` rotating items
 - manual rotation can override that mix and select any subset of rotating entries
+- rotating traps use the same pool, but still render and purchase through the trap queue in `UpgradeShopMenu`
 
 #### 2.13.3 Tune a custom item
 

@@ -1086,12 +1086,19 @@ public class GameSession {
         if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
             return false;
         }
+        if (trap == null) {
+            return false;
+        }
         TeamColor team = getTeam(player.getUniqueId());
         if (team == null) {
             return false;
         }
         TeamUpgradeState state = getUpgradeState(team);
-        int cost = getTrapCost(team);
+        if (!isRotatingTrapAvailable(trap)) {
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        int cost = getTrapCost(team, trap);
         if (cost < 0) {
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             return false;
@@ -1186,8 +1193,8 @@ public class GameSession {
         return getUpgradeState(team).getTier(type);
     }
 
-    public int getTrapCost(TeamColor team) {
-        if (team == null) {
+    public int getTrapCost(TeamColor team, TrapType trap) {
+        if (team == null || trap == null) {
             return -1;
         }
         TeamUpgradeState state = getUpgradeState(team);
@@ -1195,11 +1202,11 @@ public class GameSession {
         if (count >= TRAP_MAX_COUNT) {
             return -1;
         }
-        return switch (count) {
-            case 0 -> 1;
-            case 1 -> 2;
-            default -> 4;
-        };
+        if (trap.oneTimePurchase() && state.hasPurchasedTrap(trap)) {
+            return -1;
+        }
+        int baseCost = trap.baseCost(getMaxTeamSize());
+        return baseCost * (1 << count);
     }
 
     public List<TrapType> getActiveTraps(TeamColor team) {
@@ -1207,6 +1214,13 @@ public class GameSession {
             return List.of();
         }
         return getUpgradeState(team).getTraps();
+    }
+
+    public boolean hasPurchasedTrap(TeamColor team, TrapType trap) {
+        if (team == null || trap == null) {
+            return false;
+        }
+        return getUpgradeState(team).hasPurchasedTrap(trap);
     }
 
     public void grantTrapImmunity(UUID playerId, int seconds) {
@@ -3828,6 +3842,40 @@ public class GameSession {
         return findRotatingUpgradeDefinition(config, config.getCategory(ShopCategoryType.ROTATING), type);
     }
 
+    public boolean isRotatingTrapAvailable(TrapType trap) {
+        if (trap == null) {
+            return false;
+        }
+        String itemId = normalizeItemId(trap.rotatingUpgradeItemId());
+        if (itemId == null) {
+            return true;
+        }
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null || !isListedInRotatingUpgradeCategories(config, itemId)) {
+            return false;
+        }
+        ShopItemDefinition definition = config.getItem(itemId);
+        if (definition == null) {
+            return false;
+        }
+        if (suddenDeathActive && definition.isDisabledAfterSuddenDeath()) {
+            return false;
+        }
+        return isRotatingUpgradeEntrySelected(itemId);
+    }
+
+    public ShopItemDefinition getRotatingTrapDefinition(TrapType trap) {
+        if (trap == null) {
+            return null;
+        }
+        String itemId = normalizeItemId(trap.rotatingUpgradeItemId());
+        if (itemId == null) {
+            return null;
+        }
+        ShopConfig config = bedwarsManager.getShopConfig();
+        return config != null ? config.getItem(itemId) : null;
+    }
+
     private ShopItemDefinition findRotatingUpgradeDefinition(ShopConfig config,
                                                              krispasi.omGames.bedwars.shop.ShopCategory category,
                                                              TeamUpgradeType type) {
@@ -3844,6 +3892,28 @@ public class GameSession {
             }
         }
         return null;
+    }
+
+    private boolean isListedInRotatingUpgradeCategories(ShopConfig config, String itemId) {
+        if (config == null || itemId == null) {
+            return false;
+        }
+        krispasi.omGames.bedwars.shop.ShopCategory upgradeCategory = config.getCategory(ShopCategoryType.ROTATING_UPGRADES);
+        if (upgradeCategory != null && upgradeCategory.getEntries().containsValue(itemId)) {
+            return true;
+        }
+        krispasi.omGames.bedwars.shop.ShopCategory rotatingCategory = config.getCategory(ShopCategoryType.ROTATING);
+        return rotatingCategory != null && rotatingCategory.getEntries().containsValue(itemId);
+    }
+
+    private boolean isRotatingUpgradeEntrySelected(String itemId) {
+        if (itemId == null) {
+            return false;
+        }
+        if (rotatingMode == RotatingSelectionMode.MANUAL) {
+            return rotatingUpgradeIds.contains(itemId);
+        }
+        return rotatingUpgradeIds.isEmpty() || rotatingUpgradeIds.contains(itemId);
     }
 
     private void rollRotatingItems() {
@@ -5478,14 +5548,14 @@ public class GameSession {
                 }
             }
             if (triggeredTrap != null && intruder != null) {
-                triggerTrap(team, triggeredTrap, intruder);
+                triggerTrap(team, triggeredTrap, intruder, current);
             }
             previous.clear();
             previous.addAll(current);
         }
     }
 
-    private void triggerTrap(TeamColor team, TrapType trap, Player intruder) {
+    private void triggerTrap(TeamColor team, TrapType trap, Player intruder, Set<UUID> currentIntruders) {
         intruder.removePotionEffect(PotionEffectType.INVISIBILITY);
         switch (trap) {
             case ITS_A_TRAP -> {
@@ -5504,6 +5574,7 @@ public class GameSession {
             }
             case COUNTER_OFFENSIVE -> applyCounterOffensive(team);
             case ALARM -> showTrapTitle(team, "Alarm Trap!");
+            case ILLUSION -> triggerIllusionTrap(team, currentIntruders);
             case MINER_FATIGUE -> intruder.addPotionEffect(new PotionEffect(PotionEffectType.MINING_FATIGUE,
                     TRAP_FATIGUE_SECONDS * 20,
                     0,
@@ -5514,6 +5585,46 @@ public class GameSession {
             }
         }
         announceTrap(team, trap.displayName());
+    }
+
+    private void triggerIllusionTrap(TeamColor defendingTeam, Set<UUID> intruders) {
+        if (intruders == null || intruders.isEmpty()) {
+            return;
+        }
+        showTrapTitle(defendingTeam, "Illusion Trap!");
+        for (UUID playerId : new HashSet<>(intruders)) {
+            TeamColor enemyTeam = assignments.get(playerId);
+            if (enemyTeam == null || enemyTeam == defendingTeam) {
+                continue;
+            }
+            Player enemy = Bukkit.getPlayer(playerId);
+            if (enemy == null || !enemy.isOnline()) {
+                continue;
+            }
+            if (!isInArenaWorld(enemy.getWorld()) || enemy.getGameMode() == GameMode.SPECTATOR) {
+                continue;
+            }
+            Location destination = arena.getSpawn(enemyTeam);
+            if (destination == null) {
+                continue;
+            }
+            Location source = enemy.getLocation().clone();
+            enemy.removePotionEffect(PotionEffectType.INVISIBILITY);
+            World sourceWorld = source.getWorld();
+            if (sourceWorld != null) {
+                sourceWorld.spawnParticle(Particle.PORTAL, source.clone().add(0.0, 1.0, 0.0),
+                        30, 0.45, 0.7, 0.45, 0.0);
+                sourceWorld.playSound(source, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+            }
+            enemy.teleport(destination);
+            World destinationWorld = destination.getWorld();
+            if (destinationWorld != null) {
+                destinationWorld.spawnParticle(Particle.PORTAL, destination.clone().add(0.0, 1.0, 0.0),
+                        30, 0.45, 0.7, 0.45, 0.0);
+                destinationWorld.playSound(destination, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.1f);
+            }
+            enemy.sendMessage(Component.text("An Illusion Trap warped you back to base.", NamedTextColor.RED));
+        }
     }
 
     private void applyCounterOffensive(TeamColor team) {

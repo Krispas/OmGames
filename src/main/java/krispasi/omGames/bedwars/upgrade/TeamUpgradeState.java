@@ -2,6 +2,7 @@ package krispasi.omGames.bedwars.upgrade;
 
 import java.util.ArrayDeque;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Queue;
 
@@ -13,6 +14,7 @@ import java.util.Queue;
 public class TeamUpgradeState {
     private final EnumMap<TeamUpgradeType, Integer> tiers = new EnumMap<>(TeamUpgradeType.class);
     private final Queue<TrapType> traps = new ArrayDeque<>();
+    private final EnumSet<TrapType> purchasedTraps = EnumSet.noneOf(TrapType.class);
 
     public int getTier(TeamUpgradeType type) {
         return tiers.getOrDefault(type, 0);
@@ -28,6 +30,7 @@ public class TeamUpgradeState {
 
     public void addTrap(TrapType trap) {
         traps.add(trap);
+        purchasedTraps.add(trap);
     }
 
     public TrapType pollTrap() {
@@ -38,8 +41,13 @@ public class TeamUpgradeState {
         return List.copyOf(traps);
     }
 
+    public boolean hasPurchasedTrap(TrapType trap) {
+        return trap != null && purchasedTraps.contains(trap);
+    }
+
     public void clear() {
         tiers.clear();
         traps.clear();
+        purchasedTraps.clear();
     }
 }
