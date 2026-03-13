@@ -7,12 +7,7 @@ import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
 import krispasi.omGames.egghunt.EggHuntCommand;
 import krispasi.omGames.egghunt.EggHuntListener;
 import krispasi.omGames.egghunt.EggHuntManager;
-import org.bukkit.Difficulty;
-import org.bukkit.GameRules;
-import org.bukkit.Location;
-import org.bukkit.World;
-import org.bukkit.WorldCreator;
-import org.bukkit.WorldType;
+import org.bukkit.*;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -66,7 +61,9 @@ public final class OmGames extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new BedwarsListener(bedwarsManager), this);
         getServer().getPluginManager().registerEvents(new EggHuntListener(eggHuntManager), this);
-        //setupBedwars();
+        setupBedwars();
+        setupBedwars1();
+        setupBedwars2();
     }
 
     @Override
@@ -99,28 +96,31 @@ public final class OmGames extends JavaPlugin {
         }
     }
 
-    public static OmGames getInstance(){ return instance; }
-/*    private void setupBedwars() {
+    public static OmGames getInstance() {
+        return instance;
+    }
+
+    private void setupBedwars() {
         WorldCreator creator = new WorldCreator("slumber");
         creator.environment(World.Environment.NORMAL);
         creator.type(WorldType.FLAT);
 
         // Void superflat preset
         creator.generatorSettings("""
-        {
-          "type": "minecraft:flat",
-          "settings": {
-            "layers": [
-              {
-                "block": "minecraft:air",
-                "height": 1
-              }
-            ],
-            "biome": "minecraft:the_void",
-            "structure_overrides": []
-          }
-        }
-        """);
+                {
+                  "type": "minecraft:flat",
+                  "settings": {
+                    "layers": [
+                      {
+                        "block": "minecraft:air",
+                        "height": 1
+                      }
+                    ],
+                    "biome": "minecraft:the_void",
+                    "structure_overrides": []
+                  }
+                }
+                """);
 
         World resourceWorld = Bukkit.createWorld(creator);
         if (resourceWorld != null) {
@@ -131,5 +131,50 @@ public final class OmGames extends JavaPlugin {
         } else {
             System.out.println("Failed to create bedwars");
         }
-*/
+    }
+
+    private void setupBedwars1() {
+        WorldCreator creator = new WorldCreator("slumber");
+        creator.environment(World.Environment.NORMAL);
+        creator.type(WorldType.FLAT);
+
+        // Void superflat preset
+        creator.generatorSettings("""
+                {
+                  "type": "minecraft:flat",
+                  "settings": {
+                    "layers": [
+                      {
+                        "block": "minecraft:air",
+                        "height": 1
+                      }
+                    ],
+                    "biome": "minecraft:the_void",
+                    "structure_overrides": []
+                  }
+                }
+                """);
+    }
+    private void setupBedwars2() {
+        WorldCreator creator = new WorldCreator("slumber");
+        creator.environment(World.Environment.NORMAL);
+        creator.type(WorldType.FLAT);
+
+        // Void superflat preset
+        creator.generatorSettings("""
+                {
+                  "type": "minecraft:flat",
+                  "settings": {
+                    "layers": [
+                      {
+                        "block": "minecraft:air",
+                        "height": 1
+                      }
+                    ],
+                    "biome": "minecraft:the_void",
+                    "structure_overrides": []
+                  }
+                }
+                """);
+    }
 }

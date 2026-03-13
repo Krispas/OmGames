@@ -136,6 +136,14 @@ public class GameSession {
     private static final double BLOOD_MOON_HEALTH_MULTIPLIER = 0.5;
     private static final double MOON_BIG_JUMP_MULTIPLIER = 2.5;
     private static final double BLOOD_MOON_LIFESTEAL_RATIO = 1.0;
+    private static final Duration TITLE_FADE_IN = Duration.ofMillis(300);
+    private static final Duration TITLE_STAY = Duration.ofSeconds(2);
+    private static final Duration TITLE_FADE_OUT = Duration.ofSeconds(1);
+    private static final Duration ALERT_TITLE_STAY = Duration.ofSeconds(3);
+    private static final Title.Times DEFAULT_TITLE_TIMES =
+            Title.Times.times(TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
+    private static final Title.Times ALERT_TITLE_TIMES =
+            Title.Times.times(TITLE_FADE_IN, ALERT_TITLE_STAY, TITLE_FADE_OUT);
     private static final int ABYSSAL_RIFT_AURA_INTERVAL_TICKS = 20;
     private static final int ABYSSAL_RIFT_EFFECT_DURATION_TICKS = 40;
     private static final float ABYSSAL_RIFT_HITBOX_WIDTH = 1.0f;
@@ -2178,7 +2186,7 @@ public class GameSession {
         Title title = Title.title(
                 Component.text("Your Bed was destroyed!", NamedTextColor.RED),
                 Component.text("You will no longer respawn.", NamedTextColor.GRAY),
-                Title.Times.times(Duration.ZERO, Duration.ofSeconds(2), Duration.ofSeconds(1))
+                ALERT_TITLE_TIMES
         );
         for (UUID playerId : assignments.keySet()) {
             if (team.equals(assignments.get(playerId))) {
@@ -3731,7 +3739,7 @@ public class GameSession {
     }
 
     private void showTitleAll(Component title, Component subtitle) {
-        Title message = Title.title(title, subtitle, Title.Times.times(Duration.ZERO, Duration.ofSeconds(1), Duration.ZERO));
+        Title message = Title.title(title, subtitle, DEFAULT_TITLE_TIMES);
         for (UUID playerId : assignments.keySet()) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
@@ -3741,7 +3749,7 @@ public class GameSession {
     }
 
     private void showTitle(Player player, Component title, Component subtitle) {
-        Title message = Title.title(title, subtitle, Title.Times.times(Duration.ZERO, Duration.ofSeconds(1), Duration.ZERO));
+        Title message = Title.title(title, subtitle, DEFAULT_TITLE_TIMES);
         player.showTitle(message);
     }
 
@@ -5282,7 +5290,7 @@ public class GameSession {
         Title title = Title.title(
                 Component.text(name, NamedTextColor.RED),
                 Component.text("Enemy detected", NamedTextColor.GRAY),
-                Title.Times.times(Duration.ZERO, Duration.ofSeconds(2), Duration.ofSeconds(1))
+                ALERT_TITLE_TIMES
         );
         for (UUID playerId : assignments.keySet()) {
             if (assignments.get(playerId) != team) {

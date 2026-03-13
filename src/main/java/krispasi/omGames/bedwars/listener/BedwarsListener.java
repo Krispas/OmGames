@@ -2654,9 +2654,9 @@ public class BedwarsListener implements Listener {
         }
         Component title = Component.text("TACTICAL NUKE ACTIVATED", NamedTextColor.RED);
         Component subtitle = Component.text("Explosion in " + formatNukeTime(countdown), NamedTextColor.YELLOW);
-        Title.Times times = Title.Times.times(java.time.Duration.ofMillis(200),
+        Title.Times times = Title.Times.times(java.time.Duration.ofMillis(300),
                 java.time.Duration.ofSeconds(3),
-                java.time.Duration.ofMillis(200));
+                java.time.Duration.ofSeconds(1));
         Title display = Title.title(title, subtitle, times);
         for (UUID playerId : session.getAssignments().keySet()) {
             Player target = Bukkit.getPlayer(playerId);
