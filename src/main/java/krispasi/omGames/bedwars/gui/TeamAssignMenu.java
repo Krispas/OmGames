@@ -309,20 +309,27 @@ public class TeamAssignMenu implements InventoryHolder {
         GameSession.RotatingSelectionMode mode = session.getRotatingMode();
         lore.add(Component.text("Mode: " + formatRotatingMode(mode), NamedTextColor.GRAY));
         if (mode == GameSession.RotatingSelectionMode.MANUAL) {
-            List<String> selected = session.getManualRotatingItemIds();
-            lore.add(Component.text("Selected: " + selected.size() + "/2", selected.isEmpty()
-                    ? NamedTextColor.RED
-                    : NamedTextColor.GRAY));
-            for (String id : selected) {
+            List<String> selectedItems = session.getManualRotatingItemIds();
+            List<String> selectedUpgrades = session.getManualRotatingUpgradeIds();
+            lore.add(Component.text("Items: " + selectedItems.size() + " selected",
+                    selectedItems.isEmpty() ? NamedTextColor.RED : NamedTextColor.GRAY));
+            for (String id : selectedItems) {
                 lore.add(Component.text(formatRotatingItemName(id), NamedTextColor.DARK_GRAY));
             }
-        } else if (mode == GameSession.RotatingSelectionMode.ONE_RANDOM) {
-            lore.add(Component.text("Items: 1 random", NamedTextColor.DARK_GRAY));
+            lore.add(Component.text("Upgrades: " + selectedUpgrades.size() + " selected",
+                    selectedUpgrades.isEmpty() ? NamedTextColor.RED : NamedTextColor.GRAY));
+            for (String id : selectedUpgrades) {
+                lore.add(Component.text(formatRotatingItemName(id), NamedTextColor.DARK_GRAY));
+            }
+            if (selectedItems.isEmpty() && selectedUpgrades.isEmpty()) {
+                lore.add(Component.text("No manual entries selected", NamedTextColor.RED));
+            }
         } else {
             lore.add(Component.text("Items: 2 random", NamedTextColor.DARK_GRAY));
+            lore.add(Component.text("Upgrade: 1 random", NamedTextColor.DARK_GRAY));
         }
         lore.add(Component.text("Left click: change mode", NamedTextColor.GRAY));
-        lore.add(Component.text("Right click: choose items", NamedTextColor.DARK_GRAY));
+        lore.add(Component.text("Right click: choose rotation", NamedTextColor.DARK_GRAY));
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;
@@ -367,9 +374,8 @@ public class TeamAssignMenu implements InventoryHolder {
 
     private String formatRotatingMode(GameSession.RotatingSelectionMode mode) {
         return switch (mode) {
-            case ONE_RANDOM -> "One Random";
             case MANUAL -> "Manual";
-            default -> "Primary (Auto)";
+            default -> "Auto";
         };
     }
 
@@ -384,6 +390,9 @@ public class TeamAssignMenu implements InventoryHolder {
                 String display = definition.getDisplayName();
                 if (display != null && !display.isBlank()) {
                     return display;
+                }
+                if (definition.getUpgradeType() != null) {
+                    return definition.getUpgradeType().displayName();
                 }
                 Material material = definition.getMaterial();
                 if (material != null) {

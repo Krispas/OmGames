@@ -7,6 +7,7 @@ import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -314,7 +315,7 @@ public class GameSession {
     private final Set<String> rotatingItemIds = new HashSet<>();
     private final Set<String> rotatingUpgradeIds = new HashSet<>();
     private final List<String> manualRotatingItemIds = new ArrayList<>();
-    private String manualRotatingUpgradeId;
+    private final List<String> manualRotatingUpgradeIds = new ArrayList<>();
     private RotatingSelectionMode rotatingMode = RotatingSelectionMode.AUTO;
     private final Map<UUID, AbyssalRiftState> abyssalRifts = new HashMap<>();
     private final Map<UUID, UUID> abyssalRiftEntityLinks = new HashMap<>();
@@ -3440,8 +3441,6 @@ public class GameSession {
         sidebarLines.clear();
         rotatingItemIds.clear();
         rotatingUpgradeIds.clear();
-        manualRotatingItemIds.clear();
-        manualRotatingUpgradeId = null;
         abyssalRifts.clear();
         abyssalRiftEntityLinks.clear();
         activeElytraStrikes.clear();
@@ -3606,11 +3605,17 @@ public class GameSession {
     }
 
     public List<String> getManualRotatingItemIds() {
+        if (bedwarsManager.getShopConfig() != null) {
+            sanitizeManualRotatingSelection(getRotatingItemCandidateIds(), getRotatingUpgradeCandidateIds());
+        }
         return Collections.unmodifiableList(manualRotatingItemIds);
     }
 
-    public String getManualRotatingUpgradeId() {
-        return manualRotatingUpgradeId;
+    public List<String> getManualRotatingUpgradeIds() {
+        if (bedwarsManager.getShopConfig() != null) {
+            sanitizeManualRotatingSelection(getRotatingItemCandidateIds(), getRotatingUpgradeCandidateIds());
+        }
+        return Collections.unmodifiableList(manualRotatingUpgradeIds);
     }
 
     public boolean toggleManualRotatingItem(String id) {
@@ -3618,15 +3623,15 @@ public class GameSession {
         if (normalized == null) {
             return false;
         }
-        if (!isRotatingItemCandidate(normalized)) {
+        List<String> itemCandidates = getRotatingItemCandidateIds();
+        List<String> upgradeCandidates = getRotatingUpgradeCandidateIds();
+        sanitizeManualRotatingSelection(itemCandidates, upgradeCandidates);
+        if (!itemCandidates.contains(normalized)) {
             return false;
         }
         if (manualRotatingItemIds.remove(normalized)) {
             syncManualRotatingSelection();
             return true;
-        }
-        if (manualRotatingItemIds.size() >= 2) {
-            return false;
         }
         manualRotatingItemIds.add(normalized);
         syncManualRotatingSelection();
@@ -3635,35 +3640,22 @@ public class GameSession {
 
     public boolean toggleManualRotatingUpgrade(String id) {
         String normalized = normalizeItemId(id);
-        if (normalized == null || !isRotatingUpgradeCandidate(normalized)) {
+        if (normalized == null) {
             return false;
         }
-        if (normalized.equalsIgnoreCase(manualRotatingUpgradeId)) {
-            manualRotatingUpgradeId = null;
-        } else {
-            manualRotatingUpgradeId = normalized;
+        List<String> itemCandidates = getRotatingItemCandidateIds();
+        List<String> upgradeCandidates = getRotatingUpgradeCandidateIds();
+        sanitizeManualRotatingSelection(itemCandidates, upgradeCandidates);
+        if (!upgradeCandidates.contains(normalized)) {
+            return false;
         }
+        if (manualRotatingUpgradeIds.remove(normalized)) {
+            syncManualRotatingSelection();
+            return true;
+        }
+        manualRotatingUpgradeIds.add(normalized);
         syncManualRotatingSelection();
         return true;
-    }
-
-    public void seedManualRotatingSelectionIfEmpty() {
-        if (manualRotatingItemIds.isEmpty()) {
-            List<String> itemCandidates = getRotatingItemCandidateIds();
-            Collections.shuffle(itemCandidates);
-            int count = Math.min(2, itemCandidates.size());
-            for (int i = 0; i < count; i++) {
-                manualRotatingItemIds.add(itemCandidates.get(i));
-            }
-        }
-        if (manualRotatingUpgradeId == null) {
-            List<String> upgradeCandidates = getRotatingUpgradeCandidateIds();
-            if (!upgradeCandidates.isEmpty()) {
-                Collections.shuffle(upgradeCandidates);
-                manualRotatingUpgradeId = upgradeCandidates.get(0);
-            }
-        }
-        syncManualRotatingSelection();
     }
 
     public List<String> getRotatingItemCandidateIds() {
@@ -3687,6 +3679,32 @@ public class GameSession {
             addRotatingUpgradeCandidates(candidates, config.getCategory(ShopCategoryType.ROTATING), config);
         }
         return candidates;
+    }
+
+    private void sanitizeManualRotatingSelection(List<String> itemCandidates, List<String> upgradeCandidates) {
+        Set<String> validItems = new HashSet<>(itemCandidates);
+        LinkedHashSet<String> sanitizedItems = new LinkedHashSet<>();
+        for (String id : manualRotatingItemIds) {
+            String normalized = normalizeItemId(id);
+            if (normalized == null || !validItems.contains(normalized)) {
+                continue;
+            }
+            sanitizedItems.add(normalized);
+        }
+        manualRotatingItemIds.clear();
+        manualRotatingItemIds.addAll(sanitizedItems);
+
+        Set<String> validUpgrades = new HashSet<>(upgradeCandidates);
+        LinkedHashSet<String> sanitizedUpgrades = new LinkedHashSet<>();
+        for (String id : manualRotatingUpgradeIds) {
+            String normalized = normalizeItemId(id);
+            if (normalized == null || !validUpgrades.contains(normalized)) {
+                continue;
+            }
+            sanitizedUpgrades.add(normalized);
+        }
+        manualRotatingUpgradeIds.clear();
+        manualRotatingUpgradeIds.addAll(sanitizedUpgrades);
     }
 
     private void addRotatingItemCandidates(List<String> candidates,
@@ -3744,6 +3762,9 @@ public class GameSession {
         if (suddenDeathActive && item.isDisabledAfterSuddenDeath()) {
             return false;
         }
+        if (rotatingMode == RotatingSelectionMode.MANUAL) {
+            return rotatingItemIds.contains(item.getId());
+        }
         if (rotatingItemIds.isEmpty()) {
             return true;
         }
@@ -3776,12 +3797,16 @@ public class GameSession {
                 continue;
             }
             hasRotating = true;
-            if (rotatingUpgradeIds.isEmpty() || rotatingUpgradeIds.contains(definition.getId())) {
-                if (suddenDeathActive && definition.isDisabledAfterSuddenDeath()) {
-                    return false;
-                }
-                return true;
+            boolean selected = rotatingMode == RotatingSelectionMode.MANUAL
+                    ? rotatingUpgradeIds.contains(definition.getId())
+                    : rotatingUpgradeIds.isEmpty() || rotatingUpgradeIds.contains(definition.getId());
+            if (!selected) {
+                continue;
             }
+            if (suddenDeathActive && definition.isDisabledAfterSuddenDeath()) {
+                return false;
+            }
+            return true;
         }
         return !hasRotating;
     }
@@ -3826,30 +3851,19 @@ public class GameSession {
         rotatingUpgradeIds.clear();
         List<String> itemCandidates = getRotatingItemCandidateIds();
         List<String> upgradeCandidates = getRotatingUpgradeCandidateIds();
+        sanitizeManualRotatingSelection(itemCandidates, upgradeCandidates);
         if (rotatingMode == RotatingSelectionMode.MANUAL) {
-            List<String> selected = new ArrayList<>();
             for (String id : manualRotatingItemIds) {
                 String normalized = normalizeItemId(id);
-                if (normalized != null && itemCandidates.contains(normalized) && !selected.contains(normalized)) {
-                    selected.add(normalized);
+                if (normalized != null && itemCandidates.contains(normalized)) {
+                    rotatingItemIds.add(normalized);
                 }
             }
-            if (selected.size() < 2) {
-                for (String candidate : pickRandom(itemCandidates, itemCandidates.size())) {
-                    if (selected.size() >= 2) {
-                        break;
-                    }
-                    if (!selected.contains(candidate)) {
-                        selected.add(candidate);
-                    }
+            for (String id : manualRotatingUpgradeIds) {
+                String normalized = normalizeItemId(id);
+                if (normalized != null && upgradeCandidates.contains(normalized)) {
+                    rotatingUpgradeIds.add(normalized);
                 }
-            }
-            rotatingItemIds.addAll(selected.subList(0, Math.min(2, selected.size())));
-            String normalizedUpgrade = normalizeItemId(manualRotatingUpgradeId);
-            if (normalizedUpgrade != null && upgradeCandidates.contains(normalizedUpgrade)) {
-                rotatingUpgradeIds.add(normalizedUpgrade);
-            } else {
-                rotatingUpgradeIds.addAll(pickRandom(upgradeCandidates, 1));
             }
             return;
         }
@@ -3871,14 +3885,15 @@ public class GameSession {
         }
         names.sort(String.CASE_INSENSITIVE_ORDER);
         String itemText = names.isEmpty() ? "none" : String.join(", ", names);
-        String upgradeText = "none";
-        if (!rotatingUpgradeIds.isEmpty()) {
-            String upgradeId = rotatingUpgradeIds.iterator().next();
-            upgradeText = resolveRotatingItemName(upgradeId, config.getItem(upgradeId));
+        List<String> upgradeNames = new ArrayList<>();
+        for (String id : rotatingUpgradeIds) {
+            upgradeNames.add(resolveRotatingItemName(id, config.getItem(id)));
         }
+        upgradeNames.sort(String.CASE_INSENSITIVE_ORDER);
+        String upgradeText = upgradeNames.isEmpty() ? "none" : String.join(", ", upgradeNames);
         broadcast(Component.text("Rotation Items: ", NamedTextColor.AQUA)
                 .append(Component.text(itemText, NamedTextColor.YELLOW))
-                .append(Component.text(" | Upgrade: ", NamedTextColor.AQUA))
+                .append(Component.text(" | Upgrades: ", NamedTextColor.AQUA))
                 .append(Component.text(upgradeText, NamedTextColor.YELLOW)));
     }
 
@@ -3943,17 +3958,12 @@ public class GameSession {
         return getRotatingItemCandidateIds().contains(normalized);
     }
 
-    private boolean isRotatingUpgradeCandidate(String id) {
-        String normalized = normalizeItemId(id);
-        if (normalized == null) {
-            return false;
-        }
-        return getRotatingUpgradeCandidateIds().contains(normalized);
-    }
-
     private void syncManualRotatingSelection() {
         if (rotatingMode != RotatingSelectionMode.MANUAL) {
             return;
+        }
+        if (bedwarsManager.getShopConfig() != null) {
+            sanitizeManualRotatingSelection(getRotatingItemCandidateIds(), getRotatingUpgradeCandidateIds());
         }
         rotatingItemIds.clear();
         rotatingUpgradeIds.clear();
@@ -3963,9 +3973,11 @@ public class GameSession {
                 rotatingItemIds.add(normalized);
             }
         }
-        String normalizedUpgrade = normalizeItemId(manualRotatingUpgradeId);
-        if (normalizedUpgrade != null) {
-            rotatingUpgradeIds.add(normalizedUpgrade);
+        for (String id : manualRotatingUpgradeIds) {
+            String normalized = normalizeItemId(id);
+            if (normalized != null) {
+                rotatingUpgradeIds.add(normalized);
+            }
         }
     }
 

@@ -24,7 +24,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 /**
  * Inventory UI for choosing which rotation entries are active for a match.
- * <p>Lets admins toggle up to two rotating items/upgrades when the session is in manual mode.</p>
+ * <p>Lets admins toggle any rotating items and upgrades in manual mode.</p>
  */
 public class RotatingItemMenu implements InventoryHolder {
     private static final int INVENTORY_SIZE = 54;
@@ -76,9 +76,16 @@ public class RotatingItemMenu implements InventoryHolder {
             return;
         }
         session.setRotatingMode(GameSession.RotatingSelectionMode.MANUAL);
-        boolean changed = session.toggleManualRotatingItem(itemId);
+        ShopConfig config = session.getBedwarsManager().getShopConfig();
+        ShopItemDefinition definition = config != null ? config.getItem(itemId) : null;
+        boolean changed;
+        if (definition != null && definition.getBehavior() == ShopItemBehavior.UPGRADE) {
+            changed = session.toggleManualRotatingUpgrade(itemId);
+        } else {
+            changed = session.toggleManualRotatingItem(itemId);
+        }
         if (!changed) {
-            player.sendMessage(Component.text("You can only select 2 rotation entries.", NamedTextColor.RED));
+            player.sendMessage(Component.text("That rotation entry is no longer valid.", NamedTextColor.RED));
         }
         build();
     }
@@ -88,7 +95,9 @@ public class RotatingItemMenu implements InventoryHolder {
         itemSlots.clear();
 
         ShopConfig config = session.getBedwarsManager().getShopConfig();
-        List<String> candidates = session.getRotatingCandidateIds();
+        List<String> candidates = new ArrayList<>();
+        candidates.addAll(session.getRotatingItemCandidateIds());
+        candidates.addAll(session.getRotatingUpgradeCandidateIds());
         int slot = 0;
         for (String id : candidates) {
             if (slot >= BACK_SLOT) {
@@ -99,7 +108,10 @@ public class RotatingItemMenu implements InventoryHolder {
                 continue;
             }
             ItemStack item = definition.createDisplayItem(null);
-            item = decorateSelection(item, definition, session.getManualRotatingItemIds().contains(id));
+            boolean selected = definition.getBehavior() == ShopItemBehavior.UPGRADE
+                    ? session.getManualRotatingUpgradeIds().contains(id)
+                    : session.getManualRotatingItemIds().contains(id);
+            item = decorateSelection(item, definition, selected);
             inventory.setItem(slot, item);
             itemSlots.put(slot, id);
             slot++;

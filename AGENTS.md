@@ -328,6 +328,9 @@ Rotating item notes:
 - `disable-after-sudden-death: true`
   - blocks that entry after sudden death
   - UI should show a red warning lore
+- match runtime always rolls `2` rotating items plus `1` rotating upgrade when candidates exist
+- manual prestart rotation selection can choose any subset of rotating items and upgrades
+- if `shop.categories.rotating_upgrades` has no upgrade entries, rotating-upgrade selection falls back to upgrade entries found under `shop.categories.rotating`
 
 Merge behavior:
 - `ShopConfig.merge(base, rotating)`
@@ -472,6 +475,11 @@ Do not push BedWars rules into `OmGames`.
 3. If needed, add a linked custom item in `custom-items.yml`.
 4. `/bw reload`
 5. Validate in the rotating shop tab.
+
+If the entry is a rotating team upgrade:
+- prefer `shop.categories.rotating_upgrades.entries`
+- auto rotation expects `1` rotating upgrade per match alongside `2` rotating items
+- manual rotation can override that mix and select any subset of rotating entries
 
 #### 2.13.3 Tune a custom item
 
