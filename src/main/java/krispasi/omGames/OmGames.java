@@ -61,9 +61,11 @@ public final class OmGames extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new BedwarsListener(bedwarsManager), this);
         getServer().getPluginManager().registerEvents(new EggHuntListener(eggHuntManager), this);
-        setupBedwars();
+/*      setupBedwars();
         setupBedwars1();
         setupBedwars2();
+        setupBedwars3();
+*/
     }
 
     @Override
@@ -100,8 +102,8 @@ public final class OmGames extends JavaPlugin {
         return instance;
     }
 
-    private void setupBedwars() {
-        WorldCreator creator = new WorldCreator("slumber");
+/*    private void setupBedwars() {
+        WorldCreator creator = new WorldCreator("Rooftop");
         creator.environment(World.Environment.NORMAL);
         creator.type(WorldType.FLAT);
 
@@ -134,7 +136,7 @@ public final class OmGames extends JavaPlugin {
     }
 
     private void setupBedwars1() {
-        WorldCreator creator = new WorldCreator("slumber");
+        WorldCreator creator = new WorldCreator("Mirage");
         creator.environment(World.Environment.NORMAL);
         creator.type(WorldType.FLAT);
 
@@ -154,9 +156,18 @@ public final class OmGames extends JavaPlugin {
                   }
                 }
                 """);
+        World resourceWorld = Bukkit.createWorld(creator);
+        if (resourceWorld != null) {
+            resourceWorld.setGameRule(GameRules.KEEP_INVENTORY, true);
+            resourceWorld.setGameRule(GameRules.PLAYERS_SLEEPING_PERCENTAGE, 1);
+            resourceWorld.setDifficulty(Difficulty.HARD);
+            resourceWorld.setSpawnLocation(new Location(resourceWorld, 0.5, 64, 0.5));
+        } else {
+            System.out.println("Failed to create bedwars");
+        }
     }
     private void setupBedwars2() {
-        WorldCreator creator = new WorldCreator("slumber");
+        WorldCreator creator = new WorldCreator("Vigilante");
         creator.environment(World.Environment.NORMAL);
         creator.type(WorldType.FLAT);
 
@@ -176,5 +187,45 @@ public final class OmGames extends JavaPlugin {
                   }
                 }
                 """);
+        World resourceWorld = Bukkit.createWorld(creator);
+        if (resourceWorld != null) {
+            resourceWorld.setGameRule(GameRules.KEEP_INVENTORY, true);
+            resourceWorld.setGameRule(GameRules.PLAYERS_SLEEPING_PERCENTAGE, 1);
+            resourceWorld.setDifficulty(Difficulty.HARD);
+            resourceWorld.setSpawnLocation(new Location(resourceWorld, 0.5, 64, 0.5));
+        } else {
+            System.out.println("Failed to create bedwars");
+        }
     }
+    private void setupBedwars3() {
+        WorldCreator creator = new WorldCreator("Keep");
+        creator.environment(World.Environment.NORMAL);
+        creator.type(WorldType.FLAT);
+
+        // Void superflat preset
+        creator.generatorSettings("""
+                {
+                  "type": "minecraft:flat",
+                  "settings": {
+                    "layers": [
+                      {
+                        "block": "minecraft:air",
+                        "height": 1
+                      }
+                    ],
+                    "biome": "minecraft:the_void",
+                    "structure_overrides": []
+                  }
+                }
+                """);
+        World resourceWorld = Bukkit.createWorld(creator);
+        if (resourceWorld != null) {
+            resourceWorld.setGameRule(GameRules.KEEP_INVENTORY, true);
+            resourceWorld.setGameRule(GameRules.PLAYERS_SLEEPING_PERCENTAGE, 1);
+            resourceWorld.setDifficulty(Difficulty.HARD);
+            resourceWorld.setSpawnLocation(new Location(resourceWorld, 0.5, 64, 0.5));
+        } else {
+            System.out.println("Failed to create bedwars");
+        }
+*/
 }
