@@ -111,8 +111,7 @@ public class GameSession {
     private static final String SIDEBAR_OBJECTIVE_ID = "bedwars";
     private static final String HEALTH_OBJECTIVE_ID = "bedwars_hp";
     public enum RotatingSelectionMode {
-        TWO_RANDOM,
-        ONE_RANDOM,
+        AUTO,
         MANUAL
     }
 
@@ -313,8 +312,10 @@ public class GameSession {
     private final Map<UUID, Scoreboard> activeScoreboards = new HashMap<>();
     private final Map<UUID, List<String>> sidebarLines = new HashMap<>();
     private final Set<String> rotatingItemIds = new HashSet<>();
+    private final Set<String> rotatingUpgradeIds = new HashSet<>();
     private final List<String> manualRotatingItemIds = new ArrayList<>();
-    private RotatingSelectionMode rotatingMode = RotatingSelectionMode.TWO_RANDOM;
+    private String manualRotatingUpgradeId;
+    private RotatingSelectionMode rotatingMode = RotatingSelectionMode.AUTO;
     private final Map<UUID, AbyssalRiftState> abyssalRifts = new HashMap<>();
     private final Map<UUID, UUID> abyssalRiftEntityLinks = new HashMap<>();
     private final Map<UUID, ElytraStrikeState> activeElytraStrikes = new HashMap<>();
@@ -2176,7 +2177,7 @@ public class GameSession {
         if (team == null) {
             return;
         }
-        if (getBedState(team) == BedState.ALIVE) {
+        if (getBedState(team) == BedState.ALIVE || respawnGracePlayers.contains(player.getUniqueId())) {
             pendingRespawns.add(player.getUniqueId());
         } else {
             eliminatePlayer(player, team);
@@ -2302,6 +2303,31 @@ public class GameSession {
         respawnGracePlayers.add(targetId);
         setSpectator(target);
         scheduleRespawn(target, team, delaySeconds, true, true);
+        return true;
+    }
+
+    public boolean triggerSoloRespawnBeacon(Player player, int delaySeconds) {
+        if (player == null || !isRunning()) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        if (!isParticipant(playerId)) {
+            return false;
+        }
+        TeamColor team = getTeam(playerId);
+        if (team == null || getBedState(team) != BedState.DESTROYED) {
+            return false;
+        }
+        if (getTeamMemberCount(team) != 1) {
+            return false;
+        }
+        pendingRespawns.add(playerId);
+        respawnGracePlayers.add(playerId);
+        showTitleAll(
+                Component.empty()
+                        .append(team.displayComponent())
+                        .append(Component.text(" Respawn Beacon activated!", NamedTextColor.WHITE)),
+                Component.text(player.getName() + " will respawn in " + delaySeconds + "s.", NamedTextColor.GRAY));
         return true;
     }
 
@@ -2494,10 +2520,10 @@ public class GameSession {
             return;
         }
         String bedrockId = normalizeItemId("bedrock");
-        if (bedrockId == null || !isRotatingCandidate(bedrockId)) {
+        if (bedrockId == null || !isRotatingItemCandidate(bedrockId)) {
             return;
         }
-        int target = rotatingMode == RotatingSelectionMode.ONE_RANDOM ? 1 : 2;
+        int target = 2;
         java.util.LinkedHashSet<String> adjusted = new java.util.LinkedHashSet<>();
         adjusted.add(bedrockId);
         for (String id : rotatingItemIds) {
@@ -2509,7 +2535,7 @@ public class GameSession {
             }
         }
         if (adjusted.size() < target) {
-            for (String candidate : getRotatingCandidateIds()) {
+            for (String candidate : getRotatingItemCandidateIds()) {
                 if (adjusted.size() >= target) {
                     break;
                 }
@@ -3413,6 +3439,9 @@ public class GameSession {
         activeScoreboards.clear();
         sidebarLines.clear();
         rotatingItemIds.clear();
+        rotatingUpgradeIds.clear();
+        manualRotatingItemIds.clear();
+        manualRotatingUpgradeId = null;
         abyssalRifts.clear();
         abyssalRiftEntityLinks.clear();
         activeElytraStrikes.clear();
@@ -3454,6 +3483,10 @@ public class GameSession {
 
     public Set<String> getRotatingItemIds() {
         return Collections.unmodifiableSet(rotatingItemIds);
+    }
+
+    public Set<String> getRotatingUpgradeIds() {
+        return Collections.unmodifiableSet(rotatingUpgradeIds);
     }
 
     public RotatingSelectionMode getRotatingMode() {
@@ -3561,6 +3594,7 @@ public class GameSession {
             syncManualRotatingSelection();
         } else {
             rotatingItemIds.clear();
+            rotatingUpgradeIds.clear();
         }
     }
 
@@ -3575,12 +3609,16 @@ public class GameSession {
         return Collections.unmodifiableList(manualRotatingItemIds);
     }
 
+    public String getManualRotatingUpgradeId() {
+        return manualRotatingUpgradeId;
+    }
+
     public boolean toggleManualRotatingItem(String id) {
         String normalized = normalizeItemId(id);
         if (normalized == null) {
             return false;
         }
-        if (!isRotatingCandidate(normalized)) {
+        if (!isRotatingItemCandidate(normalized)) {
             return false;
         }
         if (manualRotatingItemIds.remove(normalized)) {
@@ -3595,41 +3633,93 @@ public class GameSession {
         return true;
     }
 
-    public void seedManualRotatingItemsIfEmpty() {
-        if (!manualRotatingItemIds.isEmpty()) {
-            return;
+    public boolean toggleManualRotatingUpgrade(String id) {
+        String normalized = normalizeItemId(id);
+        if (normalized == null || !isRotatingUpgradeCandidate(normalized)) {
+            return false;
         }
-        List<String> candidates = getRotatingCandidateIds();
-        if (candidates.isEmpty()) {
-            return;
+        if (normalized.equalsIgnoreCase(manualRotatingUpgradeId)) {
+            manualRotatingUpgradeId = null;
+        } else {
+            manualRotatingUpgradeId = normalized;
         }
-        Collections.shuffle(candidates);
-        int count = Math.min(2, candidates.size());
-        for (int i = 0; i < count; i++) {
-            manualRotatingItemIds.add(candidates.get(i));
+        syncManualRotatingSelection();
+        return true;
+    }
+
+    public void seedManualRotatingSelectionIfEmpty() {
+        if (manualRotatingItemIds.isEmpty()) {
+            List<String> itemCandidates = getRotatingItemCandidateIds();
+            Collections.shuffle(itemCandidates);
+            int count = Math.min(2, itemCandidates.size());
+            for (int i = 0; i < count; i++) {
+                manualRotatingItemIds.add(itemCandidates.get(i));
+            }
+        }
+        if (manualRotatingUpgradeId == null) {
+            List<String> upgradeCandidates = getRotatingUpgradeCandidateIds();
+            if (!upgradeCandidates.isEmpty()) {
+                Collections.shuffle(upgradeCandidates);
+                manualRotatingUpgradeId = upgradeCandidates.get(0);
+            }
         }
         syncManualRotatingSelection();
     }
 
-    public List<String> getRotatingCandidateIds() {
+    public List<String> getRotatingItemCandidateIds() {
         ShopConfig config = bedwarsManager.getShopConfig();
         if (config == null) {
             return List.of();
         }
         List<String> candidates = new ArrayList<>();
-        addRotatingCandidates(candidates, config.getCategory(ShopCategoryType.ROTATING));
-        addRotatingCandidates(candidates, config.getCategory(ShopCategoryType.ROTATING_UPGRADES));
+        addRotatingItemCandidates(candidates, config.getCategory(ShopCategoryType.ROTATING), config);
         return candidates;
     }
 
-    private void addRotatingCandidates(List<String> candidates,
-                                       krispasi.omGames.bedwars.shop.ShopCategory category) {
+    public List<String> getRotatingUpgradeCandidateIds() {
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return List.of();
+        }
+        List<String> candidates = new ArrayList<>();
+        addRotatingUpgradeCandidates(candidates, config.getCategory(ShopCategoryType.ROTATING_UPGRADES), config);
+        if (candidates.isEmpty()) {
+            addRotatingUpgradeCandidates(candidates, config.getCategory(ShopCategoryType.ROTATING), config);
+        }
+        return candidates;
+    }
+
+    private void addRotatingItemCandidates(List<String> candidates,
+                                           krispasi.omGames.bedwars.shop.ShopCategory category,
+                                           ShopConfig config) {
         if (category == null || category.getEntries().isEmpty()) {
             return;
         }
         for (String id : category.getEntries().values()) {
             String normalized = normalizeItemId(id);
-            if (normalized != null && !candidates.contains(normalized)) {
+            ShopItemDefinition definition = config != null && normalized != null ? config.getItem(normalized) : null;
+            if (normalized != null
+                    && definition != null
+                    && definition.getBehavior() != ShopItemBehavior.UPGRADE
+                    && !candidates.contains(normalized)) {
+                candidates.add(normalized);
+            }
+        }
+    }
+
+    private void addRotatingUpgradeCandidates(List<String> candidates,
+                                              krispasi.omGames.bedwars.shop.ShopCategory category,
+                                              ShopConfig config) {
+        if (category == null || category.getEntries().isEmpty()) {
+            return;
+        }
+        for (String id : category.getEntries().values()) {
+            String normalized = normalizeItemId(id);
+            ShopItemDefinition definition = config != null && normalized != null ? config.getItem(normalized) : null;
+            if (normalized != null
+                    && definition != null
+                    && definition.getBehavior() == ShopItemBehavior.UPGRADE
+                    && !candidates.contains(normalized)) {
                 candidates.add(normalized);
             }
         }
@@ -3686,7 +3776,7 @@ public class GameSession {
                 continue;
             }
             hasRotating = true;
-            if (rotatingItemIds.isEmpty() || rotatingItemIds.contains(definition.getId())) {
+            if (rotatingUpgradeIds.isEmpty() || rotatingUpgradeIds.contains(definition.getId())) {
                 if (suddenDeathActive && definition.isDisabledAfterSuddenDeath()) {
                     return false;
                 }
@@ -3733,26 +3823,38 @@ public class GameSession {
 
     private void rollRotatingItems() {
         rotatingItemIds.clear();
-        List<String> candidates = getRotatingCandidateIds();
-        if (candidates.isEmpty()) {
-            return;
-        }
+        rotatingUpgradeIds.clear();
+        List<String> itemCandidates = getRotatingItemCandidateIds();
+        List<String> upgradeCandidates = getRotatingUpgradeCandidateIds();
         if (rotatingMode == RotatingSelectionMode.MANUAL) {
             List<String> selected = new ArrayList<>();
             for (String id : manualRotatingItemIds) {
                 String normalized = normalizeItemId(id);
-                if (normalized != null && candidates.contains(normalized) && !selected.contains(normalized)) {
+                if (normalized != null && itemCandidates.contains(normalized) && !selected.contains(normalized)) {
                     selected.add(normalized);
                 }
             }
-            if (selected.isEmpty()) {
-                selected.addAll(pickRandom(candidates, 2));
+            if (selected.size() < 2) {
+                for (String candidate : pickRandom(itemCandidates, itemCandidates.size())) {
+                    if (selected.size() >= 2) {
+                        break;
+                    }
+                    if (!selected.contains(candidate)) {
+                        selected.add(candidate);
+                    }
+                }
             }
             rotatingItemIds.addAll(selected.subList(0, Math.min(2, selected.size())));
+            String normalizedUpgrade = normalizeItemId(manualRotatingUpgradeId);
+            if (normalizedUpgrade != null && upgradeCandidates.contains(normalizedUpgrade)) {
+                rotatingUpgradeIds.add(normalizedUpgrade);
+            } else {
+                rotatingUpgradeIds.addAll(pickRandom(upgradeCandidates, 1));
+            }
             return;
         }
-        int target = rotatingMode == RotatingSelectionMode.ONE_RANDOM ? 1 : 2;
-        rotatingItemIds.addAll(pickRandom(candidates, target));
+        rotatingItemIds.addAll(pickRandom(itemCandidates, 2));
+        rotatingUpgradeIds.addAll(pickRandom(upgradeCandidates, 1));
     }
 
     private void announceCurrentRotatingItems() {
@@ -3760,20 +3862,24 @@ public class GameSession {
         if (config == null) {
             return;
         }
-        if (getRotatingCandidateIds().isEmpty()) {
+        if (getRotatingItemCandidateIds().isEmpty() && getRotatingUpgradeCandidateIds().isEmpty()) {
             return;
         }
         List<String> names = new ArrayList<>();
         for (String id : rotatingItemIds) {
             names.add(resolveRotatingItemName(id, config.getItem(id)));
         }
-        if (names.isEmpty()) {
-            broadcast(Component.text("Rotation: none", NamedTextColor.GRAY));
-            return;
-        }
         names.sort(String.CASE_INSENSITIVE_ORDER);
-        broadcast(Component.text("Rotation: ", NamedTextColor.AQUA)
-                .append(Component.text(String.join(", ", names), NamedTextColor.YELLOW)));
+        String itemText = names.isEmpty() ? "none" : String.join(", ", names);
+        String upgradeText = "none";
+        if (!rotatingUpgradeIds.isEmpty()) {
+            String upgradeId = rotatingUpgradeIds.iterator().next();
+            upgradeText = resolveRotatingItemName(upgradeId, config.getItem(upgradeId));
+        }
+        broadcast(Component.text("Rotation Items: ", NamedTextColor.AQUA)
+                .append(Component.text(itemText, NamedTextColor.YELLOW))
+                .append(Component.text(" | Upgrade: ", NamedTextColor.AQUA))
+                .append(Component.text(upgradeText, NamedTextColor.YELLOW)));
     }
 
     private String resolveRotatingItemName(String id, ShopItemDefinition definition) {
@@ -3829,12 +3935,20 @@ public class GameSession {
         return new ArrayList<>(shuffled.subList(0, target));
     }
 
-    private boolean isRotatingCandidate(String id) {
+    private boolean isRotatingItemCandidate(String id) {
         String normalized = normalizeItemId(id);
         if (normalized == null) {
             return false;
         }
-        return getRotatingCandidateIds().contains(normalized);
+        return getRotatingItemCandidateIds().contains(normalized);
+    }
+
+    private boolean isRotatingUpgradeCandidate(String id) {
+        String normalized = normalizeItemId(id);
+        if (normalized == null) {
+            return false;
+        }
+        return getRotatingUpgradeCandidateIds().contains(normalized);
     }
 
     private void syncManualRotatingSelection() {
@@ -3842,11 +3956,16 @@ public class GameSession {
             return;
         }
         rotatingItemIds.clear();
+        rotatingUpgradeIds.clear();
         for (String id : manualRotatingItemIds) {
             String normalized = normalizeItemId(id);
             if (normalized != null) {
                 rotatingItemIds.add(normalized);
             }
+        }
+        String normalizedUpgrade = normalizeItemId(manualRotatingUpgradeId);
+        if (normalizedUpgrade != null) {
+            rotatingUpgradeIds.add(normalizedUpgrade);
         }
     }
 

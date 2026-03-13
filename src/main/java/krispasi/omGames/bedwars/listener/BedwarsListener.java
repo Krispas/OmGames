@@ -205,6 +205,7 @@ public class BedwarsListener implements Listener {
     private static final String PORTABLE_SHOPKEEPER_NAME = "Portable Shopkeeper";
     private static final String PORTABLE_SHOPKEEPER_TAG = "bw_portable_shopkeeper";
     private static final String PLACEABLE_BED_ITEM_ID = "placeable_bed";
+    private static final String RESPAWN_BEACON_ITEM_ID = "respawn_beacon";
     private final NamespacedKey customProjectileKey;
     private final NamespacedKey summonTeamKey;
     private final NamespacedKey happyGhastDriverKey;
@@ -1670,11 +1671,15 @@ public class BedwarsListener implements Listener {
                 }
             }
             boolean finalDeath = false;
+            boolean autoSoloBeacon = false;
             boolean statsEnabled = session.isStatsEnabled();
             if (participant) {
                 event.getDrops().removeIf(session::isActiveElytraStrikeItem);
+                autoSoloBeacon = tryAutoActivateSoloRespawnBeacon(player, session);
                 TeamColor team = session.getTeam(player.getUniqueId());
-                finalDeath = team != null && session.getBedState(team) == BedState.DESTROYED;
+                finalDeath = team != null
+                        && session.getBedState(team) == BedState.DESTROYED
+                        && !autoSoloBeacon;
                 if (statsEnabled) {
                     bedwarsManager.getStatsService().addDeath(player.getUniqueId());
                     if (finalDeath) {
@@ -2187,26 +2192,123 @@ public class BedwarsListener implements Listener {
     }
 
     private boolean activateRespawnBeacon(Player player, GameSession session, CustomItemDefinition custom) {
-        int delaySeconds = custom != null && custom.getLifetimeSeconds() > 0
-                ? custom.getLifetimeSeconds()
-                : 30;
+        int delaySeconds = resolveRespawnBeaconDelay(custom);
         boolean activated = session.triggerRespawnBeacon(player, delaySeconds);
         if (activated) {
             TeamColor team = session.getTeam(player.getUniqueId());
-            Location origin = player.getLocation();
-            if (team != null) {
-                BedLocation bed = session.getActiveBedLocation(team);
-                if (bed == null) {
-                    bed = session.getArena().getBeds().get(team);
-                }
-                World world = session.getArena().getWorld();
-                if (bed != null && world != null) {
-                    origin = bed.head().toLocation(world);
-                }
-            }
+            Location origin = resolveBeaconEffectOrigin(session, team, player.getLocation());
             startBeaconEffect(origin, team, delaySeconds);
         }
         return activated;
+    }
+
+    private boolean tryAutoActivateSoloRespawnBeacon(Player player, GameSession session) {
+        if (player == null || session == null) {
+            return false;
+        }
+        TeamColor team = session.getTeam(player.getUniqueId());
+        if (team == null
+                || session.getBedState(team) != BedState.DESTROYED
+                || session.getTeamMemberCount(team) != 1
+                || !hasCustomItem(player, RESPAWN_BEACON_ITEM_ID)) {
+            return false;
+        }
+        CustomItemDefinition custom = getCustomItem(RESPAWN_BEACON_ITEM_ID);
+        int delaySeconds = resolveRespawnBeaconDelay(custom);
+        if (!session.triggerSoloRespawnBeacon(player, delaySeconds)) {
+            return false;
+        }
+        consumeCustomItem(player, RESPAWN_BEACON_ITEM_ID);
+        startBeaconEffect(resolveBeaconEffectOrigin(session, team, player.getLocation()), team, delaySeconds);
+        return true;
+    }
+
+    private int resolveRespawnBeaconDelay(CustomItemDefinition custom) {
+        return custom != null && custom.getLifetimeSeconds() > 0
+                ? custom.getLifetimeSeconds()
+                : 30;
+    }
+
+    private Location resolveBeaconEffectOrigin(GameSession session, TeamColor team, Location fallback) {
+        if (session == null) {
+            return fallback;
+        }
+        if (team != null) {
+            BedLocation bed = session.getActiveBedLocation(team);
+            if (bed == null) {
+                bed = session.getArena().getBeds().get(team);
+            }
+            World world = session.getArena().getWorld();
+            if (bed != null && world != null) {
+                return bed.head().toLocation(world);
+            }
+        }
+        return fallback;
+    }
+
+    private boolean hasCustomItem(Player player, String customId) {
+        if (player == null || customId == null || customId.isBlank()) {
+            return false;
+        }
+        ItemStack[] contents = player.getInventory().getContents();
+        for (ItemStack item : contents) {
+            if (customId.equalsIgnoreCase(CustomItemData.getId(item))) {
+                return true;
+            }
+        }
+        if (customId.equalsIgnoreCase(CustomItemData.getId(player.getInventory().getItemInOffHand()))) {
+            return true;
+        }
+        return customId.equalsIgnoreCase(CustomItemData.getId(player.getItemOnCursor()));
+    }
+
+    private boolean consumeCustomItem(Player player, String customId) {
+        if (player == null || customId == null || customId.isBlank()) {
+            return false;
+        }
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int i = 0; i < contents.length; i++) {
+            ItemStack item = contents[i];
+            if (!customId.equalsIgnoreCase(CustomItemData.getId(item))) {
+                continue;
+            }
+            decrementStack(contents, i, item);
+            player.getInventory().setContents(contents);
+            return true;
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (customId.equalsIgnoreCase(CustomItemData.getId(offhand))) {
+            if (offhand.getAmount() <= 1) {
+                player.getInventory().setItemInOffHand(null);
+            } else {
+                offhand.setAmount(offhand.getAmount() - 1);
+                player.getInventory().setItemInOffHand(offhand);
+            }
+            return true;
+        }
+        ItemStack cursor = player.getItemOnCursor();
+        if (!customId.equalsIgnoreCase(CustomItemData.getId(cursor))) {
+            return false;
+        }
+        if (cursor.getAmount() <= 1) {
+            player.setItemOnCursor(null);
+        } else {
+            cursor.setAmount(cursor.getAmount() - 1);
+            player.setItemOnCursor(cursor);
+        }
+        return true;
+    }
+
+    private void decrementStack(ItemStack[] contents, int slot, ItemStack item) {
+        if (contents == null || slot < 0 || slot >= contents.length || item == null) {
+            return;
+        }
+        if (item.getAmount() <= 1) {
+            contents[slot] = null;
+            return;
+        }
+        item.setAmount(item.getAmount() - 1);
+        contents[slot] = item;
     }
 
     private boolean useFlamethrower(Player player,
