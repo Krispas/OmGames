@@ -749,7 +749,15 @@ public class BedwarsListener implements Listener {
             if (clicked == null) {
                 return;
             }
-            bedwarsManager.getLobbyParkour().handlePlatePress(event.getPlayer(), clicked);
+            Player player = event.getPlayer();
+            GameSession session = bedwarsManager.getActiveSession();
+            if (clicked.getType() == Material.FARMLAND
+                    && isOutsideRunningBedwarsGame(player, session)
+                    && !canEditProtectedBedwarsWorld(player, session)) {
+                event.setCancelled(true);
+                return;
+            }
+            bedwarsManager.getLobbyParkour().handlePlatePress(player, clicked);
         });
     }
 
@@ -1682,6 +1690,9 @@ public class BedwarsListener implements Listener {
                 event.getDrops().removeIf(session::isActiveElytraStrikeItem);
                 tryAutoActivateSoloRespawnBeacon(player, session);
                 finalDeath = session.handlePlayerDeath(player);
+                if (!finalDeath) {
+                    session.recordPendingDeathCredit(player.getUniqueId(), killerId);
+                }
                 if (statsEnabled) {
                     bedwarsManager.getStatsService().addDeath(player.getUniqueId());
                     if (finalDeath) {

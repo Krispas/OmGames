@@ -340,6 +340,7 @@ public class GameSession {
     private final Map<TeamColor, Map<String, Integer>> teamPurchaseCounts = new EnumMap<>(TeamColor.class);
     private final Map<UUID, Map<String, Integer>> playerPurchaseCounts = new HashMap<>();
     private final Map<UUID, Map<String, Long>> customItemCooldownEnds = new HashMap<>();
+    private final Map<UUID, UUID> pendingDeathKillCredits = new HashMap<>();
     private final Set<UUID> editorPlayers = new HashSet<>();
     private final Set<TeamColor> teamsInMatch = EnumSet.noneOf(TeamColor.class);
     private final Set<UUID> shopNpcIds = new HashSet<>();
@@ -567,6 +568,7 @@ public class GameSession {
         shieldUnlocked.remove(playerId);
         killCounts.remove(playerId);
         playerPurchaseCounts.remove(playerId);
+        pendingDeathKillCredits.remove(playerId);
         lastCombatTimes.remove(playerId);
         lastDamagers.remove(playerId);
         lastDamagerTimes.remove(playerId);
@@ -799,6 +801,17 @@ public class GameSession {
             return null;
         }
         return lastDamagers.get(victimId);
+    }
+
+    public void recordPendingDeathCredit(UUID victimId, UUID killerId) {
+        if (victimId == null) {
+            return;
+        }
+        if (!pendingRespawns.contains(victimId)) {
+            pendingDeathKillCredits.remove(victimId);
+            return;
+        }
+        pendingDeathKillCredits.put(victimId, victimId.equals(killerId) ? null : killerId);
     }
 
     public void recordCombat(UUID attackerId, UUID victimId) {
@@ -2562,22 +2575,27 @@ public class GameSession {
     }
 
     public boolean handlePlayerDeath(Player player) {
-        if (!isRunning() || !isParticipant(player.getUniqueId())) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        clearPendingDeathCredit(playerId);
+        if (!isRunning() || !isParticipant(playerId)) {
             return false;
         }
         clearElytraStrike(player, false, false);
-        clearCombat(player.getUniqueId());
-        clearTrapImmunity(player.getUniqueId());
-        removeRespawnProtection(player.getUniqueId());
-        downgradeTools(player.getUniqueId());
+        clearCombat(playerId);
+        clearTrapImmunity(playerId);
+        removeRespawnProtection(playerId);
+        downgradeTools(playerId);
         removeItems(player, PICKAXE_MATERIALS);
         removeItems(player, AXE_MATERIALS);
-        TeamColor team = getTeam(player.getUniqueId());
+        TeamColor team = getTeam(playerId);
         if (team == null) {
             return false;
         }
-        if (getBedState(team) == BedState.ALIVE || respawnGracePlayers.contains(player.getUniqueId())) {
-            pendingRespawns.add(player.getUniqueId());
+        if (getBedState(team) == BedState.ALIVE || respawnGracePlayers.contains(playerId)) {
+            pendingRespawns.add(playerId);
             return false;
         }
         eliminatePlayer(player, team);
@@ -2611,6 +2629,7 @@ public class GameSession {
         boolean allowRespawnAfterBedBreak = respawnGracePlayers.contains(playerId);
         if (getBedState(team) == BedState.DESTROYED && !allowRespawnAfterBedBreak) {
             pendingRespawns.remove(playerId);
+            awardPendingDeathFinalStats(playerId);
             eliminatePlayer(player, team);
             return;
         }
@@ -3259,7 +3278,13 @@ public class GameSession {
         }
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> safeRun("respawn", () -> {
             boolean allowRespawn = allowRespawnAfterBedBreak || respawnGracePlayers.contains(playerId);
+            boolean finalElimination = getBedState(team) == BedState.DESTROYED && !allowRespawn;
             if (state != GameState.RUNNING || (getBedState(team) == BedState.DESTROYED && !allowRespawn)) {
+                if (finalElimination) {
+                    awardPendingDeathFinalStats(playerId);
+                } else {
+                    clearPendingDeathCredit(playerId);
+                }
                 eliminatedPlayers.add(playerId);
                 pendingRespawns.remove(playerId);
                 setSpectator(player);
@@ -3282,6 +3307,7 @@ public class GameSession {
             cancelRespawnCountdown(playerId);
             respawnGracePlayers.remove(playerId);
             respawnTasks.remove(player.getUniqueId());
+            clearPendingDeathCredit(playerId);
             plugin.getServer().getScheduler().runTaskLater(plugin,
                     () -> applyPermanentItemsWithShield(player, team),
                     1L);
@@ -3309,11 +3335,36 @@ public class GameSession {
         }
     }
 
+    private void clearPendingDeathCredit(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        pendingDeathKillCredits.remove(playerId);
+    }
+
+    private void awardPendingDeathFinalStats(UUID playerId) {
+        if (playerId == null || !pendingDeathKillCredits.containsKey(playerId)) {
+            return;
+        }
+        UUID killerId = pendingDeathKillCredits.remove(playerId);
+        if (statsEnabled) {
+            bedwarsManager.getStatsService().addFinalDeath(playerId);
+        }
+        if (killerId == null) {
+            return;
+        }
+        rewardFinalKill(killerId);
+        if (statsEnabled) {
+            bedwarsManager.getStatsService().addFinalKill(killerId);
+        }
+    }
+
     private void eliminatePlayer(Player player, TeamColor team) {
         UUID playerId = player.getUniqueId();
         eliminatedPlayers.add(playerId);
         pendingRespawns.remove(playerId);
         respawnGracePlayers.remove(playerId);
+        clearPendingDeathCredit(playerId);
         setSpectator(player);
         checkTeamEliminated(team);
     }
@@ -3865,6 +3916,7 @@ public class GameSession {
         lastDamagerTimes.clear();
         lastDamageTimes.clear();
         lastRegenTimes.clear();
+        pendingDeathKillCredits.clear();
         benevolentEventUpgrades.clear();
         trapImmunityEnds.clear();
         trapImmunityTasks.clear();
@@ -5160,6 +5212,7 @@ public class GameSession {
             boolean allowRespawnAfterBedBreak = respawnGracePlayers.contains(playerId);
             if (getBedState(team) == BedState.DESTROYED && !allowRespawnAfterBedBreak) {
                 pendingRespawns.remove(playerId);
+                awardPendingDeathFinalStats(playerId);
                 eliminatePlayer(player, team);
                 syncToolTiers(player);
                 hideEditorsFrom(player);

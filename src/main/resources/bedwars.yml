@@ -373,14 +373,14 @@ arenas:
       base_cyan: -3154 71 85
       base_pink: -3221 71 198
     Base_Generators:
-      base_gen_red: -3338 70 131
-      base_gen_blue: -3338 70 85
-      base_gen_lime: -3267 70 14
-      base_gen_white: -3150 70 131
-      base_gen_black: -3267 70 202
-      base_gen_yellow: -3221 70 14
-      base_gen_cyan: -3150 70 85
-      base_gen_pink: -3221 70 202
+      base_gen_red: -3338 71 131
+      base_gen_blue: -3338 71 85
+      base_gen_lime: -3267 71 14
+      base_gen_white: -3150 71 131
+      base_gen_black: -3267 71 202
+      base_gen_yellow: -3221 71 14
+      base_gen_cyan: -3150 71 85
+      base_gen_pink: -3221 71 202
     Shops:
       red:
         main: -3332 71 125 SOUTH
@@ -524,14 +524,14 @@ arenas:
       base_cyan: 983 67 -884
       base_pink: 853 67 -938
     Base_Generators:
-      base_gen_red: 907 66 -1073
-      base_gen_blue: 983 66 -1073
-      base_gen_lime: 1042 66 -1014
-      base_gen_white: 907 66 -879
-      base_gen_black: 848 66 -1014
-      base_gen_yellow: 1042 66 -938
-      base_gen_cyan: 983 66 -879
-      base_gen_pink: 848 66 -938
+      base_gen_red: 907 67 -1073
+      base_gen_blue: 983 67 -1073
+      base_gen_lime: 1042 67 -1014
+      base_gen_white: 907 67 -879
+      base_gen_black: 848 67 -1014
+      base_gen_yellow: 1042 67 -938
+      base_gen_cyan: 983 67 -879
+      base_gen_pink: 848 67 -938
     Shops:
       red:
         main: 907 67 -1068 SOUTH
@@ -675,14 +675,14 @@ arenas:
       base_cyan: -1090 41 950
       base_pink: -949 41 909
     Base_Generators:
-      base_gen_red: -912 40 1056
-      base_gen_blue: -943 40 1087
-      base_gen_lime: -1055 40 1087
-      base_gen_white: -1055 40 913
-      base_gen_black: -912 40 944
-      base_gen_yellow: -1086 40 1056
-      base_gen_cyan: -1086 40 944
-      base_gen_pink: -943 40 913
+      base_gen_red: -912 41 1056
+      base_gen_blue: -943 41 1087
+      base_gen_lime: -1055 41 1087
+      base_gen_white: -1055 41 913
+      base_gen_black: -912 41 944
+      base_gen_yellow: -1086 41 1056
+      base_gen_cyan: -1086 41 944
+      base_gen_pink: -943 41 913
     Shops:
       red:
         main: -902 41 1047 WEST
@@ -826,14 +826,14 @@ arenas:
       base_cyan: 2574 66 125
       base_pink: 2451 66 70
     Base_Generators:
-      base_gen_red: 2506 65 -59
-      base_gen_blue: 2574 65 -59
-      base_gen_lime: 2635 65 2
-      base_gen_white: 2506 65 131
-      base_gen_black: 2445 65 2
-      base_gen_yellow: 2635 65 70
-      base_gen_cyan: 2574 65 131
-      base_gen_pink: 2445 65 70
+      base_gen_red: 2506 66 -59
+      base_gen_blue: 2574 66 -59
+      base_gen_lime: 2635 66 2
+      base_gen_white: 2506 66 131
+      base_gen_black: 2445 66 2
+      base_gen_yellow: 2635 66 70
+      base_gen_cyan: 2574 66 131
+      base_gen_pink: 2445 66 70
     Shops:
       red:
         main: 2512 66 -55 WEST

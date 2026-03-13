@@ -473,6 +473,8 @@ Do not push BedWars rules into `OmGames`.
 - Keep BedWars config parsing tolerant of legacy casing and aliases where the loaders already support them.
 - Shop + rotating config are both active after reload because of merge behavior.
 - If stats are disabled for a session, progression/wins should not be awarded.
+- Outside a running BedWars match, protected BedWars worlds should still block casual terrain changes like farmland trampling unless the player is an allowed editor.
+- If a pending respawn later turns into a true elimination because respawns are no longer allowed, final-death and final-kill stats should still resolve from that original death.
 
 ### 2.13 Common Recipes
 
