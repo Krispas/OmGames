@@ -1,8 +1,13 @@
 package krispasi.omGames;
 
+import krispasi.omGames.shared.SKIN_TYPE;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 /**
@@ -42,11 +47,22 @@ public class OmVeinsAPI {
     private static BiConsumer<Player, Integer> addPartyExpConsumer;
 
     /**
+     * Function responsible for returning a player's available Om skins,
+     * grouped and sorted by {@link SKIN_TYPE}.
+     *
+     * <p>The returned strings are the right parts of the skin IDs.
+     * The left part is always {@code "om"}, so the full ID is
+     * {@code "om:" + suffix}.</p>
+     */
+    private static Function<Player, Map<SKIN_TYPE, ArrayList<String>>> getPlayerSkinsFunction;
+
+    /**
      * Checks whether all required consumers are set.
      * If so, marks the API as initialized and logs the state.
      */
     private static void checkIfDone() {
         if (addPartyExpConsumer == null) return;
+        if (getPlayerSkinsFunction == null) return;
 
         initialized = true;
         OmGames.getInstance().getLogger().info("OmVeins API: Fully initialized!");
@@ -96,9 +112,7 @@ public class OmVeinsAPI {
      */
     public static void addPartyExp(Player player, Integer amount) {
         if (!initialized) {
-            throw new IllegalStateException(
-                    "Attempting to use OmVeins API while it is not initialized!"
-            );
+            notInitializedWarning();
         }
 
         try {
@@ -108,5 +122,47 @@ public class OmVeinsAPI {
                     .log(Level.SEVERE,
                             "OmVeins API: error while executing AddPartyExp!", e);
         }
+    }
+
+    /**
+     * Registers the function responsible for returning a player's available Om skins.
+     *
+     * <p>The function must return a map grouped by {@link SKIN_TYPE}. Each value is a list
+     * of skin ID suffixes (right part only). The full ID is always {@code "om:" + suffix}.</p>
+     *
+     * <p>Returned data is expected to be sorted by {@link SKIN_TYPE}.</p>
+     *
+     * @param consumer function returning player's skins grouped by type
+     */
+    public static void setGetPlayerSkinsFunction(Function<Player, Map<SKIN_TYPE, ArrayList<String>>> consumer) {
+        getPlayerSkinsFunction = consumer;
+        OmGames.getInstance().getLogger().info("OmVeins API: GetPlayerSkinsConsumer consumer set!");
+        checkIfDone();
+    }
+
+    /**
+     * Returns the player's available Om skins grouped by {@link SKIN_TYPE}.
+     *
+     * <p>Each string is the right part of the skin ID; the left part is always {@code "om"},
+     * so the full ID is {@code "om:" + suffix}.</p>
+     *
+     * <p>Result is expected to be sorted by {@link SKIN_TYPE}.</p>
+     *
+     * @param player player whose skins should be returned
+     * @return map of skin type to list of skin ID suffixes
+     *
+     * @throws IllegalStateException if the API has not been initialized
+     */
+    public static Map<SKIN_TYPE, ArrayList<String>> getPlayerSkins(Player player){
+        if (!initialized) {
+            notInitializedWarning();
+        }
+        return getPlayerSkinsFunction.apply(player);
+    }
+
+    private static void notInitializedWarning(){
+        throw new IllegalStateException(
+                "Attempting to use OmVeins API while it is not initialized!"
+        );
     }
 }
