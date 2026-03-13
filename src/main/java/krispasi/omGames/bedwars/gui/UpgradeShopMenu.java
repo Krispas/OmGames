@@ -39,6 +39,7 @@ public class UpgradeShopMenu implements InventoryHolder {
     private static final int HEAL_POOL_SLOT = 14;
     private static final int FEATHER_FALLING_SLOT = 15;
     private static final int THORNS_SLOT = 16;
+    private static final int EFFICIENCY_SLOT = 17;
     private static final int FIRE_ASPECT_SLOT = 19;
     private static final int SCALE_DOWN_SLOT = 20;
     private static final int TRAP_SLOT_START = 28;
@@ -104,6 +105,7 @@ public class UpgradeShopMenu implements InventoryHolder {
         setUpgrade(HEAL_POOL_SLOT, TeamUpgradeType.HEAL_POOL);
         setUpgrade(FEATHER_FALLING_SLOT, TeamUpgradeType.FEATHER_FALLING);
         setUpgrade(THORNS_SLOT, TeamUpgradeType.THORNS);
+        setUpgrade(EFFICIENCY_SLOT, TeamUpgradeType.EFFICIENCY);
         setUpgrade(FIRE_ASPECT_SLOT, TeamUpgradeType.FIRE_ASPECT);
         setUpgrade(SCALE_DOWN_SLOT, TeamUpgradeType.SCALE_DOWN);
 

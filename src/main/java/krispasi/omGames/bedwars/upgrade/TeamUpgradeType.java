@@ -14,6 +14,8 @@ public enum TeamUpgradeType {
             List.of("Sharpness I on team swords.")),
     HASTE("Haste", Material.IRON_PICKAXE, new int[]{2, 4},
             List.of("Permanent Haste for your team.")),
+    EFFICIENCY("Efficiency", Material.GOLDEN_PICKAXE, new int[]{4},
+            List.of("Efficiency I on team tools.")),
     FEATHER_FALLING("Feather Falling", Material.FEATHER, new int[]{2, 4},
             List.of("Feather Falling on team boots.")),
     THORNS("Thorns", Material.CACTUS, new int[]{2, 4, 8},

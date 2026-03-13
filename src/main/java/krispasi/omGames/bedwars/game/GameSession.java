@@ -215,6 +215,7 @@ public class GameSession {
             TeamUpgradeType.PROTECTION,
             TeamUpgradeType.SHARPNESS,
             TeamUpgradeType.HASTE,
+            TeamUpgradeType.EFFICIENCY,
             TeamUpgradeType.FEATHER_FALLING,
             TeamUpgradeType.THORNS,
             TeamUpgradeType.FIRE_ASPECT,
@@ -245,6 +246,19 @@ public class GameSession {
             Material.IRON_AXE,
             Material.GOLDEN_AXE,
             Material.DIAMOND_AXE
+    );
+    private static final Set<Material> TOOL_EFFICIENCY_MATERIALS = EnumSet.of(
+            Material.WOODEN_PICKAXE,
+            Material.STONE_PICKAXE,
+            Material.IRON_PICKAXE,
+            Material.GOLDEN_PICKAXE,
+            Material.DIAMOND_PICKAXE,
+            Material.WOODEN_AXE,
+            Material.STONE_AXE,
+            Material.IRON_AXE,
+            Material.GOLDEN_AXE,
+            Material.DIAMOND_AXE,
+            Material.SHEARS
     );
     private static final Set<Material> ATTACK_MATERIALS = EnumSet.of(
             Material.WOODEN_SWORD,
@@ -4312,6 +4326,7 @@ public class GameSession {
         }
         shearsUnlocked.add(playerId);
         giveItem(player, item.createPurchaseItem(team));
+        applyTeamUpgrades(player, team);
         return true;
     }
 
@@ -5742,6 +5757,9 @@ public class GameSession {
         if (hasteTier > 0) {
             applyHaste(player, hasteTier);
         }
+        if (upgrades.getTier(TeamUpgradeType.EFFICIENCY) > 0) {
+            applyEfficiency(player);
+        }
         int featherTier = upgrades.getTier(TeamUpgradeType.FEATHER_FALLING);
         if (featherTier > 0) {
             applyFeatherFalling(player, featherTier);
@@ -5794,6 +5812,10 @@ public class GameSession {
                 true,
                 false,
                 true));
+    }
+
+    private void applyEfficiency(Player player) {
+        applyEnchantment(player, TOOL_EFFICIENCY_MATERIALS, Enchantment.EFFICIENCY, 1);
     }
 
     private void applyFeatherFalling(Player player, int level) {
