@@ -312,6 +312,7 @@ public class GameSession {
     private final Map<BlockPoint, TeamColor> bedBlocks = new HashMap<>();
     private final Set<BlockPoint> placedBlocks = new HashSet<>();
     private final Map<BlockPoint, ItemStack> placedBlockItems = new HashMap<>();
+    private final Map<BlockPoint, BlockState> temporaryMapLobbyIslandBlocks = new HashMap<>();
     private final Set<Long> forcedChunks = new HashSet<>();
     private final Set<UUID> frozenPlayers = new HashSet<>();
     private final Set<UUID> eliminatedPlayers = new HashSet<>();
@@ -2503,6 +2504,7 @@ public class GameSession {
         initializeBaseCenters();
         initializeBeds();
         applyBedLayout();
+        createTemporaryMapLobbyIsland();
 
         lobbyCountdownRemaining = Math.max(0, lobbySeconds);
         lobbyCountdownPaused = false;
@@ -3661,6 +3663,41 @@ public class GameSession {
         }
     }
 
+    private void createTemporaryMapLobbyIsland() {
+        removeTemporaryMapLobbyIsland();
+        Location lobby = resolveMapLobbyLocation();
+        if (lobby == null || lobby.getWorld() == null) {
+            return;
+        }
+        World world = lobby.getWorld();
+        int floorY = lobby.getBlockY() - 1;
+        if (floorY < world.getMinHeight() || floorY >= world.getMaxHeight()) {
+            return;
+        }
+        int centerX = lobby.getBlockX();
+        int centerZ = lobby.getBlockZ();
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                Block block = world.getBlockAt(centerX + dx, floorY, centerZ + dz);
+                BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
+                temporaryMapLobbyIslandBlocks.put(point, block.getState());
+                block.setType(Material.BARRIER, false);
+            }
+        }
+    }
+
+    private void removeTemporaryMapLobbyIsland() {
+        if (temporaryMapLobbyIslandBlocks.isEmpty()) {
+            return;
+        }
+        for (BlockState snapshot : temporaryMapLobbyIslandBlocks.values()) {
+            if (snapshot != null) {
+                snapshot.update(true, false);
+            }
+        }
+        temporaryMapLobbyIslandBlocks.clear();
+    }
+
     private void removeActivePlacedBeds() {
         for (Map.Entry<TeamColor, BedLocation> entry : activeBedLocations.entrySet()) {
             BedLocation activeLocation = entry.getValue();
@@ -3780,6 +3817,7 @@ public class GameSession {
         finalizeMatchParticipationPartyExp();
         flushPendingPartyExpForOnlineParticipants();
         state = GameState.ENDING;
+        removeTemporaryMapLobbyIsland();
         clearAllElytraStrikes(false);
         clearAbyssalRifts();
         clearEditors();
@@ -3947,6 +3985,7 @@ public class GameSession {
         eliminationOrder.clear();
         placedBlocks.clear();
         placedBlockItems.clear();
+        temporaryMapLobbyIslandBlocks.clear();
         forcedChunks.clear();
         bedStates.clear();
         activeBedLocations.clear();

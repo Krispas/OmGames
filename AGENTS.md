@@ -484,6 +484,7 @@ Do not push BedWars rules into `OmGames`.
 - Outside a running BedWars match, players should not be able to rotate, take from, or break item frames in protected BedWars worlds unless they are allowed editors.
 - If a pending respawn later turns into a true elimination because respawns are no longer allowed, final-death and final-kill stats should still resolve from that original death.
 - `netherite_spear` movement boost reuse is listener-gated by a 5-second cooldown.
+- Lobby-mode prestart should build a temporary 5x5 barrier platform centered under the resolved `map-lobby` location and restore the original blocks when the session leaves lobby/starts the match.
 - Match end cleanup should return all remaining arena spectators to the arena `game-lobby`; `map-lobby` is for prestart/spectate flows, not post-match cleanup.
 - `/bw game spectate` can only be run by a player already standing in the active BedWars world.
 - Players put into spectator mode by `/bw game spectate` are locked to the active BedWars world until `/bw game out` or session end.
