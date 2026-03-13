@@ -496,7 +496,7 @@ public class BedwarsListener implements Listener {
             if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
                 return;
             }
-            if (rightClick && shouldBlockLungingSpearMovement(player, item, event)) {
+            if (leftClick && shouldBlockLungingSpearMovement(player, item, event)) {
                 event.setCancelled(true);
                 return;
             }
@@ -1210,13 +1210,14 @@ public class BedwarsListener implements Listener {
             if (event.getDamager() instanceof EnderCrystal crystal) {
                 TeamColor ownerTeam = getSummonTeam(crystal);
                 TeamColor victimTeam = session.getTeam(victim.getUniqueId());
-                if (ownerTeam != null && victimTeam != null && ownerTeam == victimTeam) {
+                CustomItemDefinition custom = getCustomEntity(crystal);
+                double crystalDamage = session.getCrystalContactDamage(custom != null ? custom.getDamage() : 0.0);
+                if (ownerTeam != null && victimTeam != null && ownerTeam == victimTeam && crystalDamage <= 0.0) {
                     event.setCancelled(true);
                     return;
                 }
-                CustomItemDefinition custom = getCustomEntity(crystal);
-                if (custom != null && custom.getDamage() > 0.0) {
-                    event.setDamage(custom.getDamage());
+                if (crystalDamage > 0.0) {
+                    event.setDamage(crystalDamage);
                 }
             }
             boolean sameTeamTnt = false;
@@ -2366,7 +2367,7 @@ public class BedwarsListener implements Listener {
         if (!isLungingMovementSpear(item)) {
             return false;
         }
-        if (!isLikelyItemUse(player, event)) {
+        if (!isLikelyLungingSpearMovementAction(player, event)) {
             return false;
         }
         long now = System.currentTimeMillis();
@@ -2384,11 +2385,11 @@ public class BedwarsListener implements Listener {
         return "netherite_spear".equalsIgnoreCase(itemId);
     }
 
-    private boolean isLikelyItemUse(Player player, PlayerInteractEvent event) {
-        if (event.getAction() == Action.RIGHT_CLICK_AIR) {
+    private boolean isLikelyLungingSpearMovementAction(Player player, PlayerInteractEvent event) {
+        if (event.getAction() == Action.LEFT_CLICK_AIR) {
             return true;
         }
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+        if (event.getAction() != Action.LEFT_CLICK_BLOCK) {
             return false;
         }
         Block clicked = event.getClickedBlock();

@@ -4078,6 +4078,10 @@ public class GameSession {
         return activeMatchEvent;
     }
 
+    public double getCrystalContactDamage(double configuredDamage) {
+        return configuredDamage > 0.0 ? configuredDamage : 1.0;
+    }
+
     public int adjustGeneratedResourceAmount(Material material, int baseAmount) {
         int amount = Math.max(0, baseAmount);
         if (amount <= 0 || activeMatchEvent != BedwarsMatchEventType.IN_THIS_ECONOMY || material == null) {

@@ -29,7 +29,7 @@ custom-items:
   crystal:
     type: CRYSTAL
     material: END_CRYSTAL
-    damage: 0
+    damage: 1
     yield: 6.0
   happy_ghast:
     type: HAPPY_GHAST
