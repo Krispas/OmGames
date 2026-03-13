@@ -37,6 +37,7 @@ import org.bukkit.inventory.meta.ItemMeta;
  */
 public class ShopMenu implements InventoryHolder {
     private static final int CATEGORY_ROW_SIZE = 9;
+    private static final int ROW_WIDTH = 9;
     private final GameSession session;
     private final ShopConfig config;
     private final ShopCategoryType categoryType;
@@ -111,6 +112,7 @@ public class ShopMenu implements InventoryHolder {
             return;
         }
         Map<Integer, String> entries = new LinkedHashMap<>(category.getEntries());
+        entries.entrySet().removeIf(entry -> isReservedBorderSlot(entry.getKey()));
         if (categoryType == ShopCategoryType.TOOLS) {
             applyToolOverrides(entries);
         }
@@ -124,6 +126,7 @@ public class ShopMenu implements InventoryHolder {
             }
             applyQuickBuyTierOverrides(entries);
         }
+        entries.entrySet().removeIf(entry -> isReservedBorderSlot(entry.getKey()));
         entries.entrySet().removeIf(entry -> {
             ShopItemDefinition item = config.getItem(entry.getValue());
             return item != null && !session.isRotatingItemAvailable(item);
@@ -451,10 +454,17 @@ public class ShopMenu implements InventoryHolder {
             return;
         }
         int slot = event.getRawSlot();
-        if (slot < CATEGORY_ROW_SIZE) {
+        if (isReservedBorderSlot(slot)) {
+            if (categoryType == ShopCategoryType.QUICK_BUY) {
+                player.sendMessage(Component.text("Shop border slots are reserved.", NamedTextColor.RED));
+            }
             return;
         }
         Integer pending = quickBuyService.getPendingSlot(viewerId);
+        if (pending != null && isReservedBorderSlot(pending)) {
+            quickBuyService.clearPendingSlot(viewerId);
+            pending = null;
+        }
         if (categoryType == ShopCategoryType.QUICK_BUY) {
             if (event.getClick().isRightClick()) {
                 String override = quickBuyService.getQuickBuy(viewerId).get(slot);
@@ -506,7 +516,7 @@ public class ShopMenu implements InventoryHolder {
 
     private void applySelectionMarker() {
         Integer pending = quickBuyService.getPendingSlot(viewerId);
-        if (pending == null || pending < 0 || pending >= inventory.getSize() || pending < CATEGORY_ROW_SIZE) {
+        if (pending == null || pending < 0 || pending >= inventory.getSize() || isReservedBorderSlot(pending)) {
             return;
         }
         ItemStack current = inventory.getItem(pending);
@@ -524,5 +534,15 @@ public class ShopMenu implements InventoryHolder {
         meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         current.setItemMeta(meta);
         inventory.setItem(pending, current);
+    }
+
+    private boolean isReservedBorderSlot(int slot) {
+        if (slot < 0 || slot >= inventory.getSize()) {
+            return true;
+        }
+        int rows = Math.max(1, inventory.getSize() / ROW_WIDTH);
+        int row = slot / ROW_WIDTH;
+        int column = slot % ROW_WIDTH;
+        return row == 0 || row == rows - 1 || column == 0 || column == ROW_WIDTH - 1;
     }
 }

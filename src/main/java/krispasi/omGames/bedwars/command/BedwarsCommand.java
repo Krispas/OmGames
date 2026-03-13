@@ -708,6 +708,10 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         target.setGameMode(GameMode.CREATIVE);
         target.setAllowFlight(true);
         target.setFlying(true);
+        Location editorLobby = resolveArenaLobbyLocation(session.getArena());
+        if (editorLobby != null) {
+            target.teleport(editorLobby);
+        }
         sender.sendMessage(Component.text("Removed " + target.getName() + " from the match.", NamedTextColor.YELLOW));
         if (target != caller) {
             target.sendMessage(Component.text("You were removed from the match.", NamedTextColor.YELLOW));

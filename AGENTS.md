@@ -312,6 +312,9 @@ Common item fields:
 Notes:
 - `knockback-bonus` adds an `ATTACK_KNOCKBACK` item attribute modifier on the held weapon.
 - Use config changes for shop balancing first.
+- Shop UI border slots are reserved.
+  - Avoid putting category entries on the outer top/bottom rows or the far left/right columns.
+  - Quick Buy customization should only assign interior slots.
 
 #### 2.8.3 `rotating-items.yml`
 
