@@ -12,8 +12,8 @@ shop:
         bridge_builder: 14
         creeping_arrow: 15
         tactical_nuke: 16
-        miracle_of_the_stars: 17
-        placeable_bed: 18
+        miracle_of_the_stars: 25
+        placeable_bed: 28
         totem_of_undying: 21
         portable_shopkeeper: 20
         bridge_zapper: 19

@@ -4236,10 +4236,7 @@ public class GameSession {
             return List.of();
         }
         List<String> candidates = new ArrayList<>();
-        addRotatingUpgradeCandidates(candidates, config.getCategory(ShopCategoryType.ROTATING_UPGRADES), config);
-        if (candidates.isEmpty()) {
-            addRotatingUpgradeCandidates(candidates, config.getCategory(ShopCategoryType.ROTATING), config);
-        }
+        addRotatingUpgradeCandidates(candidates, resolveRotatingUpgradeCategory(config), config);
         return candidates;
     }
 
@@ -4341,11 +4338,7 @@ public class GameSession {
         if (config == null) {
             return true;
         }
-        krispasi.omGames.bedwars.shop.ShopCategory category = config.getCategory(ShopCategoryType.ROTATING_UPGRADES);
-        if ((category == null || category.getEntries().isEmpty())
-                && config.getCategory(ShopCategoryType.ROTATING) != null) {
-            category = config.getCategory(ShopCategoryType.ROTATING);
-        }
+        krispasi.omGames.bedwars.shop.ShopCategory category = resolveRotatingUpgradeCategory(config);
         if (category == null || category.getEntries().isEmpty()) {
             return true;
         }
@@ -4381,13 +4374,7 @@ public class GameSession {
         if (config == null) {
             return null;
         }
-        ShopItemDefinition definition = findRotatingUpgradeDefinition(config,
-                config.getCategory(ShopCategoryType.ROTATING_UPGRADES),
-                type);
-        if (definition != null) {
-            return definition;
-        }
-        return findRotatingUpgradeDefinition(config, config.getCategory(ShopCategoryType.ROTATING), type);
+        return findRotatingUpgradeDefinition(config, resolveRotatingUpgradeCategory(config), type);
     }
 
     public boolean isRotatingTrapAvailable(TrapType trap) {
@@ -4446,12 +4433,8 @@ public class GameSession {
         if (config == null || itemId == null) {
             return false;
         }
-        krispasi.omGames.bedwars.shop.ShopCategory upgradeCategory = config.getCategory(ShopCategoryType.ROTATING_UPGRADES);
-        if (upgradeCategory != null && upgradeCategory.getEntries().containsValue(itemId)) {
-            return true;
-        }
-        krispasi.omGames.bedwars.shop.ShopCategory rotatingCategory = config.getCategory(ShopCategoryType.ROTATING);
-        return rotatingCategory != null && rotatingCategory.getEntries().containsValue(itemId);
+        krispasi.omGames.bedwars.shop.ShopCategory upgradeCategory = resolveRotatingUpgradeCategory(config);
+        return upgradeCategory != null && upgradeCategory.getEntries().containsValue(itemId);
     }
 
     private boolean isRotatingUpgradeEntrySelected(String itemId) {
@@ -4487,6 +4470,71 @@ public class GameSession {
         }
         rotatingItemIds.addAll(pickRandom(itemCandidates, 2));
         rotatingUpgradeIds.addAll(pickRandom(upgradeCandidates, 1));
+        normalizeAutoRotatingSelection(itemCandidates, upgradeCandidates);
+    }
+
+    private krispasi.omGames.bedwars.shop.ShopCategory resolveRotatingUpgradeCategory(ShopConfig config) {
+        if (config == null) {
+            return null;
+        }
+        krispasi.omGames.bedwars.shop.ShopCategory upgradeCategory = config.getCategory(ShopCategoryType.ROTATING_UPGRADES);
+        if (upgradeCategory != null && !upgradeCategory.getEntries().isEmpty()) {
+            return upgradeCategory;
+        }
+        return config.getCategory(ShopCategoryType.ROTATING);
+    }
+
+    private void normalizeAutoRotatingSelection(List<String> itemCandidates, List<String> upgradeCandidates) {
+        if (rotatingMode == RotatingSelectionMode.MANUAL) {
+            return;
+        }
+        normalizeAutoSelection(rotatingItemIds, itemCandidates, 2);
+        normalizeAutoSelection(rotatingUpgradeIds, upgradeCandidates, 1);
+    }
+
+    private void normalizeAutoSelection(Set<String> selected, List<String> candidates, int targetCount) {
+        if (selected == null) {
+            return;
+        }
+        if (candidates == null || candidates.isEmpty() || targetCount <= 0) {
+            selected.clear();
+            return;
+        }
+        List<String> validCandidates = new ArrayList<>();
+        for (String candidate : candidates) {
+            String normalized = normalizeItemId(candidate);
+            if (normalized != null && !validCandidates.contains(normalized)) {
+                validCandidates.add(normalized);
+            }
+        }
+        int target = Math.min(targetCount, validCandidates.size());
+        if (target <= 0) {
+            selected.clear();
+            return;
+        }
+        selected.retainAll(validCandidates);
+        if (selected.size() > target) {
+            List<String> ordered = new ArrayList<>(selected);
+            selected.clear();
+            selected.addAll(ordered.subList(0, target));
+            return;
+        }
+        if (selected.size() == target) {
+            return;
+        }
+        List<String> remaining = new ArrayList<>();
+        for (String candidate : validCandidates) {
+            if (!selected.contains(candidate)) {
+                remaining.add(candidate);
+            }
+        }
+        Collections.shuffle(remaining);
+        for (String candidate : remaining) {
+            if (selected.size() >= target) {
+                break;
+            }
+            selected.add(candidate);
+        }
     }
 
     private void announceCurrentRotatingItems() {

@@ -1182,9 +1182,6 @@ public class BedwarsListener implements Listener {
                         event.setCancelled(true);
                     }
                 }
-                if (!event.isCancelled() && isHappyGhast(event.getEntity())) {
-                    applyHappyGhastProjectileDamage(event);
-                }
                 return;
             }
             if (!session.isInArenaWorld(victim.getWorld())) {
@@ -1985,36 +1982,6 @@ public class BedwarsListener implements Listener {
                 victim.setVelocity(current.add(knockback));
             }
         }.runTask(bedwarsManager.getPlugin());
-    }
-
-    private boolean applyHappyGhastProjectileDamage(EntityDamageByEntityEvent event) {
-        if (event == null || !(event.getEntity() instanceof LivingEntity target) || target.isDead()) {
-            return false;
-        }
-        double damage = 0.0;
-        if (event.getDamager() instanceof Arrow arrow) {
-            damage = Math.max(0.0, arrow.getDamage());
-        } else if (event.getDamager() instanceof Fireball fireball) {
-            CustomItemDefinition definition = resolveCustomProjectile(fireball);
-            if (isFireballCustom(definition)) {
-                damage = Math.max(0.0, definition.getDamage());
-            }
-        }
-        if (damage <= 0.0) {
-            return false;
-        }
-        event.setCancelled(true);
-        double currentHealth = Math.max(0.0, target.getHealth());
-        double newHealth = Math.max(0.0, currentHealth - damage);
-        target.setHealth(newHealth);
-        target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
-                target.getLocation().add(0.0, target.getHeight() * 0.5, 0.0),
-                6,
-                0.25,
-                0.25,
-                0.25,
-                0.0);
-        return true;
     }
 
     private boolean isSameCustomItemInMainHand(Player player, ItemStack usedItem) {

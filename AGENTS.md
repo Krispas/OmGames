@@ -334,6 +334,7 @@ Rotating item notes:
 - match runtime always rolls `2` rotating items plus `1` rotating upgrade when candidates exist
 - manual prestart rotation selection can choose any subset of rotating items and upgrades
 - if `shop.categories.rotating_upgrades` has no upgrade entries, rotating-upgrade selection falls back to upgrade entries found under `shop.categories.rotating`
+- if `shop.categories.rotating_upgrades` does have entries, it is the authoritative upgrade/trap pool and runtime should not also consult legacy upgrade entries under `shop.categories.rotating`
 - rotating trap entries also live under `rotating_upgrades`
   - keep `behavior: UPGRADE`
   - trap behavior and purchase rules still live in Java trap handling, not `TeamUpgradeType`
@@ -400,8 +401,7 @@ Behavior notes:
   - purchased as a held item
   - right-click activation equips temporary Elytra, teleports above team spawn, and cleans up on landing/death/quit/session end
 - `HAPPY_GHAST`
-  - should use attribute-based knockback resistance instead of listener-side velocity restore hacks
-  - projectile hits must still be able to damage it
+  - should only use attribute-based knockback resistance; do not add ghast-specific damage or knockback handling in the listener
 - `UNSTABLE_TELEPORTATION_DEVICE`
   - purchased as a held item
   - right-click activation rolls one teleport outcome
