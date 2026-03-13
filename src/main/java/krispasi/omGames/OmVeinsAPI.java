@@ -1,8 +1,13 @@
 package krispasi.omGames;
 
+import krispasi.omGames.shared.SKIN_TYPE;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 /**
@@ -41,12 +46,15 @@ public class OmVeinsAPI {
      */
     private static BiConsumer<Player, Integer> addPartyExpConsumer;
 
+    private static Function<Player, Map<SKIN_TYPE, ArrayList<String>>> getPlayerSkinsFunction;
+
     /**
      * Checks whether all required consumers are set.
      * If so, marks the API as initialized and logs the state.
      */
     private static void checkIfDone() {
         if (addPartyExpConsumer == null) return;
+        if (getPlayerSkinsFunction == null) return;
 
         initialized = true;
         OmGames.getInstance().getLogger().info("OmVeins API: Fully initialized!");
@@ -96,9 +104,7 @@ public class OmVeinsAPI {
      */
     public static void addPartyExp(Player player, Integer amount) {
         if (!initialized) {
-            throw new IllegalStateException(
-                    "Attempting to use OmVeins API while it is not initialized!"
-            );
+            notInitializedWarning();
         }
 
         try {
@@ -108,5 +114,21 @@ public class OmVeinsAPI {
                     .log(Level.SEVERE,
                             "OmVeins API: error while executing AddPartyExp!", e);
         }
+    }
+
+    public static void setGetPlayerSkinsFunction(Function<Player, Map<SKIN_TYPE, ArrayList<String>>> consumer) {
+        getPlayerSkinsFunction = consumer;
+        OmGames.getInstance().getLogger().info("OmVeins API: GetPlayerSkinsConsumer consumer set!");
+        checkIfDone();
+    }
+
+    public static Map<SKIN_TYPE, ArrayList<String>> getPlayerSkins(Player player){
+        return getPlayerSkinsFunction.apply(player);
+    }
+
+    private static void notInitializedWarning(){
+        throw new IllegalStateException(
+                "Attempting to use OmVeins API while it is not initialized!"
+        );
     }
 }
