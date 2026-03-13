@@ -144,7 +144,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 Implemented in `BedwarsCommand`.
 
 Public subcommands:
-- `/bw stats`
+- `/bw stats [user]`
 - `/bw quick_buy`
 
 Admin subcommands:
@@ -396,10 +396,14 @@ Behavior notes:
 - `ELYTRA_STRIKE`
   - purchased as a held item
   - right-click activation equips temporary Elytra, teleports above team spawn, and cleans up on landing/death/quit/session end
+- `HAPPY_GHAST`
+  - should use attribute-based knockback resistance instead of listener-side velocity restore hacks
+  - projectile hits must still be able to damage it
 - `UNSTABLE_TELEPORTATION_DEVICE`
   - purchased as a held item
   - right-click activation rolls one teleport outcome
   - random-location outcome must land on a safe block with space above it
+  - every destination must also keep the player feet/head inside the arena corner bounds; do not trust `getHighestBlockAt` above the configured map ceiling
   - supports `cooldown-seconds` in `custom-items.yml`
 - `MIRACLE_OF_THE_STARS`
   - purchased as a held item
@@ -477,7 +481,12 @@ Do not push BedWars rules into `OmGames`.
 - Shop + rotating config are both active after reload because of merge behavior.
 - If stats are disabled for a session, progression/wins should not be awarded.
 - Outside a running BedWars match, protected BedWars worlds should still block casual terrain changes like farmland trampling unless the player is an allowed editor.
+- Outside a running BedWars match, players should not be able to rotate, take from, or break item frames in protected BedWars worlds unless they are allowed editors.
 - If a pending respawn later turns into a true elimination because respawns are no longer allowed, final-death and final-kill stats should still resolve from that original death.
+- `netherite_spear` movement boost reuse is listener-gated by a 5-second cooldown.
+- Match end cleanup should return all remaining arena spectators to the arena `game-lobby`; `map-lobby` is for prestart/spectate flows, not post-match cleanup.
+- `/bw game spectate` can only be run by a player already standing in the active BedWars world.
+- Players put into spectator mode by `/bw game spectate` are locked to the active BedWars world until `/bw game out` or session end.
 
 ### 2.13 Common Recipes
 

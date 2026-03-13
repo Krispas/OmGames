@@ -342,6 +342,7 @@ public class GameSession {
     private final Map<UUID, Map<String, Long>> customItemCooldownEnds = new HashMap<>();
     private final Map<UUID, UUID> pendingDeathKillCredits = new HashMap<>();
     private final Set<UUID> editorPlayers = new HashSet<>();
+    private final Set<UUID> lockedCommandSpectators = new HashSet<>();
     private final Set<TeamColor> teamsInMatch = EnumSet.noneOf(TeamColor.class);
     private final Set<UUID> shopNpcIds = new HashSet<>();
     private final Map<TeamColor, TeamUpgradeState> teamUpgrades = new EnumMap<>(TeamColor.class);
@@ -544,6 +545,28 @@ public class GameSession {
         return playerId != null && editorPlayers.contains(playerId);
     }
 
+    public boolean isLockedCommandSpectator(UUID playerId) {
+        return playerId != null && lockedCommandSpectators.contains(playerId);
+    }
+
+    public void addLockedCommandSpectator(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        lockedCommandSpectators.add(playerId);
+    }
+
+    public void removeLockedCommandSpectator(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        lockedCommandSpectators.remove(playerId);
+    }
+
+    public Location getLockedCommandSpectatorLocation() {
+        return resolveMapLobbyLocation();
+    }
+
     public boolean isTeamInMatch(TeamColor team) {
         return team != null && teamsInMatch.contains(team);
     }
@@ -569,6 +592,7 @@ public class GameSession {
         killCounts.remove(playerId);
         playerPurchaseCounts.remove(playerId);
         pendingDeathKillCredits.remove(playerId);
+        lockedCommandSpectators.remove(playerId);
         lastCombatTimes.remove(playerId);
         lastDamagers.remove(playerId);
         lastDamagerTimes.remove(playerId);
@@ -608,6 +632,7 @@ public class GameSession {
         }
         UUID playerId = player.getUniqueId();
         removeEditor(player);
+        removeLockedCommandSpectator(playerId);
         assignments.put(playerId, team);
         eliminatedPlayers.remove(playerId);
         pendingRespawns.remove(playerId);
@@ -1623,7 +1648,7 @@ public class GameSession {
         int roll = ThreadLocalRandom.current().nextInt(4);
         return switch (roll) {
             case 0 -> {
-                Location base = arena.getSpawn(team);
+                Location base = sanitizeUnstableTeleportDestination(arena.getSpawn(team));
                 yield base == null
                         ? null
                         : new UnstableTeleportResult(
@@ -1661,7 +1686,7 @@ public class GameSession {
         }
         Collections.shuffle(candidates);
         for (TeamColor targetTeam : candidates) {
-            Location spawn = arena.getSpawn(targetTeam);
+            Location spawn = sanitizeUnstableTeleportDestination(arena.getSpawn(targetTeam));
             if (spawn == null) {
                 continue;
             }
@@ -1671,7 +1696,7 @@ public class GameSession {
                     .append(Component.text(" base.", NamedTextColor.YELLOW));
             return new UnstableTeleportResult(spawn, message);
         }
-        Location fallback = arena.getSpawn(playerTeam);
+        Location fallback = sanitizeUnstableTeleportDestination(arena.getSpawn(playerTeam));
         return fallback == null
                 ? null
                 : new UnstableTeleportResult(
@@ -1708,17 +1733,24 @@ public class GameSession {
         BlockPoint corner1 = arena.getCorner1();
         BlockPoint corner2 = arena.getCorner2();
         int minY = world.getMinHeight();
+        int maxY = world.getMaxHeight() - 1;
         if (corner1 != null && corner2 != null) {
             minY = Math.max(minY, Math.min(corner1.y(), corner2.y()));
+            maxY = Math.min(maxY, Math.max(corner1.y(), corner2.y()));
+        }
+        if (maxY < minY) {
+            return null;
         }
 
         Block highest = world.getHighestBlockAt(x, z);
-        Location highestLocation = buildSafeTeleportLocation(highest);
-        if (highestLocation != null) {
-            return highestLocation;
+        if (highest != null && highest.getY() >= minY && highest.getY() <= maxY) {
+            Location highestLocation = buildSafeTeleportLocation(highest);
+            if (highestLocation != null) {
+                return highestLocation;
+            }
         }
 
-        int startY = highest != null ? highest.getY() : world.getMaxHeight() - 2;
+        int startY = highest != null ? Math.min(highest.getY(), maxY) : maxY;
         for (int y = startY; y >= minY; y--) {
             Location candidate = buildSafeTeleportLocation(world.getBlockAt(x, y, z));
             if (candidate != null) {
@@ -1737,7 +1769,24 @@ public class GameSession {
         if (!isSafeTeleportSpace(feet) || !isSafeTeleportSpace(head)) {
             return null;
         }
-        return feet.getLocation().add(0.5, 0.0, 0.5);
+        Location location = feet.getLocation().add(0.5, 0.0, 0.5);
+        return isInsideMapTeleportLocation(location) ? location : null;
+    }
+
+    private Location sanitizeUnstableTeleportDestination(Location location) {
+        if (!isInsideMapTeleportLocation(location)) {
+            return null;
+        }
+        return location;
+    }
+
+    private boolean isInsideMapTeleportLocation(Location location) {
+        if (location == null || location.getWorld() == null || !isInArenaWorld(location.getWorld())) {
+            return false;
+        }
+        BlockPoint feet = new BlockPoint(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+        BlockPoint head = new BlockPoint(location.getBlockX(), location.getBlockY() + 1, location.getBlockZ());
+        return isInsideMap(feet) && isInsideMap(head);
     }
 
     private boolean isSafeTeleportFloor(Block block) {
@@ -3566,24 +3615,41 @@ public class GameSession {
         }
         restoreBeds();
         Location lobby = arena.getLobbyLocation();
+        Set<UUID> relocatedPlayers = new HashSet<>();
         for (UUID playerId : assignments.keySet()) {
             Player player = Bukkit.getPlayer(playerId);
             if (player == null) {
                 continue;
             }
+            relocatedPlayers.add(playerId);
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
             player.getInventory().clear();
             player.getInventory().setArmorContents(null);
             player.getInventory().setItemInOffHand(null);
-          clearUpgradeEffects(player);
-          if (lobby != null) {
-              player.teleport(lobby);
-              player.setRespawnLocation(lobby, true);
-          }
-      }
-  }
+            clearUpgradeEffects(player);
+            if (lobby != null) {
+                player.teleport(lobby);
+                player.setRespawnLocation(lobby, true);
+            }
+        }
+        if (lobby == null) {
+            return;
+        }
+        for (Player player : world.getPlayers()) {
+            if (player == null || relocatedPlayers.contains(player.getUniqueId())) {
+                continue;
+            }
+            if (player.getGameMode() != GameMode.SPECTATOR) {
+                continue;
+            }
+            clearUpgradeEffects(player);
+            restoreSidebar(player.getUniqueId());
+            player.teleport(lobby);
+            player.setRespawnLocation(lobby, true);
+        }
+    }
 
     private void restoreBeds() {
         World world = arena.getWorld();
@@ -3917,6 +3983,7 @@ public class GameSession {
         lastDamageTimes.clear();
         lastRegenTimes.clear();
         pendingDeathKillCredits.clear();
+        lockedCommandSpectators.clear();
         benevolentEventUpgrades.clear();
         trapImmunityEnds.clear();
         trapImmunityTasks.clear();
@@ -5141,6 +5208,16 @@ public class GameSession {
             return;
         }
         UUID playerId = player.getUniqueId();
+        if (isLockedCommandSpectator(playerId)) {
+            Location spectate = resolveMapLobbyLocation();
+            setSpectator(player);
+            if (spectate != null) {
+                player.teleport(spectate);
+            }
+            hideEditorsFrom(player);
+            updateSidebarForPlayer(player);
+            return;
+        }
         if (!isParticipant(playerId)) {
             return;
         }

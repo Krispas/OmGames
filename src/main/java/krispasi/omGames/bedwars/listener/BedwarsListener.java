@@ -95,6 +95,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
@@ -194,7 +195,7 @@ public class BedwarsListener implements Listener {
     private static final double FLAMETHROWER_DEFAULT_SPREAD = 0.6;
     private static final double FLAMETHROWER_HALF_ANGLE_DEGREES = 38.0;
     private static final int FLAMETHROWER_FIRE_TICKS = 60;
-    private static final long LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS = 1_000L;
+    private static final long LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS = 5_000L;
     private static final long VOID_TOTEM_FALL_PROTECTION_MILLIS = 5_000L;
     private static final int NUKE_TARGET_DISTANCE = 512;
     private static final int NUKE_COUNTDOWN_CHAT_SECONDS = 15;
@@ -716,6 +717,12 @@ public class BedwarsListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
         safeHandle("onPlayerInteractEntity", () -> {
+            Player player = event.getPlayer();
+            GameSession session = bedwarsManager.getActiveSession();
+            if (isProtectedLobbyItemFrame(event.getRightClicked(), player, session)) {
+                event.setCancelled(true);
+                return;
+            }
             if (!(event.getRightClicked() instanceof Villager villager)) {
                 return;
             }
@@ -723,8 +730,6 @@ public class BedwarsListener implements Listener {
                     && !villager.getScoreboardTags().contains(GameSession.UPGRADES_SHOP_TAG)) {
                 return;
             }
-            Player player = event.getPlayer();
-            GameSession session = bedwarsManager.getActiveSession();
             if (session == null || !session.isActive()) {
                 return;
             }
@@ -1143,6 +1148,11 @@ public class BedwarsListener implements Listener {
     public void onEntityDamage(EntityDamageByEntityEvent event) {
         safeHandle("onEntityDamage", () -> {
             GameSession session = bedwarsManager.getActiveSession();
+            Player protectedWorldAttacker = resolveAttacker(event);
+            if (isProtectedLobbyItemFrame(event.getEntity(), protectedWorldAttacker, session)) {
+                event.setCancelled(true);
+                return;
+            }
             if (session == null) {
                 if (event.getEntity() instanceof Player victim
                         && bedwarsManager.isBedwarsWorld(victim.getWorld().getName())) {
@@ -1164,15 +1174,6 @@ public class BedwarsListener implements Listener {
                 if (!isSummon(event.getEntity())) {
                     return;
                 }
-                LivingEntity summonVictim = event.getEntity() instanceof LivingEntity living ? living : null;
-                Vector summonVelocityBeforeHit = null;
-                boolean suppressSummonKnockback = false;
-                if (isHappyGhast(event.getEntity())
-                        && summonVictim != null
-                        && (event.getDamager() instanceof Arrow || event.getDamager() instanceof Fireball)) {
-                    summonVelocityBeforeHit = summonVictim.getVelocity().clone();
-                    suppressSummonKnockback = true;
-                }
                 Player attacker = resolveAttacker(event);
                 if (attacker != null && session.isParticipant(attacker.getUniqueId())) {
                     TeamColor attackerTeam = session.getTeam(attacker.getUniqueId());
@@ -1181,20 +1182,14 @@ public class BedwarsListener implements Listener {
                         event.setCancelled(true);
                     }
                 }
-                boolean handledHappyGhastProjectile = false;
                 if (!event.isCancelled() && isHappyGhast(event.getEntity())) {
-                    handledHappyGhastProjectile = applyHappyGhastProjectileDamage(event);
-                }
-                if ((handledHappyGhastProjectile || !event.isCancelled()) && suppressSummonKnockback) {
-                    restoreVelocityNextTick(summonVictim, summonVelocityBeforeHit);
+                    applyHappyGhastProjectileDamage(event);
                 }
                 return;
             }
             if (!session.isInArenaWorld(victim.getWorld())) {
                 return;
             }
-            Vector victimVelocityBeforeHit = victim.getVelocity().clone();
-            boolean suppressKnockback = false;
             if (isSummon(event.getDamager())) {
                 if (!session.isParticipant(victim.getUniqueId())
                         || victim.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
@@ -1211,7 +1206,6 @@ public class BedwarsListener implements Listener {
                 if (summon != null && summon.getDamage() > 0.0) {
                     event.setDamage(summon.getDamage());
                 }
-                suppressKnockback = isHappyGhastSummon(summon, event.getDamager());
             }
             if (event.getDamager() instanceof EnderCrystal crystal) {
                 TeamColor ownerTeam = getSummonTeam(crystal);
@@ -1288,9 +1282,6 @@ public class BedwarsListener implements Listener {
                 if (isFireballCustom(definition)) {
                     applyFireballKnockback(victim, fireball, definition);
                 }
-            }
-            if (!event.isCancelled() && suppressKnockback) {
-                restoreVelocityNextTick(victim, victimVelocityBeforeHit);
             }
             if (!event.isCancelled()
                     && session.isParticipant(victim.getUniqueId())
@@ -1757,6 +1748,22 @@ public class BedwarsListener implements Listener {
             Player player = event.getPlayer();
             if (session != null) {
                 session.handleWorldChange(player);
+                if (session.isLockedCommandSpectator(player.getUniqueId()) && !session.isInArenaWorld(player.getWorld())) {
+                    Location fallback = session.getLockedCommandSpectatorLocation();
+                    if (fallback != null) {
+                        bedwarsManager.getPlugin().getServer().getScheduler().runTask(bedwarsManager.getPlugin(), () -> {
+                            if (!player.isOnline()) {
+                                return;
+                            }
+                            GameSession active = bedwarsManager.getActiveSession();
+                            if (active == null || active != session || !active.isLockedCommandSpectator(player.getUniqueId())) {
+                                return;
+                            }
+                            player.teleport(fallback);
+                            player.sendMessage(Component.text("Spectators must stay in the BedWars world.", NamedTextColor.RED));
+                        });
+                    }
+                }
                 refreshInvisibility(player, session);
                 syncInvisibilityForViewer(player, session);
             }
@@ -1780,6 +1787,26 @@ public class BedwarsListener implements Listener {
                 applyOutsideGameBedwarsBuffs(player);
             }
             deliverPendingLoyaltyTridents(player);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onLockedCommandSpectatorTeleport(PlayerTeleportEvent event) {
+        safeHandle("onLockedCommandSpectatorTeleport", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isActive()) {
+                return;
+            }
+            Player player = event.getPlayer();
+            if (!session.isLockedCommandSpectator(player.getUniqueId())) {
+                return;
+            }
+            Location destination = event.getTo();
+            if (destination == null || session.isInArenaWorld(destination.getWorld())) {
+                return;
+            }
+            event.setCancelled(true);
+            player.sendMessage(Component.text("Spectators must stay in the BedWars world.", NamedTextColor.RED));
         });
     }
 
@@ -1987,45 +2014,6 @@ public class BedwarsListener implements Listener {
                 0.25,
                 0.0);
         return true;
-    }
-
-    private boolean isHappyGhastSummon(CustomItemDefinition summon, org.bukkit.entity.Entity summonEntity) {
-        if (summon != null && summon.getType() == CustomItemType.HAPPY_GHAST) {
-            return true;
-        }
-        return summonEntity != null && summonEntity.getScoreboardTags().contains(GameSession.HAPPY_GHAST_TAG);
-    }
-
-    private void restoreVelocityNextTick(Player victim, Vector velocity) {
-        if (victim == null || velocity == null) {
-            return;
-        }
-        Vector restored = velocity.clone();
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (!victim.isOnline()) {
-                    return;
-                }
-                victim.setVelocity(restored);
-            }
-        }.runTask(bedwarsManager.getPlugin());
-    }
-
-    private void restoreVelocityNextTick(LivingEntity entity, Vector velocity) {
-        if (entity == null || velocity == null) {
-            return;
-        }
-        Vector restored = velocity.clone();
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                if (!entity.isValid() || entity.isDead()) {
-                    return;
-                }
-                entity.setVelocity(restored);
-            }
-        }.runTask(bedwarsManager.getPlugin());
     }
 
     private boolean isSameCustomItemInMainHand(Player player, ItemStack usedItem) {
@@ -3234,6 +3222,7 @@ public class BedwarsListener implements Listener {
         applyHappyGhastHarness(entity, team);
         scheduleHappyGhastHarness(entity, team);
         applySummonStats(entity, custom);
+        applyEntityKnockbackResistance(entity, 1.0);
         scheduleMountHappyGhast(entity, player);
         int lifetimeSeconds = custom != null && custom.getLifetimeSeconds() > 0
                 ? custom.getLifetimeSeconds()
@@ -4059,6 +4048,16 @@ public class BedwarsListener implements Listener {
         }
     }
 
+    private void applyEntityKnockbackResistance(LivingEntity entity, double resistance) {
+        try {
+            Class<?> attributeClass = Class.forName("org.bukkit.attribute.Attribute");
+            Method getAttribute = LivingEntity.class.getMethod("getAttribute", attributeClass);
+            Object knockbackResistance = resolveAttribute(attributeClass, "GENERIC_KNOCKBACK_RESISTANCE");
+            applyAttributeValue(entity, getAttribute, knockbackResistance, resistance);
+        } catch (ReflectiveOperationException ignored) {
+        }
+    }
+
     private Object resolveAttribute(Class<?> attributeClass, String name) {
         if (attributeClass == null || name == null) {
             return null;
@@ -4524,6 +4523,21 @@ public class BedwarsListener implements Listener {
             return true;
         }
         return !session.isRunning() || !session.isParticipant(player.getUniqueId());
+    }
+
+    private boolean isProtectedLobbyItemFrame(org.bukkit.entity.Entity entity, Player player, GameSession session) {
+        if (!isItemFrameEntity(entity) || player == null) {
+            return false;
+        }
+        return isOutsideRunningBedwarsGame(player, session) && !canEditProtectedBedwarsWorld(player, session);
+    }
+
+    private boolean isItemFrameEntity(org.bukkit.entity.Entity entity) {
+        if (entity == null) {
+            return false;
+        }
+        EntityType type = entity.getType();
+        return type == EntityType.ITEM_FRAME || type == EntityType.GLOW_ITEM_FRAME;
     }
 
     private boolean canEditProtectedBedwarsWorld(Player player, GameSession session) {

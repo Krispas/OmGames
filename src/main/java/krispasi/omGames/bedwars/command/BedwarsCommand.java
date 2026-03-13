@@ -296,7 +296,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -323,8 +323,11 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("stats")) {
             String input = args[1].toLowerCase(Locale.ROOT);
-            return Stream.of("modify")
-                    .filter(option -> option.startsWith(input))
+            return Stream.concat(
+                            Stream.of("modify"),
+                            Bukkit.getOnlinePlayers().stream().map(Player::getName))
+                    .distinct()
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("stats") && args[1].equalsIgnoreCase("modify")) {
@@ -550,23 +553,23 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         if (args.length >= 2 && args[1].equalsIgnoreCase("modify")) {
             return handleStatsModifyCommand(sender, player, args);
         }
-        if (args.length != 1) {
-            sender.sendMessage(Component.text("Usage: /bw stats | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]",
+        if (args.length > 2) {
+            sender.sendMessage(Component.text("Usage: /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]",
                     NamedTextColor.YELLOW));
             return true;
         }
-        BedwarsPlayerStats stats = bedwarsManager.getStatsService().getStats(player.getUniqueId());
-        String bestTime = stats.getParkourBestTimeMillis() > 0L ? formatElapsed(stats.getParkourBestTimeMillis()) : "N/A";
-        player.sendMessage(Component.text("BedWars Stats", NamedTextColor.GOLD));
-        player.sendMessage(Component.text("Wins: " + stats.getWins(), NamedTextColor.YELLOW));
-        player.sendMessage(Component.text("Kills: " + stats.getKills(), NamedTextColor.YELLOW));
-        player.sendMessage(Component.text("Deaths: " + stats.getDeaths(), NamedTextColor.YELLOW));
-        player.sendMessage(Component.text("Final Kills: " + stats.getFinalKills(), NamedTextColor.YELLOW));
-        player.sendMessage(Component.text("Final Deaths: " + stats.getFinalDeaths(), NamedTextColor.YELLOW));
-        player.sendMessage(Component.text("Games Played: " + stats.getGamesPlayed(), NamedTextColor.YELLOW));
-        player.sendMessage(Component.text("Beds Broken: " + stats.getBedsBroken(), NamedTextColor.YELLOW));
-        player.sendMessage(Component.text("Parkour Best Time: " + bestTime, NamedTextColor.YELLOW));
-        player.sendMessage(Component.text("Parkour Best Checkpoint Uses: " + stats.getParkourBestCheckpointUses(), NamedTextColor.YELLOW));
+        OfflinePlayer target = player;
+        String targetName = player.getName();
+        if (args.length == 2) {
+            target = resolveKnownPlayer(args[1]);
+            if (target == null || target.getUniqueId() == null) {
+                sender.sendMessage(Component.text("Player not found: " + args[1], NamedTextColor.RED));
+                return true;
+            }
+            targetName = resolvePlayerName(target, args[1]);
+        }
+        BedwarsPlayerStats stats = bedwarsManager.getStatsService().getStats(target.getUniqueId());
+        sendStatsView(player, targetName, stats);
         return true;
     }
 
@@ -671,6 +674,20 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void sendStatsView(Player viewer, String targetName, BedwarsPlayerStats stats) {
+        String bestTime = stats.getParkourBestTimeMillis() > 0L ? formatElapsed(stats.getParkourBestTimeMillis()) : "N/A";
+        viewer.sendMessage(Component.text("BedWars Stats: " + targetName, NamedTextColor.GOLD));
+        viewer.sendMessage(Component.text("Wins: " + stats.getWins(), NamedTextColor.YELLOW));
+        viewer.sendMessage(Component.text("Kills: " + stats.getKills(), NamedTextColor.YELLOW));
+        viewer.sendMessage(Component.text("Deaths: " + stats.getDeaths(), NamedTextColor.YELLOW));
+        viewer.sendMessage(Component.text("Final Kills: " + stats.getFinalKills(), NamedTextColor.YELLOW));
+        viewer.sendMessage(Component.text("Final Deaths: " + stats.getFinalDeaths(), NamedTextColor.YELLOW));
+        viewer.sendMessage(Component.text("Games Played: " + stats.getGamesPlayed(), NamedTextColor.YELLOW));
+        viewer.sendMessage(Component.text("Beds Broken: " + stats.getBedsBroken(), NamedTextColor.YELLOW));
+        viewer.sendMessage(Component.text("Parkour Best Time: " + bestTime, NamedTextColor.YELLOW));
+        viewer.sendMessage(Component.text("Parkour Best Checkpoint Uses: " + stats.getParkourBestCheckpointUses(), NamedTextColor.YELLOW));
+    }
+
     private long safeAbs(long value) {
         if (value == Long.MIN_VALUE) {
             return Long.MAX_VALUE;
@@ -703,6 +720,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("No active BedWars session.", NamedTextColor.RED));
             return true;
         }
+        session.removeLockedCommandSpectator(target.getUniqueId());
         session.removeParticipant(target);
         session.addEditor(target);
         target.setGameMode(GameMode.CREATIVE);
@@ -730,8 +748,13 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("No active BedWars session.", NamedTextColor.RED));
             return true;
         }
+        if (!session.isInArenaWorld(caller.getWorld())) {
+            sender.sendMessage(Component.text("You must be in the active BedWars world to use /bw game spectate.", NamedTextColor.RED));
+            return true;
+        }
         session.removeEditor(target);
         session.removeParticipant(target);
+        session.addLockedCommandSpectator(target.getUniqueId());
         target.getInventory().clear();
         target.setGameMode(GameMode.SPECTATOR);
         Location spectate = resolveArenaLobbyLocation(session.getArena());
