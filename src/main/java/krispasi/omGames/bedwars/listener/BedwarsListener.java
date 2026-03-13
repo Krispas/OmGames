@@ -575,6 +575,9 @@ public class BedwarsListener implements Listener {
                 case ELYTRA_STRIKE -> {
                     yield session.activateElytraStrike(player, custom);
                 }
+                case UNSTABLE_TELEPORTATION_DEVICE -> {
+                    yield session.activateUnstableTeleportationDevice(player, custom);
+                }
                 case MAGIC_MILK -> {
                     yield false;
                 }

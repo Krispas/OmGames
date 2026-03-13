@@ -95,6 +95,10 @@ custom-items:
   elytra_strike:
     type: ELYTRA_STRIKE
     material: ELYTRA
+  unstable_teleportation_device:
+    type: UNSTABLE_TELEPORTATION_DEVICE
+    material: ENDER_EYE
+    cooldown-seconds: 30
   tower_chest:
     type: TOWER_CHEST
     material: CHEST

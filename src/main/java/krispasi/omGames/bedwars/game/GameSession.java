@@ -338,6 +338,7 @@ public class GameSession {
     private final Map<UUID, Integer> pendingPartyExp = new HashMap<>();
     private final Map<TeamColor, Map<String, Integer>> teamPurchaseCounts = new EnumMap<>(TeamColor.class);
     private final Map<UUID, Map<String, Integer>> playerPurchaseCounts = new HashMap<>();
+    private final Map<UUID, Map<String, Long>> customItemCooldownEnds = new HashMap<>();
     private final Set<UUID> editorPlayers = new HashSet<>();
     private final Set<TeamColor> teamsInMatch = EnumSet.noneOf(TeamColor.class);
     private final Set<UUID> shopNpcIds = new HashSet<>();
@@ -1487,6 +1488,49 @@ public class GameSession {
         return true;
     }
 
+    public boolean activateUnstableTeleportationDevice(Player player, CustomItemDefinition custom) {
+        if (player == null
+                || custom == null
+                || !isRunning()
+                || !isParticipant(player.getUniqueId())
+                || !isInArenaWorld(player.getWorld())) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        long remainingMillis = getCustomItemCooldownRemainingMillis(playerId, custom.getId());
+        if (remainingMillis > 0L) {
+            long secondsRemaining = Math.max(1L, (remainingMillis + 999L) / 1000L);
+            player.sendMessage(Component.text(
+                    "Unstable Teleportation Device is on cooldown for " + secondsRemaining + "s.",
+                    NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+
+        UnstableTeleportResult result = rollUnstableTeleportationDestination(player);
+        if (result == null || result.destination() == null) {
+            player.sendMessage(Component.text("The device fizzled. No safe destination was found.", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+
+        Location origin = player.getLocation().clone();
+        Location destination = result.destination().clone();
+        destination.setYaw(origin.getYaw());
+        destination.setPitch(origin.getPitch());
+        if (!player.teleport(destination)) {
+            player.sendMessage(Component.text("The device fizzled. Teleport failed.", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+
+        startCustomItemCooldown(playerId, custom.getId(), custom.getCooldownSeconds());
+        playUnstableTeleportEffects(origin);
+        playUnstableTeleportEffects(destination);
+        player.sendMessage(result.message());
+        return true;
+    }
+
     public void handleElytraStrikeMovement(Player player) {
         if (player == null) {
             return;
@@ -1508,6 +1552,214 @@ public class GameSession {
 
     public boolean isActiveElytraStrikeItem(ItemStack item) {
         return ELYTRA_STRIKE_ACTIVE_ITEM_ID.equalsIgnoreCase(CustomItemData.getId(item));
+    }
+
+    private UnstableTeleportResult rollUnstableTeleportationDestination(Player player) {
+        TeamColor team = getTeam(player.getUniqueId());
+        if (team == null) {
+            return null;
+        }
+        int roll = ThreadLocalRandom.current().nextInt(4);
+        return switch (roll) {
+            case 0 -> {
+                Location base = arena.getSpawn(team);
+                yield base == null
+                        ? null
+                        : new UnstableTeleportResult(
+                        base,
+                        Component.text("The device snapped you back to your base.", NamedTextColor.AQUA));
+            }
+            case 1 -> {
+                BlockPoint center = arena.getCenter();
+                Location centerLocation = center == null ? null : findSafeArenaTeleportLocation(center.x(), center.z());
+                yield centerLocation == null
+                        ? null
+                        : new UnstableTeleportResult(
+                        centerLocation,
+                        Component.text("The device dropped you at the exact center of the map.", NamedTextColor.LIGHT_PURPLE));
+            }
+            case 2 -> {
+                Location randomLocation = findRandomSafeArenaLocation();
+                yield randomLocation == null
+                        ? null
+                        : new UnstableTeleportResult(
+                        randomLocation,
+                        Component.text("The device scattered you to a random location.", NamedTextColor.YELLOW));
+            }
+            default -> {
+                UnstableTeleportResult baseResult = findRandomBaseTeleportResult(team);
+                yield baseResult;
+            }
+        };
+    }
+
+    private UnstableTeleportResult findRandomBaseTeleportResult(TeamColor playerTeam) {
+        List<TeamColor> candidates = new ArrayList<>(teamsInMatch.isEmpty() ? arena.getTeams() : teamsInMatch);
+        if (candidates.size() > 1) {
+            candidates.remove(playerTeam);
+        }
+        Collections.shuffle(candidates);
+        for (TeamColor targetTeam : candidates) {
+            Location spawn = arena.getSpawn(targetTeam);
+            if (spawn == null) {
+                continue;
+            }
+            Component message = Component.text("The device hurled you to the ",
+                            NamedTextColor.YELLOW)
+                    .append(targetTeam.displayComponent())
+                    .append(Component.text(" base.", NamedTextColor.YELLOW));
+            return new UnstableTeleportResult(spawn, message);
+        }
+        Location fallback = arena.getSpawn(playerTeam);
+        return fallback == null
+                ? null
+                : new UnstableTeleportResult(
+                fallback,
+                Component.text("The device snapped you back to your base.", NamedTextColor.AQUA));
+    }
+
+    private Location findRandomSafeArenaLocation() {
+        BlockPoint corner1 = arena.getCorner1();
+        BlockPoint corner2 = arena.getCorner2();
+        if (corner1 == null || corner2 == null) {
+            return null;
+        }
+        int minX = Math.min(corner1.x(), corner2.x());
+        int maxX = Math.max(corner1.x(), corner2.x());
+        int minZ = Math.min(corner1.z(), corner2.z());
+        int maxZ = Math.max(corner1.z(), corner2.z());
+        for (int attempt = 0; attempt < 64; attempt++) {
+            int x = ThreadLocalRandom.current().nextInt(minX, maxX + 1);
+            int z = ThreadLocalRandom.current().nextInt(minZ, maxZ + 1);
+            Location safe = findSafeArenaTeleportLocation(x, z);
+            if (safe != null) {
+                return safe;
+            }
+        }
+        return null;
+    }
+
+    private Location findSafeArenaTeleportLocation(int x, int z) {
+        World world = arena.getWorld();
+        if (world == null) {
+            return null;
+        }
+        BlockPoint corner1 = arena.getCorner1();
+        BlockPoint corner2 = arena.getCorner2();
+        int minY = world.getMinHeight();
+        if (corner1 != null && corner2 != null) {
+            minY = Math.max(minY, Math.min(corner1.y(), corner2.y()));
+        }
+
+        Block highest = world.getHighestBlockAt(x, z);
+        Location highestLocation = buildSafeTeleportLocation(highest);
+        if (highestLocation != null) {
+            return highestLocation;
+        }
+
+        int startY = highest != null ? highest.getY() : world.getMaxHeight() - 2;
+        for (int y = startY; y >= minY; y--) {
+            Location candidate = buildSafeTeleportLocation(world.getBlockAt(x, y, z));
+            if (candidate != null) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private Location buildSafeTeleportLocation(Block floor) {
+        if (floor == null || !isSafeTeleportFloor(floor)) {
+            return null;
+        }
+        Block feet = floor.getRelative(BlockFace.UP);
+        Block head = feet.getRelative(BlockFace.UP);
+        if (!isSafeTeleportSpace(feet) || !isSafeTeleportSpace(head)) {
+            return null;
+        }
+        return feet.getLocation().add(0.5, 0.0, 0.5);
+    }
+
+    private boolean isSafeTeleportFloor(Block block) {
+        if (block == null) {
+            return false;
+        }
+        Material type = block.getType();
+        if (!type.isSolid()) {
+            return false;
+        }
+        return switch (type) {
+            case LAVA,
+                    WATER,
+                    FIRE,
+                    SOUL_FIRE,
+                    CACTUS,
+                    MAGMA_BLOCK,
+                    CAMPFIRE,
+                    SOUL_CAMPFIRE,
+                    POWDER_SNOW,
+                    END_PORTAL -> false;
+            default -> true;
+        };
+    }
+
+    private boolean isSafeTeleportSpace(Block block) {
+        if (block == null) {
+            return false;
+        }
+        Material type = block.getType();
+        if (type == Material.WATER || type == Material.LAVA) {
+            return false;
+        }
+        return block.isPassable();
+    }
+
+    private void playUnstableTeleportEffects(Location location) {
+        if (location == null || location.getWorld() == null) {
+            return;
+        }
+        location.getWorld().spawnParticle(Particle.PORTAL,
+                location.clone().add(0.0, 1.0, 0.0),
+                40,
+                0.45,
+                0.8,
+                0.45,
+                0.0);
+        location.getWorld().playSound(location, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+    }
+
+    private long getCustomItemCooldownRemainingMillis(UUID playerId, String itemId) {
+        String normalized = normalizeItemId(itemId);
+        if (playerId == null || normalized == null) {
+            return 0L;
+        }
+        Map<String, Long> cooldowns = customItemCooldownEnds.get(playerId);
+        if (cooldowns == null) {
+            return 0L;
+        }
+        Long expiresAt = cooldowns.get(normalized);
+        if (expiresAt == null) {
+            return 0L;
+        }
+        long remaining = expiresAt - System.currentTimeMillis();
+        if (remaining > 0L) {
+            return remaining;
+        }
+        cooldowns.remove(normalized);
+        if (cooldowns.isEmpty()) {
+            customItemCooldownEnds.remove(playerId);
+        }
+        return 0L;
+    }
+
+    private void startCustomItemCooldown(UUID playerId, String itemId, int cooldownSeconds) {
+        String normalized = normalizeItemId(itemId);
+        if (playerId == null || normalized == null || cooldownSeconds <= 0) {
+            return;
+        }
+        long expiresAt = System.currentTimeMillis() + cooldownSeconds * 1000L;
+        customItemCooldownEnds
+                .computeIfAbsent(playerId, key -> new HashMap<>())
+                .put(normalized, expiresAt);
     }
 
     private void clearAllElytraStrikes(boolean restoreChestplate) {
@@ -3476,6 +3728,7 @@ public class GameSession {
         pendingPartyExp.clear();
         teamPurchaseCounts.clear();
         playerPurchaseCounts.clear();
+        customItemCooldownEnds.clear();
         respawnProtectionEnds.clear();
         respawnProtectionTasks.clear();
         teamsInMatch.clear();
@@ -5137,6 +5390,9 @@ public class GameSession {
         int minutes = Math.max(0, totalSeconds) / 60;
         int seconds = Math.max(0, totalSeconds) % 60;
         return String.format("%d:%02d", minutes, seconds);
+    }
+
+    private record UnstableTeleportResult(Location destination, Component message) {
     }
 
     private record EventInfo(String label, int secondsRemaining) {

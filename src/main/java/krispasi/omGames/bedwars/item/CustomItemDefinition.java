@@ -24,6 +24,7 @@ public class CustomItemDefinition {
     private final double speed;
     private final double range;
     private final int uses;
+    private final int cooldownSeconds;
 
     public CustomItemDefinition(String id,
                                 CustomItemType type,
@@ -39,7 +40,8 @@ public class CustomItemDefinition {
                                 double health,
                                 double speed,
                                 double range,
-                                int uses) {
+                                int uses,
+                                int cooldownSeconds) {
         this.id = id;
         this.type = type;
         this.material = material;
@@ -55,6 +57,7 @@ public class CustomItemDefinition {
         this.speed = speed;
         this.range = range;
         this.uses = uses;
+        this.cooldownSeconds = Math.max(0, cooldownSeconds);
     }
 
     public String getId() {
@@ -115,5 +118,9 @@ public class CustomItemDefinition {
 
     public int getUses() {
         return uses;
+    }
+
+    public int getCooldownSeconds() {
+        return cooldownSeconds;
     }
 }

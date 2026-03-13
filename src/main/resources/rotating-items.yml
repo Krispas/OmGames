@@ -18,6 +18,7 @@ shop:
         bridge_zapper: 19
         abyssal_rift: 22
         elytra: 23
+        unstable_teleportation_device: 24
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -193,6 +194,24 @@ shop:
           - "Launch 300 blocks above"
           - "your spawn for an airstrike."
         custom-item: elytra_strike
+      unstable_teleportation_device:
+        material: ENDER_EYE
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 8
+        display-name: "Unstable Teleportation Device"
+        lore:
+          - "Randomly teleports you to:"
+          - "your base, map center,"
+          - "a safe random spot, or"
+          - "a random base."
+          - "30s cooldown."
+        custom-item: unstable_teleportation_device
+        disable-after-sudden-death: true
+        limit:
+          scope: PLAYER
+          amount: 5
       thorns_upgrade:
         material: CACTUS
         amount: 1

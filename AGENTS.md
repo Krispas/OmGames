@@ -356,6 +356,7 @@ Common definition fields:
 - `speed`
 - `range`
 - `uses`
+- `cooldown-seconds`
 - `max-blocks`
 - `bridge-width`
 
@@ -376,6 +377,7 @@ Supported `type` values:
 - `MAGIC_MILK`
 - `ABYSSAL_RIFT`
 - `ELYTRA_STRIKE`
+- `UNSTABLE_TELEPORTATION_DEVICE`
 - `TOWER_CHEST`
 
 Behavior notes:
@@ -390,6 +392,11 @@ Behavior notes:
 - `ELYTRA_STRIKE`
   - purchased as a held item
   - right-click activation equips temporary Elytra, teleports above team spawn, and cleans up on landing/death/quit/session end
+- `UNSTABLE_TELEPORTATION_DEVICE`
+  - purchased as a held item
+  - right-click activation rolls one teleport outcome
+  - random-location outcome must land on a safe block with space above it
+  - supports `cooldown-seconds` in `custom-items.yml`
 - `TOWER_CHEST`
   - chest deployable that builds a fixed wool tower aligned to player facing
   - uses team wool plus placed ladders and removes the center chest shortly after placement
