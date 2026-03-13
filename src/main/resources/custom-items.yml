@@ -99,6 +99,9 @@ custom-items:
     type: UNSTABLE_TELEPORTATION_DEVICE
     material: ENDER_EYE
     cooldown-seconds: 30
+  miracle_of_the_stars:
+    type: MIRACLE_OF_THE_STARS
+    material: NETHER_STAR
   tower_chest:
     type: TOWER_CHEST
     material: CHEST

@@ -575,6 +575,9 @@ public class BedwarsListener implements Listener {
                 case ELYTRA_STRIKE -> {
                     yield session.activateElytraStrike(player, custom);
                 }
+                case MIRACLE_OF_THE_STARS -> {
+                    yield session.activateMiracleOfTheStars(player, custom);
+                }
                 case UNSTABLE_TELEPORTATION_DEVICE -> {
                     yield session.activateUnstableTeleportationDevice(player, custom);
                 }
@@ -1674,15 +1677,11 @@ public class BedwarsListener implements Listener {
                 }
             }
             boolean finalDeath = false;
-            boolean autoSoloBeacon = false;
             boolean statsEnabled = session.isStatsEnabled();
             if (participant) {
                 event.getDrops().removeIf(session::isActiveElytraStrikeItem);
-                autoSoloBeacon = tryAutoActivateSoloRespawnBeacon(player, session);
-                TeamColor team = session.getTeam(player.getUniqueId());
-                finalDeath = team != null
-                        && session.getBedState(team) == BedState.DESTROYED
-                        && !autoSoloBeacon;
+                tryAutoActivateSoloRespawnBeacon(player, session);
+                finalDeath = session.handlePlayerDeath(player);
                 if (statsEnabled) {
                     bedwarsManager.getStatsService().addDeath(player.getUniqueId());
                     if (finalDeath) {
@@ -1702,7 +1701,6 @@ public class BedwarsListener implements Listener {
                     }
                 }
             }
-            session.handlePlayerDeath(player);
         });
     }
 

@@ -154,6 +154,7 @@ public class GameSession {
     private static final int ELYTRA_STRIKE_ALTITUDE = 300;
     private static final int ELYTRA_STRIKE_REGEN_DURATION_TICKS = 20;
     private static final int ELYTRA_STRIKE_REGEN_AMPLIFIER = 9;
+    private static final long MIRACLE_OF_THE_STARS_DELAY_TICKS = 5L * 20L;
     private static final long TOWER_CHEST_TEMP_CHEST_TICKS = 8L;
     private static final NamespacedKey ABYSSAL_RIFT_ITEM_MODEL = new NamespacedKey("om", "rift1");
     private static final String[][] TOWER_CHEST_LAYERS = new String[][]{
@@ -1531,6 +1532,53 @@ public class GameSession {
         return true;
     }
 
+    public boolean activateMiracleOfTheStars(Player player, CustomItemDefinition custom) {
+        if (player == null
+                || custom == null
+                || plugin == null
+                || !isRunning()
+                || !isParticipant(player.getUniqueId())
+                || !isInArenaWorld(player.getWorld())) {
+            return false;
+        }
+        if (suddenDeathActive) {
+            player.sendMessage(Component.text("Miracle of the Stars is disabled after sudden death.", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        TeamColor team = getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        Location baseSpawn = arena.getSpawn(team);
+        if (baseSpawn == null) {
+            player.sendMessage(Component.text("The stars could not find your base.", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+
+        Component primedMessage = Component.text("Miracle of the Stars activates in ", NamedTextColor.AQUA)
+                .append(Component.text("5 seconds", NamedTextColor.YELLOW))
+                .append(Component.text(". Your team will be recalled to base.", NamedTextColor.AQUA));
+        for (UUID playerId : assignments.keySet()) {
+            if (!isMiracleOfTheStarsTarget(playerId, team)) {
+                continue;
+            }
+            Player teammate = Bukkit.getPlayer(playerId);
+            if (teammate == null) {
+                continue;
+            }
+            teammate.sendMessage(primedMessage);
+            teammate.playSound(teammate.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.9f, 1.3f);
+        }
+
+        BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () ->
+                safeRun("miracleOfTheStars", () -> resolveMiracleOfTheStars(team)),
+                MIRACLE_OF_THE_STARS_DELAY_TICKS);
+        tasks.add(task);
+        return true;
+    }
+
     public void handleElytraStrikeMovement(Player player) {
         if (player == null) {
             return;
@@ -1725,6 +1773,76 @@ public class GameSession {
                 0.45,
                 0.0);
         location.getWorld().playSound(location, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
+    }
+
+    private void resolveMiracleOfTheStars(TeamColor team) {
+        if (team == null || state != GameState.RUNNING) {
+            return;
+        }
+        if (suddenDeathActive) {
+            Component cancelled = Component.text("Miracle of the Stars faded when sudden death began.", NamedTextColor.RED);
+            for (UUID playerId : assignments.keySet()) {
+                if (assignments.get(playerId) != team) {
+                    continue;
+                }
+                Player teammate = Bukkit.getPlayer(playerId);
+                if (teammate == null) {
+                    continue;
+                }
+                teammate.sendMessage(cancelled);
+                teammate.playSound(teammate.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            }
+            return;
+        }
+        Location baseSpawn = arena.getSpawn(team);
+        if (baseSpawn == null) {
+            return;
+        }
+
+        Component recallMessage = Component.text("Miracle of the Stars carried your team back to base.", NamedTextColor.GOLD);
+        for (UUID playerId : assignments.keySet()) {
+            if (!isMiracleOfTheStarsTarget(playerId, team)) {
+                continue;
+            }
+            Player teammate = Bukkit.getPlayer(playerId);
+            if (teammate == null) {
+                continue;
+            }
+            Location source = teammate.getLocation().clone();
+            Location destination = baseSpawn.clone();
+            if (!teammate.teleport(destination)) {
+                continue;
+            }
+            teammate.setFallDistance(0.0f);
+            playMiracleOfTheStarsEffects(source);
+            playMiracleOfTheStarsEffects(destination);
+            teammate.sendMessage(recallMessage);
+        }
+    }
+
+    private boolean isMiracleOfTheStarsTarget(UUID playerId, TeamColor team) {
+        if (playerId == null || team == null || assignments.get(playerId) != team) {
+            return false;
+        }
+        if (eliminatedPlayers.contains(playerId) || pendingRespawns.contains(playerId)) {
+            return false;
+        }
+        Player player = Bukkit.getPlayer(playerId);
+        return player != null
+                && player.isOnline()
+                && isInArenaWorld(player.getWorld())
+                && player.getGameMode() != GameMode.SPECTATOR;
+    }
+
+    private void playMiracleOfTheStarsEffects(Location location) {
+        if (location == null || location.getWorld() == null) {
+            return;
+        }
+        World world = location.getWorld();
+        Location center = location.clone().add(0.0, 1.0, 0.0);
+        world.spawnParticle(Particle.END_ROD, center, 30, 0.45, 0.75, 0.45, 0.0);
+        world.spawnParticle(Particle.PORTAL, center, 24, 0.35, 0.65, 0.35, 0.0);
+        world.playSound(location, Sound.BLOCK_BEACON_ACTIVATE, 0.9f, 1.25f);
     }
 
     private long getCustomItemCooldownRemainingMillis(UUID playerId, String itemId) {
@@ -2443,9 +2561,9 @@ public class GameSession {
         state = GameState.IDLE;
     }
 
-    public void handlePlayerDeath(Player player) {
+    public boolean handlePlayerDeath(Player player) {
         if (!isRunning() || !isParticipant(player.getUniqueId())) {
-            return;
+            return false;
         }
         clearElytraStrike(player, false, false);
         clearCombat(player.getUniqueId());
@@ -2456,13 +2574,14 @@ public class GameSession {
         removeItems(player, AXE_MATERIALS);
         TeamColor team = getTeam(player.getUniqueId());
         if (team == null) {
-            return;
+            return false;
         }
         if (getBedState(team) == BedState.ALIVE || respawnGracePlayers.contains(player.getUniqueId())) {
             pendingRespawns.add(player.getUniqueId());
-        } else {
-            eliminatePlayer(player, team);
+            return false;
         }
+        eliminatePlayer(player, team);
+        return true;
     }
 
     public void handleRespawn(Player player) {

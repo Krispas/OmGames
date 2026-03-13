@@ -12,6 +12,7 @@ shop:
         bridge_builder: 14
         creeping_arrow: 15
         tactical_nuke: 16
+        miracle_of_the_stars: 17
         placeable_bed: 18
         totem_of_undying: 21
         portable_shopkeeper: 20
@@ -212,6 +213,22 @@ shop:
         limit:
           scope: PLAYER
           amount: 5
+      miracle_of_the_stars:
+        material: NETHER_STAR
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 6
+        display-name: "Miracle of the Stars"
+        lore:
+          - "Recalls you and"
+          - "alive teammates to"
+          - "base after 5 seconds."
+        custom-item: miracle_of_the_stars
+        disable-after-sudden-death: true
+        limit:
+          scope: TEAM
+          amount: 1
       thorns_upgrade:
         material: CACTUS
         amount: 1

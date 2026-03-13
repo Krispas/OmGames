@@ -378,6 +378,7 @@ Supported `type` values:
 - `ABYSSAL_RIFT`
 - `ELYTRA_STRIKE`
 - `UNSTABLE_TELEPORTATION_DEVICE`
+- `MIRACLE_OF_THE_STARS`
 - `TOWER_CHEST`
 
 Behavior notes:
@@ -397,6 +398,10 @@ Behavior notes:
   - right-click activation rolls one teleport outcome
   - random-location outcome must land on a safe block with space above it
   - supports `cooldown-seconds` in `custom-items.yml`
+- `MIRACLE_OF_THE_STARS`
+  - purchased as a held item
+  - right-click activation recalls alive online teammates to base after 5 seconds
+  - must fail once sudden death is active and cancel if sudden death begins during the windup
 - `TOWER_CHEST`
   - chest deployable that builds a fixed wool tower aligned to player facing
   - uses team wool plus placed ladders and removes the center chest shortly after placement
