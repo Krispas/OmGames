@@ -59,13 +59,18 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             bedwarsManager.openQuickBuyEditor(player);
             return true;
         }
-        if (!player.isOp()) {
+        boolean temporaryCreator = bedwarsManager.isTemporaryCreator(player.getUniqueId());
+        if (args.length > 0 && isCreatorCommand(args[0])) {
+            return handleCreatorCommand(sender, player, args);
+        }
+        if (!player.isOp() && !temporaryCreator) {
             sender.sendMessage(Component.text("Only OP can use this command (except /bw stats and /bw quick-buy).", NamedTextColor.RED));
             return true;
         }
         if (!sender.hasPermission("omgames.bw.start")
                 && !sender.hasPermission("omgames.bw.setup")
-                && !sender.hasPermission("omgames.bw.reload")) {
+                && !sender.hasPermission("omgames.bw.reload")
+                && !temporaryCreator) {
             sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
             return true;
         }
@@ -99,12 +104,12 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args[0].equalsIgnoreCase("tp")) {
-            if (!sender.hasPermission("omgames.bw.start")) {
+            if (!canUseMapSetupCommands(sender, player)) {
                 sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
                 return true;
             }
             if (args.length < 2) {
-                sender.sendMessage(Component.text("Usage: /bw tp <arena>", NamedTextColor.YELLOW));
+                sender.sendMessage(Component.text("Usage: /bw tp <arena>|lobby", NamedTextColor.YELLOW));
                 return true;
             }
             if (args.length == 2 && args[1].equalsIgnoreCase("lobby")) {
@@ -119,7 +124,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
             String arenaName = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).trim();
             if (arenaName.isBlank()) {
-                sender.sendMessage(Component.text("Usage: /bw tp <arena>", NamedTextColor.YELLOW));
+                sender.sendMessage(Component.text("Usage: /bw tp <arena>|lobby", NamedTextColor.YELLOW));
                 return true;
             }
             Arena arena = findArena(arenaName);
@@ -263,7 +268,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args[0].equalsIgnoreCase("setup")) {
-            if (!sender.hasPermission("omgames.bw.setup") && !sender.hasPermission("omgames.bw.start")) {
+            if (!canUseMapSetupCommands(sender, player)) {
                 sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
                 return true;
             }
@@ -291,7 +296,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key]", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -299,8 +304,21 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "quick_buy", "stats", "reload", "setup")
+            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "quick_buy", "stats", "reload", "setup", "creator")
                     .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 2 && isCreatorCommand(args[0])) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Stream.of("add", "remove")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3 && isCreatorCommand(args[0])) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("stats")) {
@@ -432,6 +450,84 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                     .toList();
         }
         return List.of();
+    }
+
+    private boolean handleCreatorCommand(CommandSender sender, Player player, String[] args) {
+        if (!player.isOp()) {
+            sender.sendMessage(Component.text("Only OP can use /bw creator.", NamedTextColor.RED));
+            return true;
+        }
+        if (!sender.hasPermission("omgames.bw.setup") && !sender.hasPermission("omgames.bw.start")) {
+            sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+            return true;
+        }
+        if (args.length < 3) {
+            sender.sendMessage(Component.text("Usage: /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+            return true;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        OfflinePlayer target = resolveKnownPlayer(args[2]);
+        if (target == null || target.getUniqueId() == null) {
+            sender.sendMessage(Component.text("Player not found: " + args[2], NamedTextColor.RED));
+            return true;
+        }
+        String targetName = resolvePlayerName(target, args[2]);
+        if (action.equals("add")) {
+            if (!bedwarsManager.addTemporaryCreator(target.getUniqueId())) {
+                sender.sendMessage(Component.text(targetName + " already has temporary creator access.", NamedTextColor.YELLOW));
+                return true;
+            }
+            sender.sendMessage(Component.text("Granted temporary BedWars creator access to " + targetName + " until restart.", NamedTextColor.GREEN));
+            if (target.isOnline() && target.getPlayer() != null) {
+                target.getPlayer().sendMessage(Component.text("You can now use /bw setup and /bw tp until restart.", NamedTextColor.GREEN));
+            }
+            return true;
+        }
+        if (action.equals("remove")) {
+            if (!bedwarsManager.removeTemporaryCreator(target.getUniqueId())) {
+                sender.sendMessage(Component.text(targetName + " does not have temporary creator access.", NamedTextColor.YELLOW));
+                return true;
+            }
+            sender.sendMessage(Component.text("Removed temporary BedWars creator access from " + targetName + ".", NamedTextColor.GREEN));
+            if (target.isOnline() && target.getPlayer() != null) {
+                target.getPlayer().sendMessage(Component.text("Your temporary BedWars creator access was removed.", NamedTextColor.YELLOW));
+            }
+            return true;
+        }
+        sender.sendMessage(Component.text("Usage: /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+        return true;
+    }
+
+    private boolean canUseMapSetupCommands(CommandSender sender, Player player) {
+        return bedwarsManager.isTemporaryCreator(player.getUniqueId())
+                || sender.hasPermission("omgames.bw.setup")
+                || sender.hasPermission("omgames.bw.start");
+    }
+
+    private boolean isCreatorCommand(String command) {
+        return command != null
+                && (command.equalsIgnoreCase("creater") || command.equalsIgnoreCase("creator"));
+    }
+
+    private OfflinePlayer resolveKnownPlayer(String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        Player online = Bukkit.getPlayerExact(name);
+        if (online != null) {
+            return online;
+        }
+        return Arrays.stream(Bukkit.getOfflinePlayers())
+                .filter(player -> player.getName() != null && player.getName().equalsIgnoreCase(name))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String resolvePlayerName(OfflinePlayer player, String fallback) {
+        if (player != null && player.getName() != null && !player.getName().isBlank()) {
+            return player.getName();
+        }
+        return fallback;
     }
 
     private Arena findArena(String name) {

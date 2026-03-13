@@ -146,13 +146,14 @@ public class BedwarsSetupManager {
         }
         ConfigurationSection arena = arenas.createSection(arenaId);
         Location location = player.getLocation();
+        Location defaultGameLobby = new Location(location.getWorld(), 0.0, 73.0, 0.0);
         arena.set(KEY_WORLD, location.getWorld().getName());
         arena.set(KEY_CENTER, formatPoint(location));
         arena.set(KEY_CENTER_RADIUS, 32);
         arena.set(KEY_CORNER_1, "");
         arena.set(KEY_CORNER_2, "");
         arena.set(KEY_BASE_RADIUS, 0);
-        arena.set(KEY_GAME_LOBBY, formatPoint(location));
+        arena.set(KEY_GAME_LOBBY, formatPoint(defaultGameLobby));
         arena.set(KEY_MAP_LOBBY, formatPoint(location));
         ConfigurationSection antiBuild = arena.createSection(KEY_ANTI_BUILD);
         antiBuild.set("base-generator-radius", 0);
@@ -176,7 +177,9 @@ public class BedwarsSetupManager {
         }
         populateGeneratorSettings(arena);
         populateEventTimes(arena);
-        saveAndReload(player, config);
+        if (!saveAndReload(player, config)) {
+            return;
+        }
         player.sendMessage(Component.text("Arena created: " + arenaId, NamedTextColor.GREEN));
         showSetupList(player, arenaId);
     }
@@ -187,19 +190,21 @@ public class BedwarsSetupManager {
             player.sendMessage(Component.text("Unknown setup key: " + rawTarget, NamedTextColor.RED));
             return;
         }
-        Optional<SetupTarget> targetOptional = SetupTarget.parse(trimmed);
         Integer numericValue = null;
-        if (targetOptional.isEmpty()) {
-            String[] tokens = trimmed.split("\\s+");
-            String keyPart = trimmed;
-            if (tokens.length > 1) {
-                Integer parsed = parseInteger(tokens[tokens.length - 1]);
-                if (parsed != null) {
+        Optional<SetupTarget> targetOptional = Optional.empty();
+        String[] tokens = trimmed.split("\\s+");
+        if (tokens.length > 1) {
+            Integer parsed = parseInteger(tokens[tokens.length - 1]);
+            if (parsed != null) {
+                String keyPart = String.join(" ", java.util.Arrays.copyOf(tokens, tokens.length - 1));
+                targetOptional = SetupTarget.parse(keyPart);
+                if (targetOptional.isPresent()) {
                     numericValue = parsed;
-                    keyPart = String.join(" ", java.util.Arrays.copyOf(tokens, tokens.length - 1));
                 }
             }
-            targetOptional = SetupTarget.parse(keyPart);
+        }
+        if (targetOptional.isEmpty()) {
+            targetOptional = SetupTarget.parse(trimmed);
         }
         if (targetOptional.isEmpty()) {
             player.sendMessage(Component.text("Unknown setup key: " + rawTarget, NamedTextColor.RED));
@@ -215,13 +220,21 @@ public class BedwarsSetupManager {
 
         SetupTarget target = targetOptional.get();
         Location location = player.getLocation();
+        TeamColor team = target.team();
+        boolean teamWasComplete = isSetupCompletionTarget(target.kind()) && isTeamSetupComplete(arena, team);
+        GeneratorType generatorType = target.generatorType();
+        boolean generatorSetWasComplete = target.kind() == SetupKind.GENERATOR
+                && isGeneratorSetComplete(arena, generatorType);
 
         if (target.kind() == SetupKind.BED) {
             PendingSetup pendingSetup = pendingBeds.get(player.getUniqueId());
             if (trySaveBedFromBlock(player, arena, target, location)) {
                 pendingBeds.remove(player.getUniqueId());
-                saveAndReload(player, config);
+                if (!saveAndReload(player, config)) {
+                    return;
+                }
                 player.sendMessage(Component.text("Bed saved for " + target.team().displayName() + ".", NamedTextColor.GREEN));
+                notifyTeamSetupCompleted(player, arena, team, teamWasComplete);
                 return;
             }
             if (pendingSetup != null
@@ -229,8 +242,11 @@ public class BedwarsSetupManager {
                     && pendingSetup.target().equals(target)) {
                 saveBed(arena, target.team(), pendingSetup.firstBedPoint(), location);
                 pendingBeds.remove(player.getUniqueId());
-                saveAndReload(player, config);
+                if (!saveAndReload(player, config)) {
+                    return;
+                }
                 player.sendMessage(Component.text("Bed saved for " + target.team().displayName() + ".", NamedTextColor.GREEN));
+                notifyTeamSetupCompleted(player, arena, team, teamWasComplete);
                 return;
             }
             BlockPoint head = new BlockPoint(location.getBlockX(), location.getBlockY(), location.getBlockZ());
@@ -275,8 +291,12 @@ public class BedwarsSetupManager {
             }
         }
 
-        saveAndReload(player, config);
+        if (!saveAndReload(player, config)) {
+            return;
+        }
         player.sendMessage(Component.text("Saved " + target.label() + ".", NamedTextColor.GREEN));
+        notifyTeamSetupCompleted(player, arena, team, teamWasComplete);
+        notifyGeneratorSetupCompleted(player, arena, generatorType, generatorSetWasComplete);
     }
 
     public List<String> getSetupKeys(String arenaId) {
@@ -297,12 +317,6 @@ public class BedwarsSetupManager {
             keys.add(team.key() + ".base-gen");
             keys.add(team.key() + ".shop");
             keys.add(team.key() + ".upgrades");
-            // Backwards-compatible aliases.
-            keys.add("bed." + team.key());
-            keys.add("spawn." + team.key());
-            keys.add("base-gen." + team.key());
-            keys.add("shop." + team.key() + ".main");
-            keys.add("shop." + team.key() + ".upgrades");
         }
 
         YamlConfiguration config = loadConfig();
@@ -319,16 +333,85 @@ public class BedwarsSetupManager {
         return keys;
     }
 
-    private void saveAndReload(Player player, YamlConfiguration config) {
+    private boolean saveAndReload(Player player, YamlConfiguration config) {
         File file = getConfigFile();
         try {
             config.save(file);
         } catch (IOException ex) {
             player.sendMessage(Component.text("Failed to save bedwars.yml.", NamedTextColor.RED));
             plugin.getLogger().warning("Failed to save bedwars.yml: " + ex.getMessage());
-            return;
+            return false;
         }
         bedwarsManager.loadArenas();
+        return true;
+    }
+
+    private void notifyTeamSetupCompleted(Player player, ConfigurationSection arena, TeamColor team, boolean teamWasComplete) {
+        if (player == null || team == null || teamWasComplete || !isTeamSetupComplete(arena, team)) {
+            return;
+        }
+        player.sendMessage(Component.text("Team ", NamedTextColor.GREEN)
+                .append(team.displayComponent())
+                .append(Component.text(" setup complete", NamedTextColor.GREEN)));
+    }
+
+    private void notifyGeneratorSetupCompleted(Player player,
+                                               ConfigurationSection arena,
+                                               GeneratorType generatorType,
+                                               boolean generatorSetWasComplete) {
+        if (player == null || generatorType == null || generatorSetWasComplete || !isGeneratorSetComplete(arena, generatorType)) {
+            return;
+        }
+        String label = generatorType == GeneratorType.DIAMOND ? "Diamond generators" : "Emerald generators";
+        player.sendMessage(Component.text(label + " setup complete", NamedTextColor.GREEN));
+    }
+
+    private boolean isSetupCompletionTarget(SetupKind kind) {
+        return kind == SetupKind.BED
+                || kind == SetupKind.SPAWN
+                || kind == SetupKind.BASE_GEN
+                || kind == SetupKind.SHOP;
+    }
+
+    private boolean isTeamSetupComplete(ConfigurationSection arena, TeamColor team) {
+        if (arena == null || team == null) {
+            return false;
+        }
+        ConfigurationSection beds = getSectionAnyCase(arena, KEY_BEDS);
+        ConfigurationSection spawns = getSectionAnyCase(arena, KEY_SPAWNS);
+        ConfigurationSection baseGenerators = getSectionAnyCase(arena, KEY_BASE_GENERATORS);
+        ConfigurationSection shops = getSectionAnyCase(arena, KEY_SHOPS);
+        ConfigurationSection teamShops = shops != null ? getSectionAnyCase(shops, team.key()) : null;
+        return hasValue(beds != null ? beds.getString(team.key()) : null)
+                && hasValue(spawns != null ? spawns.getString("base_" + team.key()) : null)
+                && hasValue(baseGenerators != null ? baseGenerators.getString("base_gen_" + team.key()) : null)
+                && hasValue(teamShops != null ? teamShops.getString("main") : null)
+                && hasValue(teamShops != null ? teamShops.getString("upgrades") : null);
+    }
+
+    private boolean isGeneratorSetComplete(ConfigurationSection arena, GeneratorType type) {
+        if (arena == null || type == null) {
+            return false;
+        }
+        ConfigurationSection generators = getSectionAnyCase(arena, KEY_GENERATORS);
+        if (generators == null) {
+            return false;
+        }
+        String prefix = type == GeneratorType.DIAMOND ? "diamond_" : "emerald_";
+        List<String> keys = findGeneratorKeys(generators, prefix);
+        if (keys.isEmpty()) {
+            return false;
+        }
+        for (String key : keys) {
+            if (!hasValue(generators.getString(key))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean hasValue(String value) {
+        return value != null && !value.isBlank();
     }
 
     private void saveBed(ConfigurationSection arena, TeamColor team, BlockPoint head, Location footLocation) {

@@ -3,7 +3,9 @@ package krispasi.omGames.bedwars;
 import java.io.File;
 import java.util.Collection;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import krispasi.omGames.bedwars.config.BedwarsConfigLoader;
 import krispasi.omGames.bedwars.event.BedwarsMatchEventConfig;
@@ -56,6 +58,7 @@ public class BedwarsManager {
     private final BedwarsLobbyLeaderboard lobbyLeaderboard;
     private final BedwarsLobbyParkour lobbyParkour;
     private final BedwarsParkourLeaderboard parkourLeaderboard;
+    private final Set<UUID> temporaryCreators = new HashSet<>();
     private Map<String, Arena> arenas = Map.of();
     private GameSession activeSession;
     private ShopConfig shopConfig = ShopConfig.empty();
@@ -165,6 +168,24 @@ public class BedwarsManager {
 
     public BedwarsLobbyParkour getLobbyParkour() {
         return lobbyParkour;
+    }
+
+    public boolean addTemporaryCreator(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
+        return temporaryCreators.add(playerId);
+    }
+
+    public boolean removeTemporaryCreator(UUID playerId) {
+        if (playerId == null) {
+            return false;
+        }
+        return temporaryCreators.remove(playerId);
+    }
+
+    public boolean isTemporaryCreator(UUID playerId) {
+        return playerId != null && temporaryCreators.contains(playerId);
     }
 
     public boolean isBedwarsWorld(String worldName) {
@@ -311,6 +332,7 @@ public class BedwarsManager {
             activeSession.stop();
             activeSession = null;
         }
+        temporaryCreators.clear();
         lobbyLeaderboard.stop();
         parkourLeaderboard.stop();
         lobbyParkour.shutdown();

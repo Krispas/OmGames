@@ -431,7 +431,7 @@ public class BedwarsListener implements Listener {
             if (!isOutsideRunningBedwarsGame(player, session)) {
                 return;
             }
-            if (player.isOp()) {
+            if (canEditProtectedBedwarsWorld(player, session)) {
                 return;
             }
             if (!(clicked.getBlockData() instanceof Openable)) {
@@ -947,7 +947,8 @@ public class BedwarsListener implements Listener {
             Player player = event.getPlayer();
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null) {
-                if (!player.isOp() && bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
+                if (!canEditProtectedBedwarsWorld(player, null)
+                        && bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
                     event.setCancelled(true);
                 }
                 return;
@@ -1002,7 +1003,8 @@ public class BedwarsListener implements Listener {
             Player player = event.getPlayer();
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null) {
-                if (!player.isOp() && bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
+                if (!canEditProtectedBedwarsWorld(player, null)
+                        && bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
                     event.setCancelled(true);
                 }
                 return;
@@ -1051,7 +1053,8 @@ public class BedwarsListener implements Listener {
             Player player = event.getPlayer();
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null) {
-                if (!player.isOp() && bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
+                if (!canEditProtectedBedwarsWorld(player, null)
+                        && bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
                     event.setCancelled(true);
                 }
                 return;
@@ -4353,6 +4356,19 @@ public class BedwarsListener implements Listener {
             return true;
         }
         return !session.isRunning() || !session.isParticipant(player.getUniqueId());
+    }
+
+    private boolean canEditProtectedBedwarsWorld(Player player, GameSession session) {
+        if (player == null || !bedwarsManager.isBedwarsWorld(player.getWorld().getName())) {
+            return false;
+        }
+        if (player.isOp()) {
+            return true;
+        }
+        if (!bedwarsManager.isTemporaryCreator(player.getUniqueId())) {
+            return false;
+        }
+        return session == null || !session.isInArenaWorld(player.getWorld());
     }
 
     private void applyOutsideGameBedwarsBuffs(Player player) {

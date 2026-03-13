@@ -116,6 +116,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - `QuickBuyService`
   - `BedwarsStatsService`
   - lobby/parkour leaderboards
+  - temporary BedWars creator allowlist for setup access until restart
 
 - `GameSession` owns match-scoped runtime:
   - assignments
@@ -151,6 +152,8 @@ Admin subcommands:
 - `/bw test start`
 - `/bw stop`
 - `/bw tp <arena>|lobby`
+- `/bw creator add <user>`
+- `/bw creator remove <user>`
 - `/bw lobby parkour <start|checkpoint [x]|end>`
 - `/bw game out [player]`
 - `/bw game spectate [player]`
@@ -166,6 +169,12 @@ Permissions declared in `plugin.yml`:
 - `omgames.bw.start`
 - `omgames.bw.setup`
 - `omgames.bw.reload`
+
+Temporary creator notes:
+- `/bw creator add <user>` and `/bw creator remove <user>` are OP-only management commands
+- temporary creators may use `/bw setup` and `/bw tp`
+- temporary creators may also place/break blocks and use openable blocks in protected BedWars worlds when there is no active session in that world
+- temporary creator access is in-memory only and is cleared on restart/shutdown
 
 ### 2.5 GameSession State Machine
 
@@ -393,6 +402,7 @@ Manager: `BedwarsSetupManager`
 
 Create arena:
 - `/bw setup new <arenaId>`
+  - seeds `game-lobby` to `0 73 0` in the arena world by default
 
 Status:
 - `/bw setup <arenaId>`
@@ -415,6 +425,15 @@ Apply keys:
 - `<team>.upgrades`
 - `generator.diamond.<n>`
 - `generator.emerald.<n>`
+
+Setup key autocomplete:
+- tab completion should prefer canonical team-first keys such as `red.bed`, `red.spawn`, `red.shop`, `red.upgrades`, and `red.base-gen`
+- legacy alias forms may still be accepted by parsing, but should not be suggested in autocomplete
+
+Team setup completion feedback:
+- when a team gets its last missing setup field (`bed`, `spawn`, `base-gen`, `shop`, `upgrades`), `/bw setup` should send `Team <color> setup complete`
+- when the last missing diamond generator is filled, `/bw setup` should send `Diamond generators setup complete`
+- when the last missing emerald generator is filled, `/bw setup` should send `Emerald generators setup complete`
 
 ### 2.11 Placement Rules
 
