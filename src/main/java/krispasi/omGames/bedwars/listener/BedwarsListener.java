@@ -1209,6 +1209,9 @@ public class BedwarsListener implements Listener {
                 if (!isSummon(event.getEntity())) {
                     return;
                 }
+                if (isHappyGhast(event.getEntity())) {
+                    return;
+                }
                 Player attacker = resolveAttacker(event);
                 if (attacker != null && session.isParticipant(attacker.getUniqueId())) {
                     TeamColor attackerTeam = session.getTeam(attacker.getUniqueId());
@@ -3311,9 +3314,9 @@ public class BedwarsListener implements Listener {
         if (player == null) {
             return;
         }
-        // Paper 1.21 exposes Attribute.GENERIC_SCALE directly. Older API targets would need
+        // Paper 1.21 exposes Attribute.SCALE directly. Older API targets may still need
         // a reflective fallback here if this BedWars runtime is ever backported.
-        AttributeInstance attribute = player.getAttribute(Attribute.GENERIC_SCALE);
+        AttributeInstance attribute = player.getAttribute(Attribute.SCALE);
         if (attribute == null) {
             return;
         }
@@ -3433,7 +3436,6 @@ public class BedwarsListener implements Listener {
             mob.setRemoveWhenFarAway(true);
         }
         entity.setPersistent(false);
-        entity.setCollidable(false);
         entity.addScoreboardTag(GameSession.HAPPY_GHAST_TAG);
         setSummonTeam(entity, team);
         setHappyGhastDriver(entity, player.getUniqueId());

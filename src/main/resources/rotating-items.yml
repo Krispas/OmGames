@@ -20,6 +20,7 @@ shop:
         abyssal_rift: 22
         elytra: 23
         unstable_teleportation_device: 24
+        gigantify_grenade: 29
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -229,6 +230,17 @@ shop:
         limit:
           scope: TEAM
           amount: 1
+      gigantify_grenade:
+        material: FIRE_CHARGE
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 12
+        display-name: "Gigantify Grenade"
+        lore:
+          - "Throws a grenade that"
+          - "makes the target grow."
+        custom-item: gigantify_grenade
       thorns_upgrade:
         material: CACTUS
         amount: 1

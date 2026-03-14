@@ -407,7 +407,7 @@ Behavior notes:
   - scales the target up over 2 seconds, holds for 3 seconds, then shrinks over 3 seconds
   - effect cleanup must restore the player's BedWars scale on death, quit, world/session exit, and natural expiry
 - `HAPPY_GHAST`
-  - should take normal damage and use attribute-based knockback resistance; do not add ghast-specific damage or knockback handling in the listener
+  - should take normal damage from players and projectiles, including same-team hits, and use attribute-based knockback resistance; do not add ghast-specific damage or knockback handling in the listener
 - `UNSTABLE_TELEPORTATION_DEVICE`
   - purchased as a held item
   - right-click activation rolls one teleport outcome
