@@ -406,6 +406,9 @@ Behavior notes:
   - only affects enemy players on direct hit; block hits should only despawn the projectile
   - scales the target up over 2 seconds, holds for 3 seconds, then shrinks over 3 seconds
   - effect cleanup must restore the player's BedWars scale on death, quit, world/session exit, and natural expiry
+- `BRIDGE_BUILDER`
+  - right-clicking a block places a piston anchor at the clicked placement position
+  - the tunnel should extend from that piston anchor in the player's horizontal facing direction, not from the player's feet
 - `HAPPY_GHAST`
   - should take normal damage from players and projectiles, including same-team hits, and use attribute-based knockback resistance; do not add ghast-specific damage or knockback handling in the listener
 - `UNSTABLE_TELEPORTATION_DEVICE`
@@ -420,7 +423,7 @@ Behavior notes:
   - must fail once sudden death is active and cancel if sudden death begins during the windup
 - `TOWER_CHEST`
   - chest deployable that builds a fixed wool tower aligned to player facing
-  - uses team wool plus placed ladders, follows the fixed 7-layer popup-tower layout in `GameSession.TOWER_CHEST_LAYERS`, and removes the center chest shortly after placement
+  - uses team wool plus placed ladders, follows the fixed 7-layer popup-tower layout in `GameSession.TOWER_CHEST_LAYERS`, only fills air blocks inside the map, ignores anti-build placement restrictions, and removes the center chest shortly after placement
 
 ### 2.9 Match Event Workflow
 

@@ -37,8 +37,10 @@ import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.Container;
 import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.Openable;
 import org.bukkit.block.data.type.Bed;
 import org.bukkit.Particle;
@@ -566,7 +568,7 @@ public class BedwarsListener implements Listener {
                     yield useFlamethrower(player, session, custom, item, event.getHand());
                 }
                 case BRIDGE_BUILDER -> {
-                    yield useBridgeBuilder(player, session, custom);
+                    yield useBridgeBuilder(player, session, custom, event);
                 }
                 case TOWER_CHEST -> {
                     if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
@@ -2544,12 +2546,33 @@ public class BedwarsListener implements Listener {
         }.runTask(bedwarsManager.getPlugin());
     }
 
-    private boolean useBridgeBuilder(Player player, GameSession session, CustomItemDefinition custom) {
-        if (player == null || session == null || custom == null) {
+    private boolean useBridgeBuilder(Player player,
+                                     GameSession session,
+                                     CustomItemDefinition custom,
+                                     PlayerInteractEvent event) {
+        if (player == null || session == null || custom == null || event == null) {
+            return false;
+        }
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+            return false;
+        }
+        Block clicked = event.getClickedBlock();
+        BlockFace clickedFace = event.getBlockFace();
+        if (clicked == null || clickedFace == null) {
             return false;
         }
         TeamColor team = session.getTeam(player.getUniqueId());
         if (team == null) {
+            return false;
+        }
+        Block anchor = clicked.getRelative(clickedFace);
+        BlockPoint anchorPoint = new BlockPoint(anchor.getX(), anchor.getY(), anchor.getZ());
+        if (!session.isInsideMap(anchorPoint)) {
+            player.sendMessage(Component.text("You cannot place a bridge builder outside the map.", NamedTextColor.RED));
+            return false;
+        }
+        if (session.isPlacementBlocked(anchorPoint) || !anchor.getType().isAir()) {
+            player.sendMessage(Component.text("You cannot place a bridge builder here.", NamedTextColor.RED));
             return false;
         }
         int length = Math.max(1, custom.getMaxBlocks());
@@ -2559,15 +2582,17 @@ public class BedwarsListener implements Listener {
         int shellHeight = openingWidth + 2;
         double blocksPerSecond = resolveBridgeBuilderBlocksPerSecond(custom);
         double blocksPerTick = blocksPerSecond / 20.0;
-        Vector direction = player.getLocation().getDirection().setY(0);
-        if (direction.lengthSquared() < 0.01) {
-            return false;
-        }
-        direction.normalize();
-        Vector right = new Vector(-direction.getZ(), 0, direction.getX());
-        Location origin = player.getLocation().getBlock().getLocation().subtract(0.0, 1.0, 0.0);
+        BlockFace forward = resolveBridgeBuilderForward(player);
+        BlockFace rightFace = rotateClockwiseBridgeBuilderFace(forward);
+        ItemStack pistonDrop = new ItemStack(Material.PISTON);
         Material blockType = Material.END_STONE;
         ItemStack record = new ItemStack(blockType);
+        anchor.setType(Material.PISTON, false);
+        if (anchor.getBlockData() instanceof Directional directional) {
+            directional.setFacing(forward);
+            anchor.setBlockData(directional, false);
+        }
+        session.recordPlacedBlock(anchorPoint, pistonDrop);
         new BukkitRunnable() {
             private int step = 0;
             private double budget = 0.0;
@@ -2584,10 +2609,9 @@ public class BedwarsListener implements Listener {
                 }
                 budget += blocksPerTick;
                 while (budget >= 1.0 && step < length) {
-                    Location base = origin.clone().add(direction.clone().multiply(step + 1));
-                    int baseX = base.getBlockX();
-                    int baseY = origin.getBlockY();
-                    int baseZ = base.getBlockZ();
+                    int baseX = anchor.getX() + forward.getModX() * step;
+                    int baseY = anchor.getY();
+                    int baseZ = anchor.getZ() + forward.getModZ() * step;
                     for (int y = 0; y < shellHeight; y++) {
                         for (int offset = -shellHalf; offset <= shellHalf; offset++) {
                             boolean border = y == 0
@@ -2596,9 +2620,9 @@ public class BedwarsListener implements Listener {
                             if (!border) {
                                 continue;
                             }
-                            int dx = (int) Math.round(right.getX() * offset);
-                            int dz = (int) Math.round(right.getZ() * offset);
-                            Block target = base.getWorld().getBlockAt(baseX + dx, baseY + y, baseZ + dz);
+                            int dx = rightFace.getModX() * offset;
+                            int dz = rightFace.getModZ() * offset;
+                            Block target = anchor.getWorld().getBlockAt(baseX + dx, baseY + y, baseZ + dz);
                             if (!target.getType().isAir()) {
                                 continue;
                             }
@@ -2630,6 +2654,30 @@ public class BedwarsListener implements Listener {
             configured = 8.0;
         }
         return Math.max(0.1, configured);
+    }
+
+    private BlockFace resolveBridgeBuilderForward(Player player) {
+        if (player == null) {
+            return BlockFace.SOUTH;
+        }
+        Vector direction = player.getLocation().getDirection();
+        if (Math.abs(direction.getX()) >= Math.abs(direction.getZ())) {
+            return direction.getX() >= 0.0 ? BlockFace.EAST : BlockFace.WEST;
+        }
+        return direction.getZ() >= 0.0 ? BlockFace.SOUTH : BlockFace.NORTH;
+    }
+
+    private BlockFace rotateClockwiseBridgeBuilderFace(BlockFace face) {
+        if (face == null) {
+            return BlockFace.WEST;
+        }
+        return switch (face) {
+            case NORTH -> BlockFace.EAST;
+            case EAST -> BlockFace.SOUTH;
+            case SOUTH -> BlockFace.WEST;
+            case WEST -> BlockFace.NORTH;
+            default -> BlockFace.WEST;
+        };
     }
 
     private boolean useBridgeZapper(Player player,

@@ -2166,7 +2166,7 @@ public class GameSession {
                         outsideMap = true;
                         continue;
                     }
-                    if (isPlacementBlocked(point) || !target.getType().isAir()) {
+                    if (!target.getType().isAir()) {
                         player.sendMessage(Component.text("You cannot place a tower chest here.", NamedTextColor.RED));
                         return false;
                     }
