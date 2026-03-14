@@ -1,5 +1,6 @@
 package krispasi.omGames.bedwars.listener;
 
+import io.papermc.paper.event.player.PlayerArmSwingEvent;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
@@ -29,9 +30,12 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.EntityEffect;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
 import org.bukkit.block.Container;
 import org.bukkit.block.data.BlockData;
@@ -197,6 +201,14 @@ public class BedwarsListener implements Listener {
     private static final int FLAMETHROWER_FIRE_TICKS = 60;
     private static final long LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS = 5_000L;
     private static final long VOID_TOTEM_FALL_PROTECTION_MILLIS = 5_000L;
+    private static final int GIGANTIFY_GROWTH_TICKS = 40;
+    private static final int GIGANTIFY_SUSTAIN_TICKS = 60;
+    private static final int GIGANTIFY_SHRINK_TICKS = 60;
+    private static final int GIGANTIFY_TOTAL_TICKS =
+            GIGANTIFY_GROWTH_TICKS + GIGANTIFY_SUSTAIN_TICKS + GIGANTIFY_SHRINK_TICKS;
+    private static final double GIGANTIFY_MAX_SCALE_MULTIPLIER = 2.5;
+    private static final Particle.DustOptions GIGANTIFY_PARTICLE =
+            new DustOptions(Color.fromRGB(190, 90, 255), 1.3f);
     private static final int NUKE_TARGET_DISTANCE = 512;
     private static final int NUKE_COUNTDOWN_CHAT_SECONDS = 15;
     private static final String DREAM_DEFENDER_NAME = "Dream Defender";
@@ -207,6 +219,7 @@ public class BedwarsListener implements Listener {
     private static final String PORTABLE_SHOPKEEPER_TAG = "bw_portable_shopkeeper";
     private static final String PLACEABLE_BED_ITEM_ID = "placeable_bed";
     private static final String RESPAWN_BEACON_ITEM_ID = "respawn_beacon";
+    private static final String GIGANTIFY_GRENADE_ITEM_ID = "gigantify_grenade";
     private final NamespacedKey customProjectileKey;
     private final NamespacedKey summonTeamKey;
     private final NamespacedKey happyGhastDriverKey;
@@ -218,6 +231,7 @@ public class BedwarsListener implements Listener {
     private final Map<UUID, Long> fireballCooldowns = new HashMap<>();
     private final Map<UUID, Long> flamethrowerCooldowns = new HashMap<>();
     private final Map<UUID, Long> lungingSpearMovementCooldowns = new HashMap<>();
+    private final Map<UUID, BukkitTask> gigantifyTasks = new HashMap<>();
     private final Map<UUID, Long> voidTotemFallProtection = new HashMap<>();
 
     public BedwarsListener(BedwarsManager bedwarsManager) {
@@ -496,10 +510,6 @@ public class BedwarsListener implements Listener {
             if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
                 return;
             }
-            if (leftClick && shouldBlockLungingSpearMovement(player, item, event)) {
-                event.setCancelled(true);
-                return;
-            }
             CustomItemDefinition custom = resolveCustomItem(item);
             if (custom == null) {
                 return;
@@ -538,6 +548,9 @@ public class BedwarsListener implements Listener {
                 }
                 case HAPPY_GHAST -> {
                     yield spawnHappyGhast(player, session, custom, event);
+                }
+                case GIGANTIFY_GRENADE -> {
+                    yield launchGigantifyGrenade(player, session, custom);
                 }
                 case ABYSSAL_RIFT -> {
                     if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
@@ -619,6 +632,28 @@ public class BedwarsListener implements Listener {
                 setSummonTeam(arrow, team);
             }
             arrow.setDamage(0.0);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerArmSwing(PlayerArmSwingEvent event) {
+        safeHandle("onPlayerArmSwing", () -> {
+            if (event.getHand() != EquipmentSlot.HAND) {
+                return;
+            }
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            Player player = event.getPlayer();
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            ItemStack item = player.getInventory().getItemInMainHand();
+            if (!shouldBlockLungingSpearMovement(player, item)) {
+                return;
+            }
+            event.setCancelled(true);
         });
     }
 
@@ -1459,7 +1494,14 @@ public class BedwarsListener implements Listener {
             }
             if (event.getEntity() instanceof Snowball snowball) {
                 String customId = snowball.getPersistentDataContainer().get(customProjectileKey, PersistentDataType.STRING);
-                if (customId == null || !customId.equalsIgnoreCase("bed_bug")) {
+                if (customId == null) {
+                    return;
+                }
+                if (customId.equalsIgnoreCase(GIGANTIFY_GRENADE_ITEM_ID)) {
+                    handleGigantifyGrenadeHit(session, snowball, event);
+                    return;
+                }
+                if (!customId.equalsIgnoreCase("bed_bug")) {
                     return;
                 }
                 TeamColor team = getSummonTeam(snowball);
@@ -1656,6 +1698,7 @@ public class BedwarsListener implements Listener {
             }
             Player player = event.getEntity();
             voidTotemFallProtection.remove(player.getUniqueId());
+            clearGigantifyEffect(player, session, true);
             if (!session.isInArenaWorld(player.getWorld())) {
                 return;
             }
@@ -1746,6 +1789,10 @@ public class BedwarsListener implements Listener {
             Player player = event.getPlayer();
             if (session != null) {
                 session.handleWorldChange(player);
+                if (gigantifyTasks.containsKey(player.getUniqueId())
+                        && (!session.isParticipant(player.getUniqueId()) || !session.isInArenaWorld(player.getWorld()))) {
+                    clearGigantifyEffect(player, session, true);
+                }
                 if (session.isLockedCommandSpectator(player.getUniqueId()) && !session.isInArenaWorld(player.getWorld())) {
                     Location fallback = session.getLockedCommandSpectatorLocation();
                     if (fallback != null) {
@@ -1764,6 +1811,8 @@ public class BedwarsListener implements Listener {
                 }
                 refreshInvisibility(player, session);
                 syncInvisibilityForViewer(player, session);
+            } else if (gigantifyTasks.containsKey(player.getUniqueId())) {
+                clearGigantifyEffect(player, null, true);
             }
             if (isOutsideRunningBedwarsGame(player, session)) {
                 applyOutsideGameBedwarsBuffs(player);
@@ -1813,6 +1862,7 @@ public class BedwarsListener implements Listener {
         safeHandle("onPlayerQuit", () -> {
             GameSession session = bedwarsManager.getActiveSession();
             bedwarsManager.getLobbyParkour().handleQuit(event.getPlayer());
+            clearGigantifyEffect(event.getPlayer(), session, true);
             if (session == null) {
                 return;
             }
@@ -2327,14 +2377,11 @@ public class BedwarsListener implements Listener {
         return true;
     }
 
-    private boolean shouldBlockLungingSpearMovement(Player player, ItemStack item, PlayerInteractEvent event) {
-        if (player == null || item == null || event == null) {
+    private boolean shouldBlockLungingSpearMovement(Player player, ItemStack item) {
+        if (player == null || item == null) {
             return false;
         }
         if (!isLungingMovementSpear(item)) {
-            return false;
-        }
-        if (!isLikelyLungingSpearMovementAction(player, event)) {
             return false;
         }
         long now = System.currentTimeMillis();
@@ -2350,20 +2397,6 @@ public class BedwarsListener implements Listener {
     private boolean isLungingMovementSpear(ItemStack item) {
         String itemId = ShopItemData.getId(item);
         return "netherite_spear".equalsIgnoreCase(itemId);
-    }
-
-    private boolean isLikelyLungingSpearMovementAction(Player player, PlayerInteractEvent event) {
-        if (event.getAction() == Action.LEFT_CLICK_AIR) {
-            return true;
-        }
-        if (event.getAction() != Action.LEFT_CLICK_BLOCK) {
-            return false;
-        }
-        Block clicked = event.getClickedBlock();
-        if (clicked == null) {
-            return true;
-        }
-        return player.isSneaking() || !clicked.getType().isInteractable();
     }
 
     private void sprayFlamethrower(Player player, GameSession session, CustomItemDefinition custom) {
@@ -3071,6 +3104,224 @@ public class BedwarsListener implements Listener {
         return true;
     }
 
+    private boolean launchGigantifyGrenade(Player player, GameSession session, CustomItemDefinition custom) {
+        if (player == null || session == null || custom == null) {
+            return false;
+        }
+        TeamColor team = session.getTeam(player.getUniqueId());
+        if (team == null) {
+            return false;
+        }
+        Snowball snowball = player.launchProjectile(Snowball.class);
+        snowball.setVelocity(player.getLocation().getDirection().normalize().multiply(custom.getVelocity()));
+        snowball.setGravity(false);
+        snowball.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
+        setSummonTeam(snowball, team);
+        player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 1.0f, 0.95f);
+        trackGigantifyProjectileLifetime(snowball, session, Math.max(40L, custom.getLifetimeSeconds() * 20L));
+        return true;
+    }
+
+    private void trackGigantifyProjectileLifetime(Snowball snowball, GameSession session, long maxLifetimeTicks) {
+        if (snowball == null || session == null) {
+            return;
+        }
+        new BukkitRunnable() {
+            private long livedTicks;
+
+            @Override
+            public void run() {
+                if (!snowball.isValid() || snowball.isDead()) {
+                    cancel();
+                    return;
+                }
+                GameSession active = bedwarsManager.getActiveSession();
+                if (active == null || active != session || !active.isRunning() || !active.isInArenaWorld(snowball.getWorld())) {
+                    snowball.remove();
+                    cancel();
+                    return;
+                }
+                livedTicks++;
+                if (livedTicks >= maxLifetimeTicks || isOutsideMapBounds(session, snowball.getLocation())) {
+                    snowball.remove();
+                    cancel();
+                }
+            }
+        }.runTaskTimer(bedwarsManager.getPlugin(), 1L, 1L);
+    }
+
+    private boolean isOutsideMapBounds(GameSession session, Location location) {
+        if (session == null || location == null || location.getWorld() == null) {
+            return true;
+        }
+        return !session.isInsideMap(new BlockPoint(location.getBlockX(), location.getBlockY(), location.getBlockZ()));
+    }
+
+    private void handleGigantifyGrenadeHit(GameSession session, Snowball snowball, ProjectileHitEvent event) {
+        if (session == null || snowball == null) {
+            return;
+        }
+        try {
+            if (!(event.getHitEntity() instanceof Player target)) {
+                return;
+            }
+            if (!session.isParticipant(target.getUniqueId())
+                    || target.getGameMode() == org.bukkit.GameMode.SPECTATOR
+                    || !session.isInArenaWorld(target.getWorld())) {
+                return;
+            }
+            Player thrower = snowball.getShooter() instanceof Player player ? player : null;
+            if (thrower == null
+                    || !session.isParticipant(thrower.getUniqueId())
+                    || !session.isInArenaWorld(thrower.getWorld())
+                    || thrower.getUniqueId().equals(target.getUniqueId())) {
+                return;
+            }
+            TeamColor throwerTeam = getSummonTeam(snowball);
+            if (throwerTeam == null) {
+                throwerTeam = session.getTeam(thrower.getUniqueId());
+            }
+            TeamColor targetTeam = session.getTeam(target.getUniqueId());
+            if (throwerTeam != null && targetTeam != null && throwerTeam == targetTeam) {
+                return;
+            }
+            if (!applyGigantifyEffect(target, session)) {
+                return;
+            }
+            target.getWorld().playSound(target.getLocation(), Sound.ENTITY_WITHER_SHOOT, 0.9f, 1.3f);
+            target.getWorld().spawnParticle(Particle.EXPLOSION, target.getLocation().add(0.0, 1.0, 0.0),
+                    6, 0.45, 0.6, 0.45, 0.02);
+            target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0.0, 1.0, 0.0),
+                    18, 0.5, 0.8, 0.5, 0.04);
+        } finally {
+            snowball.remove();
+        }
+    }
+
+    private boolean applyGigantifyEffect(Player target, GameSession session) {
+        if (target == null || session == null) {
+            return false;
+        }
+        UUID targetId = target.getUniqueId();
+        if (gigantifyTasks.containsKey(targetId)) {
+            return false;
+        }
+        BukkitRunnable runnable = new BukkitRunnable() {
+            private int elapsedTicks;
+
+            @Override
+            public void run() {
+                Player online = Bukkit.getPlayer(targetId);
+                GameSession active = bedwarsManager.getActiveSession();
+                if (online == null
+                        || !online.isOnline()
+                        || online.isDead()
+                        || active == null
+                        || active != session
+                        || !active.isActive()
+                        || !active.isParticipant(targetId)
+                        || !active.isInArenaWorld(online.getWorld())) {
+                    clearGigantifyEffect(targetId, active != null && active == session ? active : null, true);
+                    return;
+                }
+                if (elapsedTicks >= GIGANTIFY_TOTAL_TICKS) {
+                    clearGigantifyEffect(online, session, true);
+                    return;
+                }
+                double baseScale = session.getEffectivePlayerScale(online);
+                applyGigantifyScale(online, baseScale * resolveGigantifyScaleMultiplier(elapsedTicks));
+                spawnGigantifyParticles(online, elapsedTicks);
+                elapsedTicks++;
+            }
+        };
+        BukkitTask task = runnable.runTaskTimer(bedwarsManager.getPlugin(), 0L, 1L);
+        gigantifyTasks.put(targetId, task);
+        return true;
+    }
+
+    private double resolveGigantifyScaleMultiplier(int elapsedTicks) {
+        if (elapsedTicks < 0) {
+            return 1.0;
+        }
+        if (elapsedTicks < GIGANTIFY_GROWTH_TICKS) {
+            double progress = elapsedTicks / (double) GIGANTIFY_GROWTH_TICKS;
+            return 1.0 + ((GIGANTIFY_MAX_SCALE_MULTIPLIER - 1.0) * progress);
+        }
+        if (elapsedTicks < GIGANTIFY_GROWTH_TICKS + GIGANTIFY_SUSTAIN_TICKS) {
+            return GIGANTIFY_MAX_SCALE_MULTIPLIER;
+        }
+        double shrinkTicks = elapsedTicks - GIGANTIFY_GROWTH_TICKS - GIGANTIFY_SUSTAIN_TICKS;
+        double progress = Math.min(1.0, shrinkTicks / (double) GIGANTIFY_SHRINK_TICKS);
+        return GIGANTIFY_MAX_SCALE_MULTIPLIER
+                - ((GIGANTIFY_MAX_SCALE_MULTIPLIER - 1.0) * progress);
+    }
+
+    private void spawnGigantifyParticles(Player player, int elapsedTicks) {
+        if (player == null || elapsedTicks % 2 != 0) {
+            return;
+        }
+        Location center = player.getLocation().add(0.0, 1.0, 0.0);
+        World world = center.getWorld();
+        if (world == null) {
+            return;
+        }
+        world.spawnParticle(Particle.DUST, center, 12, 0.45, 0.9, 0.45, 0.01, GIGANTIFY_PARTICLE);
+        if (elapsedTicks % 10 == 0) {
+            world.spawnParticle(Particle.CLOUD, center, 6, 0.35, 0.7, 0.35, 0.01);
+        }
+    }
+
+    private void clearGigantifyEffect(Player player, GameSession session, boolean restoreScale) {
+        if (player == null) {
+            return;
+        }
+        clearGigantifyEffect(player.getUniqueId(), session, restoreScale);
+    }
+
+    private void clearGigantifyEffect(UUID playerId, GameSession session, boolean restoreScale) {
+        if (playerId == null) {
+            return;
+        }
+        BukkitTask task = gigantifyTasks.remove(playerId);
+        if (task != null) {
+            task.cancel();
+        }
+        if (!restoreScale) {
+            return;
+        }
+        Player player = Bukkit.getPlayer(playerId);
+        if (player == null) {
+            return;
+        }
+        restorePlayerScale(player, session);
+    }
+
+    private void restorePlayerScale(Player player, GameSession session) {
+        if (player == null) {
+            return;
+        }
+        if (session != null && session.isParticipant(player.getUniqueId())) {
+            session.restorePlayerScale(player);
+            return;
+        }
+        applyGigantifyScale(player, 1.0);
+    }
+
+    private void applyGigantifyScale(Player player, double scale) {
+        if (player == null) {
+            return;
+        }
+        // Paper 1.21 exposes Attribute.GENERIC_SCALE directly. Older API targets would need
+        // a reflective fallback here if this BedWars runtime is ever backported.
+        AttributeInstance attribute = player.getAttribute(Attribute.GENERIC_SCALE);
+        if (attribute == null) {
+            return;
+        }
+        // This is the only native server-side way to scale players. It also changes the hitbox,
+        // so a purely visual-only version would require packet/disguise support outside this plugin.
+        attribute.setBaseValue(Math.max(0.0625, scale));
+    }
+
     private boolean spawnDreamDefender(Player player,
                                        GameSession session,
                                        CustomItemDefinition custom,
@@ -3183,6 +3434,7 @@ public class BedwarsListener implements Listener {
         }
         entity.setPersistent(false);
         entity.setCollidable(false);
+        entity.setInvulnerable(true);
         entity.addScoreboardTag(GameSession.HAPPY_GHAST_TAG);
         setSummonTeam(entity, team);
         setHappyGhastDriver(entity, player.getUniqueId());

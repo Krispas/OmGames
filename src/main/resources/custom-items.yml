@@ -95,6 +95,11 @@ custom-items:
   elytra_strike:
     type: ELYTRA_STRIKE
     material: ELYTRA
+  gigantify_grenade:
+    type: GIGANTIFY_GRENADE
+    material: FIRE_CHARGE
+    velocity: 1.15
+    lifetime-seconds: 6
   unstable_teleportation_device:
     type: UNSTABLE_TELEPORTATION_DEVICE
     material: ENDER_EYE

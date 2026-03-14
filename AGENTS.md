@@ -381,6 +381,7 @@ Supported `type` values:
 - `MAGIC_MILK`
 - `ABYSSAL_RIFT`
 - `ELYTRA_STRIKE`
+- `GIGANTIFY_GRENADE`
 - `UNSTABLE_TELEPORTATION_DEVICE`
 - `MIRACLE_OF_THE_STARS`
 - `TOWER_CHEST`
@@ -400,8 +401,13 @@ Behavior notes:
 - `ELYTRA_STRIKE`
   - purchased as a held item
   - right-click activation equips temporary Elytra, teleports above team spawn, and cleans up on landing/death/quit/session end
+- `GIGANTIFY_GRENADE`
+  - thrown as a gravity-free snowball projectile with custom projectile metadata
+  - only affects enemy players on direct hit; block hits should only despawn the projectile
+  - scales the target up over 2 seconds, holds for 3 seconds, then shrinks over 3 seconds
+  - effect cleanup must restore the player's BedWars scale on death, quit, world/session exit, and natural expiry
 - `HAPPY_GHAST`
-  - should only use attribute-based knockback resistance; do not add ghast-specific damage or knockback handling in the listener
+  - should be invulnerable and use attribute-based knockback resistance; do not add ghast-specific damage or knockback handling in the listener
 - `UNSTABLE_TELEPORTATION_DEVICE`
   - purchased as a held item
   - right-click activation rolls one teleport outcome
@@ -486,7 +492,7 @@ Do not push BedWars rules into `OmGames`.
 - Outside a running BedWars match, protected BedWars worlds should still block casual terrain changes like farmland trampling unless the player is an allowed editor.
 - Outside a running BedWars match, players should not be able to rotate, take from, or break item frames in protected BedWars worlds unless they are allowed editors.
 - If a pending respawn later turns into a true elimination because respawns are no longer allowed, final-death and final-kill stats should still resolve from that original death.
-- `netherite_spear` movement boost reuse is listener-gated by a 5-second cooldown on left-click movement activation, not right-click.
+- `netherite_spear` movement boost reuse is listener-gated by a 5-second cooldown on the spear jab/arm-swing action, not right-click interact.
 - Lobby-mode prestart should build a temporary 5x5 barrier platform centered under the resolved `map-lobby` location and restore the original blocks when the session leaves lobby/starts the match.
 - Match end cleanup should return all remaining arena spectators to the arena `game-lobby`; `map-lobby` is for prestart/spectate flows, not post-match cleanup.
 - `/bw game spectate` can only be run by a player already standing in the active BedWars world.

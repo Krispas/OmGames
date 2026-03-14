@@ -450,6 +450,25 @@ public class GameSession {
         applyTeamUpgrades(player, team);
     }
 
+    public double getEffectivePlayerScale(Player player) {
+        if (player == null) {
+            return DEFAULT_PLAYER_SCALE;
+        }
+        TeamColor team = getTeam(player.getUniqueId());
+        if (team == null) {
+            return resolveMatchEventScaleMultiplier();
+        }
+        TeamUpgradeState upgrades = getUpgradeState(team);
+        return resolveEffectiveScale(upgrades.getTier(TeamUpgradeType.SCALE_DOWN));
+    }
+
+    public void restorePlayerScale(Player player) {
+        if (player == null) {
+            return;
+        }
+        applyScale(player, getEffectivePlayerScale(player));
+    }
+
     public void assignTeam(UUID playerId, TeamColor team) {
         if (team == null) {
             assignments.remove(playerId);
