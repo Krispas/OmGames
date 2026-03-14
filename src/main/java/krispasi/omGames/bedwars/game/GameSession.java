@@ -183,6 +183,14 @@ public class GameSession {
                     "0000000"
             },
             {
+                    "0000000",
+                    "00xxx00",
+                    "0x0L0x0",
+                    "0x000x0",
+                    "00xxx00",
+                    "0000000"
+            },
+            {
                     "0x0x0x0",
                     "xxxxxxx",
                     "0xxLxx0",

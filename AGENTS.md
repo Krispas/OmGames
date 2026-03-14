@@ -407,7 +407,7 @@ Behavior notes:
   - scales the target up over 2 seconds, holds for 3 seconds, then shrinks over 3 seconds
   - effect cleanup must restore the player's BedWars scale on death, quit, world/session exit, and natural expiry
 - `HAPPY_GHAST`
-  - should be invulnerable and use attribute-based knockback resistance; do not add ghast-specific damage or knockback handling in the listener
+  - should take normal damage and use attribute-based knockback resistance; do not add ghast-specific damage or knockback handling in the listener
 - `UNSTABLE_TELEPORTATION_DEVICE`
   - purchased as a held item
   - right-click activation rolls one teleport outcome
@@ -420,7 +420,7 @@ Behavior notes:
   - must fail once sudden death is active and cancel if sudden death begins during the windup
 - `TOWER_CHEST`
   - chest deployable that builds a fixed wool tower aligned to player facing
-  - uses team wool plus placed ladders and removes the center chest shortly after placement
+  - uses team wool plus placed ladders, follows the fixed 7-layer popup-tower layout in `GameSession.TOWER_CHEST_LAYERS`, and removes the center chest shortly after placement
 
 ### 2.9 Match Event Workflow
 
@@ -496,6 +496,7 @@ Do not push BedWars rules into `OmGames`.
 - Lobby-mode prestart should build a temporary 5x5 barrier platform centered under the resolved `map-lobby` location and restore the original blocks when the session leaves lobby/starts the match.
 - Match end cleanup should return all remaining arena spectators to the arena `game-lobby`; `map-lobby` is for prestart/spectate flows, not post-match cleanup.
 - `/bw game spectate` can only be run by a player already standing in the active BedWars world.
+- When there is no active BedWars session, the main BedWars lobby world should play a `BLOCK_AMETHYST_BLOCK_CHIME` ambient sound at `0 90 0` for players in that world at random intervals between 30 and 60 seconds.
 - Players put into spectator mode by `/bw game spectate` are locked to the active BedWars world until `/bw game out` or session end.
 
 ### 2.13 Common Recipes

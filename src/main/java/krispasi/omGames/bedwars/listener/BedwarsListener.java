@@ -3434,7 +3434,6 @@ public class BedwarsListener implements Listener {
         }
         entity.setPersistent(false);
         entity.setCollidable(false);
-        entity.setInvulnerable(true);
         entity.addScoreboardTag(GameSession.HAPPY_GHAST_TAG);
         setSummonTeam(entity, team);
         setHappyGhastDriver(entity, player.getUniqueId());

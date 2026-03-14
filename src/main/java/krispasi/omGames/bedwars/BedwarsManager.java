@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import krispasi.omGames.bedwars.config.BedwarsConfigLoader;
 import krispasi.omGames.bedwars.event.BedwarsMatchEventConfig;
 import krispasi.omGames.bedwars.event.BedwarsMatchEventType;
@@ -23,6 +24,9 @@ import krispasi.omGames.bedwars.shop.ShopConfigLoader;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Firework;
@@ -31,6 +35,7 @@ import org.bukkit.FireworkEffect;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.meta.FireworkMeta;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.plugin.java.JavaPlugin;
 import krispasi.omGames.bedwars.gui.MapSelectMenu;
 import krispasi.omGames.bedwars.gui.ShopMenu;
@@ -52,6 +57,13 @@ public class BedwarsManager {
     private static final double DEFAULT_LEADERBOARD_X = 4.0;
     private static final double DEFAULT_LEADERBOARD_Y = 73.0;
     private static final double DEFAULT_LEADERBOARD_Z = -1.0;
+    private static final long LOBBY_CHIME_MIN_DELAY_TICKS = 30L * 20L;
+    private static final long LOBBY_CHIME_MAX_DELAY_TICKS = 60L * 20L;
+    private static final double LOBBY_CHIME_X = 0.0;
+    private static final double LOBBY_CHIME_Y = 90.0;
+    private static final double LOBBY_CHIME_Z = 0.0;
+    private static final float LOBBY_CHIME_VOLUME = 5.0f;
+    private static final float LOBBY_CHIME_PITCH = 1.8f;
     private final JavaPlugin plugin;
     private final QuickBuyService quickBuyService;
     private final BedwarsStatsService statsService;
@@ -61,6 +73,8 @@ public class BedwarsManager {
     private final Set<UUID> temporaryCreators = new HashSet<>();
     private Map<String, Arena> arenas = Map.of();
     private GameSession activeSession;
+    private String lobbyAmbientWorldName;
+    private BukkitTask lobbyAmbientChimeTask;
     private ShopConfig shopConfig = ShopConfig.empty();
     private CustomItemConfig customItemConfig = CustomItemConfig.empty();
     private BedwarsMatchEventConfig matchEventConfig = BedwarsMatchEventConfig.defaults();
@@ -93,6 +107,7 @@ public class BedwarsManager {
         matchEventConfig = loadMatchEventConfig(configFile);
         configureLobbyLeaderboard(configFile);
         configureParkourLeaderboard(configFile);
+        configureLobbyAmbientWorld(configFile);
         lobbyParkour.load(configFile);
         plugin.getLogger().info("Loaded " + arenas.size() + " BedWars arenas.");
     }
@@ -128,6 +143,7 @@ public class BedwarsManager {
     public void startLobbyLeaderboard() {
         lobbyLeaderboard.start();
         parkourLeaderboard.start();
+        startLobbyAmbientChimeLoop();
     }
 
     public Collection<Arena> getArenas() {
@@ -328,6 +344,7 @@ public class BedwarsManager {
     }
 
     public void shutdown() {
+        stopLobbyAmbientChimeLoop();
         if (activeSession != null) {
             activeSession.stop();
             activeSession = null;
@@ -510,6 +527,14 @@ public class BedwarsManager {
         parkourLeaderboard.configureAnchor(worldName, x, y, z);
     }
 
+    private void configureLobbyAmbientWorld(File configFile) {
+        String worldName = resolveLobbyParkourWorld(configFile);
+        if (worldName == null || worldName.isBlank()) {
+            worldName = resolveLeaderboardWorldFallback();
+        }
+        lobbyAmbientWorldName = worldName;
+    }
+
     private String resolveLobbyParkourWorld(File configFile) {
         if (configFile == null || !configFile.exists()) {
             return null;
@@ -576,6 +601,67 @@ public class BedwarsManager {
             return secondary.getName();
         }
         return null;
+    }
+
+    private void startLobbyAmbientChimeLoop() {
+        stopLobbyAmbientChimeLoop();
+        scheduleNextLobbyAmbientChime();
+    }
+
+    private void stopLobbyAmbientChimeLoop() {
+        if (lobbyAmbientChimeTask != null) {
+            lobbyAmbientChimeTask.cancel();
+            lobbyAmbientChimeTask = null;
+        }
+    }
+
+    private void scheduleNextLobbyAmbientChime() {
+        if (!plugin.isEnabled()) {
+            lobbyAmbientChimeTask = null;
+            return;
+        }
+        long delay = ThreadLocalRandom.current().nextLong(LOBBY_CHIME_MIN_DELAY_TICKS, LOBBY_CHIME_MAX_DELAY_TICKS + 1L);
+        lobbyAmbientChimeTask = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            try {
+                playLobbyAmbientChimeIfNeeded();
+            } finally {
+                if (plugin.isEnabled()) {
+                    scheduleNextLobbyAmbientChime();
+                } else {
+                    lobbyAmbientChimeTask = null;
+                }
+            }
+        }, delay);
+    }
+
+    private void playLobbyAmbientChimeIfNeeded() {
+        GameSession session = activeSession;
+        if (session != null && session.isActive()) {
+            return;
+        }
+        World world = resolveLobbyAmbientWorld();
+        if (world == null || world.getPlayers().isEmpty()) {
+            return;
+        }
+        Location origin = new Location(world, LOBBY_CHIME_X, LOBBY_CHIME_Y, LOBBY_CHIME_Z);
+        for (Player player : world.getPlayers()) {
+            player.playSound(origin, Sound.BLOCK_AMETHYST_BLOCK_CHIME, SoundCategory.MASTER,
+                    LOBBY_CHIME_VOLUME, LOBBY_CHIME_PITCH);
+        }
+    }
+
+    private World resolveLobbyAmbientWorld() {
+        if (lobbyAmbientWorldName != null && !lobbyAmbientWorldName.isBlank()) {
+            World world = Bukkit.getWorld(lobbyAmbientWorldName);
+            if (world != null) {
+                return world;
+            }
+        }
+        String fallback = resolveLeaderboardWorldFallback();
+        if (fallback == null || fallback.isBlank()) {
+            return null;
+        }
+        return Bukkit.getWorld(fallback);
     }
 
 }
