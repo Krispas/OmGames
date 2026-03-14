@@ -1211,9 +1211,6 @@ public class BedwarsListener implements Listener {
                 if (!isSummon(event.getEntity())) {
                     return;
                 }
-                if (isHappyGhast(event.getEntity())) {
-                    return;
-                }
                 Player attacker = resolveAttacker(event);
                 if (attacker != null && session.isParticipant(attacker.getUniqueId())) {
                     TeamColor attackerTeam = session.getTeam(attacker.getUniqueId());
