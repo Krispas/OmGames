@@ -563,6 +563,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                     }
                     yield session.deployTowerChest(player, event.getClickedBlock(), event.getBlockFace());
                 }
+                case STEEL_SHELL -> {
+                    yield session.activateSteelShell(player, custom);
+                }
                 case CREEPING_ARROW -> {
                     yield false;
                 }

@@ -769,11 +769,27 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
         }
         double speed = custom.getSpeed();
         if (speed > 0.0) {
-            applyEntitySpeed(entity, speed);
+            if (isHappyGhast(entity)) {
+                applyHappyGhastSpeed(entity, speed);
+            } else {
+                applyEntitySpeed(entity, speed);
+            }
         }
         double range = custom.getRange();
         if (range > 0.0) {
             applyEntityRange(entity, range);
+        }
+    }
+
+    protected void applyHappyGhastSpeed(LivingEntity entity, double speedMultiplier) {
+        try {
+            Class<?> attributeClass = Class.forName("org.bukkit.attribute.Attribute");
+            Method getAttribute = LivingEntity.class.getMethod("getAttribute", attributeClass);
+            Object movement = resolveAttribute(attributeClass, "GENERIC_MOVEMENT_SPEED");
+            scaleAttributeValue(entity, getAttribute, movement, speedMultiplier);
+            Object flying = resolveAttribute(attributeClass, "GENERIC_FLYING_SPEED");
+            scaleAttributeValue(entity, getAttribute, flying, speedMultiplier);
+        } catch (ReflectiveOperationException ignored) {
         }
     }
 
@@ -785,6 +801,29 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
             applyAttributeValue(entity, getAttribute, movement, speed);
             Object flying = resolveAttribute(attributeClass, "GENERIC_FLYING_SPEED");
             applyAttributeValue(entity, getAttribute, flying, speed);
+        } catch (ReflectiveOperationException ignored) {
+        }
+    }
+
+    protected void scaleAttributeValue(LivingEntity entity,
+                                       Method getAttribute,
+                                       Object attribute,
+                                       double multiplier) {
+        if (entity == null || getAttribute == null || attribute == null) {
+            return;
+        }
+        try {
+            Object instance = getAttribute.invoke(entity, attribute);
+            if (instance == null) {
+                return;
+            }
+            Method getBaseValue = instance.getClass().getMethod("getBaseValue");
+            Object current = getBaseValue.invoke(instance);
+            if (!(current instanceof Number number)) {
+                return;
+            }
+            Method setBaseValue = instance.getClass().getMethod("setBaseValue", double.class);
+            setBaseValue.invoke(instance, Math.max(0.0, number.doubleValue() * multiplier));
         } catch (ReflectiveOperationException ignored) {
         }
     }

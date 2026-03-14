@@ -46,9 +46,11 @@ public class BedwarsLobbyParkour {
     private static final long PLATE_COOLDOWN_MILLIS = 800L;
     private static final long CONTROL_ITEM_PLATE_LOCK_MILLIS = 3_000L;
     private static final long ACTION_BAR_UPDATE_TICKS = 2L;
+    private static final int CONTROL_SLOT_RESET = 5;
     private static final int CONTROL_SLOT_DIRECTION = 6;
     private static final int CONTROL_SLOT_EXIT = 7;
     private static final int CONTROL_SLOT_CHECKPOINT = 8;
+    private static final String CONTROL_RESET = "reset";
     private static final String CONTROL_DIRECTION = "direction";
     private static final String CONTROL_EXIT = "exit";
     private static final String CONTROL_CHECKPOINT = "checkpoint";
@@ -197,6 +199,10 @@ public class BedwarsLobbyParkour {
             abortRun(player, run, true);
             return true;
         }
+        if (CONTROL_RESET.equals(control)) {
+            restartRun(player, run);
+            return true;
+        }
         if (CONTROL_CHECKPOINT.equals(control)) {
             if (run.lastCheckpointIndex == null) {
                 restartRun(player, run);
@@ -309,9 +315,11 @@ public class BedwarsLobbyParkour {
         run.lastCheckpoint = startPlate;
         run.lastCheckpointLabel = "start";
         run.compassTargetBackup = cloneLocation(player.getCompassTarget());
+        run.resetSlotBackup = cloneItem(player.getInventory().getItem(CONTROL_SLOT_RESET));
         run.directionSlotBackup = cloneItem(player.getInventory().getItem(CONTROL_SLOT_DIRECTION));
         run.exitSlotBackup = cloneItem(player.getInventory().getItem(CONTROL_SLOT_EXIT));
         run.checkpointSlotBackup = cloneItem(player.getInventory().getItem(CONTROL_SLOT_CHECKPOINT));
+        player.getInventory().setItem(CONTROL_SLOT_RESET, createResetControlItem());
         player.getInventory().setItem(CONTROL_SLOT_DIRECTION, createDirectionControlItem("Next Target"));
         player.getInventory().setItem(CONTROL_SLOT_EXIT, createExitControlItem());
         player.getInventory().setItem(CONTROL_SLOT_CHECKPOINT, createCheckpointControlItem());
@@ -320,7 +328,7 @@ public class BedwarsLobbyParkour {
         player.sendMessage(Component.text("Parkour started! Reach the end plate.", NamedTextColor.AQUA));
         sendNextObjectiveHint(player, run);
         player.sendMessage(Component.text(
-                "Gold ingot: end run and return to start. Iron ingot: last checkpoint, or instant restart until you reach one.",
+                "Redstone: reset run. Gold ingot: end run and return to start. Iron ingot: last checkpoint, or instant restart until you reach one.",
                 NamedTextColor.GRAY));
     }
 
@@ -416,6 +424,21 @@ public class BedwarsLobbyParkour {
         return item;
     }
 
+    private ItemStack createResetControlItem() {
+        ItemStack item = new ItemStack(Material.REDSTONE);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("Reset Run", NamedTextColor.RED));
+            List<Component> lore = new ArrayList<>();
+            lore.add(Component.text("Right-click to restart", NamedTextColor.GRAY));
+            lore.add(Component.text("your run instantly.", NamedTextColor.GRAY));
+            meta.lore(lore);
+            tagControl(meta, CONTROL_RESET);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     private ItemStack createDirectionControlItem(String targetLabel) {
         ItemStack item = new ItemStack(Material.COMPASS);
         ItemMeta meta = item.getItemMeta();
@@ -474,6 +497,7 @@ public class BedwarsLobbyParkour {
             return;
         }
         removeControlItems(player);
+        player.getInventory().setItem(CONTROL_SLOT_RESET, cloneItem(run.resetSlotBackup));
         player.getInventory().setItem(CONTROL_SLOT_DIRECTION, cloneItem(run.directionSlotBackup));
         player.getInventory().setItem(CONTROL_SLOT_EXIT, cloneItem(run.exitSlotBackup));
         player.getInventory().setItem(CONTROL_SLOT_CHECKPOINT, cloneItem(run.checkpointSlotBackup));
@@ -829,6 +853,7 @@ public class BedwarsLobbyParkour {
         private Integer lastCheckpointIndex;
         private int checkpointUses;
         private Location compassTargetBackup;
+        private ItemStack resetSlotBackup;
         private ItemStack directionSlotBackup;
         private ItemStack exitSlotBackup;
         private ItemStack checkpointSlotBackup;

@@ -22,6 +22,7 @@ shop:
         unstable_teleportation_device: 24
         gigantify_grenade: 29
         lockpick: 30
+        steel_shell: 31
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -250,6 +251,21 @@ shop:
           - "Unlock enemy team chests."
           - "Can target ender chests too."
         custom-item: lockpick
+      steel_shell:
+        material: NETHERITE_BLOCK
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 20
+        display-name: "Steel Shell"
+        lore:
+          - "Trap yourself inside a"
+          - "temporary bedrock shell."
+          - "You become invulnerable for 10s."
+        custom-item: steel_shell
+        limit:
+          scope: PLAYER
+          amount: 3
       thorns_upgrade:
         material: CACTUS
         amount: 1

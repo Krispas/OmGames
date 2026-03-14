@@ -63,6 +63,7 @@ final class GameSessionCustomItemRuntime {
     private static final int ELYTRA_STRIKE_REGEN_AMPLIFIER = 9;
     private static final long MIRACLE_OF_THE_STARS_DELAY_TICKS = 5L * 20L;
     private static final long TOWER_CHEST_TEMP_CHEST_TICKS = 8L;
+    private static final int STEEL_SHELL_RESISTANCE_AMPLIFIER = 4;
     private static final long LOCKPICK_CHEST_DELAY_TICKS = 10L * 20L;
     private static final long LOCKPICK_ENDER_CHEST_DELAY_TICKS = 20L * 20L;
     private static final long LOCKPICK_ACCESS_DURATION_MILLIS = 60_000L;
@@ -138,6 +139,7 @@ final class GameSessionCustomItemRuntime {
     private final Map<UUID, AbyssalRiftState> abyssalRifts = new HashMap<>();
     private final Map<UUID, UUID> abyssalRiftEntityLinks = new HashMap<>();
     private final Map<UUID, ElytraStrikeState> activeElytraStrikes = new HashMap<>();
+    private final Map<UUID, SteelShellState> activeSteelShells = new HashMap<>();
     private final Map<UUID, Map<String, Long>> customItemCooldownEnds = new HashMap<>();
     private final Map<LockpickAccessKey, Long> chestLockpickAccessEnds = new HashMap<>();
     private final Map<LockpickAccessKey, EnderChestLockpickAccess> enderChestLockpickAccesses = new HashMap<>();
@@ -162,6 +164,7 @@ final class GameSessionCustomItemRuntime {
     void reset() {
         clearAllElytraStrikes(false);
         clearAbyssalRifts();
+        clearAllSteelShells(false);
         clearLockpickState();
         customItemCooldownEnds.clear();
     }
@@ -548,6 +551,61 @@ final class GameSessionCustomItemRuntime {
                 () -> runSafe(plugin, "miracleOfTheStars", () -> resolveMiracleOfTheStars(team)),
                 MIRACLE_OF_THE_STARS_DELAY_TICKS);
         sessionTasks.add(task);
+        return true;
+    }
+
+    boolean activateSteelShell(Player player, CustomItemDefinition custom, JavaPlugin plugin) {
+        if (player == null
+                || custom == null
+                || plugin == null
+                || !session.isRunning()
+                || !session.isParticipant(player.getUniqueId())
+                || !session.isInArenaWorld(player.getWorld())) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        if (activeSteelShells.containsKey(playerId)) {
+            player.sendMessage(Component.text("Steel Shell is already active.", NamedTextColor.RED));
+            return false;
+        }
+        List<Block> shellBlocks = resolveSteelShellBlocks(player);
+        if (!canPlaceSteelShell(player, shellBlocks)) {
+            return false;
+        }
+
+        Location centered = player.getLocation().clone();
+        centered.setX(player.getLocation().getBlockX() + 0.5);
+        centered.setZ(player.getLocation().getBlockZ() + 0.5);
+        player.teleport(centered);
+        player.setFallDistance(0.0f);
+
+        List<BlockPoint> shellPoints = new ArrayList<>(shellBlocks.size());
+        for (Block block : shellBlocks) {
+            block.setType(Material.BEDROCK, false);
+            BlockPoint point = toPoint(block);
+            shellPoints.add(point);
+            session.recordPlacedBlock(point);
+        }
+
+        int durationSeconds = custom.getLifetimeSeconds() > 0 ? custom.getLifetimeSeconds() : 10;
+        PotionEffectType resistance = resolveResistanceEffectType();
+        PotionEffect previousResistance = resistance != null ? player.getPotionEffect(resistance) : null;
+        if (resistance != null) {
+            player.addPotionEffect(new PotionEffect(resistance,
+                    durationSeconds * 20 + 10,
+                    STEEL_SHELL_RESISTANCE_AMPLIFIER,
+                    true,
+                    false,
+                    true));
+        }
+
+        BukkitTask task = plugin.getServer().getScheduler().runTaskLater(
+                plugin,
+                () -> clearSteelShell(playerId, true),
+                durationSeconds * 20L);
+        sessionTasks.add(task);
+        activeSteelShells.put(playerId, new SteelShellState(shellPoints, task, previousResistance));
+        player.getWorld().playSound(player.getLocation(), Sound.BLOCK_NETHERITE_BLOCK_PLACE, 1.0f, 0.9f);
         return true;
     }
 
@@ -1132,6 +1190,111 @@ final class GameSessionCustomItemRuntime {
         world.playSound(location, Sound.BLOCK_BEACON_ACTIVATE, 0.9f, 1.25f);
     }
 
+    private List<Block> resolveSteelShellBlocks(Player player) {
+        List<Block> blocks = new ArrayList<>();
+        if (player == null || player.getWorld() == null) {
+            return blocks;
+        }
+        World world = player.getWorld();
+        int centerX = player.getLocation().getBlockX();
+        int centerY = player.getLocation().getBlockY();
+        int centerZ = player.getLocation().getBlockZ();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                blocks.add(world.getBlockAt(centerX + dx, centerY + 2, centerZ + dz));
+            }
+        }
+        for (int dy = 0; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (Math.abs(dx) != 1 && Math.abs(dz) != 1) {
+                        continue;
+                    }
+                    blocks.add(world.getBlockAt(centerX + dx, centerY + dy, centerZ + dz));
+                }
+            }
+        }
+        return blocks;
+    }
+
+    private boolean canPlaceSteelShell(Player player, List<Block> shellBlocks) {
+        boolean outsideMap = false;
+        for (Block block : shellBlocks) {
+            if (block == null) {
+                continue;
+            }
+            if (!session.isInsideMap(toPoint(block))) {
+                outsideMap = true;
+                continue;
+            }
+            if (!block.getType().isAir()) {
+                player.sendMessage(Component.text("You cannot use Steel Shell here.", NamedTextColor.RED));
+                return false;
+            }
+        }
+        if (outsideMap) {
+            player.sendMessage(Component.text("You cannot use Steel Shell outside the map.", NamedTextColor.RED));
+            return false;
+        }
+        return true;
+    }
+
+    private void clearAllSteelShells(boolean restorePreviousResistance) {
+        for (UUID playerId : new ArrayList<>(activeSteelShells.keySet())) {
+            clearSteelShell(playerId, restorePreviousResistance);
+        }
+    }
+
+    private void clearSteelShell(UUID playerId, boolean restorePreviousResistance) {
+        if (playerId == null) {
+            return;
+        }
+        SteelShellState state = activeSteelShells.remove(playerId);
+        if (state == null) {
+            return;
+        }
+        if (state.task() != null) {
+            state.task().cancel();
+        }
+        World world = resolveArenaWorld();
+        for (BlockPoint point : state.blocks()) {
+            if (point == null) {
+                continue;
+            }
+            if (world != null) {
+                Block block = world.getBlockAt(point.x(), point.y(), point.z());
+                if (block.getType() == Material.BEDROCK) {
+                    block.setType(Material.AIR, false);
+                }
+            }
+            session.removePlacedBlock(point);
+        }
+        Player player = Bukkit.getPlayer(playerId);
+        PotionEffectType resistance = resolveResistanceEffectType();
+        if (player != null && resistance != null) {
+            player.removePotionEffect(resistance);
+            if (restorePreviousResistance && state.previousResistance() != null) {
+                player.addPotionEffect(state.previousResistance());
+            }
+        }
+    }
+
+    private PotionEffectType resolveResistanceEffectType() {
+        PotionEffectType resistance = PotionEffectType.getByName("RESISTANCE");
+        if (resistance != null) {
+            return resistance;
+        }
+        return PotionEffectType.getByName("DAMAGE_RESISTANCE");
+    }
+
+    private World resolveArenaWorld() {
+        String worldName = arena.getWorldName();
+        if (worldName == null || worldName.isBlank()) {
+            return null;
+        }
+        return Bukkit.getWorld(worldName);
+    }
+
     private List<TowerChestPlacement> resolveTowerChestPlacements(Block origin, BlockFace forward, BlockFace right) {
         List<TowerChestPlacement> placements = new ArrayList<>();
         for (int layer = 0; layer < TOWER_CHEST_LAYERS.length; layer++) {
@@ -1533,6 +1696,11 @@ final class GameSessionCustomItemRuntime {
     private record ElytraStrikeState(ItemStack previousChestplate,
                                      boolean previousAllowFlight,
                                      boolean previousFlying) {
+    }
+
+    private record SteelShellState(List<BlockPoint> blocks,
+                                   BukkitTask task,
+                                   PotionEffect previousResistance) {
     }
 
     private record LockpickAccessKey(UUID playerId, TeamColor baseTeam) {

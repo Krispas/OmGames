@@ -1334,6 +1334,10 @@ public class GameSession extends GameSessionMatchFlowSupport {
         return customItemRuntime.activateMiracleOfTheStars(player, custom, plugin);
     }
 
+    public boolean activateSteelShell(Player player, CustomItemDefinition custom) {
+        return customItemRuntime.activateSteelShell(player, custom, plugin);
+    }
+
     public void handleElytraStrikeMovement(Player player) {
         customItemRuntime.handleElytraStrikeMovement(player);
     }

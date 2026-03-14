@@ -414,6 +414,7 @@ Supported `type` values:
 - `UNSTABLE_TELEPORTATION_DEVICE`
 - `MIRACLE_OF_THE_STARS`
 - `TOWER_CHEST`
+- `STEEL_SHELL`
 
 Behavior notes:
 - `FLAMETHROWER`
@@ -446,6 +447,7 @@ Behavior notes:
   - the tunnel should extend from that piston anchor in the player's horizontal facing direction, not from the player's feet
 - `HAPPY_GHAST`
   - should take normal damage from players and projectiles, including same-team hits, and use attribute-based knockback resistance; do not add ghast-specific damage or knockback handling in the listener
+  - custom `speed` should be applied as a multiplier on the native Happy Ghast move/flying speed so config values below `1.0` reliably slow the mount down
   - summon nameplate should show current health above it alongside the despawn timer
 - `UNSTABLE_TELEPORTATION_DEVICE`
   - purchased as a held item
@@ -460,6 +462,10 @@ Behavior notes:
 - `TOWER_CHEST`
   - chest deployable that builds a fixed wool tower aligned to player facing
   - uses team wool plus placed ladders, follows the fixed 7-layer popup-tower layout in `GameSession.TOWER_CHEST_LAYERS`, only fills air blocks inside the map, ignores anti-build placement restrictions, and removes the center chest shortly after placement
+- `STEEL_SHELL`
+  - purchased as a held item using a `NETHERITE_BLOCK` icon
+  - right-click activation builds a temporary bedrock prison around the user for 10 seconds if every shell block fits in air inside the map
+  - while active it applies `Resistance V` and then restores any previous resistance effect when the shell expires
 
 ### 2.9 Match Event Workflow
 
@@ -539,7 +545,7 @@ Do not re-introduce large BedWars god classes; use the existing support/runtime 
 - `/bw game spectate` can only be run by a player already standing in the active BedWars world.
 - When there is no active BedWars session, the main BedWars lobby world should play a `BLOCK_AMETHYST_BLOCK_CHIME` ambient sound at `0 90 0` for players in that world at random intervals between 30 and 60 seconds.
 - Players put into spectator mode by `/bw game spectate` are locked to the active BedWars world until `/bw game out` or session end.
-- Active lobby parkour runs should keep the current timer in the action bar; the last-checkpoint control should instantly restart the run until a real checkpoint has been reached, and only the exit control should apply the temporary pressure-plate lock.
+- Active lobby parkour runs should keep the current timer in the action bar; the redstone reset control should instantly restart the run, the last-checkpoint control should instantly restart the run until a real checkpoint has been reached, and only the exit control should apply the temporary pressure-plate lock.
 
 ### 2.13 Common Recipes
 

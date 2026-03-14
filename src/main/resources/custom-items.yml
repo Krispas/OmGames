@@ -110,6 +110,10 @@ custom-items:
   tower_chest:
     type: TOWER_CHEST
     material: CHEST
+  steel_shell:
+    type: STEEL_SHELL
+    material: NETHERITE_BLOCK
+    lifetime-seconds: 10
   lockpick:
     type: LOCKPICK
     material: TRIPWIRE_HOOK

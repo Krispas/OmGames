@@ -195,6 +195,9 @@ abstract class BedwarsListenerCustomSupport {
     }
 
     protected CustomItemDefinition resolveCustomItem(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) {
+            return null;
+        }
         CustomItemConfig config = bedwarsManager.getCustomItemConfig();
         if (config == null) {
             return null;
