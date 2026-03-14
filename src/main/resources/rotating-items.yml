@@ -92,9 +92,6 @@ shop:
           - "Builds a 3x3 tunnel"
           - "20 blocks forward."
         custom-item: bridge_builder
-        limit:
-          scope: PLAYER
-          amount: 3
       creeping_arrow:
         material: ARROW
         amount: 1
@@ -247,7 +244,7 @@ shop:
         amount: 1
         cost:
           material: EMERALD
-          amount: 4
+          amount: 5
         display-name: "Lockpick"
         lore:
           - "Unlock enemy team chests."
