@@ -332,6 +332,7 @@ Common item fields:
 - `custom-item`
 - `knockback-bonus`
 - `disable-after-sudden-death`
+- `max-carry-amount`
 - `limit.scope`
 - `limit.amount`
 - `enchants`
@@ -339,6 +340,7 @@ Common item fields:
 
 Notes:
 - `knockback-bonus` adds an `ATTACK_KNOCKBACK` item attribute modifier on the held weapon.
+- `max-carry-amount` caps how many copies of that shop item a player may carry at once; purchases and dropped-item pickup should both respect it.
 - Use config changes for shop balancing first.
 - Shop UI border slots are reserved.
   - Avoid putting category entries on the outer top/bottom rows or the far left/right columns.
@@ -369,6 +371,8 @@ Rotating item notes:
 
 Merge behavior:
 - `ShopConfig.merge(base, rotating)`
+- rotating config item definitions with the same item id override base definitions from `shop.yml`
+- rotating category entry slots remain additive; the rotating config should not replace existing base category slots
 
 #### 2.8.4 `custom-items.yml`
 
@@ -428,6 +432,9 @@ Behavior notes:
 - `CRYSTAL`
   - direct crystal contact damage defaults to `1` in all modes
   - crystal contact damage should hit both allies and enemies; same-team crystal contact should only be cancelled if the resolved contact damage is `0`
+- `RESPAWN_BEACON`
+  - solo teams should auto-activate it on death from inventory and use the normal `5s` respawn delay/title
+  - manual use on teams with living teammates should keep the configured beacon delay and revive all currently eliminated online teammates still in that team
 - `ELYTRA_STRIKE`
   - purchased as a held item
   - right-click activation equips temporary Elytra, teleports above team spawn, and cleans up on landing/death/quit/session end
@@ -440,8 +447,9 @@ Behavior notes:
   - rotating held item used on enemy team storage inside that base's radius
   - right-clicking a normal chest/trapped chest starts a 10-second countdown above the chest, then grants that player 60 seconds of access to that base team's normal chests
   - right-clicking an enemy ender chest opens a team-member target GUI unless the player already has active lockpicked access for that base team
-  - ender chest target selection starts a 20-second countdown above the chest, then grants 60 seconds where right-clicking that base team's ender chests with the lockpick opens the selected player's fake BedWars ender chest
-  - without a lockpick in hand, ender chests should still open the viewer's own fake BedWars ender chest
+  - lockpick countdowns and the 60-second access windows should show a timer above the clicked chest that is only visible to the player who triggered that lockpick
+  - ender chest target selection starts a 20-second countdown above the chest, then grants 60 seconds where right-clicking that base team's ender chests opens the selected player's fake BedWars ender chest until the timer expires
+  - once the ender-chest access timer expires, those enemy ender chests should revert to opening the viewer's own fake ender chest again
 - `BRIDGE_BUILDER`
   - right-clicking a block places a piston anchor at the clicked placement position
   - the tunnel should extend from that piston anchor in the player's horizontal facing direction, not from the player's feet
@@ -539,12 +547,13 @@ Do not re-introduce large BedWars god classes; use the existing support/runtime 
 - Outside a running BedWars match, players should not be able to rotate, take from, or break item frames in protected BedWars worlds unless they are allowed editors.
 - During a running BedWars match, normal chests/trapped chests inside a team's base radius are locked to that team until that team's bed is destroyed; afterward they are open to everyone.
 - If a pending respawn later turns into a true elimination because respawns are no longer allowed, final-death and final-kill stats should still resolve from that original death.
-- `netherite_spear` movement boost reuse is listener-gated by a 5-second cooldown on the spear jab/arm-swing action, not right-click interact.
-- Lobby-mode prestart should build a temporary 5x5 barrier platform centered under the resolved `map-lobby` location and restore the original blocks when the session leaves lobby/starts the match.
+- `netherite_spear` movement boost reuse is enforced on the native spear lunge activation (`PlayerRiptideEvent`) with a 5-second native item cooldown; do not rely on message-only listener gating.
+- Lobby-mode prestart should build a temporary 15x15 barrier platform centered under the resolved `map-lobby` location and restore the original blocks when the session leaves lobby/starts the match.
 - Match end cleanup should return all remaining arena spectators to the arena `game-lobby`; `map-lobby` is for prestart/spectate flows, not post-match cleanup.
 - `/bw game spectate` can only be run by a player already standing in the active BedWars world.
 - When there is no active BedWars session, the main BedWars lobby world should play a `BLOCK_AMETHYST_BLOCK_CHIME` ambient sound at `0 90 0` for players in that world at random intervals between 30 and 60 seconds.
 - Players put into spectator mode by `/bw game spectate` are locked to the active BedWars world until `/bw game out` or session end.
+- BedWars full-screen titles should use one shared timing window with fade-in and fade-out instead of per-feature custom lengths.
 - Active lobby parkour runs should keep the current timer in the action bar; the redstone reset control should instantly restart the run, the last-checkpoint control should instantly restart the run until a real checkpoint has been reached, and only the exit control should apply the temporary pressure-plate lock.
 
 ### 2.13 Common Recipes

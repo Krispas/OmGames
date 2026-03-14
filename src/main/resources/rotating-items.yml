@@ -33,6 +33,16 @@ shop:
         scale_down_upgrade: 30
         illusion_trap: 31
   items:
+    utility:
+      fireball:
+        material: FIRE_CHARGE
+        amount: 1
+        cost:
+          material: IRON
+          amount: 40
+        display-name: "Fireball"
+        custom-item: fireball
+        max-carry-amount: 16
     rotating:
       respawn_beacon:
         material: BEACON
@@ -228,7 +238,7 @@ shop:
         disable-after-sudden-death: true
         limit:
           scope: TEAM
-          amount: 1
+          amount: 6
       gigantify_grenade:
         material: FIRE_CHARGE
         amount: 1

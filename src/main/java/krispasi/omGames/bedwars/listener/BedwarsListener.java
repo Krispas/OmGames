@@ -1,6 +1,7 @@
 package krispasi.omGames.bedwars.listener;
 
 import io.papermc.paper.event.player.PlayerArmSwingEvent;
+import io.papermc.paper.event.player.PrePlayerAttackEntityEvent;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
@@ -102,7 +103,9 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerRiptideEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerVelocityEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.ItemStack;
@@ -359,13 +362,13 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             event.setCancelled(true);
             if (!holdingLockpick) {
-                session.openAccessibleEnderChest(player, clickedBlock, false);
+                session.openAccessibleEnderChest(player, clickedBlock, true);
                 return;
             }
             TeamColor ownerTeam = session.resolveBaseOwner(clickedBlock);
             TeamColor playerTeam = session.getTeam(player.getUniqueId());
             if (ownerTeam == null || ownerTeam == playerTeam) {
-                session.openAccessibleEnderChest(player, clickedBlock, false);
+                session.openAccessibleEnderChest(player, clickedBlock, true);
                 return;
             }
             UUID ownerId = session.resolveAccessibleEnderChestOwner(player, clickedBlock, true);
@@ -645,9 +648,87 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 return;
             }
             ItemStack item = player.getInventory().getItemInMainHand();
-            if (!shouldBlockLungingSpearMovement(player, item)) {
+            if (!isLungingMovementSpear(item)) {
                 return;
             }
+            if (isLungingSpearMovementOnCooldown(player, item)) {
+                armBlockedLungingSpearVelocity(player);
+                event.setCancelled(true);
+                return;
+            }
+            markLungingSpearMovementUsed(player, item);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onPrePlayerAttackEntity(PrePlayerAttackEntityEvent event) {
+        safeHandle("onPrePlayerAttackEntity", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            Player player = event.getPlayer();
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            if (!event.willAttack()) {
+                return;
+            }
+            ItemStack item = player.getInventory().getItemInMainHand();
+            if (!isLungingMovementSpear(item)) {
+                return;
+            }
+            if (isPendingLungingSpearSuccess(player)) {
+                return;
+            }
+            if (isLungingSpearMovementOnCooldown(player, item)) {
+                armBlockedLungingSpearVelocity(player);
+                event.setCancelled(true);
+                return;
+            }
+            markLungingSpearMovementUsed(player, item);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerRiptide(PlayerRiptideEvent event) {
+        safeHandle("onPlayerRiptide", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            Player player = event.getPlayer();
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            ItemStack item = event.getItem();
+            if (isPendingLungingSpearSuccess(player)) {
+                return;
+            }
+            if (isLungingSpearMovementOnCooldown(player, item)) {
+                armBlockedLungingSpearVelocity(player);
+                event.setCancelled(true);
+                return;
+            }
+            markLungingSpearMovementUsed(player, item);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onPlayerVelocity(PlayerVelocityEvent event) {
+        safeHandle("onPlayerVelocity", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            Player player = event.getPlayer();
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            if (!consumeBlockedLungingSpearVelocity(player)) {
+                return;
+            }
+            event.setVelocity(new Vector(0.0, 0.0, 0.0));
             event.setCancelled(true);
         });
     }
@@ -732,7 +813,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             event.setCancelled(true);
             Inventory target = null;
             if (type == Material.ENDER_CHEST) {
-                target = session.getAccessibleEnderChest(player, block, isHoldingLockpick(event, player));
+                target = session.getAccessibleEnderChest(player, block, true);
             } else if (block.getState() instanceof Container container) {
                 TeamColor ownerTeam = session.resolveBaseOwner(block);
                 if (ownerTeam != null && !session.canAccessBaseChest(player, block)) {
@@ -747,12 +828,6 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             depositHeldItem(player, target, event.getHand());
             scheduleToolTierSync(player, session);
         });
-    }
-
-    private boolean isHoldingLockpick(PlayerInteractEvent event, Player player) {
-        ItemStack item = resolveInteractItem(event, player);
-        CustomItemDefinition custom = resolveCustomItem(item);
-        return custom != null && custom.getType() == CustomItemType.LOCKPICK;
     }
 
     private void sendLockedBaseChestMessage(Player player, TeamColor ownerTeam) {
@@ -1659,6 +1734,17 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             if (isProtectedItem(stack)) {
                 ItemStack updated = makeUnbreakable(stack);
                 event.getItem().setItemStack(updated);
+                stack = updated;
+            }
+            String shopItemId = ShopItemData.getId(stack);
+            if (shopItemId != null && bedwarsManager.getShopConfig() != null) {
+                ShopItemDefinition definition = bedwarsManager.getShopConfig().getItem(shopItemId);
+                if (definition != null && definition.getMaxCarryAmount() > 0
+                        && !session.canCarryAdditionalAmount(player, definition, stack.getAmount())) {
+                    event.setCancelled(true);
+                    player.sendActionBar(Component.text("You cannot carry more of that item.", NamedTextColor.RED));
+                    return;
+                }
             }
             if (RESOURCE_MATERIALS.contains(stack.getType())) {
                 player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.2f);
@@ -1895,6 +1981,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             fireballCooldowns.remove(event.getPlayer().getUniqueId());
             flamethrowerCooldowns.remove(event.getPlayer().getUniqueId());
             lungingSpearMovementCooldowns.remove(event.getPlayer().getUniqueId());
+            pendingSuccessfulLungingSpearEvents.remove(event.getPlayer().getUniqueId());
+            blockedLungingSpearVelocityUntil.remove(event.getPlayer().getUniqueId());
+            lungingSpearCooldownMessageTimes.remove(event.getPlayer().getUniqueId());
             voidTotemFallProtection.remove(event.getPlayer().getUniqueId());
             Player player = event.getPlayer();
             if (session.isRunning()

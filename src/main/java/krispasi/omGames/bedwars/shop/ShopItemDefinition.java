@@ -45,6 +45,7 @@ public class ShopItemDefinition {
     private final String customItemId;
     private final TeamUpgradeType upgradeType;
     private final ShopItemLimit limit;
+    private final int maxCarryAmount;
     private final Integer fireworkPower;
     private final FireworkEffect fireworkEffect;
     private final Double fireworkExplosionPower;
@@ -67,6 +68,7 @@ public class ShopItemDefinition {
                               String customItemId,
                               TeamUpgradeType upgradeType,
                               ShopItemLimit limit,
+                              int maxCarryAmount,
                               Integer fireworkPower,
                               FireworkEffect fireworkEffect,
                               Double fireworkExplosionPower,
@@ -88,6 +90,7 @@ public class ShopItemDefinition {
         this.customItemId = customItemId;
         this.upgradeType = upgradeType;
         this.limit = limit;
+        this.maxCarryAmount = Math.max(0, maxCarryAmount);
         this.fireworkPower = fireworkPower;
         this.fireworkEffect = fireworkEffect;
         this.fireworkExplosionPower = fireworkExplosionPower;
@@ -135,6 +138,10 @@ public class ShopItemDefinition {
 
     public ShopItemLimit getLimit() {
         return limit;
+    }
+
+    public int getMaxCarryAmount() {
+        return maxCarryAmount;
     }
 
     public String getDisplayName() {

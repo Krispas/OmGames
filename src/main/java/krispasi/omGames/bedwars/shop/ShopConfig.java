@@ -85,7 +85,7 @@ public class ShopConfig {
         }
         Map<String, ShopItemDefinition> mergedItems = new HashMap<>(base.items);
         for (Map.Entry<String, ShopItemDefinition> entry : extra.items.entrySet()) {
-            mergedItems.putIfAbsent(entry.getKey(), entry.getValue());
+            mergedItems.put(entry.getKey(), entry.getValue());
         }
         Map<ShopCategoryType, ShopCategory> mergedCategories = new EnumMap<>(ShopCategoryType.class);
         mergedCategories.putAll(base.categories);

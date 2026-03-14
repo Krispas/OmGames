@@ -721,6 +721,21 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         return Math.max(0, remaining);
     }
 
+    public int getRemainingCarryAmount(UUID playerId, ShopItemDefinition item) {
+        if (playerId == null || item == null) {
+            return -1;
+        }
+        int maxCarryAmount = item.getMaxCarryAmount();
+        if (maxCarryAmount <= 0) {
+            return -1;
+        }
+        Player player = Bukkit.getPlayer(playerId);
+        if (player == null) {
+            return 0;
+        }
+        return Math.max(0, maxCarryAmount - countCarriedShopItem(player, item.getId()));
+    }
+
     protected void closeFakeEnderChests() {
         for (UUID playerId : assignments.keySet()) {
             Player player = Bukkit.getPlayer(playerId);
@@ -1231,6 +1246,26 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         }
         ItemStack offhand = player.getInventory().getItemInOffHand();
         if (offhand != null && offhand.getType() == material) {
+            count += offhand.getAmount();
+        }
+        return count;
+    }
+
+    protected int countCarriedShopItem(Player player, String itemId) {
+        if (player == null || itemId == null || itemId.isBlank()) {
+            return 0;
+        }
+        int count = 0;
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item == null) {
+                continue;
+            }
+            if (itemId.equalsIgnoreCase(ShopItemData.getId(item))) {
+                count += item.getAmount();
+            }
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && itemId.equalsIgnoreCase(ShopItemData.getId(offhand))) {
             count += offhand.getAmount();
         }
         return count;

@@ -37,6 +37,7 @@ import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
@@ -144,6 +145,8 @@ final class GameSessionCustomItemRuntime {
     private final Map<LockpickAccessKey, Long> chestLockpickAccessEnds = new HashMap<>();
     private final Map<LockpickAccessKey, EnderChestLockpickAccess> enderChestLockpickAccesses = new HashMap<>();
     private final Map<LockpickAccessKey, LockpickCountdownState> lockpickCountdowns = new HashMap<>();
+    private final Map<LockpickAccessKey, LockpickAccessDisplayState> chestLockpickDisplays = new HashMap<>();
+    private final Map<LockpickAccessKey, LockpickAccessDisplayState> enderChestLockpickDisplays = new HashMap<>();
 
     GameSessionCustomItemRuntime(GameSession session,
                                  Arena arena,
@@ -180,6 +183,7 @@ final class GameSessionCustomItemRuntime {
         }
         if (expiresAt <= System.currentTimeMillis()) {
             chestLockpickAccessEnds.remove(key);
+            clearLockpickAccessDisplay(chestLockpickDisplays, key);
             return false;
         }
         return true;
@@ -196,10 +200,12 @@ final class GameSessionCustomItemRuntime {
         }
         if (access.expiresAt() <= System.currentTimeMillis()) {
             enderChestLockpickAccesses.remove(key);
+            clearLockpickAccessDisplay(enderChestLockpickDisplays, key);
             return null;
         }
         if (assignments.get(access.targetPlayerId()) != baseTeam) {
             enderChestLockpickAccesses.remove(key);
+            clearLockpickAccessDisplay(enderChestLockpickDisplays, key);
             return null;
         }
         return access.targetPlayerId();
@@ -231,7 +237,19 @@ final class GameSessionCustomItemRuntime {
                 (int) (LOCKPICK_CHEST_DELAY_TICKS / 20L),
                 plugin,
                 () -> {
-                    chestLockpickAccessEnds.put(key, System.currentTimeMillis() + LOCKPICK_ACCESS_DURATION_MILLIS);
+                    long expiresAt = System.currentTimeMillis() + LOCKPICK_ACCESS_DURATION_MILLIS;
+                    chestLockpickAccessEnds.put(key, expiresAt);
+                    startLockpickAccessDisplay(player,
+                            chestBlock,
+                            key,
+                            "Chest access",
+                            expiresAt,
+                            plugin,
+                            chestLockpickDisplays,
+                            () -> {
+                                chestLockpickAccessEnds.remove(key);
+                                closeLockpickInventory(player.getUniqueId());
+                            });
                     player.sendMessage(Component.text("You can open the ", NamedTextColor.GREEN)
                             .append(ownerTeam.displayComponent())
                             .append(Component.text(" team's chests for 60s.", NamedTextColor.GREEN)));
@@ -269,9 +287,21 @@ final class GameSessionCustomItemRuntime {
                 (int) (LOCKPICK_ENDER_CHEST_DELAY_TICKS / 20L),
                 plugin,
                 () -> {
+                    long expiresAt = System.currentTimeMillis() + LOCKPICK_ACCESS_DURATION_MILLIS;
                     enderChestLockpickAccesses.put(key,
                             new EnderChestLockpickAccess(targetPlayerId,
-                                    System.currentTimeMillis() + LOCKPICK_ACCESS_DURATION_MILLIS));
+                                    expiresAt));
+                    startLockpickAccessDisplay(player,
+                            chestBlock,
+                            key,
+                            "Ender access",
+                            expiresAt,
+                            plugin,
+                            enderChestLockpickDisplays,
+                            () -> {
+                                enderChestLockpickAccesses.remove(key);
+                                closeLockpickInventory(player.getUniqueId());
+                            });
                     player.sendMessage(Component.text("You can open ", NamedTextColor.GREEN)
                             .append(Component.text(targetName, NamedTextColor.YELLOW))
                             .append(Component.text("'s ender chest for 60s.", NamedTextColor.GREEN)));
@@ -292,6 +322,7 @@ final class GameSessionCustomItemRuntime {
         if (display == null) {
             return false;
         }
+        configurePrivateLockpickDisplay(display, player, plugin);
         BukkitTask task = new BukkitRunnable() {
             private int remaining = countdownSeconds;
 
@@ -332,7 +363,21 @@ final class GameSessionCustomItemRuntime {
             }
             removeLockpickDisplay(countdown.displayId());
         }
+        for (LockpickAccessDisplayState access : chestLockpickDisplays.values()) {
+            if (access.task() != null) {
+                access.task().cancel();
+            }
+            removeLockpickDisplay(access.displayId());
+        }
+        for (LockpickAccessDisplayState access : enderChestLockpickDisplays.values()) {
+            if (access.task() != null) {
+                access.task().cancel();
+            }
+            removeLockpickDisplay(access.displayId());
+        }
         lockpickCountdowns.clear();
+        chestLockpickDisplays.clear();
+        enderChestLockpickDisplays.clear();
         chestLockpickAccessEnds.clear();
         enderChestLockpickAccesses.clear();
     }
@@ -351,6 +396,69 @@ final class GameSessionCustomItemRuntime {
         removeLockpickDisplay(countdown.displayId());
     }
 
+    private void startLockpickAccessDisplay(Player player,
+                                            Block chestBlock,
+                                            LockpickAccessKey key,
+                                            String label,
+                                            long expiresAt,
+                                            JavaPlugin plugin,
+                                            Map<LockpickAccessKey, LockpickAccessDisplayState> displayMap,
+                                            Runnable onExpire) {
+        if (player == null || chestBlock == null || key == null || plugin == null || displayMap == null) {
+            return;
+        }
+        clearLockpickAccessDisplay(displayMap, key);
+        ArmorStand display = spawnLockpickDisplay(chestBlock.getLocation().add(0.5, LOCKPICK_DISPLAY_Y_OFFSET, 0.5));
+        if (display == null) {
+            return;
+        }
+        configurePrivateLockpickDisplay(display, player, plugin);
+        BukkitTask task = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!session.isRunning() || !player.isOnline() || !isValidLockpickTargetBlock(chestBlock)) {
+                    clearLockpickAccessDisplay(displayMap, key);
+                    onExpire.run();
+                    cancel();
+                    return;
+                }
+                long remainingMillis = Math.max(0L, expiresAt - System.currentTimeMillis());
+                ArmorStand currentDisplay = getLockpickDisplay(display.getUniqueId());
+                if (currentDisplay == null) {
+                    clearLockpickAccessDisplay(displayMap, key);
+                    onExpire.run();
+                    cancel();
+                    return;
+                }
+                currentDisplay.teleport(chestBlock.getLocation().add(0.5, LOCKPICK_DISPLAY_Y_OFFSET, 0.5));
+                long remainingSeconds = (remainingMillis + 999L) / 1000L;
+                currentDisplay.customName(Component.text(label + ": " + remainingSeconds + "s", NamedTextColor.GREEN));
+                if (remainingMillis <= 0L) {
+                    clearLockpickAccessDisplay(displayMap, key);
+                    onExpire.run();
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
+        sessionTasks.add(task);
+        displayMap.put(key, new LockpickAccessDisplayState(display.getUniqueId(), task));
+    }
+
+    private void clearLockpickAccessDisplay(Map<LockpickAccessKey, LockpickAccessDisplayState> displayMap,
+                                            LockpickAccessKey key) {
+        if (displayMap == null || key == null) {
+            return;
+        }
+        LockpickAccessDisplayState displayState = displayMap.remove(key);
+        if (displayState == null) {
+            return;
+        }
+        if (displayState.task() != null) {
+            displayState.task().cancel();
+        }
+        removeLockpickDisplay(displayState.displayId());
+    }
+
     private ArmorStand spawnLockpickDisplay(Location location) {
         if (location == null || location.getWorld() == null) {
             return null;
@@ -365,6 +473,18 @@ final class GameSessionCustomItemRuntime {
             stand.setCustomNameVisible(true);
             stand.addScoreboardTag(LOCKPICK_DISPLAY_TAG);
         });
+    }
+
+    private void configurePrivateLockpickDisplay(ArmorStand display, Player viewer, JavaPlugin plugin) {
+        if (display == null || viewer == null || plugin == null) {
+            return;
+        }
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (online.getUniqueId().equals(viewer.getUniqueId())) {
+                continue;
+            }
+            online.hideEntity(plugin, display);
+        }
     }
 
     private ArmorStand getLockpickDisplay(UUID displayId) {
@@ -403,6 +523,20 @@ final class GameSessionCustomItemRuntime {
             return offlineName;
         }
         return targetPlayerId.toString().substring(0, 8);
+    }
+
+    private void closeLockpickInventory(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        Player player = Bukkit.getPlayer(playerId);
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        InventoryType type = player.getOpenInventory().getTopInventory().getType();
+        if (type == InventoryType.CHEST || type == InventoryType.ENDER_CHEST) {
+            player.closeInventory();
+        }
     }
 
     boolean activateElytraStrike(Player player, CustomItemDefinition custom, JavaPlugin plugin) {
@@ -1707,6 +1841,9 @@ final class GameSessionCustomItemRuntime {
     }
 
     private record LockpickCountdownState(UUID displayId, BukkitTask task) {
+    }
+
+    private record LockpickAccessDisplayState(UUID displayId, BukkitTask task) {
     }
 
     private record EnderChestLockpickAccess(UUID targetPlayerId, long expiresAt) {

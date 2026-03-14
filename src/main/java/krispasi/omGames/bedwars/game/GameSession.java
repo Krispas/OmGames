@@ -115,6 +115,10 @@ public class GameSession extends GameSessionMatchFlowSupport {
                 tasks);
     }
 
+    public static Title.Times sharedTitleTimes() {
+        return DEFAULT_TITLE_TIMES;
+    }
+
     public Arena getArena() {
         return arena;
     }
@@ -922,6 +926,14 @@ public class GameSession extends GameSessionMatchFlowSupport {
             player.sendMessage(Component.text("Purchase limit reached.", NamedTextColor.RED));
             return false;
         }
+        if (!canCarryPurchasedItem(player, item)) {
+            player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            int maxCarryAmount = item.getMaxCarryAmount();
+            if (maxCarryAmount > 0) {
+                player.sendMessage(Component.text("You can only carry " + maxCarryAmount + " of this item.", NamedTextColor.RED));
+            }
+            return false;
+        }
         if (!applyPurchase(player, item)) {
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             return false;
@@ -1065,6 +1077,21 @@ public class GameSession extends GameSessionMatchFlowSupport {
             return current < limit.amount();
         }
         return true;
+    }
+
+    private boolean canCarryPurchasedItem(Player player, ShopItemDefinition item) {
+        return canCarryAdditionalAmount(player, item, item != null ? item.getAmount() : 0);
+    }
+
+    public boolean canCarryAdditionalAmount(Player player, ShopItemDefinition item, int amount) {
+        if (player == null || item == null) {
+            return false;
+        }
+        int maxCarryAmount = item.getMaxCarryAmount();
+        if (maxCarryAmount <= 0) {
+            return true;
+        }
+        return countCarriedShopItem(player, item.getId()) + Math.max(1, amount) <= maxCarryAmount;
     }
 
     private void recordLimitedPurchase(Player player, ShopItemDefinition item) {

@@ -159,6 +159,7 @@ public class ShopMenu implements InventoryHolder {
                 display = decorateShieldDisplay(display);
             }
             display = applyLimitLore(display, item);
+            display = applyCarryLimitLore(display, item);
             inventory.setItem(slot, display);
             itemSlots.put(slot, item);
         }
@@ -304,6 +305,35 @@ public class ShopMenu implements InventoryHolder {
         int remaining = session.getRemainingLimit(viewerId, definition);
         if (remaining >= 0) {
             lore.add(Component.text("Remaining: " + remaining,
+                    remaining > 0 ? NamedTextColor.GREEN : NamedTextColor.RED));
+        }
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack applyCarryLimitLore(ItemStack item, ShopItemDefinition definition) {
+        if (item == null || definition == null) {
+            return item;
+        }
+        int maxCarryAmount = definition.getMaxCarryAmount();
+        if (maxCarryAmount <= 0) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return item;
+        }
+        java.util.List<Component> lore = meta.lore();
+        if (lore == null) {
+            lore = new java.util.ArrayList<>();
+        } else {
+            lore = new java.util.ArrayList<>(lore);
+        }
+        lore.add(Component.text("Carry limit: " + maxCarryAmount, NamedTextColor.GRAY));
+        int remaining = session.getRemainingCarryAmount(viewerId, definition);
+        if (remaining >= 0) {
+            lore.add(Component.text("Can carry more: " + remaining,
                     remaining > 0 ? NamedTextColor.GREEN : NamedTextColor.RED));
         }
         meta.lore(lore);

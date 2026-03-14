@@ -291,11 +291,11 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             activator.sendMessage(Component.text("Your bed is still alive.", NamedTextColor.RED));
             return false;
         }
-        if (getTeamMemberCount(team) != 2) {
-            activator.sendMessage(Component.text("Respawn Beacon can only be used in 2-player teams.", NamedTextColor.RED));
+        if (getTeamMemberCount(team) <= 1) {
+            activator.sendMessage(Component.text("Respawn Beacon cannot manually revive a solo team.", NamedTextColor.RED));
             return false;
         }
-        UUID targetId = null;
+        List<Player> targets = new ArrayList<>();
         for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
             if (entry.getValue() != team) {
                 continue;
@@ -304,18 +304,17 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             if (playerId.equals(activatorId)) {
                 continue;
             }
-            if (eliminatedPlayers.contains(playerId)) {
-                targetId = playerId;
-                break;
+            if (!eliminatedPlayers.contains(playerId)) {
+                continue;
             }
+            Player target = Bukkit.getPlayer(playerId);
+            if (target == null || !target.isOnline()) {
+                continue;
+            }
+            targets.add(target);
         }
-        if (targetId == null) {
-            activator.sendMessage(Component.text("No eliminated teammate to respawn.", NamedTextColor.RED));
-            return false;
-        }
-        Player target = Bukkit.getPlayer(targetId);
-        if (target == null || !target.isOnline()) {
-            activator.sendMessage(Component.text("Your teammate must be online to respawn.", NamedTextColor.RED));
+        if (targets.isEmpty()) {
+            activator.sendMessage(Component.text("No eliminated teammates to respawn.", NamedTextColor.RED));
             return false;
         }
         showTitleAll(
@@ -324,10 +323,13 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
                         .append(Component.text(" Used the Respawn Beacon.", NamedTextColor.WHITE)),
                 Component.empty()
         );
-        eliminatedPlayers.remove(targetId);
-        respawnGracePlayers.add(targetId);
-        setSpectator(target);
-        scheduleRespawn(target, team, delaySeconds, true, true);
+        for (Player target : targets) {
+            UUID targetId = target.getUniqueId();
+            eliminatedPlayers.remove(targetId);
+            respawnGracePlayers.add(targetId);
+            setSpectator(target);
+            scheduleRespawn(target, team, delaySeconds, true, true);
+        }
         return true;
     }
 
@@ -354,6 +356,10 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
                         .append(Component.text(" Respawn Beacon activated!", NamedTextColor.WHITE)),
                 Component.text(player.getName() + " will respawn in " + delaySeconds + "s.", NamedTextColor.GRAY));
         return true;
+    }
+
+    public int getDefaultRespawnDelaySeconds() {
+        return RESPAWN_DELAY_SECONDS;
     }
 
     protected void playSoundToParticipants(Sound sound, float volume, float pitch) {
@@ -1231,8 +1237,8 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         }
         int centerX = lobby.getBlockX();
         int centerZ = lobby.getBlockZ();
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
+        for (int dx = -7; dx <= 7; dx++) {
+            for (int dz = -7; dz <= 7; dz++) {
                 Block block = world.getBlockAt(centerX + dx, floorY, centerZ + dz);
                 BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
                 temporaryMapLobbyIslandBlocks.put(point, block.getState());

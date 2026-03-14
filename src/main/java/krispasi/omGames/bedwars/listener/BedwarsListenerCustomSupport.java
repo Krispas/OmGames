@@ -100,6 +100,9 @@ abstract class BedwarsListenerCustomSupport {
     protected static final double FLAMETHROWER_HALF_ANGLE_DEGREES = 38.0;
     protected static final int FLAMETHROWER_FIRE_TICKS = 60;
     protected static final long LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS = 5_000L;
+    protected static final long LUNGING_SPEAR_EVENT_LINK_WINDOW_MILLIS = 50L;
+    protected static final long BLOCKED_LUNGING_SPEAR_VELOCITY_WINDOW_MILLIS = 100L;
+    protected static final long LUNGING_SPEAR_COOLDOWN_MESSAGE_THROTTLE_MILLIS = 750L;
     protected static final long VOID_TOTEM_FALL_PROTECTION_MILLIS = 5_000L;
     protected static final int GIGANTIFY_GROWTH_TICKS = 40;
     protected static final int GIGANTIFY_SUSTAIN_TICKS = 60;
@@ -131,6 +134,9 @@ abstract class BedwarsListenerCustomSupport {
     protected final Map<UUID, Long> fireballCooldowns = new HashMap<>();
     protected final Map<UUID, Long> flamethrowerCooldowns = new HashMap<>();
     protected final Map<UUID, Long> lungingSpearMovementCooldowns = new HashMap<>();
+    protected final Map<UUID, Long> pendingSuccessfulLungingSpearEvents = new HashMap<>();
+    protected final Map<UUID, Long> blockedLungingSpearVelocityUntil = new HashMap<>();
+    protected final Map<UUID, Long> lungingSpearCooldownMessageTimes = new HashMap<>();
     protected final Map<UUID, BukkitTask> gigantifyTasks = new HashMap<>();
     protected final Map<UUID, Long> voidTotemFallProtection = new HashMap<>();
 
@@ -453,8 +459,7 @@ abstract class BedwarsListenerCustomSupport {
                 || !hasCustomItem(player, RESPAWN_BEACON_ITEM_ID)) {
             return false;
         }
-        CustomItemDefinition custom = getCustomItem(RESPAWN_BEACON_ITEM_ID);
-        int delaySeconds = resolveRespawnBeaconDelay(custom);
+        int delaySeconds = session.getDefaultRespawnDelaySeconds();
         if (!session.triggerSoloRespawnBeacon(player, delaySeconds)) {
             return false;
         }
@@ -599,26 +604,105 @@ abstract class BedwarsListenerCustomSupport {
         return true;
     }
 
-    protected boolean shouldBlockLungingSpearMovement(Player player, ItemStack item) {
+    protected boolean isLungingSpearMovementOnCooldown(Player player, ItemStack item) {
         if (player == null || item == null) {
             return false;
         }
         if (!isLungingMovementSpear(item)) {
             return false;
         }
+        int nativeCooldownTicks = player.getCooldown(item);
+        if (nativeCooldownTicks > 0) {
+            sendLungingSpearCooldownMessage(player, nativeCooldownTicks * 50L);
+            return true;
+        }
         long now = System.currentTimeMillis();
         long last = lungingSpearMovementCooldowns.getOrDefault(player.getUniqueId(), 0L);
         if (now - last < LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS) {
-            player.sendActionBar(Component.text("Spear movement is cooling down.", NamedTextColor.RED));
+            long remainingMillis = LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS - (now - last);
+            sendLungingSpearCooldownMessage(player, remainingMillis);
+            int remainingTicks = (int) Math.ceil(remainingMillis / 50.0);
+            if (remainingTicks > 0) {
+                player.setCooldown(item, remainingTicks);
+            }
             return true;
         }
-        lungingSpearMovementCooldowns.put(player.getUniqueId(), now);
         return false;
+    }
+
+    protected void markLungingSpearMovementUsed(Player player, ItemStack item) {
+        if (player == null || item == null || !isLungingMovementSpear(item)) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        lungingSpearMovementCooldowns.put(player.getUniqueId(), now);
+        pendingSuccessfulLungingSpearEvents.put(player.getUniqueId(), now + LUNGING_SPEAR_EVENT_LINK_WINDOW_MILLIS);
+        player.setCooldown(item, (int) Math.ceil(LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS / 50.0));
     }
 
     protected boolean isLungingMovementSpear(ItemStack item) {
         String itemId = ShopItemData.getId(item);
         return "netherite_spear".equalsIgnoreCase(itemId);
+    }
+
+    protected boolean isPendingLungingSpearSuccess(Player player) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        Long until = pendingSuccessfulLungingSpearEvents.get(playerId);
+        if (until == null) {
+            return false;
+        }
+        if (until < System.currentTimeMillis()) {
+            pendingSuccessfulLungingSpearEvents.remove(playerId);
+            return false;
+        }
+        return true;
+    }
+
+    protected void armBlockedLungingSpearVelocity(Player player) {
+        if (player == null) {
+            return;
+        }
+        blockedLungingSpearVelocityUntil.put(player.getUniqueId(),
+                System.currentTimeMillis() + BLOCKED_LUNGING_SPEAR_VELOCITY_WINDOW_MILLIS);
+    }
+
+    protected boolean consumeBlockedLungingSpearVelocity(Player player) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        Long until = blockedLungingSpearVelocityUntil.get(playerId);
+        if (until == null) {
+            return false;
+        }
+        if (until < System.currentTimeMillis()) {
+            blockedLungingSpearVelocityUntil.remove(playerId);
+            return false;
+        }
+        blockedLungingSpearVelocityUntil.remove(playerId);
+        return true;
+    }
+
+    protected void sendLungingSpearCooldownMessage(Player player, long remainingMillis) {
+        if (player == null) {
+            return;
+        }
+        long clampedMillis = Math.max(0L, remainingMillis);
+        double remainingSeconds = clampedMillis / 1000.0;
+        Component message = Component.text(
+                "Spear lunge cooldown: " + String.format(Locale.US, "%.1fs", remainingSeconds),
+                NamedTextColor.RED);
+        player.sendActionBar(message);
+        long now = System.currentTimeMillis();
+        long lastSent = lungingSpearCooldownMessageTimes.getOrDefault(player.getUniqueId(), 0L);
+        if (now - lastSent < LUNGING_SPEAR_COOLDOWN_MESSAGE_THROTTLE_MILLIS) {
+            return;
+        }
+        lungingSpearCooldownMessageTimes.put(player.getUniqueId(), now);
+        player.sendMessage(message);
     }
 
     protected void sprayFlamethrower(Player player, GameSession session, CustomItemDefinition custom) {
@@ -1082,10 +1166,7 @@ abstract class BedwarsListenerCustomSupport {
         }
         Component title = Component.text("TACTICAL NUKE ACTIVATED", NamedTextColor.RED);
         Component subtitle = Component.text("Explosion in " + formatNukeTime(countdown), NamedTextColor.YELLOW);
-        Title.Times times = Title.Times.times(java.time.Duration.ofMillis(300),
-                java.time.Duration.ofSeconds(3),
-                java.time.Duration.ofSeconds(1));
-        Title display = Title.title(title, subtitle, times);
+        Title display = Title.title(title, subtitle, GameSession.sharedTitleTimes());
         for (UUID playerId : session.getAssignments().keySet()) {
             Player target = Bukkit.getPlayer(playerId);
             if (target != null) {

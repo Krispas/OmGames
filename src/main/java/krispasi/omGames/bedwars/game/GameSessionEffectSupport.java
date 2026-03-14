@@ -72,13 +72,12 @@ abstract class GameSessionEffectSupport {
     protected static final double MOON_BIG_JUMP_MULTIPLIER = 2.5;
     protected static final double BLOOD_MOON_LIFESTEAL_RATIO = 1.0;
     protected static final Duration TITLE_FADE_IN = Duration.ofMillis(300);
-    protected static final Duration TITLE_STAY = Duration.ofSeconds(2);
+    protected static final Duration TITLE_STAY = Duration.ofSeconds(3);
     protected static final Duration TITLE_FADE_OUT = Duration.ofSeconds(1);
-    protected static final Duration ALERT_TITLE_STAY = Duration.ofSeconds(3);
     protected static final Title.Times DEFAULT_TITLE_TIMES =
             Title.Times.times(TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
     protected static final Title.Times ALERT_TITLE_TIMES =
-            Title.Times.times(TITLE_FADE_IN, ALERT_TITLE_STAY, TITLE_FADE_OUT);
+            DEFAULT_TITLE_TIMES;
     protected static final Set<String> IN_THIS_ECONOMY_BANNED_ITEMS = Set.of();
     protected static final Set<String> IN_THIS_ECONOMY_PRICE_MULTIPLIED_ITEMS = Set.of(
             "fireball",

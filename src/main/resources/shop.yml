@@ -442,7 +442,7 @@ shop:
       amount: 1
       cost:
         material: IRON
-        amount: 40
+        amount: 60
       display-name: "Fireball"
       custom-item: fireball
     tnt:

@@ -133,6 +133,7 @@ public class ShopConfigLoader {
         List<String> lore = section.getStringList("lore");
         String customItemId = section.getString("custom-item");
         ShopItemLimit limit = parseLimit(section.getConfigurationSection("limit"));
+        int maxCarryAmount = Math.max(0, section.getInt("max-carry-amount", 0));
         double knockbackBonus = Math.max(0.0, section.getDouble("knockback-bonus", 0.0));
         boolean disabledAfterSuddenDeath = section.getBoolean("disable-after-sudden-death", false);
         Integer fireworkPower = null;
@@ -175,7 +176,7 @@ public class ShopConfigLoader {
         }
 
         return new ShopItemDefinition(id, material, amount, cost, behavior, teamColor, tier,
-                enchants, potionEffects, displayName, lore, customItemId, upgradeType, limit,
+                enchants, potionEffects, displayName, lore, customItemId, upgradeType, limit, maxCarryAmount,
                 fireworkPower, fireworkEffect, fireworkExplosionPower, fireworkExplosionDamage,
                 fireworkExplosionKnockback, knockbackBonus, disabledAfterSuddenDeath);
     }

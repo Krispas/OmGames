@@ -35,7 +35,7 @@ custom-items:
     type: HAPPY_GHAST
     material: GHAST_SPAWN_EGG
     health: 100
-    speed: 0.12
+    speed: 0.8
     lifetime-seconds: 180
   respawn_beacon:
     type: RESPAWN_BEACON
