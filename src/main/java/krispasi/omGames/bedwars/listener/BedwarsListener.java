@@ -4330,7 +4330,7 @@ public class BedwarsListener implements Listener {
         try {
             Class<?> attributeClass = Class.forName("org.bukkit.attribute.Attribute");
             Method getAttribute = LivingEntity.class.getMethod("getAttribute", attributeClass);
-            Object knockbackResistance = resolveAttribute(attributeClass, "GENERIC_KNOCKBACK_RESISTANCE");
+            Object knockbackResistance = resolveAttribute(attributeClass, "KNOCKBACK_RESISTANCE");
             applyAttributeValue(entity, getAttribute, knockbackResistance, resistance);
         } catch (ReflectiveOperationException ignored) {
         }
