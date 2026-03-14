@@ -157,6 +157,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - checkpoint progression
   - temporary hotbar control items
   - direction compass target updates
+  - live parkour action-bar timer/status updates
 
 ### 2.4 Command Surface
 
@@ -409,6 +410,7 @@ Supported `type` values:
 - `ABYSSAL_RIFT`
 - `ELYTRA_STRIKE`
 - `GIGANTIFY_GRENADE`
+- `LOCKPICK`
 - `UNSTABLE_TELEPORTATION_DEVICE`
 - `MIRACLE_OF_THE_STARS`
 - `TOWER_CHEST`
@@ -433,6 +435,12 @@ Behavior notes:
   - only affects enemy players on direct hit; block hits should only despawn the projectile
   - scales the target up over 2 seconds, holds for 3 seconds, then shrinks over 3 seconds
   - effect cleanup must restore the player's BedWars scale on death, quit, world/session exit, and natural expiry
+- `LOCKPICK`
+  - rotating held item used on enemy team storage inside that base's radius
+  - right-clicking a normal chest/trapped chest starts a 10-second countdown above the chest, then grants that player 60 seconds of access to that base team's normal chests
+  - right-clicking an enemy ender chest opens a team-member target GUI unless the player already has active lockpicked access for that base team
+  - ender chest target selection starts a 20-second countdown above the chest, then grants 60 seconds where right-clicking that base team's ender chests with the lockpick opens the selected player's fake BedWars ender chest
+  - without a lockpick in hand, ender chests should still open the viewer's own fake BedWars ender chest
 - `BRIDGE_BUILDER`
   - right-clicking a block places a piston anchor at the clicked placement position
   - the tunnel should extend from that piston anchor in the player's horizontal facing direction, not from the player's feet
@@ -523,6 +531,7 @@ Do not re-introduce large BedWars god classes; use the existing support/runtime 
 - If stats are disabled for a session, progression/wins should not be awarded.
 - Outside a running BedWars match, protected BedWars worlds should still block casual terrain changes like farmland trampling unless the player is an allowed editor.
 - Outside a running BedWars match, players should not be able to rotate, take from, or break item frames in protected BedWars worlds unless they are allowed editors.
+- During a running BedWars match, normal chests/trapped chests inside a team's base radius are locked to that team until that team's bed is destroyed; afterward they are open to everyone.
 - If a pending respawn later turns into a true elimination because respawns are no longer allowed, final-death and final-kill stats should still resolve from that original death.
 - `netherite_spear` movement boost reuse is listener-gated by a 5-second cooldown on the spear jab/arm-swing action, not right-click interact.
 - Lobby-mode prestart should build a temporary 5x5 barrier platform centered under the resolved `map-lobby` location and restore the original blocks when the session leaves lobby/starts the match.
@@ -530,6 +539,7 @@ Do not re-introduce large BedWars god classes; use the existing support/runtime 
 - `/bw game spectate` can only be run by a player already standing in the active BedWars world.
 - When there is no active BedWars session, the main BedWars lobby world should play a `BLOCK_AMETHYST_BLOCK_CHIME` ambient sound at `0 90 0` for players in that world at random intervals between 30 and 60 seconds.
 - Players put into spectator mode by `/bw game spectate` are locked to the active BedWars world until `/bw game out` or session end.
+- Active lobby parkour runs should keep the current timer in the action bar; the last-checkpoint control should instantly restart the run until a real checkpoint has been reached, and only the exit control should apply the temporary pressure-plate lock.
 
 ### 2.13 Common Recipes
 

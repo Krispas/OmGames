@@ -20,6 +20,7 @@ import krispasi.omGames.bedwars.shop.ShopConfig;
 import krispasi.omGames.bedwars.shop.ShopItemDefinition;
 import krispasi.omGames.bedwars.gui.MapSelectMenu;
 import krispasi.omGames.bedwars.gui.EventSelectMenu;
+import krispasi.omGames.bedwars.gui.LockpickTargetMenu;
 import krispasi.omGames.bedwars.gui.RotatingItemMenu;
 import krispasi.omGames.bedwars.gui.ShopMenu;
 import krispasi.omGames.bedwars.gui.TeamAssignMenu;
@@ -211,6 +212,14 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 menu.handleClick(event);
                 return;
             }
+            if (topInventory.getHolder() instanceof LockpickTargetMenu menu) {
+                if (event.getRawSlot() >= topInventory.getSize()) {
+                    event.setCancelled(true);
+                    return;
+                }
+                menu.handleClick(event);
+                return;
+            }
 
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null || !session.isActive()) {
@@ -247,7 +256,8 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                     || topInventory.getHolder() instanceof EventSelectMenu
                     || topInventory.getHolder() instanceof RotatingItemMenu
                     || topInventory.getHolder() instanceof ShopMenu
-                    || topInventory.getHolder() instanceof UpgradeShopMenu) {
+                    || topInventory.getHolder() instanceof UpgradeShopMenu
+                    || topInventory.getHolder() instanceof LockpickTargetMenu) {
                 event.setCancelled(true);
                 return;
             }
@@ -322,7 +332,8 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
                 return;
             }
-            if (event.getClickedBlock() == null || event.getClickedBlock().getType() != Material.ENDER_CHEST) {
+            Block clickedBlock = event.getClickedBlock();
+            if (clickedBlock == null || clickedBlock.getType() != Material.ENDER_CHEST) {
                 return;
             }
             Player player = event.getPlayer();
@@ -340,7 +351,72 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 player.sendMessage(Component.text("Ender chests are disabled in BedWars.", NamedTextColor.RED));
                 return;
             }
-            session.openFakeEnderChest(player);
+            ItemStack item = resolveInteractItem(event, player);
+            CustomItemDefinition custom = resolveCustomItem(item);
+            boolean holdingLockpick = custom != null && custom.getType() == CustomItemType.LOCKPICK;
+            if (holdingLockpick && event.getHand() == EquipmentSlot.OFF_HAND && isSameCustomItemInMainHand(player, item)) {
+                return;
+            }
+            event.setCancelled(true);
+            if (!holdingLockpick) {
+                session.openAccessibleEnderChest(player, clickedBlock, false);
+                return;
+            }
+            TeamColor ownerTeam = session.resolveBaseOwner(clickedBlock);
+            TeamColor playerTeam = session.getTeam(player.getUniqueId());
+            if (ownerTeam == null || ownerTeam == playerTeam) {
+                session.openAccessibleEnderChest(player, clickedBlock, false);
+                return;
+            }
+            UUID ownerId = session.resolveAccessibleEnderChestOwner(player, clickedBlock, true);
+            if (ownerId != null && !ownerId.equals(player.getUniqueId())) {
+                session.openAccessibleEnderChest(player, clickedBlock, true);
+                return;
+            }
+            new LockpickTargetMenu(session, player, clickedBlock, ownerTeam).open(player);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBaseChestInteract(PlayerInteractEvent event) {
+        safeHandle("onBaseChestInteract", () -> {
+            if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+                return;
+            }
+            Block clickedBlock = event.getClickedBlock();
+            if (clickedBlock == null) {
+                return;
+            }
+            Material type = clickedBlock.getType();
+            if (type != Material.CHEST && type != Material.TRAPPED_CHEST) {
+                return;
+            }
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            Player player = event.getPlayer();
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            TeamColor ownerTeam = session.resolveBaseOwner(clickedBlock);
+            if (ownerTeam == null || session.canAccessBaseChest(player, clickedBlock)) {
+                return;
+            }
+            ItemStack item = resolveInteractItem(event, player);
+            CustomItemDefinition custom = resolveCustomItem(item);
+            boolean holdingLockpick = custom != null && custom.getType() == CustomItemType.LOCKPICK;
+            if (holdingLockpick && event.getHand() == EquipmentSlot.OFF_HAND && isSameCustomItemInMainHand(player, item)) {
+                return;
+            }
+            event.setCancelled(true);
+            if (!holdingLockpick) {
+                sendLockedBaseChestMessage(player, ownerTeam);
+                return;
+            }
+            if (session.beginChestLockpick(player, clickedBlock)) {
+                consumeHeldItem(player, event.getHand(), item);
+            }
         });
     }
 
@@ -427,6 +503,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             if (custom.getType() == CustomItemType.MAGIC_MILK) {
                 return;
             }
+            if (custom.getType() == CustomItemType.LOCKPICK) {
+                return;
+            }
             if (!rightClick && custom.getType() != CustomItemType.BRIDGE_ZAPPER) {
                 return;
             }
@@ -504,6 +583,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 }
                 case UNSTABLE_TELEPORTATION_DEVICE -> {
                     yield session.activateUnstableTeleportationDevice(player, custom);
+                }
+                case LOCKPICK -> {
+                    yield false;
                 }
                 case MAGIC_MILK -> {
                     yield false;
@@ -647,17 +729,41 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             event.setCancelled(true);
             Inventory target = null;
             if (type == Material.ENDER_CHEST) {
-                target = session.getFakeEnderChest(player);
+                target = session.getAccessibleEnderChest(player, block, isHoldingLockpick(event, player));
             } else if (block.getState() instanceof Container container) {
+                TeamColor ownerTeam = session.resolveBaseOwner(block);
+                if (ownerTeam != null && !session.canAccessBaseChest(player, block)) {
+                    sendLockedBaseChestMessage(player, ownerTeam);
+                    return;
+                }
                 target = container.getInventory();
             }
-        if (target == null) {
+            if (target == null) {
+                return;
+            }
+            depositHeldItem(player, target, event.getHand());
+            scheduleToolTierSync(player, session);
+        });
+    }
+
+    private boolean isHoldingLockpick(PlayerInteractEvent event, Player player) {
+        ItemStack item = resolveInteractItem(event, player);
+        CustomItemDefinition custom = resolveCustomItem(item);
+        return custom != null && custom.getType() == CustomItemType.LOCKPICK;
+    }
+
+    private void sendLockedBaseChestMessage(Player player, TeamColor ownerTeam) {
+        if (player == null) {
             return;
         }
-        depositHeldItem(player, target, event.getHand());
-        scheduleToolTierSync(player, session);
-    });
-}
+        if (ownerTeam == null) {
+            player.sendMessage(Component.text("This chest is locked.", NamedTextColor.RED));
+            return;
+        }
+        player.sendMessage(Component.text("This chest is locked to the ", NamedTextColor.RED)
+                .append(ownerTeam.displayComponent())
+                .append(Component.text(" team until their bed is destroyed.", NamedTextColor.RED)));
+    }
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {

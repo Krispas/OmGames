@@ -249,6 +249,41 @@ public class GameSession extends GameSessionMatchFlowSupport {
         return assignments.containsKey(playerId);
     }
 
+    public TeamColor resolveBaseOwner(Block block) {
+        if (block == null) {
+            return null;
+        }
+        return resolveBaseOwner(new BlockPoint(block.getX(), block.getY(), block.getZ()));
+    }
+
+    public TeamColor resolveBaseOwner(BlockPoint point) {
+        if (point == null) {
+            return null;
+        }
+        int baseRadius = arena.getBaseRadius();
+        if (baseRadius <= 0) {
+            return null;
+        }
+        TeamColor owner = null;
+        int bestDistanceSquared = Integer.MAX_VALUE;
+        for (Map.Entry<TeamColor, BlockPoint> entry : baseCenters.entrySet()) {
+            TeamColor team = entry.getKey();
+            BlockPoint center = entry.getValue();
+            if (team == null || center == null || !teamsInMatch.contains(team)) {
+                continue;
+            }
+            int dx = point.x() - center.x();
+            int dz = point.z() - center.z();
+            int distanceSquared = dx * dx + dz * dz;
+            if (distanceSquared > baseRadius * baseRadius || distanceSquared >= bestDistanceSquared) {
+                continue;
+            }
+            owner = team;
+            bestDistanceSquared = distanceSquared;
+        }
+        return owner;
+    }
+
     public int getKillCount(UUID playerId) {
         return killCounts.getOrDefault(playerId, 0);
     }
@@ -749,13 +784,89 @@ public class GameSession extends GameSessionMatchFlowSupport {
     }
 
     public void openFakeEnderChest(Player player) {
-        Inventory inventory = getFakeEnderChest(player);
-        player.openInventory(inventory);
+        openFakeEnderChest(player, player != null ? player.getUniqueId() : null);
     }
 
     public Inventory getFakeEnderChest(Player player) {
-        return fakeEnderChests.computeIfAbsent(player.getUniqueId(),
-                id -> Bukkit.createInventory(player, 27, Component.text("Ender Chest")));
+        return player == null ? null : getFakeEnderChest(player.getUniqueId());
+    }
+
+    public void openFakeEnderChest(Player viewer, UUID ownerId) {
+        if (viewer == null) {
+            return;
+        }
+        Inventory inventory = getFakeEnderChest(ownerId != null ? ownerId : viewer.getUniqueId());
+        if (inventory != null) {
+            viewer.openInventory(inventory);
+        }
+    }
+
+    public Inventory getFakeEnderChest(UUID ownerId) {
+        if (ownerId == null) {
+            return null;
+        }
+        return fakeEnderChests.computeIfAbsent(ownerId,
+                id -> Bukkit.createInventory(null, 27, Component.text("Ender Chest")));
+    }
+
+    public boolean canAccessBaseChest(Player player, Block block) {
+        if (player == null || block == null) {
+            return false;
+        }
+        TeamColor ownerTeam = resolveBaseOwner(block);
+        if (ownerTeam == null) {
+            return true;
+        }
+        TeamColor playerTeam = getTeam(player.getUniqueId());
+        if (playerTeam == ownerTeam || getBedState(ownerTeam) == BedState.DESTROYED) {
+            return true;
+        }
+        return customItemRuntime.hasChestLockpickAccess(player.getUniqueId(), ownerTeam);
+    }
+
+    public boolean beginChestLockpick(Player player, Block chestBlock) {
+        return customItemRuntime.beginChestLockpick(player, resolveBaseOwner(chestBlock), chestBlock, plugin);
+    }
+
+    public boolean beginEnderChestLockpick(Player player, Block chestBlock, UUID targetPlayerId) {
+        return customItemRuntime.beginEnderChestLockpick(player,
+                resolveBaseOwner(chestBlock),
+                chestBlock,
+                targetPlayerId,
+                plugin);
+    }
+
+    public UUID resolveAccessibleEnderChestOwner(Player player, Block chestBlock, boolean allowLockpickAccess) {
+        if (player == null) {
+            return null;
+        }
+        TeamColor ownerTeam = resolveBaseOwner(chestBlock);
+        UUID overrideOwner = allowLockpickAccess && ownerTeam != null
+                ? customItemRuntime.resolveEnderChestLockpickTarget(player.getUniqueId(), ownerTeam)
+                : null;
+        return overrideOwner != null ? overrideOwner : player.getUniqueId();
+    }
+
+    public UUID resolveAccessibleEnderChestOwner(Player player, Block chestBlock) {
+        return resolveAccessibleEnderChestOwner(player, chestBlock, true);
+    }
+
+    public Inventory getAccessibleEnderChest(Player player, Block chestBlock, boolean allowLockpickAccess) {
+        UUID ownerId = resolveAccessibleEnderChestOwner(player, chestBlock, allowLockpickAccess);
+        return ownerId == null ? null : getFakeEnderChest(ownerId);
+    }
+
+    public Inventory getAccessibleEnderChest(Player player, Block chestBlock) {
+        return getAccessibleEnderChest(player, chestBlock, true);
+    }
+
+    public void openAccessibleEnderChest(Player player, Block chestBlock, boolean allowLockpickAccess) {
+        UUID ownerId = resolveAccessibleEnderChestOwner(player, chestBlock, allowLockpickAccess);
+        openFakeEnderChest(player, ownerId);
+    }
+
+    public void openAccessibleEnderChest(Player player, Block chestBlock) {
+        openAccessibleEnderChest(player, chestBlock, true);
     }
 
     public void openShop(Player player, ShopType type) {

@@ -16,6 +16,7 @@ import krispasi.omGames.bedwars.model.BlockPoint;
 import krispasi.omGames.bedwars.stats.BedwarsStatsService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -30,6 +31,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Lobby parkour runtime and config service.
@@ -43,6 +45,7 @@ public class BedwarsLobbyParkour {
     private static final String CONFIG_CHECKPOINTS = "checkpoints";
     private static final long PLATE_COOLDOWN_MILLIS = 800L;
     private static final long CONTROL_ITEM_PLATE_LOCK_MILLIS = 3_000L;
+    private static final long ACTION_BAR_UPDATE_TICKS = 2L;
     private static final int CONTROL_SLOT_DIRECTION = 6;
     private static final int CONTROL_SLOT_EXIT = 7;
     private static final int CONTROL_SLOT_CHECKPOINT = 8;
@@ -55,6 +58,7 @@ public class BedwarsLobbyParkour {
     private final Map<UUID, RunState> runs = new HashMap<>();
     private final Map<UUID, Map<BlockPoint, Long>> plateTriggerCooldowns = new HashMap<>();
     private final Map<UUID, Long> plateLockUntil = new HashMap<>();
+    private BukkitTask actionBarTask;
 
     private String worldName;
     private BlockPoint startPlate;
@@ -64,6 +68,7 @@ public class BedwarsLobbyParkour {
     public BedwarsLobbyParkour(BedwarsManager bedwarsManager) {
         this.bedwarsManager = bedwarsManager;
         this.controlItemKey = new NamespacedKey(bedwarsManager.getPlugin(), "bw_lobby_parkour_control");
+        startActionBarTask();
     }
 
     public void load(File configFile) {
@@ -103,6 +108,10 @@ public class BedwarsLobbyParkour {
         runs.clear();
         plateTriggerCooldowns.clear();
         plateLockUntil.clear();
+        if (actionBarTask != null) {
+            actionBarTask.cancel();
+            actionBarTask = null;
+        }
     }
 
     public List<ParkourTopEntry> getTopEntries(int limit) {
@@ -189,8 +198,11 @@ public class BedwarsLobbyParkour {
             return true;
         }
         if (CONTROL_CHECKPOINT.equals(control)) {
-            applyPlateLock(player.getUniqueId());
-            teleportToLastCheckpoint(player, run);
+            if (run.lastCheckpointIndex == null) {
+                restartRun(player, run);
+            } else {
+                teleportToLastCheckpoint(player, run);
+            }
             return true;
         }
         return true;
@@ -284,6 +296,7 @@ public class BedwarsLobbyParkour {
             return;
         }
         restoreControlSlots(player, run);
+        clearRunStatusActionBar(player);
     }
 
     private void startRun(Player player) {
@@ -306,7 +319,8 @@ public class BedwarsLobbyParkour {
         updateDirectionTarget(player, run);
         player.sendMessage(Component.text("Parkour started! Reach the end plate.", NamedTextColor.AQUA));
         sendNextObjectiveHint(player, run);
-        player.sendMessage(Component.text("Gold ingot: end run and return to start. Iron ingot: teleport to last checkpoint.",
+        player.sendMessage(Component.text(
+                "Gold ingot: end run and return to start. Iron ingot: last checkpoint, or instant restart until you reach one.",
                 NamedTextColor.GRAY));
     }
 
@@ -315,6 +329,7 @@ public class BedwarsLobbyParkour {
         plateTriggerCooldowns.remove(player.getUniqueId());
         plateLockUntil.remove(player.getUniqueId());
         restoreControlSlots(player, run);
+        clearRunStatusActionBar(player);
         long elapsed = Math.max(0L, System.currentTimeMillis() - run.startedAt);
         bedwarsManager.getStatsService().recordParkourFinish(player.getUniqueId(), elapsed, run.checkpointUses);
         player.sendMessage(Component.text("Parkour finished in " + formatElapsed(elapsed) + ".", NamedTextColor.GOLD));
@@ -328,6 +343,7 @@ public class BedwarsLobbyParkour {
             plateLockUntil.remove(player.getUniqueId());
         }
         restoreControlSlots(player, run);
+        clearRunStatusActionBar(player);
         if (teleportToStart && startPlate != null) {
             applyPlateLock(player.getUniqueId());
             Location start = toTeleportLocation(player, startPlate);
@@ -346,6 +362,7 @@ public class BedwarsLobbyParkour {
         if (target == null) {
             return;
         }
+        markPlateTriggered(player.getUniqueId(), run.lastCheckpoint);
         run.checkpointUses++;
         player.teleport(target);
         updateDirectionTarget(player, run);
@@ -353,6 +370,26 @@ public class BedwarsLobbyParkour {
         player.sendMessage(Component.text(
                 "Teleported to " + run.lastCheckpointLabel + ". Checkpoints used: " + run.checkpointUses + ".",
                 NamedTextColor.YELLOW));
+    }
+
+    private void restartRun(Player player, RunState run) {
+        if (player == null || run == null || startPlate == null) {
+            return;
+        }
+        Location start = toTeleportLocation(player, startPlate);
+        if (start == null) {
+            return;
+        }
+        run.startedAt = System.currentTimeMillis();
+        run.lastCheckpoint = startPlate;
+        run.lastCheckpointLabel = "start";
+        run.lastCheckpointIndex = null;
+        run.checkpointUses = 0;
+        markPlateTriggered(player.getUniqueId(), startPlate);
+        player.teleport(start);
+        updateDirectionTarget(player, run);
+        sendNextObjectiveHint(player, run);
+        player.sendMessage(Component.text("Run restarted.", NamedTextColor.YELLOW));
     }
 
     private Location toTeleportLocation(Player player, BlockPoint point) {
@@ -403,6 +440,8 @@ public class BedwarsLobbyParkour {
             List<Component> lore = new ArrayList<>();
             lore.add(Component.text("Right-click to teleport", NamedTextColor.GRAY));
             lore.add(Component.text("to your last checkpoint.", NamedTextColor.GRAY));
+            lore.add(Component.text("If you have none yet,", NamedTextColor.DARK_GRAY));
+            lore.add(Component.text("it restarts your run.", NamedTextColor.DARK_GRAY));
             meta.lore(lore);
             tagControl(meta, CONTROL_CHECKPOINT);
             item.setItemMeta(meta);
@@ -509,19 +548,7 @@ public class BedwarsLobbyParkour {
     }
 
     private void sendNextObjectiveHint(Player player, RunState run) {
-        if (player == null || run == null) {
-            return;
-        }
-        ParkourObjective objective = resolveNextObjective(run);
-        if (objective == null) {
-            return;
-        }
-        Location target = toCompassLocation(player, objective.point());
-        if (target == null) {
-            return;
-        }
-        int blocks = (int) Math.round(player.getLocation().distance(target));
-        player.sendActionBar(Component.text("Next: " + objective.label() + " (" + blocks + "m)", NamedTextColor.AQUA));
+        sendRunStatusActionBar(player, run);
     }
 
     private ParkourObjective resolveNextObjective(RunState run) {
@@ -727,6 +754,61 @@ public class BedwarsLobbyParkour {
             return false;
         }
         return true;
+    }
+
+    private void startActionBarTask() {
+        if (actionBarTask != null) {
+            return;
+        }
+        actionBarTask = bedwarsManager.getPlugin().getServer().getScheduler().runTaskTimer(
+                bedwarsManager.getPlugin(),
+                this::tickRunActionBars,
+                ACTION_BAR_UPDATE_TICKS,
+                ACTION_BAR_UPDATE_TICKS);
+    }
+
+    private void tickRunActionBars() {
+        if (runs.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<UUID, RunState> entry : runs.entrySet()) {
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null || !player.isOnline()) {
+                continue;
+            }
+            if (!isPlayerInLobbyParkourContext(player) || !matchesParkourWorld(player.getWorld().getName())) {
+                continue;
+            }
+            sendRunStatusActionBar(player, entry.getValue());
+        }
+    }
+
+    private void sendRunStatusActionBar(Player player, RunState run) {
+        if (player == null || run == null) {
+            return;
+        }
+        Component message = Component.text("Time: ", NamedTextColor.GRAY)
+                .append(Component.text(formatElapsed(Math.max(0L, System.currentTimeMillis() - run.startedAt)),
+                        NamedTextColor.GOLD));
+        ParkourObjective objective = resolveNextObjective(run);
+        if (objective != null) {
+            Location target = toCompassLocation(player, objective.point());
+            if (target != null) {
+                int blocks = (int) Math.round(player.getLocation().distance(target));
+                message = message.append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                        .append(Component.text("Next: ", NamedTextColor.GRAY))
+                        .append(Component.text(objective.label(), NamedTextColor.AQUA))
+                        .append(Component.text(" (" + blocks + "m)", NamedTextColor.YELLOW));
+            }
+        }
+        player.sendActionBar(message);
+    }
+
+    private void clearRunStatusActionBar(Player player) {
+        if (player == null) {
+            return;
+        }
+        player.sendActionBar(Component.empty());
     }
 
     private String formatElapsed(long elapsedMillis) {

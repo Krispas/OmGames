@@ -21,6 +21,7 @@ shop:
         elytra: 23
         unstable_teleportation_device: 24
         gigantify_grenade: 29
+        lockpick: 30
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -241,6 +242,17 @@ shop:
           - "Throws a grenade that"
           - "makes the target grow."
         custom-item: gigantify_grenade
+      lockpick:
+        material: TRIPWIRE_HOOK
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Lockpick"
+        lore:
+          - "Unlock enemy team chests."
+          - "Can target ender chests too."
+        custom-item: lockpick
       thorns_upgrade:
         material: CACTUS
         amount: 1

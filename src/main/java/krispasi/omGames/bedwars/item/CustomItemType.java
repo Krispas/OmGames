@@ -24,6 +24,7 @@ public enum CustomItemType {
     GIGANTIFY_GRENADE(1.15, 0.0f, false, 0, 1, 0.0, 0.0, 6, -1.0, -1.0, -1.0, 0, 0),
     MIRACLE_OF_THE_STARS(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     TOWER_CHEST(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
+    LOCKPICK(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     UNSTABLE_TELEPORTATION_DEVICE(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 30);
 
     private final double defaultVelocity;

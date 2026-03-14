@@ -13,6 +13,7 @@ import java.util.logging.Level;
 import krispasi.omGames.bedwars.item.CustomItemData;
 import krispasi.omGames.bedwars.item.CustomItemDefinition;
 import krispasi.omGames.bedwars.model.Arena;
+import krispasi.omGames.bedwars.model.BedState;
 import krispasi.omGames.bedwars.model.BlockPoint;
 import krispasi.omGames.bedwars.model.TeamColor;
 import net.kyori.adventure.text.Component;
@@ -62,6 +63,11 @@ final class GameSessionCustomItemRuntime {
     private static final int ELYTRA_STRIKE_REGEN_AMPLIFIER = 9;
     private static final long MIRACLE_OF_THE_STARS_DELAY_TICKS = 5L * 20L;
     private static final long TOWER_CHEST_TEMP_CHEST_TICKS = 8L;
+    private static final long LOCKPICK_CHEST_DELAY_TICKS = 10L * 20L;
+    private static final long LOCKPICK_ENDER_CHEST_DELAY_TICKS = 20L * 20L;
+    private static final long LOCKPICK_ACCESS_DURATION_MILLIS = 60_000L;
+    private static final double LOCKPICK_DISPLAY_Y_OFFSET = 1.2;
+    private static final String LOCKPICK_DISPLAY_TAG = "bw_lockpick_display";
     private static final NamespacedKey ABYSSAL_RIFT_ITEM_MODEL = new NamespacedKey("om", "rift1");
     private static final String[][] TOWER_CHEST_LAYERS = new String[][]{
             {
@@ -133,6 +139,9 @@ final class GameSessionCustomItemRuntime {
     private final Map<UUID, UUID> abyssalRiftEntityLinks = new HashMap<>();
     private final Map<UUID, ElytraStrikeState> activeElytraStrikes = new HashMap<>();
     private final Map<UUID, Map<String, Long>> customItemCooldownEnds = new HashMap<>();
+    private final Map<LockpickAccessKey, Long> chestLockpickAccessEnds = new HashMap<>();
+    private final Map<LockpickAccessKey, EnderChestLockpickAccess> enderChestLockpickAccesses = new HashMap<>();
+    private final Map<LockpickAccessKey, LockpickCountdownState> lockpickCountdowns = new HashMap<>();
 
     GameSessionCustomItemRuntime(GameSession session,
                                  Arena arena,
@@ -153,7 +162,244 @@ final class GameSessionCustomItemRuntime {
     void reset() {
         clearAllElytraStrikes(false);
         clearAbyssalRifts();
+        clearLockpickState();
         customItemCooldownEnds.clear();
+    }
+
+    boolean hasChestLockpickAccess(UUID playerId, TeamColor baseTeam) {
+        if (playerId == null || baseTeam == null) {
+            return false;
+        }
+        LockpickAccessKey key = new LockpickAccessKey(playerId, baseTeam);
+        Long expiresAt = chestLockpickAccessEnds.get(key);
+        if (expiresAt == null) {
+            return false;
+        }
+        if (expiresAt <= System.currentTimeMillis()) {
+            chestLockpickAccessEnds.remove(key);
+            return false;
+        }
+        return true;
+    }
+
+    UUID resolveEnderChestLockpickTarget(UUID playerId, TeamColor baseTeam) {
+        if (playerId == null || baseTeam == null) {
+            return null;
+        }
+        LockpickAccessKey key = new LockpickAccessKey(playerId, baseTeam);
+        EnderChestLockpickAccess access = enderChestLockpickAccesses.get(key);
+        if (access == null) {
+            return null;
+        }
+        if (access.expiresAt() <= System.currentTimeMillis()) {
+            enderChestLockpickAccesses.remove(key);
+            return null;
+        }
+        if (assignments.get(access.targetPlayerId()) != baseTeam) {
+            enderChestLockpickAccesses.remove(key);
+            return null;
+        }
+        return access.targetPlayerId();
+    }
+
+    boolean beginChestLockpick(Player player, TeamColor ownerTeam, Block chestBlock, JavaPlugin plugin) {
+        if (player == null || ownerTeam == null || chestBlock == null || plugin == null
+                || !session.isRunning() || !session.isParticipant(player.getUniqueId())) {
+            return false;
+        }
+        TeamColor playerTeam = assignments.get(player.getUniqueId());
+        if (playerTeam == ownerTeam) {
+            player.sendMessage(Component.text("Your team already owns this chest.", NamedTextColor.RED));
+            return false;
+        }
+        if (session.getBedState(ownerTeam) == BedState.DESTROYED) {
+            player.sendMessage(Component.text("That chest is already open to everyone.", NamedTextColor.RED));
+            return false;
+        }
+        LockpickAccessKey key = new LockpickAccessKey(player.getUniqueId(), ownerTeam);
+        if (lockpickCountdowns.containsKey(key)) {
+            player.sendMessage(Component.text("You are already picking this team's chest.", NamedTextColor.RED));
+            return false;
+        }
+        return startLockpickCountdown(player,
+                chestBlock,
+                key,
+                "Chest unlock",
+                (int) (LOCKPICK_CHEST_DELAY_TICKS / 20L),
+                plugin,
+                () -> {
+                    chestLockpickAccessEnds.put(key, System.currentTimeMillis() + LOCKPICK_ACCESS_DURATION_MILLIS);
+                    player.sendMessage(Component.text("You can open the ", NamedTextColor.GREEN)
+                            .append(ownerTeam.displayComponent())
+                            .append(Component.text(" team's chests for 60s.", NamedTextColor.GREEN)));
+                });
+    }
+
+    boolean beginEnderChestLockpick(Player player,
+                                    TeamColor ownerTeam,
+                                    Block chestBlock,
+                                    UUID targetPlayerId,
+                                    JavaPlugin plugin) {
+        if (player == null || ownerTeam == null || chestBlock == null || targetPlayerId == null || plugin == null
+                || !session.isRunning() || !session.isParticipant(player.getUniqueId())) {
+            return false;
+        }
+        TeamColor playerTeam = assignments.get(player.getUniqueId());
+        if (playerTeam == ownerTeam) {
+            player.sendMessage(Component.text("Your own team's ender chest already opens your storage.", NamedTextColor.RED));
+            return false;
+        }
+        if (assignments.get(targetPlayerId) != ownerTeam) {
+            player.sendMessage(Component.text("That player is no longer on this team.", NamedTextColor.RED));
+            return false;
+        }
+        LockpickAccessKey key = new LockpickAccessKey(player.getUniqueId(), ownerTeam);
+        if (lockpickCountdowns.containsKey(key)) {
+            player.sendMessage(Component.text("You are already picking this team's ender chest.", NamedTextColor.RED));
+            return false;
+        }
+        String targetName = resolveTargetPlayerName(targetPlayerId);
+        return startLockpickCountdown(player,
+                chestBlock,
+                key,
+                "Ender chest access",
+                (int) (LOCKPICK_ENDER_CHEST_DELAY_TICKS / 20L),
+                plugin,
+                () -> {
+                    enderChestLockpickAccesses.put(key,
+                            new EnderChestLockpickAccess(targetPlayerId,
+                                    System.currentTimeMillis() + LOCKPICK_ACCESS_DURATION_MILLIS));
+                    player.sendMessage(Component.text("You can open ", NamedTextColor.GREEN)
+                            .append(Component.text(targetName, NamedTextColor.YELLOW))
+                            .append(Component.text("'s ender chest for 60s.", NamedTextColor.GREEN)));
+                });
+    }
+
+    private boolean startLockpickCountdown(Player player,
+                                           Block chestBlock,
+                                           LockpickAccessKey key,
+                                           String label,
+                                           int countdownSeconds,
+                                           JavaPlugin plugin,
+                                           Runnable onComplete) {
+        if (player == null || chestBlock == null || key == null || plugin == null || countdownSeconds <= 0) {
+            return false;
+        }
+        ArmorStand display = spawnLockpickDisplay(chestBlock.getLocation().add(0.5, LOCKPICK_DISPLAY_Y_OFFSET, 0.5));
+        if (display == null) {
+            return false;
+        }
+        BukkitTask task = new BukkitRunnable() {
+            private int remaining = countdownSeconds;
+
+            @Override
+            public void run() {
+                if (!session.isRunning() || !player.isOnline() || !isValidLockpickTargetBlock(chestBlock)) {
+                    clearLockpickCountdown(key);
+                    cancel();
+                    return;
+                }
+                ArmorStand currentDisplay = getLockpickDisplay(display.getUniqueId());
+                if (currentDisplay == null) {
+                    clearLockpickCountdown(key);
+                    cancel();
+                    return;
+                }
+                currentDisplay.teleport(chestBlock.getLocation().add(0.5, LOCKPICK_DISPLAY_Y_OFFSET, 0.5));
+                currentDisplay.customName(Component.text(label + ": " + remaining + "s", NamedTextColor.GOLD));
+                if (remaining <= 1) {
+                    currentDisplay.remove();
+                    lockpickCountdowns.remove(key);
+                    onComplete.run();
+                    cancel();
+                    return;
+                }
+                remaining--;
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
+        sessionTasks.add(task);
+        lockpickCountdowns.put(key, new LockpickCountdownState(display.getUniqueId(), task));
+        return true;
+    }
+
+    private void clearLockpickState() {
+        for (LockpickCountdownState countdown : lockpickCountdowns.values()) {
+            if (countdown.task() != null) {
+                countdown.task().cancel();
+            }
+            removeLockpickDisplay(countdown.displayId());
+        }
+        lockpickCountdowns.clear();
+        chestLockpickAccessEnds.clear();
+        enderChestLockpickAccesses.clear();
+    }
+
+    private void clearLockpickCountdown(LockpickAccessKey key) {
+        if (key == null) {
+            return;
+        }
+        LockpickCountdownState countdown = lockpickCountdowns.remove(key);
+        if (countdown == null) {
+            return;
+        }
+        if (countdown.task() != null) {
+            countdown.task().cancel();
+        }
+        removeLockpickDisplay(countdown.displayId());
+    }
+
+    private ArmorStand spawnLockpickDisplay(Location location) {
+        if (location == null || location.getWorld() == null) {
+            return null;
+        }
+        return location.getWorld().spawn(location, ArmorStand.class, stand -> {
+            stand.setInvisible(true);
+            stand.setMarker(true);
+            stand.setSmall(true);
+            stand.setGravity(false);
+            stand.setInvulnerable(true);
+            stand.setCollidable(false);
+            stand.setCustomNameVisible(true);
+            stand.addScoreboardTag(LOCKPICK_DISPLAY_TAG);
+        });
+    }
+
+    private ArmorStand getLockpickDisplay(UUID displayId) {
+        if (displayId == null) {
+            return null;
+        }
+        Entity entity = Bukkit.getEntity(displayId);
+        return entity instanceof ArmorStand stand ? stand : null;
+    }
+
+    private void removeLockpickDisplay(UUID displayId) {
+        ArmorStand display = getLockpickDisplay(displayId);
+        if (display != null) {
+            display.remove();
+        }
+    }
+
+    private boolean isValidLockpickTargetBlock(Block block) {
+        if (block == null || block.getWorld() == null) {
+            return false;
+        }
+        Material type = block.getType();
+        return type == Material.CHEST || type == Material.TRAPPED_CHEST || type == Material.ENDER_CHEST;
+    }
+
+    private String resolveTargetPlayerName(UUID targetPlayerId) {
+        if (targetPlayerId == null) {
+            return "Unknown";
+        }
+        Player online = Bukkit.getPlayer(targetPlayerId);
+        if (online != null) {
+            return online.getName();
+        }
+        String offlineName = Bukkit.getOfflinePlayer(targetPlayerId).getName();
+        if (offlineName != null && !offlineName.isBlank()) {
+            return offlineName;
+        }
+        return targetPlayerId.toString().substring(0, 8);
     }
 
     boolean activateElytraStrike(Player player, CustomItemDefinition custom, JavaPlugin plugin) {
@@ -1287,5 +1533,14 @@ final class GameSessionCustomItemRuntime {
     private record ElytraStrikeState(ItemStack previousChestplate,
                                      boolean previousAllowFlight,
                                      boolean previousFlying) {
+    }
+
+    private record LockpickAccessKey(UUID playerId, TeamColor baseTeam) {
+    }
+
+    private record LockpickCountdownState(UUID displayId, BukkitTask task) {
+    }
+
+    private record EnderChestLockpickAccess(UUID targetPlayerId, long expiresAt) {
     }
 }

@@ -110,3 +110,6 @@ custom-items:
   tower_chest:
     type: TOWER_CHEST
     material: CHEST
+  lockpick:
+    type: LOCKPICK
+    material: TRIPWIRE_HOOK
