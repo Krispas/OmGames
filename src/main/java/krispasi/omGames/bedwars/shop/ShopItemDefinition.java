@@ -150,14 +150,18 @@ public class ShopItemDefinition {
     }
 
     public ItemStack createDisplayItem(TeamColor team) {
-        return createItem(team, true);
+        return createDisplayItem(team, cost);
+    }
+
+    public ItemStack createDisplayItem(TeamColor team, ShopCost displayCost) {
+        return createItem(team, true, displayCost);
     }
 
     public ItemStack createPurchaseItem(TeamColor team) {
-        return createItem(team, false);
+        return createItem(team, false, cost);
     }
 
-    private ItemStack createItem(TeamColor team, boolean includeCost) {
+    private ItemStack createItem(TeamColor team, boolean includeCost, ShopCost displayCost) {
         Material resolved = resolveMaterial(team);
         ItemStack stack = new ItemStack(resolved, amount);
         ItemMeta meta = stack.getItemMeta();
@@ -202,8 +206,8 @@ public class ShopItemDefinition {
         if (includeCost && disabledAfterSuddenDeath) {
             lines.add(Component.text("Disabled after sudden death", NamedTextColor.RED));
         }
-        if (includeCost && cost != null && cost.isValid()) {
-            Component costLine = formatCost();
+        if (includeCost && displayCost != null && displayCost.isValid()) {
+            Component costLine = formatCost(displayCost);
             if (costLine != null) {
                 lines.add(costLine);
             }
@@ -239,24 +243,24 @@ public class ShopItemDefinition {
         return material;
     }
 
-    private Component formatCost() {
-        if (cost == null || !cost.isValid()) {
+    private Component formatCost(ShopCost displayCost) {
+        if (displayCost == null || !displayCost.isValid()) {
             return null;
         }
-        NamedTextColor color = switch (cost.material()) {
+        NamedTextColor color = switch (displayCost.material()) {
             case IRON_INGOT -> NamedTextColor.GRAY;
             case GOLD_INGOT -> NamedTextColor.GOLD;
             case DIAMOND -> NamedTextColor.AQUA;
             case EMERALD -> NamedTextColor.GREEN;
             default -> NamedTextColor.GRAY;
         };
-        String name = switch (cost.material()) {
+        String name = switch (displayCost.material()) {
             case IRON_INGOT -> "Iron";
             case GOLD_INGOT -> "Gold";
             case DIAMOND -> "Diamond";
             case EMERALD -> "Emerald";
-            default -> cost.material().name();
+            default -> displayCost.material().name();
         };
-        return Component.text("Cost: " + cost.amount() + " " + name, color);
+        return Component.text("Cost: " + displayCost.amount() + " " + name, color);
     }
 }

@@ -297,6 +297,14 @@ Supported event ids:
 - `in-this-economy`
 - `april-fools`
 
+`moon-big` runtime note:
+- use the gravity attribute for the low-gravity effect
+- only apply `Slow Falling I`
+
+`in-this-economy` runtime note:
+- `fireball`, `bed_bug`, and `dream_defender` stay purchasable at `4x` their normal price
+- diamond and emerald map generators should drop gold instead, keeping their slower generator cadence
+
 Arena timing fields:
 - `event-times.tier-2`
 - `event-times.tier-3`

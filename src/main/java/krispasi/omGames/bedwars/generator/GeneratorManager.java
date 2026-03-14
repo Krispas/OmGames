@@ -140,15 +140,16 @@ public class GeneratorManager {
             if (world == null) {
                 return;
             }
-            int spawnAmount = session.adjustGeneratedResourceAmount(material, amount);
+            Material dropMaterial = session.adjustGeneratedResourceMaterial(null, material);
+            int spawnAmount = session.adjustGeneratedResourceAmount(null, dropMaterial, amount);
             if (spawnAmount <= 0) {
                 return;
             }
             Location dropLocation = point.toLocation(world).add(0, 0.1, 0);
-            if (countNearbyItems(dropLocation, material, 1.5) >= cap) {
+            if (countNearbyItems(dropLocation, dropMaterial, 1.5) >= cap) {
                 return;
             }
-            Item item = world.dropItem(dropLocation, new ItemStack(material, spawnAmount));
+            Item item = world.dropItem(dropLocation, new ItemStack(dropMaterial, spawnAmount));
             item.setVelocity(new Vector(0, 0, 0));
             trackedDrops.put(item.getUniqueId(), System.currentTimeMillis());
         }, 0L, intervalTicks);
@@ -161,21 +162,22 @@ public class GeneratorManager {
             if (world == null) {
                 return;
             }
-            int spawnAmount = session.adjustGeneratedResourceAmount(material, amount);
+            Material dropMaterial = session.adjustGeneratedResourceMaterial(generator.type(), material);
+            int spawnAmount = session.adjustGeneratedResourceAmount(generator.type(), dropMaterial, amount);
             if (spawnAmount <= 0) {
                 return;
             }
             Location dropLocation = generator.location().toLocation(world).add(0, 0.1, 0);
             List<Player> recipients = findForgeRecipients(generator, dropLocation);
             if (!recipients.isEmpty()) {
-                giveToRecipients(recipients, material, spawnAmount);
-                dropVisualItem(world, dropLocation, new ItemStack(material, spawnAmount));
+                giveToRecipients(recipients, dropMaterial, spawnAmount);
+                dropVisualItem(world, dropLocation, new ItemStack(dropMaterial, spawnAmount));
                 return;
             }
-            if (countNearbyItems(dropLocation, material, 1.5) >= cap) {
+            if (countNearbyItems(dropLocation, dropMaterial, 1.5) >= cap) {
                 return;
             }
-            dropTrackedItem(world, dropLocation, new ItemStack(material, spawnAmount));
+            dropTrackedItem(world, dropLocation, new ItemStack(dropMaterial, spawnAmount));
         }, 0L, intervalTicks);
         tasks.add(task);
     }
@@ -188,15 +190,16 @@ public class GeneratorManager {
                 return;
             }
             updateNextDrop(generator.key());
-            int spawnAmount = session.adjustGeneratedResourceAmount(material, amount);
+            Material dropMaterial = session.adjustGeneratedResourceMaterial(generator.type(), material);
+            int spawnAmount = session.adjustGeneratedResourceAmount(generator.type(), dropMaterial, amount);
             if (spawnAmount <= 0) {
                 return;
             }
             Location dropLocation = generator.location().toLocation(world).add(0, 0.1, 0);
-            if (countNearbyItems(dropLocation, material, 1.5) >= cap) {
+            if (countNearbyItems(dropLocation, dropMaterial, 1.5) >= cap) {
                 return;
             }
-            Item item = world.dropItem(dropLocation, new ItemStack(material, spawnAmount));
+            Item item = world.dropItem(dropLocation, new ItemStack(dropMaterial, spawnAmount));
             item.setVelocity(new Vector(0, 0, 0));
             trackedDrops.put(item.getUniqueId(), System.currentTimeMillis());
         }, 0L, intervalTicks);

@@ -810,8 +810,28 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
     }
 
     protected Object resolveAttribute(Class<?> attributeClass, String name) {
-        if (attributeClass == null || name == null) {
+        if (attributeClass == null || name == null || name.isBlank()) {
             return null;
+        }
+        String normalized = name.trim().toLowerCase(Locale.ROOT);
+        if (normalized.contains(":")) {
+            NamespacedKey key = NamespacedKey.fromString(normalized);
+            if (key != null) {
+                Attribute attribute = Registry.ATTRIBUTE.get(key);
+                if (attribute != null && attributeClass.isInstance(attribute)) {
+                    return attribute;
+                }
+            }
+        }
+        String keyName = normalized;
+        if (keyName.startsWith("generic_")) {
+            keyName = keyName.substring("generic_".length());
+        } else if (keyName.startsWith("player_")) {
+            keyName = keyName.substring("player_".length());
+        }
+        Attribute attribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(keyName));
+        if (attribute != null && attributeClass.isInstance(attribute)) {
+            return attribute;
         }
         try {
             return Enum.valueOf((Class) attributeClass, name);

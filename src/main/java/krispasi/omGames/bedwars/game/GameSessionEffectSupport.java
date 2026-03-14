@@ -79,11 +79,13 @@ abstract class GameSessionEffectSupport {
             Title.Times.times(TITLE_FADE_IN, TITLE_STAY, TITLE_FADE_OUT);
     protected static final Title.Times ALERT_TITLE_TIMES =
             Title.Times.times(TITLE_FADE_IN, ALERT_TITLE_STAY, TITLE_FADE_OUT);
-    protected static final Set<String> IN_THIS_ECONOMY_BANNED_ITEMS = Set.of(
+    protected static final Set<String> IN_THIS_ECONOMY_BANNED_ITEMS = Set.of();
+    protected static final Set<String> IN_THIS_ECONOMY_PRICE_MULTIPLIED_ITEMS = Set.of(
             "fireball",
             "bed_bug",
             "dream_defender"
     );
+    protected static final int IN_THIS_ECONOMY_PRICE_MULTIPLIER = 4;
     protected static final List<TeamUpgradeType> BENEVOLENT_UPGRADE_POOL = List.of(
             TeamUpgradeType.PROTECTION,
             TeamUpgradeType.SHARPNESS,
@@ -1069,15 +1071,10 @@ abstract class GameSessionEffectSupport {
                     "BLOCK_INTERACTION_RANGE",
                     "PLAYER_BLOCK_INTERACTION_RANGE");
             case MOON_BIG -> {
-                boolean jumpApplied = setAttributeToDefaultMultiplier(player, MOON_BIG_JUMP_MULTIPLIER,
-                        "JUMP_STRENGTH",
-                        "GENERIC_JUMP_STRENGTH");
-                if (!jumpApplied) {
-                    setAttributeToDefaultMultiplier(player, 0.6, "GRAVITY", "GENERIC_GRAVITY");
-                }
+                setAttributeToDefaultMultiplier(player, 0.6, "GRAVITY", "GENERIC_GRAVITY");
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,
                         Integer.MAX_VALUE,
-                        1,
+                        0,
                         true,
                         false,
                         true));

@@ -534,8 +534,8 @@ arenas:
       base_gen_pink: 848 67 -938
     Shops:
       red:
-        main: 907 67 -1068 SOUTH
-        upgrades: 900 67 -1068 EAST
+        main: 914 67 -1068 SOUTH
+        upgrades: 900 67 -1068 WEST
       blue:
         main: 990 67 -1068 WEST
         upgrades: 976 67 -1068 EAST

@@ -91,9 +91,42 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         return configuredDamage > 0.0 ? configuredDamage : 1.0;
     }
 
+    public ShopCost getEffectiveShopCost(ShopItemDefinition item) {
+        if (item == null) {
+            return null;
+        }
+        ShopCost cost = item.getCost();
+        if (cost == null || !cost.isValid()) {
+            return cost;
+        }
+        if (activeMatchEvent == BedwarsMatchEventType.IN_THIS_ECONOMY
+                && IN_THIS_ECONOMY_PRICE_MULTIPLIED_ITEMS.contains(item.getId())) {
+            return new ShopCost(cost.material(), cost.amount() * IN_THIS_ECONOMY_PRICE_MULTIPLIER);
+        }
+        return cost;
+    }
+
+    public Material adjustGeneratedResourceMaterial(GeneratorType generatorType, Material baseMaterial) {
+        if (baseMaterial == null || activeMatchEvent != BedwarsMatchEventType.IN_THIS_ECONOMY) {
+            return baseMaterial;
+        }
+        if (generatorType == GeneratorType.DIAMOND || generatorType == GeneratorType.EMERALD) {
+            return Material.GOLD_INGOT;
+        }
+        return baseMaterial;
+    }
+
     public int adjustGeneratedResourceAmount(Material material, int baseAmount) {
+        return adjustGeneratedResourceAmount(null, material, baseAmount);
+    }
+
+    public int adjustGeneratedResourceAmount(GeneratorType generatorType, Material material, int baseAmount) {
         int amount = Math.max(0, baseAmount);
         if (amount <= 0 || activeMatchEvent != BedwarsMatchEventType.IN_THIS_ECONOMY || material == null) {
+            return amount;
+        }
+        if ((generatorType == GeneratorType.DIAMOND || generatorType == GeneratorType.EMERALD)
+                && material == Material.GOLD_INGOT) {
             return amount;
         }
         return switch (material) {

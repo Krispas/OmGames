@@ -177,7 +177,7 @@ shop:
         cost:
           material: EMERALD
           amount: 4
-        display-name: "Abyssal Rift"
+        display-name: "Abyssal Rift: Domination"
         lore:
           - "Deploy a 10-block aura."
           - "Buffs allies and weakens enemies."

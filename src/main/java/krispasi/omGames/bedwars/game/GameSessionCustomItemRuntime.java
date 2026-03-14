@@ -48,7 +48,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 final class GameSessionCustomItemRuntime {
-    private static final String ABYSSAL_RIFT_NAME = "Abyssal Rift";
+    private static final String ABYSSAL_RIFT_NAME = "Abyssal Rift: Domination";
     private static final String AIRSTRIKE_ELYTRA_NAME = "Airstrike Elytra";
     private static final int ABYSSAL_RIFT_AURA_INTERVAL_TICKS = 20;
     private static final int ABYSSAL_RIFT_EFFECT_DURATION_TICKS = 40;

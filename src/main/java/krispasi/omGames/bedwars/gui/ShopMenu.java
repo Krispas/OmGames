@@ -10,6 +10,7 @@ import krispasi.omGames.bedwars.shop.QuickBuyService;
 import krispasi.omGames.bedwars.shop.ShopCategory;
 import krispasi.omGames.bedwars.shop.ShopCategoryType;
 import krispasi.omGames.bedwars.shop.ShopConfig;
+import krispasi.omGames.bedwars.shop.ShopCost;
 import krispasi.omGames.bedwars.shop.ShopItemBehavior;
 import krispasi.omGames.bedwars.shop.ShopItemDefinition;
 import krispasi.omGames.bedwars.shop.ShopItemLimit;
@@ -146,7 +147,8 @@ public class ShopMenu implements InventoryHolder {
             if (slot < 0 || slot >= inventory.getSize()) {
                 continue;
             }
-            ItemStack display = item.createDisplayItem(team);
+            ShopCost displayCost = session.getEffectiveShopCost(item);
+            ItemStack display = item.createDisplayItem(team, displayCost);
             if (item.getBehavior() == ShopItemBehavior.UPGRADE && item.getUpgradeType() != null) {
                 display = buildUpgradeDisplay(item);
             }

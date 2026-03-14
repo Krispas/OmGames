@@ -801,7 +801,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
         if (item.getBehavior() == ShopItemBehavior.UPGRADE) {
             return handleUpgradePurchaseInternal(player, item.getUpgradeType());
         }
-        ShopCost cost = item.getCost();
+        ShopCost cost = getEffectiveShopCost(item);
         if (cost == null || !cost.isValid() || !hasResources(player, cost)) {
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             return false;
