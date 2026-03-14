@@ -3488,7 +3488,7 @@ public class BedwarsListener implements Listener {
         applyHappyGhastHarness(entity, team);
         scheduleHappyGhastHarness(entity, team);
         applySummonStats(entity, custom);
-        applyEntityKnockbackResistance(entity, 1.0);
+        applyEntityKnockbackResistance(entity, 10.0);
         scheduleMountHappyGhast(entity, player);
         int lifetimeSeconds = custom != null && custom.getLifetimeSeconds() > 0
                 ? custom.getLifetimeSeconds()
@@ -4003,7 +4003,7 @@ public class BedwarsListener implements Listener {
         Component title = team != null
                 ? Component.text(team.displayName() + " " + name, team.textColor())
                 : Component.text(name, NamedTextColor.WHITE);
-        Component timer = Component.text("Despawn: " + Math.max(0, remainingSeconds) + "s", NamedTextColor.GRAY);
+        Component timer = buildSummonStatusLine(living, remainingSeconds);
         SummonNameplate nameplate = summonNameplates.get(entity.getUniqueId());
         if (nameplate != null) {
             living.customName(title);
@@ -4013,6 +4013,18 @@ public class BedwarsListener implements Listener {
             living.customName(title.append(Component.newline()).append(timer));
             living.setCustomNameVisible(true);
         }
+    }
+
+    private Component buildSummonStatusLine(LivingEntity entity, int remainingSeconds) {
+        Component despawn = Component.text("Despawn: " + Math.max(0, remainingSeconds) + "s", NamedTextColor.GRAY);
+        if (!isHappyGhast(entity)) {
+            return despawn;
+        }
+        int currentHealth = (int) Math.ceil(Math.max(0.0, entity.getHealth()));
+        int maxHealth = (int) Math.ceil(Math.max(entity.getMaxHealth(), entity.getHealth()));
+        return Component.text(currentHealth + "/" + maxHealth + " HP", NamedTextColor.RED)
+                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                .append(despawn);
     }
 
     private void sendSummonActionBar(org.bukkit.entity.Entity entity, int remainingSeconds) {

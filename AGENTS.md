@@ -411,6 +411,7 @@ Behavior notes:
   - the tunnel should extend from that piston anchor in the player's horizontal facing direction, not from the player's feet
 - `HAPPY_GHAST`
   - should take normal damage from players and projectiles, including same-team hits, and use attribute-based knockback resistance; do not add ghast-specific damage or knockback handling in the listener
+  - summon nameplate should show current health above it alongside the despawn timer
 - `UNSTABLE_TELEPORTATION_DEVICE`
   - purchased as a held item
   - right-click activation rolls one teleport outcome
