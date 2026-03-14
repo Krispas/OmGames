@@ -28,6 +28,8 @@ public class EggHuntManager {
     private static final double START_RADIUS = 50.0;
     private static final double MAX_EGG_DISTANCE = 1000.0;
     private static final double MAX_EGG_DISTANCE_SQUARED = MAX_EGG_DISTANCE * MAX_EGG_DISTANCE;
+    private static final double CLEAR_NEAR_RADIUS = 5.0;
+    private static final double CLEAR_NEAR_RADIUS_SQUARED = CLEAR_NEAR_RADIUS * CLEAR_NEAR_RADIUS;
     private static final String SIDEBAR_OBJECTIVE_ID = "egghunt";
 
     public record Result(boolean success, String message) {
@@ -203,6 +205,27 @@ public class EggHuntManager {
         }
         clearSidebarInternal();
         return new Result(true, "Egg Hunt scoreboard cleared.");
+    }
+
+    public Result clearPointsNear(Player player) {
+        if (player == null || player.getWorld() == null) {
+            return new Result(false, "Only a player in a loaded world can clear nearby Egg Hunt points.");
+        }
+        List<EggHuntPoint> removed = removeSavedPoints(point -> isNearPoint(point, player.getLocation()));
+        if (removed.isEmpty()) {
+            return new Result(false, "No Egg Hunt points were found within " + (int) CLEAR_NEAR_RADIUS + " blocks.");
+        }
+        return new Result(true, "Removed " + removed.size() + " nearby Egg Hunt point"
+                + (removed.size() == 1 ? "." : "s permanently."));
+    }
+
+    public Result clearAllPoints() {
+        if (savedPoints.isEmpty()) {
+            return new Result(false, "No Egg Hunt points are saved.");
+        }
+        List<EggHuntPoint> removed = removeSavedPoints(point -> true);
+        return new Result(true, "Removed " + removed.size() + " Egg Hunt point"
+                + (removed.size() == 1 ? "." : "s permanently."));
     }
 
     public void syncSidebar(EggHuntSession session) {
@@ -483,6 +506,42 @@ public class EggHuntManager {
         int chunkX = Location.locToBlock(point.x()) >> 4;
         int chunkZ = Location.locToBlock(point.z()) >> 4;
         return world.isChunkLoaded(chunkX, chunkZ);
+    }
+
+    private List<EggHuntPoint> removeSavedPoints(java.util.function.Predicate<EggHuntPoint> predicate) {
+        List<EggHuntPoint> removed = new ArrayList<>();
+        for (EggHuntPoint point : new ArrayList<>(savedPoints)) {
+            if (!predicate.test(point)) {
+                continue;
+            }
+            savedPoints.remove(point);
+            removed.add(point);
+        }
+        if (removed.isEmpty()) {
+            return removed;
+        }
+        save();
+        if (activeSession != null) {
+            activeSession.removePoints(removed);
+        }
+        if (sidebarScoreboard != null && activeSession == null) {
+            sidebarEggsRemaining = savedPoints.size();
+            refreshSidebar();
+        }
+        return removed;
+    }
+
+    private boolean isNearPoint(EggHuntPoint point, Location center) {
+        if (point == null || center == null || center.getWorld() == null) {
+            return false;
+        }
+        if (!point.worldName().equalsIgnoreCase(center.getWorld().getName())) {
+            return false;
+        }
+        double dx = point.x() - center.getX();
+        double dy = point.y() - center.getY();
+        double dz = point.z() - center.getZ();
+        return dx * dx + dy * dy + dz * dz <= CLEAR_NEAR_RADIUS_SQUARED;
     }
 
     private File getDataFolder() {

@@ -51,7 +51,21 @@ public class EggHuntCommand implements CommandExecutor, TabCompleter {
                 result = eggHuntManager.setTimerSeconds(seconds);
             }
             case "start" -> result = eggHuntManager.start(player);
-            case "clear" -> result = eggHuntManager.clearSidebar();
+            case "clear" -> {
+                if (args.length < 2) {
+                    sender.sendMessage(Component.text("Usage: /egghunt clear <near/all>", NamedTextColor.YELLOW));
+                    return true;
+                }
+                String mode = args[1].toLowerCase(Locale.ROOT);
+                if (mode.equals("near")) {
+                    result = eggHuntManager.clearPointsNear(player);
+                } else if (mode.equals("all")) {
+                    result = eggHuntManager.clearAllPoints();
+                } else {
+                    sender.sendMessage(Component.text("Usage: /egghunt clear <near/all>", NamedTextColor.YELLOW));
+                    return true;
+                }
+            }
             default -> {
                 sender.sendMessage(usage());
                 return true;
@@ -79,12 +93,18 @@ public class EggHuntCommand implements CommandExecutor, TabCompleter {
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
+        if (args.length == 2 && args[0].equalsIgnoreCase("clear")) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Stream.of("near", "all")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
         return List.of();
     }
 
     private Component usage() {
         return Component.text(
-                "Usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt clear",
+                "Usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt clear <near/all>",
                 NamedTextColor.YELLOW
         );
     }

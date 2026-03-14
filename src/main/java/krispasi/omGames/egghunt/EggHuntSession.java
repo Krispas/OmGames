@@ -150,6 +150,27 @@ public class EggHuntSession {
         teleportToStart(player);
     }
 
+    public void removePoints(Collection<EggHuntPoint> points) {
+        if (points == null || points.isEmpty()) {
+            return;
+        }
+        eggPoints.removeIf(points::contains);
+        for (UUID displayId : new ArrayList<>(activeEggs.keySet())) {
+            EggHuntPoint point = activeEggs.get(displayId);
+            if (point == null || !points.contains(point)) {
+                continue;
+            }
+            activeEggs.remove(displayId);
+            if (Bukkit.getEntity(displayId) instanceof ItemDisplay display) {
+                display.remove();
+            }
+        }
+        manager.syncSidebar(this);
+        if (state != State.ABORTED && state != State.FINISHED && eggPoints.isEmpty()) {
+            finish();
+        }
+    }
+
     private void beginRunning() {
         if (state != State.COUNTDOWN) {
             return;

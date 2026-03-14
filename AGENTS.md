@@ -600,7 +600,12 @@ Egg Hunt admin subcommands:
 - `/egghunt prepare`
 - `/egghunt timer <seconds>`
 - `/egghunt start`
-- `/egghunt clear`
+- `/egghunt clear <near/all>`
+
+Egg Hunt clear behavior:
+- `clear near` permanently removes saved egg points within the near-clear radius of the executing player
+- `clear all` permanently removes all saved egg points
+- if an Egg Hunt session is active, cleared points should also disappear from the live session immediately
 
 ### 3.3 Runtime Data Layout
 
