@@ -25,6 +25,9 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 
 - Prefer config edits over Java changes when the change is balance or content tuning.
 - Do not add automatic config or file migration logic.
+- Do not create or grow monolithic classes.
+- If a class is approaching roughly `2000` lines, split it by responsibility before adding more code.
+- Prefer extracting support/runtime/helper classes by concern while preserving ownership boundaries and cleanup invariants.
 - If defaults need to change, update the resource files in `src/main/resources/`.
 - If an existing server config needs the new defaults, the expected workflow is to delete that file and let the plugin recreate it.
 - Do not touch `OmVeinsAPI`.
@@ -48,9 +51,23 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - Match state machine and main BedWars rules owner.
   - Handles gameplay, rotating items, match events, upgrades, beds, respawns, and scoreboards.
 
+- `src/main/java/krispasi/omGames/bedwars/game/GameSessionEffectSupport.java`
+- `src/main/java/krispasi/omGames/bedwars/game/GameSessionRuntimeSupport.java`
+- `src/main/java/krispasi/omGames/bedwars/game/GameSessionMatchFlowSupport.java`
+- `src/main/java/krispasi/omGames/bedwars/game/GameSessionCustomItemRuntime.java`
+  - Internal `GameSession` support/runtime split.
+  - Used to keep match logic separated by concern without changing `GameSession` ownership.
+  - Do not collapse these back into a single large class.
+
 - `src/main/java/krispasi/omGames/bedwars/listener/BedwarsListener.java`
   - BedWars event plumbing.
   - Handles Bukkit events and delegates actual game rules into `GameSession`.
+
+- `src/main/java/krispasi/omGames/bedwars/listener/BedwarsListenerCustomSupport.java`
+- `src/main/java/krispasi/omGames/bedwars/listener/BedwarsListenerRuntimeSupport.java`
+  - Internal `BedwarsListener` support split.
+  - Keep listener code as event translation; do not move BedWars ownership out of `GameSession`.
+  - Do not collapse these back into a single large class.
 
 - `src/main/java/krispasi/omGames/bedwars/setup/BedwarsSetupManager.java`
   - `/bw setup` workflow.
@@ -130,8 +147,10 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - sidebar/scoreboard state
   - rotating selection
   - match events
+  - internal support classes under `bedwars/game/` do not change this ownership; they are implementation detail
 
 - `BedwarsListener` should stay as Bukkit event translation and call into `GameSession` for rules.
+  - internal support classes under `bedwars/listener/` are still listener implementation detail, not a place to move match ownership
 
 - `BedwarsLobbyParkour` owns lobby parkour runtime:
   - active run state
@@ -484,6 +503,7 @@ Put changes here:
 - custom item parsing/model -> `item/*`
 
 Do not push BedWars rules into `OmGames`.
+Do not re-introduce large BedWars god classes; use the existing support/runtime split pattern when adding substantial new logic.
 
 ### 2.12 High-Risk Invariants
 
