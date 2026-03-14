@@ -18,6 +18,7 @@ import krispasi.omGames.bedwars.model.BlockPoint;
 import krispasi.omGames.bedwars.model.TeamColor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -62,6 +63,13 @@ final class GameSessionCustomItemRuntime {
     private static final int ELYTRA_STRIKE_ALTITUDE = 300;
     private static final int ELYTRA_STRIKE_REGEN_DURATION_TICKS = 20;
     private static final int ELYTRA_STRIKE_REGEN_AMPLIFIER = 9;
+    private static final long RAILGUN_BLAST_CHARGE_TICKS = 5L * 20L;
+    private static final long RAILGUN_BLAST_ACTIVE_STEP_TICKS = 2L;
+    private static final int RAILGUN_BLAST_CHARGE_SOUND_INTERVAL_TICKS = 10;
+    private static final double RAILGUN_BLAST_RADIUS = 2.5;
+    private static final double RAILGUN_BLAST_FALLBACK_RANGE = 160.0;
+    private static final double RAILGUN_BLAST_CHARGE_PARTICLE_STEP = 1.75;
+    private static final double RAILGUN_BLAST_ACTIVE_PARTICLE_STEP = 1.5;
     private static final long MIRACLE_OF_THE_STARS_DELAY_TICKS = 5L * 20L;
     private static final long TOWER_CHEST_TEMP_CHEST_TICKS = 8L;
     private static final int STEEL_SHELL_RESISTANCE_AMPLIFIER = 4;
@@ -140,6 +148,8 @@ final class GameSessionCustomItemRuntime {
     private final Map<UUID, AbyssalRiftState> abyssalRifts = new HashMap<>();
     private final Map<UUID, UUID> abyssalRiftEntityLinks = new HashMap<>();
     private final Map<UUID, ElytraStrikeState> activeElytraStrikes = new HashMap<>();
+    private final Map<UUID, RailgunChargeState> activeRailgunCharges = new HashMap<>();
+    private final Map<UUID, RailgunBeamState> activeRailgunBeams = new HashMap<>();
     private final Map<UUID, SteelShellState> activeSteelShells = new HashMap<>();
     private final Map<UUID, Map<String, Long>> customItemCooldownEnds = new HashMap<>();
     private final Map<LockpickAccessKey, Long> chestLockpickAccessEnds = new HashMap<>();
@@ -166,6 +176,7 @@ final class GameSessionCustomItemRuntime {
 
     void reset() {
         clearAllElytraStrikes(false);
+        clearAllRailgunBlasts();
         clearAbyssalRifts();
         clearAllSteelShells(false);
         clearLockpickState();
@@ -230,7 +241,7 @@ final class GameSessionCustomItemRuntime {
             player.sendMessage(Component.text("You are already picking this team's chest.", NamedTextColor.RED));
             return false;
         }
-        return startLockpickCountdown(player,
+        boolean started = startLockpickCountdown(player,
                 chestBlock,
                 key,
                 "Chest unlock",
@@ -254,6 +265,10 @@ final class GameSessionCustomItemRuntime {
                             .append(ownerTeam.displayComponent())
                             .append(Component.text(" team's chests for 60s.", NamedTextColor.GREEN)));
                 });
+        if (started) {
+            showLockpickChestAlert(ownerTeam, player.getName());
+        }
+        return started;
     }
 
     boolean beginEnderChestLockpick(Player player,
@@ -280,7 +295,7 @@ final class GameSessionCustomItemRuntime {
             return false;
         }
         String targetName = resolveTargetPlayerName(targetPlayerId);
-        return startLockpickCountdown(player,
+        boolean started = startLockpickCountdown(player,
                 chestBlock,
                 key,
                 "Ender chest access",
@@ -306,6 +321,10 @@ final class GameSessionCustomItemRuntime {
                             .append(Component.text(targetName, NamedTextColor.YELLOW))
                             .append(Component.text("'s ender chest for 60s.", NamedTextColor.GREEN)));
                 });
+        if (started) {
+            showLockpickEnderChestAlert(targetPlayerId, player.getName());
+        }
+        return started;
     }
 
     private boolean startLockpickCountdown(Player player,
@@ -594,6 +613,80 @@ final class GameSessionCustomItemRuntime {
             online.setVelocity(finalLaunchVelocity);
         });
         broadcast(Component.text("airstrike incoming!", NamedTextColor.RED));
+        return true;
+    }
+
+    boolean activateRailgunBlast(Player player, CustomItemDefinition custom, JavaPlugin plugin) {
+        if (player == null
+                || custom == null
+                || plugin == null
+                || !session.isRunning()
+                || !session.isParticipant(player.getUniqueId())
+                || !session.isInArenaWorld(player.getWorld())) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        if (activeRailgunCharges.containsKey(playerId) || activeRailgunBeams.containsKey(playerId)) {
+            player.sendMessage(Component.text("Railgun Blast is already active.", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        RailgunPath initialPath = resolveRailgunPath(player, custom);
+        if (initialPath == null) {
+            player.sendMessage(Component.text("You need a clear firing line inside the map.", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+
+        RailgunChargeState state = new RailgunChargeState(null, initialPath);
+        BukkitTask task = new BukkitRunnable() {
+            private long elapsedTicks = 0L;
+
+            @Override
+            public void run() {
+                RailgunChargeState currentState = activeRailgunCharges.get(playerId);
+                Player shooter = Bukkit.getPlayer(playerId);
+                if (currentState == null || !canMaintainRailgunOwner(shooter)) {
+                    clearRailgunBlast(playerId);
+                    cancel();
+                    return;
+                }
+
+                RailgunPath currentPath = resolveRailgunPath(shooter, custom);
+                if (currentPath != null) {
+                    currentState.setLastPath(currentPath);
+                } else {
+                    currentPath = currentState.lastPath();
+                }
+                if (currentPath != null && (elapsedTicks & 1L) == 0L) {
+                    spawnRailgunChargeParticles(currentPath);
+                }
+                if (currentPath != null && elapsedTicks % RAILGUN_BLAST_CHARGE_SOUND_INTERVAL_TICKS == 0L) {
+                    playRailgunArenaSound(currentPath.origin(), Sound.BLOCK_BEACON_ACTIVATE, 1.8f, 1.15f);
+                }
+                elapsedTicks++;
+                if (elapsedTicks < RAILGUN_BLAST_CHARGE_TICKS) {
+                    return;
+                }
+
+                RailgunPath firingPath = currentState.lastPath();
+                clearRailgunCharge(playerId);
+                if (firingPath == null || !canMaintainRailgunOwner(shooter)) {
+                    if (shooter != null) {
+                        shooter.sendMessage(Component.text("Railgun Blast lost its firing line.", NamedTextColor.RED));
+                        shooter.playSound(shooter.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+                    }
+                    cancel();
+                    return;
+                }
+                startRailgunBeam(shooter, custom, firingPath, plugin);
+                cancel();
+            }
+        }.runTaskTimer(plugin, 1L, 1L);
+        state.setTask(task);
+        activeRailgunCharges.put(playerId, state);
+        sessionTasks.add(task);
+        player.sendMessage(Component.text("Railgun Blast charging...", NamedTextColor.GOLD));
         return true;
     }
 
@@ -1252,6 +1345,308 @@ final class GameSessionCustomItemRuntime {
         location.getWorld().playSound(location, Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
     }
 
+    private boolean canMaintainRailgunOwner(Player player) {
+        return player != null
+                && player.isOnline()
+                && !player.isDead()
+                && session.isRunning()
+                && session.isParticipant(player.getUniqueId())
+                && session.isInArenaWorld(player.getWorld())
+                && player.getGameMode() != GameMode.SPECTATOR
+                && session.getTeam(player.getUniqueId()) != null;
+    }
+
+    private void startRailgunBeam(Player player,
+                                  CustomItemDefinition custom,
+                                  RailgunPath path,
+                                  JavaPlugin plugin) {
+        if (player == null || custom == null || path == null || plugin == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        TeamColor team = session.getTeam(playerId);
+        if (team == null) {
+            return;
+        }
+        long durationTicks = Math.max(1L, (custom.getLifetimeSeconds() > 0 ? custom.getLifetimeSeconds() : 5) * 20L);
+        double damage = custom.getDamage() > 0.0 ? custom.getDamage() : 1000.0;
+        BukkitTask task = new BukkitRunnable() {
+            private long remainingTicks = durationTicks;
+
+            @Override
+            public void run() {
+                RailgunBeamState currentState = activeRailgunBeams.get(playerId);
+                Player shooter = Bukkit.getPlayer(playerId);
+                if (currentState == null || !canMaintainRailgunOwner(shooter)) {
+                    clearRailgunBeam(playerId);
+                    cancel();
+                    return;
+                }
+                spawnRailgunActiveParticles(currentState.path());
+                damagePlayersInRailgunBeam(shooter, currentState);
+                remainingTicks -= RAILGUN_BLAST_ACTIVE_STEP_TICKS;
+                if (remainingTicks > 0L) {
+                    return;
+                }
+                clearRailgunBeam(playerId);
+                cancel();
+            }
+        }.runTaskTimer(plugin, 0L, RAILGUN_BLAST_ACTIVE_STEP_TICKS);
+        activeRailgunBeams.put(playerId, new RailgunBeamState(path, task, team, damage));
+        sessionTasks.add(task);
+        playRailgunFireEffects(path);
+    }
+
+    private RailgunPath resolveRailgunPath(Player player, CustomItemDefinition custom) {
+        if (player == null || player.getWorld() == null) {
+            return null;
+        }
+        Location origin = player.getEyeLocation().clone();
+        Vector direction = origin.getDirection();
+        if (direction.lengthSquared() <= 0.0001) {
+            return null;
+        }
+        direction.normalize();
+        origin.add(direction.clone().multiply(0.75));
+        double length = resolveRailgunLength(origin, direction, resolveRailgunMaxRange(custom));
+        if (length < 2.0) {
+            return null;
+        }
+        return new RailgunPath(origin, direction, length, RAILGUN_BLAST_RADIUS);
+    }
+
+    private double resolveRailgunMaxRange(CustomItemDefinition custom) {
+        if (custom != null && custom.getRange() > 0.0) {
+            return custom.getRange();
+        }
+        BlockPoint corner1 = arena.getCorner1();
+        BlockPoint corner2 = arena.getCorner2();
+        if (corner1 == null || corner2 == null) {
+            return RAILGUN_BLAST_FALLBACK_RANGE;
+        }
+        double dx = Math.abs(corner1.x() - corner2.x()) + 1.0;
+        double dy = Math.abs(corner1.y() - corner2.y()) + 1.0;
+        double dz = Math.abs(corner1.z() - corner2.z()) + 1.0;
+        return Math.max(RAILGUN_BLAST_FALLBACK_RANGE, Math.sqrt(dx * dx + dy * dy + dz * dz) + 8.0);
+    }
+
+    private double resolveRailgunLength(Location origin, Vector direction, double maxRange) {
+        if (origin == null || direction == null || maxRange <= 0.0) {
+            return 0.0;
+        }
+        double lastInside = 0.0;
+        for (double distance = 0.0; distance <= maxRange; distance += 0.5) {
+            Location sample = origin.clone().add(direction.clone().multiply(distance));
+            if (!isInsideRailgunSample(sample)) {
+                break;
+            }
+            lastInside = distance;
+        }
+        return lastInside;
+    }
+
+    private boolean isInsideRailgunSample(Location location) {
+        if (location == null || location.getWorld() == null || !session.isInArenaWorld(location.getWorld())) {
+            return false;
+        }
+        return session.isInsideMap(new BlockPoint(location.getBlockX(), location.getBlockY(), location.getBlockZ()));
+    }
+
+    private void spawnRailgunChargeParticles(RailgunPath path) {
+        if (path == null || path.origin().getWorld() == null) {
+            return;
+        }
+        World world = path.origin().getWorld();
+        for (double distance = 0.0; distance <= path.length(); distance += RAILGUN_BLAST_CHARGE_PARTICLE_STEP) {
+            Location point = pointAlongRailgun(path, distance);
+            world.spawnParticle(Particle.ELECTRIC_SPARK, point, 1, 0.0, 0.0, 0.0, 0.0);
+            world.spawnParticle(Particle.END_ROD, point, 1, 0.0, 0.0, 0.0, 0.0);
+        }
+    }
+
+    private void spawnRailgunActiveParticles(RailgunPath path) {
+        if (path == null || path.origin().getWorld() == null) {
+            return;
+        }
+        World world = path.origin().getWorld();
+        Vector right = path.direction().clone().crossProduct(new Vector(0.0, 1.0, 0.0));
+        if (right.lengthSquared() < 0.001) {
+            right = new Vector(1.0, 0.0, 0.0);
+        }
+        right.normalize();
+        Vector up = right.clone().crossProduct(path.direction()).normalize();
+        for (double distance = 0.0; distance <= path.length(); distance += RAILGUN_BLAST_ACTIVE_PARTICLE_STEP) {
+            Location center = pointAlongRailgun(path, distance);
+            world.spawnParticle(Particle.FLAME,
+                    center,
+                    8,
+                    path.radius() * 0.35,
+                    path.radius() * 0.35,
+                    path.radius() * 0.35,
+                    0.01);
+            world.spawnParticle(Particle.SMOKE,
+                    center,
+                    3,
+                    path.radius() * 0.35,
+                    path.radius() * 0.35,
+                    path.radius() * 0.35,
+                    0.0);
+            for (int point = 0; point < 8; point++) {
+                double angle = (Math.PI * 2.0 * point) / 8.0;
+                Vector offset = right.clone().multiply(Math.cos(angle) * path.radius())
+                        .add(up.clone().multiply(Math.sin(angle) * path.radius()));
+                world.spawnParticle(Particle.FLAME, center.clone().add(offset), 1, 0.0, 0.0, 0.0, 0.0);
+            }
+        }
+    }
+
+    private Location pointAlongRailgun(RailgunPath path, double distance) {
+        return path.origin().clone().add(path.direction().clone().multiply(distance));
+    }
+
+    private void playRailgunFireEffects(RailgunPath path) {
+        if (path == null) {
+            return;
+        }
+        spawnRailgunActiveParticles(path);
+        playRailgunArenaSound(path.origin(), Sound.ENTITY_GENERIC_EXPLODE, 2.6f, 0.7f);
+    }
+
+    private void playRailgunArenaSound(Location location, Sound sound, float volume, float pitch) {
+        if (location == null || sound == null) {
+            return;
+        }
+        for (Player target : Bukkit.getOnlinePlayers()) {
+            if (target == null || !target.isOnline() || !session.isInArenaWorld(target.getWorld())) {
+                continue;
+            }
+            target.playSound(location, sound, volume, pitch);
+        }
+    }
+
+    private void damagePlayersInRailgunBeam(Player shooter, RailgunBeamState state) {
+        if (shooter == null || state == null) {
+            return;
+        }
+        UUID shooterId = shooter.getUniqueId();
+        for (UUID targetId : assignments.keySet()) {
+            if (targetId == null || targetId.equals(shooterId)) {
+                continue;
+            }
+            Player target = Bukkit.getPlayer(targetId);
+            if (!isValidRailgunTarget(target, state.team())) {
+                continue;
+            }
+            if (!isInsideRailgunBeam(target, state.path())) {
+                continue;
+            }
+            session.recordCombat(shooterId, targetId);
+            target.setNoDamageTicks(0);
+            target.damage(Math.max(1.0, state.damage()), shooter);
+            if (!target.isDead() && target.getHealth() > 0.0) {
+                target.setHealth(0.0);
+            }
+            target.setFireTicks(Math.max(target.getFireTicks(), 60));
+        }
+    }
+
+    private boolean isValidRailgunTarget(Player target, TeamColor shooterTeam) {
+        if (target == null
+                || !target.isOnline()
+                || target.isDead()
+                || !session.isParticipant(target.getUniqueId())
+                || !session.isInArenaWorld(target.getWorld())
+                || target.getGameMode() == GameMode.SPECTATOR
+                || session.hasRespawnProtection(target.getUniqueId())) {
+            return false;
+        }
+        TeamColor targetTeam = session.getTeam(target.getUniqueId());
+        return shooterTeam == null || targetTeam == null || shooterTeam != targetTeam;
+    }
+
+    private boolean isInsideRailgunBeam(Player target, RailgunPath path) {
+        if (target == null || path == null) {
+            return false;
+        }
+        Location targetLocation = target.getLocation().add(0.0, target.getHeight() * 0.5, 0.0);
+        Vector fromOrigin = targetLocation.toVector().subtract(path.origin().toVector());
+        double along = fromOrigin.dot(path.direction());
+        if (along < 0.0 || along > path.length()) {
+            return false;
+        }
+        Vector closest = path.origin().toVector().add(path.direction().clone().multiply(along));
+        double effectiveRadius = path.radius() + 0.4;
+        return targetLocation.toVector().distanceSquared(closest) <= effectiveRadius * effectiveRadius;
+    }
+
+    private void clearAllRailgunBlasts() {
+        for (UUID playerId : new ArrayList<>(activeRailgunCharges.keySet())) {
+            clearRailgunCharge(playerId);
+        }
+        for (UUID playerId : new ArrayList<>(activeRailgunBeams.keySet())) {
+            clearRailgunBeam(playerId);
+        }
+    }
+
+    private void clearRailgunBlast(UUID playerId) {
+        clearRailgunCharge(playerId);
+        clearRailgunBeam(playerId);
+    }
+
+    private void clearRailgunCharge(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        RailgunChargeState state = activeRailgunCharges.remove(playerId);
+        if (state != null && state.task() != null) {
+            state.task().cancel();
+        }
+    }
+
+    private void clearRailgunBeam(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        RailgunBeamState state = activeRailgunBeams.remove(playerId);
+        if (state != null && state.task() != null) {
+            state.task().cancel();
+        }
+    }
+
+    private void showLockpickChestAlert(TeamColor ownerTeam, String robberName) {
+        if (ownerTeam == null || robberName == null || robberName.isBlank()) {
+            return;
+        }
+        Title title = Title.title(
+                Component.text(robberName, NamedTextColor.RED),
+                Component.text("is robbing your team chest", NamedTextColor.YELLOW),
+                GameSession.sharedTitleTimes());
+        for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
+            if (entry.getValue() != ownerTeam) {
+                continue;
+            }
+            Player teammate = Bukkit.getPlayer(entry.getKey());
+            if (teammate == null || !teammate.isOnline() || !session.isInArenaWorld(teammate.getWorld())) {
+                continue;
+            }
+            teammate.showTitle(title);
+        }
+    }
+
+    private void showLockpickEnderChestAlert(UUID targetPlayerId, String robberName) {
+        if (targetPlayerId == null || robberName == null || robberName.isBlank()) {
+            return;
+        }
+        Player target = Bukkit.getPlayer(targetPlayerId);
+        if (target == null || !target.isOnline() || !session.isInArenaWorld(target.getWorld())) {
+            return;
+        }
+        target.showTitle(Title.title(
+                Component.text(robberName, NamedTextColor.RED),
+                Component.text("is robbing your ender chest", NamedTextColor.YELLOW),
+                GameSession.sharedTitleTimes()));
+    }
+
     private void resolveMiracleOfTheStars(TeamColor team) {
         if (team == null || session.getState() != GameState.RUNNING) {
             return;
@@ -1830,6 +2225,44 @@ final class GameSessionCustomItemRuntime {
     private record ElytraStrikeState(ItemStack previousChestplate,
                                      boolean previousAllowFlight,
                                      boolean previousFlying) {
+    }
+
+    private static final class RailgunChargeState {
+        private BukkitTask task;
+        private RailgunPath lastPath;
+
+        private RailgunChargeState(BukkitTask task, RailgunPath lastPath) {
+            this.task = task;
+            this.lastPath = lastPath;
+        }
+
+        private BukkitTask task() {
+            return task;
+        }
+
+        private void setTask(BukkitTask task) {
+            this.task = task;
+        }
+
+        private RailgunPath lastPath() {
+            return lastPath;
+        }
+
+        private void setLastPath(RailgunPath lastPath) {
+            this.lastPath = lastPath;
+        }
+    }
+
+    private record RailgunBeamState(RailgunPath path,
+                                    BukkitTask task,
+                                    TeamColor team,
+                                    double damage) {
+    }
+
+    private record RailgunPath(Location origin,
+                               Vector direction,
+                               double length,
+                               double radius) {
     }
 
     private record SteelShellState(List<BlockPoint> blocks,

@@ -584,6 +584,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 case ELYTRA_STRIKE -> {
                     yield session.activateElytraStrike(player, custom);
                 }
+                case RAILGUN_BLAST -> {
+                    yield session.activateRailgunBlast(player, custom);
+                }
                 case MIRACLE_OF_THE_STARS -> {
                     yield session.activateMiracleOfTheStars(player, custom);
                 }
@@ -652,7 +655,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 return;
             }
             if (isLungingSpearMovementOnCooldown(player, item)) {
-                armBlockedLungingSpearVelocity(player);
+                suppressBlockedLungingSpearMovement(player);
                 event.setCancelled(true);
                 return;
             }
@@ -682,7 +685,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 return;
             }
             if (isLungingSpearMovementOnCooldown(player, item)) {
-                armBlockedLungingSpearVelocity(player);
+                suppressBlockedLungingSpearMovement(player);
                 event.setCancelled(true);
                 return;
             }
@@ -706,7 +709,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 return;
             }
             if (isLungingSpearMovementOnCooldown(player, item)) {
-                armBlockedLungingSpearVelocity(player);
+                suppressBlockedLungingSpearMovement(player);
                 event.setCancelled(true);
                 return;
             }
@@ -1983,7 +1986,6 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             lungingSpearMovementCooldowns.remove(event.getPlayer().getUniqueId());
             pendingSuccessfulLungingSpearEvents.remove(event.getPlayer().getUniqueId());
             blockedLungingSpearVelocityUntil.remove(event.getPlayer().getUniqueId());
-            lungingSpearCooldownMessageTimes.remove(event.getPlayer().getUniqueId());
             voidTotemFallProtection.remove(event.getPlayer().getUniqueId());
             Player player = event.getPlayer();
             if (session.isRunning()

@@ -74,6 +74,14 @@ public class BedwarsPlayerStats {
         return parkourBestCheckpointUses;
     }
 
+    public double getKillDeathRatio() {
+        return ratio(kills, deaths);
+    }
+
+    public double getFinalKillDeathRatio() {
+        return ratio(finalKills, finalDeaths);
+    }
+
     public void addWins(int amount) {
         wins = Math.max(0, wins + amount);
     }
@@ -174,5 +182,14 @@ public class BedwarsPlayerStats {
                 parkourBestTimeMillis,
                 parkourBestCheckpointUses
         );
+    }
+
+    private double ratio(int numerator, int denominator) {
+        int safeNumerator = Math.max(0, numerator);
+        int safeDenominator = Math.max(0, denominator);
+        if (safeDenominator == 0) {
+            return safeNumerator;
+        }
+        return (double) safeNumerator / safeDenominator;
     }
 }

@@ -101,8 +101,7 @@ abstract class BedwarsListenerCustomSupport {
     protected static final int FLAMETHROWER_FIRE_TICKS = 60;
     protected static final long LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS = 5_000L;
     protected static final long LUNGING_SPEAR_EVENT_LINK_WINDOW_MILLIS = 50L;
-    protected static final long BLOCKED_LUNGING_SPEAR_VELOCITY_WINDOW_MILLIS = 100L;
-    protected static final long LUNGING_SPEAR_COOLDOWN_MESSAGE_THROTTLE_MILLIS = 750L;
+    protected static final long BLOCKED_LUNGING_SPEAR_VELOCITY_WINDOW_MILLIS = 250L;
     protected static final long VOID_TOTEM_FALL_PROTECTION_MILLIS = 5_000L;
     protected static final int GIGANTIFY_GROWTH_TICKS = 40;
     protected static final int GIGANTIFY_SUSTAIN_TICKS = 60;
@@ -136,7 +135,6 @@ abstract class BedwarsListenerCustomSupport {
     protected final Map<UUID, Long> lungingSpearMovementCooldowns = new HashMap<>();
     protected final Map<UUID, Long> pendingSuccessfulLungingSpearEvents = new HashMap<>();
     protected final Map<UUID, Long> blockedLungingSpearVelocityUntil = new HashMap<>();
-    protected final Map<UUID, Long> lungingSpearCooldownMessageTimes = new HashMap<>();
     protected final Map<UUID, BukkitTask> gigantifyTasks = new HashMap<>();
     protected final Map<UUID, Long> voidTotemFallProtection = new HashMap<>();
 
@@ -611,7 +609,7 @@ abstract class BedwarsListenerCustomSupport {
         if (!isLungingMovementSpear(item)) {
             return false;
         }
-        int nativeCooldownTicks = player.getCooldown(item);
+        int nativeCooldownTicks = item.getType() != Material.AIR ? player.getCooldown(item.getType()) : 0;
         if (nativeCooldownTicks > 0) {
             sendLungingSpearCooldownMessage(player, nativeCooldownTicks * 50L);
             return true;
@@ -623,6 +621,7 @@ abstract class BedwarsListenerCustomSupport {
             sendLungingSpearCooldownMessage(player, remainingMillis);
             int remainingTicks = (int) Math.ceil(remainingMillis / 50.0);
             if (remainingTicks > 0) {
+                player.setCooldown(item.getType(), remainingTicks);
                 player.setCooldown(item, remainingTicks);
             }
             return true;
@@ -637,6 +636,7 @@ abstract class BedwarsListenerCustomSupport {
         long now = System.currentTimeMillis();
         lungingSpearMovementCooldowns.put(player.getUniqueId(), now);
         pendingSuccessfulLungingSpearEvents.put(player.getUniqueId(), now + LUNGING_SPEAR_EVENT_LINK_WINDOW_MILLIS);
+        player.setCooldown(item.getType(), (int) Math.ceil(LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS / 50.0));
         player.setCooldown(item, (int) Math.ceil(LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS / 50.0));
     }
 
@@ -669,6 +669,26 @@ abstract class BedwarsListenerCustomSupport {
                 System.currentTimeMillis() + BLOCKED_LUNGING_SPEAR_VELOCITY_WINDOW_MILLIS);
     }
 
+    protected void suppressBlockedLungingSpearMovement(Player player) {
+        if (player == null) {
+            return;
+        }
+        armBlockedLungingSpearVelocity(player);
+        if (bedwarsManager.getPlugin() == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        for (long delay = 0L; delay <= 3L; delay++) {
+            bedwarsManager.getPlugin().getServer().getScheduler().runTaskLater(bedwarsManager.getPlugin(), () -> {
+                Player online = Bukkit.getPlayer(playerId);
+                if (online == null || !online.isOnline()) {
+                    return;
+                }
+                online.setVelocity(new Vector(0.0, 0.0, 0.0));
+            }, delay);
+        }
+    }
+
     protected boolean consumeBlockedLungingSpearVelocity(Player player) {
         if (player == null) {
             return false;
@@ -696,13 +716,6 @@ abstract class BedwarsListenerCustomSupport {
                 "Spear lunge cooldown: " + String.format(Locale.US, "%.1fs", remainingSeconds),
                 NamedTextColor.RED);
         player.sendActionBar(message);
-        long now = System.currentTimeMillis();
-        long lastSent = lungingSpearCooldownMessageTimes.getOrDefault(player.getUniqueId(), 0L);
-        if (now - lastSent < LUNGING_SPEAR_COOLDOWN_MESSAGE_THROTTLE_MILLIS) {
-            return;
-        }
-        lungingSpearCooldownMessageTimes.put(player.getUniqueId(), now);
-        player.sendMessage(message);
     }
 
     protected void sprayFlamethrower(Player player, GameSession session, CustomItemDefinition custom) {

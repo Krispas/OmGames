@@ -1353,6 +1353,10 @@ public class GameSession extends GameSessionMatchFlowSupport {
         return customItemRuntime.activateElytraStrike(player, custom, plugin);
     }
 
+    public boolean activateRailgunBlast(Player player, CustomItemDefinition custom) {
+        return customItemRuntime.activateRailgunBlast(player, custom, plugin);
+    }
+
     public boolean activateUnstableTeleportationDevice(Player player, CustomItemDefinition custom) {
         return customItemRuntime.activateUnstableTeleportationDevice(player, custom);
     }

@@ -22,6 +22,7 @@ public enum CustomItemType {
     ABYSSAL_RIFT(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, 30.0, -1.0, 10.0, 0, 0),
     ELYTRA_STRIKE(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     GIGANTIFY_GRENADE(1.15, 0.0f, false, 0, 1, 0.0, 0.0, 6, -1.0, -1.0, -1.0, 0, 0),
+    RAILGUN_BLAST(0.0, 0.0f, false, 0, 1, 1000.0, 0.0, 5, -1.0, -1.0, 160.0, 0, 0),
     MIRACLE_OF_THE_STARS(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     TOWER_CHEST(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     STEEL_SHELL(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 10, -1.0, -1.0, -1.0, 0, 0),

@@ -680,8 +680,10 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         viewer.sendMessage(Component.text("Wins: " + stats.getWins(), NamedTextColor.YELLOW));
         viewer.sendMessage(Component.text("Kills: " + stats.getKills(), NamedTextColor.YELLOW));
         viewer.sendMessage(Component.text("Deaths: " + stats.getDeaths(), NamedTextColor.YELLOW));
+        viewer.sendMessage(Component.text("KDR: " + formatRatio(stats.getKillDeathRatio()), NamedTextColor.YELLOW));
         viewer.sendMessage(Component.text("Final Kills: " + stats.getFinalKills(), NamedTextColor.YELLOW));
         viewer.sendMessage(Component.text("Final Deaths: " + stats.getFinalDeaths(), NamedTextColor.YELLOW));
+        viewer.sendMessage(Component.text("FKDR: " + formatRatio(stats.getFinalKillDeathRatio()), NamedTextColor.YELLOW));
         viewer.sendMessage(Component.text("Games Played: " + stats.getGamesPlayed(), NamedTextColor.YELLOW));
         viewer.sendMessage(Component.text("Beds Broken: " + stats.getBedsBroken(), NamedTextColor.YELLOW));
         viewer.sendMessage(Component.text("Parkour Best Time: " + bestTime, NamedTextColor.YELLOW));
@@ -704,6 +706,10 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             return String.format(Locale.ROOT, "%d:%02d.%03d", minutes, seconds, ms);
         }
         return String.format(Locale.ROOT, "%d.%03ds", seconds, ms);
+    }
+
+    private String formatRatio(double ratio) {
+        return String.format(Locale.ROOT, "%.2f", Math.max(0.0, ratio));
     }
 
     private record ParsedStatOperation(BedwarsStatsService.StatOperation operation, long amount) {

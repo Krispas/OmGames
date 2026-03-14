@@ -23,6 +23,7 @@ shop:
         gigantify_grenade: 29
         lockpick: 30
         steel_shell: 31
+        railgun_blast: 32
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -250,6 +251,19 @@ shop:
           - "Throws a grenade that"
           - "makes the target grow."
         custom-item: gigantify_grenade
+      railgun_blast:
+        material: LIGHTNING_ROD
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 32
+        display-name: "Railgun Blast"
+        lore:
+          - "Charges for 5 seconds,"
+          - "then fires a giant"
+          - "instakill flame beam"
+          - "for another 5 seconds."
+        custom-item: railgun_blast
       lockpick:
         material: TRIPWIRE_HOOK
         amount: 1
