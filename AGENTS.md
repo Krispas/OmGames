@@ -69,6 +69,10 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - Keep listener code as event translation; do not move BedWars ownership out of `GameSession`.
   - Do not collapse these back into a single large class.
 
+- `src/main/java/krispasi/omGames/bedwars/storage/BedwarsLegacyDatabaseMigrator.java`
+  - Temporary startup migration utility.
+  - Imports legacy BedWars SQLite data into the shared root `OmGames.db`.
+
 - `src/main/java/krispasi/omGames/bedwars/setup/BedwarsSetupManager.java`
   - `/bw setup` workflow.
   - Writes arena metadata back to `bedwars.yml`.
@@ -103,6 +107,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
    - `custom-items.yml`
 2. Construct `BedwarsManager`.
 3. Load:
+   - temporary legacy DB migration into `plugins/OmGames/OmGames.db` when needed
    - arenas
    - custom items
    - shop config
@@ -231,20 +236,31 @@ High-signal rule APIs:
 
 BedWars runtime files live in:
 - `plugins/OmGames/Bedwars/`
+- `plugins/OmGames/OmGames.db`
 
 Files:
 - `bedwars.yml`
 - `shop.yml`
 - `rotating-items.yml`
 - `custom-items.yml`
-- `quickbuy.db`
-- `bedwars-stats.db`
+- `../OmGames.db`
 
-No automatic config/file migration is expected.
+Temporary legacy DB migration:
+- startup currently imports from `plugins/OmGames/Bedwars/quickbuy.db`
+- startup currently imports from `plugins/OmGames/Bedwars/bedwars-stats.db`
+- migration is one-time into `plugins/OmGames/OmGames.db` and should be removed after the migration window closes
+- this is a temporary explicit exception to the normal no-migration rule
 
 ### 2.7 SQLite
 
-#### 2.7.1 `quickbuy.db`
+SQLite data currently lives in:
+- `plugins/OmGames/OmGames.db`
+
+Temporary legacy BedWars DB files may still exist during the migration window:
+- `plugins/OmGames/Bedwars/quickbuy.db`
+- `plugins/OmGames/Bedwars/bedwars-stats.db`
+
+#### 2.7.1 `OmGames.db -> quick_buy`
 
 Table: `quick_buy`
 - `player_uuid TEXT NOT NULL`
@@ -255,7 +271,7 @@ Table: `quick_buy`
 Special marker:
 - `__empty__` means intentional empty quick-buy slot.
 
-#### 2.7.2 `bedwars-stats.db`
+#### 2.7.2 `OmGames.db -> bedwars_stats`
 
 Table: `bedwars_stats`
 - `player_uuid TEXT PRIMARY KEY`
@@ -303,6 +319,7 @@ Supported event ids:
 - `long-arms`
 - `moon-big`
 - `blood-moon`
+- `chaos`
 - `in-this-economy`
 - `april-fools`
 
@@ -313,6 +330,10 @@ Supported event ids:
 `in-this-economy` runtime note:
 - `fireball`, `bed_bug`, and `dream_defender` stay purchasable at `4x` their normal price
 - diamond and emerald map generators should drop gold instead, keeping their slower generator cadence
+
+`chaos` runtime note:
+- all rotating items and rotating upgrades should be active for that match, regardless of the normal `2 items + 1 upgrade` auto-roll
+- teams should begin with max base forge, and diamond/emerald map generators should start at tier III immediately
 
 Arena timing fields:
 - `event-times.tier-2`
@@ -394,6 +415,7 @@ Common definition fields:
 - `yield`
 - `incendiary`
 - `damage`
+- `heal`
 - `knockback`
 - `lifetime-seconds`
 - `health`
@@ -423,6 +445,7 @@ Supported `type` values:
 - `ELYTRA_STRIKE`
 - `GIGANTIFY_GRENADE`
 - `RAILGUN_BLAST`
+- `PROXIMITY_MINE`
 - `LOCKPICK`
 - `UNSTABLE_TELEPORTATION_DEVICE`
 - `MIRACLE_OF_THE_STARS`
@@ -435,7 +458,11 @@ Behavior notes:
   - uses particles for the area preview and directly damages/ignites targets in the cone
 - `ABYSSAL_RIFT`
   - fixed deployable aura
-  - uses model `om:rift1`
+  - `abyssal_rift` / `Abyssal Rift: Domination` uses model `om:rift1` and buffs allies while weakening enemies in the radius
+  - `abyssal_rift_regeneration` / `Abyssal Rift: Regeneration` uses model `om:rift2` and heals allied players in the same radius
+  - `abyssal_rift_regeneration.heal` controls the direct heal amount per aura tick; the aura ticks once per second
+  - `abyssal_rift_corruption` / `Abyssal Rift: Corruption` uses model `om:rift3` and damages enemy players in the same radius
+  - `abyssal_rift_corruption.damage` controls the direct damage amount per aura tick; the aura ticks once per second
   - has separate hitbox/display/nameplate entities
   - health/range come from config
 - `CRYSTAL`
@@ -446,7 +473,8 @@ Behavior notes:
   - manual use on teams with living teammates should keep the configured beacon delay and revive all currently eliminated online teammates still in that team
 - `ELYTRA_STRIKE`
   - purchased as a held item
-  - right-click activation equips temporary Elytra, teleports above team spawn, and cleans up on landing/death/quit/session end
+  - right-click activation equips temporary Elytra, teleports above team spawn, launches directly into glide, and cleans up on landing/death/quit/session end
+  - while active it should be glide-only; do not leave normal creative-flight toggling enabled
 - `GIGANTIFY_GRENADE`
   - thrown as a gravity-free snowball projectile with custom projectile metadata
   - only affects enemy players on direct hit; block hits should only despawn the projectile
@@ -454,8 +482,14 @@ Behavior notes:
   - effect cleanup must restore the player's BedWars scale on death, quit, world/session exit, and natural expiry
 - `RAILGUN_BLAST`
   - purchased as a held rotating item and activated on right-click
-  - spends 5 seconds charging with a visible straight-line preview and arena-wide charge sound pulses, then locks in a 5-second flame beam
+  - spends 5 seconds charging with a visible straight-line preview on the initial locked aim; once charging starts, the owner should not be able to move or turn until the shot resolves or is cancelled
+  - uses a 75-block max range unless a shorter in-bounds line is forced by the arena corner bounds
+  - charge and fire sounds should be heard along the beam line, not only at the caster origin
   - the fired beam should stay inside the arena corner bounds, render as roughly a 5-block-thick cylinder, and instantly kill enemy players while still recording normal BedWars combat credit
+- `PROXIMITY_MINE`
+  - bought as a normal placeable block item and placed as a `STONE_PRESSURE_PLATE`
+  - should arm on placement, trigger when an enemy player moves onto the mine or the surrounding 3x3 horizontal area, and detonate through the normal TNT explosion path
+  - should use placed-block tracking so it can be broken, dropped, rolled back, and chain-exploded like other BedWars placed blocks
 - `LOCKPICK`
   - rotating held item used on enemy team storage inside that base's radius
   - right-clicking a normal chest/trapped chest starts a 10-second countdown above the chest, then grants that player 60 seconds of access to that base team's normal chests
@@ -562,6 +596,9 @@ Do not re-introduce large BedWars god classes; use the existing support/runtime 
 - Outside a running BedWars match, players should not be able to rotate, take from, or break item frames in protected BedWars worlds unless they are allowed editors.
 - During a running BedWars match, normal chests/trapped chests inside a team's base radius are locked to that team until that team's bed is destroyed; afterward they are open to everyone.
 - If a pending respawn later turns into a true elimination because respawns are no longer allowed, final-death and final-kill stats should still resolve from that original death.
+- If a running participant quits, they should be removed from the match immediately; if that was the last remaining player on their team, normal team-elimination and win-resolution must still happen from that quit.
+- If a participant or spectator quits from the active arena world, move them to the arena lobby state before logout so reconnecting does not leave them stranded on the map.
+- If a player joins while outside the running match but still inside a BedWars arena world, non-editor players should be snapped back to that arena's lobby on join as a safety net.
 - `netherite_spear` movement boost reuse must be hard-blocked for 5 seconds with native `NETHERITE_SPEAR` cooldown plus short follow-up velocity suppression on denied attempts; do not rely on message-only listener gating.
 - Lobby-mode prestart should build a temporary 15x15 barrier platform centered under the resolved `map-lobby` location and restore the original blocks when the session leaves lobby/starts the match.
 - Match end cleanup should return all remaining arena spectators to the arena `game-lobby`; `map-lobby` is for prestart/spectate flows, not post-match cleanup.
@@ -668,12 +705,13 @@ Egg Hunt admin subcommands:
 - `/egghunt prepare`
 - `/egghunt timer <seconds>`
 - `/egghunt start`
-- `/egghunt clear <near/all>`
+- `/egghunt clear <near/all/scoreboard>`
 
 Egg Hunt clear behavior:
 - `clear near` permanently removes saved egg points within the near-clear radius of the executing player
 - `clear all` permanently removes all saved egg points
 - if an Egg Hunt session is active, cleared points should also disappear from the live session immediately
+- `clear scoreboard` removes the Egg Hunt sidebar scoreboard without deleting saved egg points
 
 ### 3.3 Runtime Data Layout
 

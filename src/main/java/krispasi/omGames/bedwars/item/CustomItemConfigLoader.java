@@ -72,6 +72,7 @@ public class CustomItemConfigLoader {
         double health = section.getDouble("health", type.getDefaultHealth());
         double speed = section.getDouble("speed", type.getDefaultSpeed());
         double range = section.getDouble("range", type.getDefaultRange());
+        double heal = section.getDouble("heal", 0.0);
         int uses = Math.max(0, section.getInt("uses", type.getDefaultUses()));
         int cooldownSeconds = Math.max(0, section.getInt("cooldown-seconds", type.getDefaultCooldownSeconds()));
         int maxBlocks = section.getInt("max-blocks", type.getDefaultMaxBlocks());
@@ -87,7 +88,7 @@ public class CustomItemConfigLoader {
         }
         String normalizedId = id.toLowerCase(Locale.ROOT);
         return new CustomItemDefinition(normalizedId, type, material, velocity, yield, incendiary,
-                maxBlocks, bridgeWidth, damage, knockback, lifetimeSeconds, health, speed, range, uses,
+                maxBlocks, bridgeWidth, damage, knockback, lifetimeSeconds, health, speed, range, heal, uses,
                 cooldownSeconds);
     }
 

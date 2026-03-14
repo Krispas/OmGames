@@ -89,6 +89,7 @@ shop:
         wind_charge: 21
         bed_bug: 29
         dream_defender: 28
+        proximity_mine: 31
         water_bucket: 20
         crystal: 13
         happy_ghast: 30
@@ -504,6 +505,18 @@ shop:
         amount: 1
       display-name: "Bridge Egg"
       custom-item: bridge_egg
+    proximity_mine:
+      material: STONE_PRESSURE_PLATE
+      amount: 1
+      cost:
+        material: IRON
+        amount: 30
+      display-name: "Placeable Mine"
+      lore:
+        - "Explodes when an enemy"
+        - "steps on or near it."
+      custom-item: proximity_mine
+      behavior: BLOCK
     tower_chest:
       material: CHEST
       amount: 1

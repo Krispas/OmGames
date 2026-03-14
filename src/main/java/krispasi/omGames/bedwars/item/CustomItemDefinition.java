@@ -4,8 +4,8 @@ import org.bukkit.Material;
 
 /**
  * Data model for a custom item definition.
- * <p>Includes material, projectile tuning (velocity, yield, damage, knockback), and
- * entity stats (health, speed, lifetime).</p>
+ * <p>Includes material, projectile tuning (velocity, yield, damage, knockback), aura tuning
+ * (heal), and entity stats (health, speed, lifetime).</p>
  * @see krispasi.omGames.bedwars.item.CustomItemType
  */
 public class CustomItemDefinition {
@@ -23,6 +23,7 @@ public class CustomItemDefinition {
     private final double health;
     private final double speed;
     private final double range;
+    private final double heal;
     private final int uses;
     private final int cooldownSeconds;
 
@@ -40,6 +41,7 @@ public class CustomItemDefinition {
                                 double health,
                                 double speed,
                                 double range,
+                                double heal,
                                 int uses,
                                 int cooldownSeconds) {
         this.id = id;
@@ -56,6 +58,7 @@ public class CustomItemDefinition {
         this.health = health;
         this.speed = speed;
         this.range = range;
+        this.heal = heal;
         this.uses = uses;
         this.cooldownSeconds = Math.max(0, cooldownSeconds);
     }
@@ -114,6 +117,10 @@ public class CustomItemDefinition {
 
     public double getRange() {
         return range;
+    }
+
+    public double getHeal() {
+        return heal;
     }
 
     public int getUses() {

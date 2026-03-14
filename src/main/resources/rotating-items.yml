@@ -24,6 +24,8 @@ shop:
         lockpick: 30
         steel_shell: 31
         railgun_blast: 32
+        abyssal_rift_corruption: 33
+        abyssal_rift_regeneration: 34
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -195,6 +197,36 @@ shop:
           scope: TEAM
           amount: 4
         custom-item: abyssal_rift
+      abyssal_rift_corruption:
+        material: ECHO_SHARD
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Abyssal Rift: Corruption"
+        lore:
+          - "Deploy a 10-block aura."
+          - "Deals 2 damage per second"
+          - "to enemy players inside."
+        limit:
+          scope: TEAM
+          amount: 4
+        custom-item: abyssal_rift_corruption
+      abyssal_rift_regeneration:
+        material: ECHO_SHARD
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Abyssal Rift: Regeneration"
+        lore:
+          - "Deploy a 10-block aura."
+          - "Grants Regeneration II"
+          - "to allied players inside."
+        limit:
+          scope: TEAM
+          amount: 4
+        custom-item: abyssal_rift_regeneration
       elytra:
         material: ELYTRA
         amount: 1

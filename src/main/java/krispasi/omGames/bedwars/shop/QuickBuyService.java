@@ -14,6 +14,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bukkit.plugin.java.JavaPlugin;
+import krispasi.omGames.storage.OmGamesDatabaseFiles;
 
 /**
  * Persists quick-buy layout per player.
@@ -47,7 +48,7 @@ public class QuickBuyService {
     private final Map<UUID, Integer> pendingSlots = new HashMap<>();
 
     public QuickBuyService(JavaPlugin plugin) {
-        this.databaseFile = resolveDatabaseFile(plugin, "quickbuy.db");
+        this.databaseFile = OmGamesDatabaseFiles.getMainDatabaseFile(plugin.getDataFolder());
         this.logger = plugin.getLogger();
     }
 
@@ -159,11 +160,9 @@ public class QuickBuyService {
             logger.log(Level.SEVERE, "SQLite driver not found.", ex);
         }
         connection = DriverManager.getConnection("jdbc:sqlite:" + databaseFile.getAbsolutePath());
-    }
-
-    private static File resolveDatabaseFile(JavaPlugin plugin, String name) {
-        File base = new File(plugin.getDataFolder(), "Bedwars");
-        return new File(base, name);
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA busy_timeout = 5000");
+        }
     }
 
     private void createTable() throws SQLException {

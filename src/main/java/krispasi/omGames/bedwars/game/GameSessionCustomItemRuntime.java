@@ -36,6 +36,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.TNTPrimed;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.event.inventory.InventoryType;
@@ -51,10 +52,14 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 final class GameSessionCustomItemRuntime {
-    private static final String ABYSSAL_RIFT_NAME = "Abyssal Rift: Domination";
+    private static final String ABYSSAL_RIFT_DOMINATION_NAME = "Abyssal Rift: Domination";
+    private static final String ABYSSAL_RIFT_REGENERATION_NAME = "Abyssal Rift: Regeneration";
+    private static final String ABYSSAL_RIFT_CORRUPTION_NAME = "Abyssal Rift: Corruption";
     private static final String AIRSTRIKE_ELYTRA_NAME = "Airstrike Elytra";
     private static final int ABYSSAL_RIFT_AURA_INTERVAL_TICKS = 20;
     private static final int ABYSSAL_RIFT_EFFECT_DURATION_TICKS = 40;
+    private static final double DEFAULT_ABYSSAL_RIFT_CORRUPTION_DAMAGE = 2.0;
+    private static final double DEFAULT_ABYSSAL_RIFT_REGENERATION_HEAL = 1.0;
     private static final float ABYSSAL_RIFT_HITBOX_WIDTH = 1.0f;
     private static final float ABYSSAL_RIFT_HITBOX_HEIGHT = 2.0f;
     private static final double ABYSSAL_RIFT_DISPLAY_Y_OFFSET = 1.5;
@@ -67,7 +72,7 @@ final class GameSessionCustomItemRuntime {
     private static final long RAILGUN_BLAST_ACTIVE_STEP_TICKS = 2L;
     private static final int RAILGUN_BLAST_CHARGE_SOUND_INTERVAL_TICKS = 10;
     private static final double RAILGUN_BLAST_RADIUS = 2.5;
-    private static final double RAILGUN_BLAST_FALLBACK_RANGE = 160.0;
+    private static final double RAILGUN_BLAST_FALLBACK_RANGE = 75.0;
     private static final double RAILGUN_BLAST_CHARGE_PARTICLE_STEP = 1.75;
     private static final double RAILGUN_BLAST_ACTIVE_PARTICLE_STEP = 1.5;
     private static final long MIRACLE_OF_THE_STARS_DELAY_TICKS = 5L * 20L;
@@ -78,7 +83,11 @@ final class GameSessionCustomItemRuntime {
     private static final long LOCKPICK_ACCESS_DURATION_MILLIS = 60_000L;
     private static final double LOCKPICK_DISPLAY_Y_OFFSET = 1.2;
     private static final String LOCKPICK_DISPLAY_TAG = "bw_lockpick_display";
-    private static final NamespacedKey ABYSSAL_RIFT_ITEM_MODEL = new NamespacedKey("om", "rift1");
+    private static final String ABYSSAL_RIFT_REGENERATION_ITEM_ID = "abyssal_rift_regeneration";
+    private static final String ABYSSAL_RIFT_CORRUPTION_ITEM_ID = "abyssal_rift_corruption";
+    private static final NamespacedKey ABYSSAL_RIFT_DOMINATION_ITEM_MODEL = new NamespacedKey("om", "rift1");
+    private static final NamespacedKey ABYSSAL_RIFT_REGENERATION_ITEM_MODEL = new NamespacedKey("om", "rift2");
+    private static final NamespacedKey ABYSSAL_RIFT_CORRUPTION_ITEM_MODEL = new NamespacedKey("om", "rift3");
     private static final String[][] TOWER_CHEST_LAYERS = new String[][]{
             {
                     "0000000",
@@ -151,6 +160,7 @@ final class GameSessionCustomItemRuntime {
     private final Map<UUID, RailgunChargeState> activeRailgunCharges = new HashMap<>();
     private final Map<UUID, RailgunBeamState> activeRailgunBeams = new HashMap<>();
     private final Map<UUID, SteelShellState> activeSteelShells = new HashMap<>();
+    private final Map<BlockPoint, ProximityMineState> placedProximityMines = new HashMap<>();
     private final Map<UUID, Map<String, Long>> customItemCooldownEnds = new HashMap<>();
     private final Map<LockpickAccessKey, Long> chestLockpickAccessEnds = new HashMap<>();
     private final Map<LockpickAccessKey, EnderChestLockpickAccess> enderChestLockpickAccesses = new HashMap<>();
@@ -179,8 +189,54 @@ final class GameSessionCustomItemRuntime {
         clearAllRailgunBlasts();
         clearAbyssalRifts();
         clearAllSteelShells(false);
+        placedProximityMines.clear();
         clearLockpickState();
         customItemCooldownEnds.clear();
+    }
+
+    boolean placeProximityMine(Player player, Block block, ItemStack item) {
+        if (player == null
+                || block == null
+                || item == null
+                || !session.isRunning()
+                || !session.isParticipant(player.getUniqueId())
+                || !session.isInArenaWorld(block.getWorld())) {
+            return false;
+        }
+        TeamColor team = assignments.get(player.getUniqueId());
+        if (team == null || block.getType() != Material.STONE_PRESSURE_PLATE) {
+            return false;
+        }
+        BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
+        session.recordPlacedBlock(point, item);
+        placedProximityMines.put(point, new ProximityMineState(player.getUniqueId(), team));
+        return true;
+    }
+
+    void handleProximityMineMovement(Player player) {
+        if (player == null
+                || !session.isRunning()
+                || !session.isParticipant(player.getUniqueId())
+                || !session.isInArenaWorld(player.getWorld())
+                || player.getGameMode() == GameMode.SPECTATOR) {
+            return;
+        }
+        TeamColor playerTeam = assignments.get(player.getUniqueId());
+        if (playerTeam == null) {
+            return;
+        }
+        BlockPoint triggerPoint = resolveTriggeredProximityMine(player, playerTeam);
+        if (triggerPoint == null) {
+            return;
+        }
+        detonateProximityMine(triggerPoint);
+    }
+
+    void removeProximityMine(BlockPoint point) {
+        if (point == null) {
+            return;
+        }
+        placedProximityMines.remove(point);
     }
 
     boolean hasChestLockpickAccess(UUID playerId, TeamColor baseTeam) {
@@ -610,6 +666,8 @@ final class GameSessionCustomItemRuntime {
                 return;
             }
             online.setGliding(true);
+            online.setAllowFlight(false);
+            online.setFlying(false);
             online.setVelocity(finalLaunchVelocity);
         });
         broadcast(Component.text("airstrike incoming!", NamedTextColor.RED));
@@ -638,7 +696,8 @@ final class GameSessionCustomItemRuntime {
             return false;
         }
 
-        RailgunChargeState state = new RailgunChargeState(null, initialPath);
+        Location lockedLocation = player.getLocation().clone();
+        RailgunChargeState state = new RailgunChargeState(null, initialPath, lockedLocation);
         BukkitTask task = new BukkitRunnable() {
             private long elapsedTicks = 0L;
 
@@ -652,24 +711,20 @@ final class GameSessionCustomItemRuntime {
                     return;
                 }
 
-                RailgunPath currentPath = resolveRailgunPath(shooter, custom);
-                if (currentPath != null) {
-                    currentState.setLastPath(currentPath);
-                } else {
-                    currentPath = currentState.lastPath();
+                holdRailgunChargeOwnerInPlace(shooter, currentState.lockedLocation());
+                RailgunPath lockedPath = currentState.path();
+                if (lockedPath != null && (elapsedTicks & 1L) == 0L) {
+                    spawnRailgunChargeParticles(lockedPath);
                 }
-                if (currentPath != null && (elapsedTicks & 1L) == 0L) {
-                    spawnRailgunChargeParticles(currentPath);
-                }
-                if (currentPath != null && elapsedTicks % RAILGUN_BLAST_CHARGE_SOUND_INTERVAL_TICKS == 0L) {
-                    playRailgunArenaSound(currentPath.origin(), Sound.BLOCK_BEACON_ACTIVATE, 1.8f, 1.15f);
+                if (lockedPath != null && elapsedTicks % RAILGUN_BLAST_CHARGE_SOUND_INTERVAL_TICKS == 0L) {
+                    playRailgunLineSound(lockedPath, Sound.BLOCK_BEACON_ACTIVATE, 1.8f, 1.15f);
                 }
                 elapsedTicks++;
                 if (elapsedTicks < RAILGUN_BLAST_CHARGE_TICKS) {
                     return;
                 }
 
-                RailgunPath firingPath = currentState.lastPath();
+                RailgunPath firingPath = currentState.path();
                 clearRailgunCharge(playerId);
                 if (firingPath == null || !canMaintainRailgunOwner(shooter)) {
                     if (shooter != null) {
@@ -688,6 +743,17 @@ final class GameSessionCustomItemRuntime {
         sessionTasks.add(task);
         player.sendMessage(Component.text("Railgun Blast charging...", NamedTextColor.GOLD));
         return true;
+    }
+
+    Location getRailgunChargeLockedLocation(Player player) {
+        if (player == null) {
+            return null;
+        }
+        RailgunChargeState state = activeRailgunCharges.get(player.getUniqueId());
+        if (state == null || state.lockedLocation() == null) {
+            return null;
+        }
+        return state.lockedLocation().clone();
     }
 
     boolean activateUnstableTeleportationDevice(Player player, CustomItemDefinition custom) {
@@ -847,9 +913,27 @@ final class GameSessionCustomItemRuntime {
             clearElytraStrike(player, false, false);
             return;
         }
+        if (player.getAllowFlight()) {
+            player.setAllowFlight(false);
+        }
+        if (player.isFlying()) {
+            player.setFlying(false);
+        }
         if (player.isOnGround()) {
             clearElytraStrike(player, true, true);
         }
+    }
+
+    boolean handleElytraStrikeFlightToggle(Player player) {
+        if (player == null || !activeElytraStrikes.containsKey(player.getUniqueId())) {
+            return false;
+        }
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        if (!player.isOnGround() && !player.isGliding()) {
+            player.setGliding(true);
+        }
+        return true;
     }
 
     boolean isActiveElytraStrikeItem(ItemStack item) {
@@ -965,6 +1049,7 @@ final class GameSessionCustomItemRuntime {
         if (world == null) {
             return false;
         }
+        AbyssalRiftVariant variant = resolveAbyssalRiftVariant(custom);
 
         Interaction interaction = world.spawn(base, Interaction.class, entity -> {
             entity.setPersistent(false);
@@ -991,7 +1076,7 @@ final class GameSessionCustomItemRuntime {
                     new Quaternionf(),
                     new Vector3f(1.0f, 1.0f, 1.0f),
                     new Quaternionf()));
-            entity.setItemStack(createAbyssalRiftDisplayItem(custom));
+            entity.setItemStack(createAbyssalRiftDisplayItem(custom, variant));
         });
         double health = custom.getHealth() > 0.0 ? custom.getHealth() : 30.0;
         double radius = custom.getRange() > 0.0 ? custom.getRange() : 10.0;
@@ -1001,7 +1086,10 @@ final class GameSessionCustomItemRuntime {
                 display.getUniqueId(),
                 titleStand != null ? titleStand.getUniqueId() : null,
                 healthStand != null ? healthStand.getUniqueId() : null,
+                player.getUniqueId(),
                 team,
+                custom,
+                variant,
                 health,
                 health,
                 radius);
@@ -1419,15 +1507,7 @@ final class GameSessionCustomItemRuntime {
         if (custom != null && custom.getRange() > 0.0) {
             return custom.getRange();
         }
-        BlockPoint corner1 = arena.getCorner1();
-        BlockPoint corner2 = arena.getCorner2();
-        if (corner1 == null || corner2 == null) {
-            return RAILGUN_BLAST_FALLBACK_RANGE;
-        }
-        double dx = Math.abs(corner1.x() - corner2.x()) + 1.0;
-        double dy = Math.abs(corner1.y() - corner2.y()) + 1.0;
-        double dz = Math.abs(corner1.z() - corner2.z()) + 1.0;
-        return Math.max(RAILGUN_BLAST_FALLBACK_RANGE, Math.sqrt(dx * dx + dy * dy + dz * dz) + 8.0);
+        return RAILGUN_BLAST_FALLBACK_RANGE;
     }
 
     private double resolveRailgunLength(Location origin, Vector direction, double maxRange) {
@@ -1509,19 +1589,44 @@ final class GameSessionCustomItemRuntime {
             return;
         }
         spawnRailgunActiveParticles(path);
-        playRailgunArenaSound(path.origin(), Sound.ENTITY_GENERIC_EXPLODE, 2.6f, 0.7f);
+        playRailgunLineSound(path, Sound.ENTITY_GENERIC_EXPLODE, 2.6f, 0.7f);
     }
 
-    private void playRailgunArenaSound(Location location, Sound sound, float volume, float pitch) {
-        if (location == null || sound == null) {
+    private void playRailgunLineSound(RailgunPath path, Sound sound, float volume, float pitch) {
+        if (path == null || path.origin() == null || path.origin().getWorld() == null || sound == null) {
             return;
         }
+        World world = path.origin().getWorld();
         for (Player target : Bukkit.getOnlinePlayers()) {
-            if (target == null || !target.isOnline() || !session.isInArenaWorld(target.getWorld())) {
+            if (target == null
+                    || !target.isOnline()
+                    || target.getWorld() != world
+                    || !session.isInArenaWorld(target.getWorld())) {
                 continue;
             }
-            target.playSound(location, sound, volume, pitch);
+            target.playSound(closestPointOnRailgun(path, target.getEyeLocation()), sound, volume, pitch);
         }
+    }
+
+    private Location closestPointOnRailgun(RailgunPath path, Location targetLocation) {
+        if (path == null || targetLocation == null) {
+            return path == null ? null : path.origin().clone();
+        }
+        Vector offset = targetLocation.toVector().subtract(path.origin().toVector());
+        double projection = offset.dot(path.direction());
+        double clampedDistance = Math.max(0.0, Math.min(path.length(), projection));
+        return pointAlongRailgun(path, clampedDistance);
+    }
+
+    private void holdRailgunChargeOwnerInPlace(Player shooter, Location lockedLocation) {
+        if (shooter == null || lockedLocation == null) {
+            return;
+        }
+        if (shooter.getWorld() != lockedLocation.getWorld()) {
+            return;
+        }
+        shooter.setVelocity(new Vector(0.0, 0.0, 0.0));
+        shooter.setFallDistance(0.0f);
     }
 
     private void damagePlayersInRailgunBeam(Player shooter, RailgunBeamState state) {
@@ -1774,6 +1879,61 @@ final class GameSessionCustomItemRuntime {
         }
     }
 
+    private BlockPoint resolveTriggeredProximityMine(Player player, TeamColor playerTeam) {
+        if (player == null || playerTeam == null) {
+            return null;
+        }
+        Location feet = player.getLocation();
+        int centerX = feet.getBlockX();
+        int supportY = feet.clone().subtract(0.0, 0.2, 0.0).getBlockY();
+        int centerZ = feet.getBlockZ();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                BlockPoint point = new BlockPoint(centerX + dx, supportY, centerZ + dz);
+                ProximityMineState state = placedProximityMines.get(point);
+                if (state == null || state.team() == playerTeam) {
+                    continue;
+                }
+                return point;
+            }
+        }
+        return null;
+    }
+
+    private void detonateProximityMine(BlockPoint point) {
+        if (point == null) {
+            return;
+        }
+        ProximityMineState state = placedProximityMines.remove(point);
+        World world = resolveArenaWorld();
+        if (world == null) {
+            session.removePlacedBlock(point);
+            return;
+        }
+        Block block = world.getBlockAt(point.x(), point.y(), point.z());
+        if (block.getType() == Material.STONE_PRESSURE_PLATE) {
+            block.setType(Material.AIR, false);
+        }
+        session.removePlacedBlock(point);
+        Location spawn = block.getLocation().add(0.5, 0.0, 0.5);
+        world.spawn(spawn, TNTPrimed.class, tnt -> {
+            tnt.setFuseTicks(0);
+            tnt.setIsIncendiary(false);
+            if (state != null && state.team() != null) {
+                tnt.addScoreboardTag("bw_proximity_mine_team_" + state.team().key());
+            }
+            if (state == null || state.ownerId() == null) {
+                return;
+            }
+            Player owner = Bukkit.getPlayer(state.ownerId());
+            if (owner != null && owner.isOnline() && session.isParticipant(owner.getUniqueId())
+                    && session.isInArenaWorld(owner.getWorld())) {
+                tnt.setSource(owner);
+            }
+        });
+        world.playSound(spawn, Sound.ENTITY_TNT_PRIMED, 1.0f, 1.2f);
+    }
+
     private void clearSteelShell(UUID playerId, boolean restorePreviousResistance) {
         if (playerId == null) {
             return;
@@ -1963,6 +2123,19 @@ final class GameSessionCustomItemRuntime {
             if (candidateTeam == null) {
                 continue;
             }
+            if (state.variant() == AbyssalRiftVariant.CORRUPTION) {
+                if (candidateTeam == state.team() || session.hasRespawnProtection(candidate.getUniqueId())) {
+                    continue;
+                }
+                applyAbyssalRiftCorruptionDamage(state, candidate);
+                continue;
+            }
+            if (state.variant() == AbyssalRiftVariant.REGENERATION) {
+                if (candidateTeam == state.team()) {
+                    applyAbyssalRiftRegenerationHeal(state, candidate);
+                }
+                continue;
+            }
             if (candidateTeam == state.team()) {
                 applyAuraEffect(candidate, PotionEffectType.STRENGTH, 0);
                 applyAuraEffect(candidate, PotionEffectType.SPEED, 0);
@@ -1994,11 +2167,72 @@ final class GameSessionCustomItemRuntime {
                 true));
     }
 
-    private ItemStack createAbyssalRiftDisplayItem(CustomItemDefinition custom) {
+    private void applyAbyssalRiftCorruptionDamage(AbyssalRiftState state, Player candidate) {
+        if (state == null || candidate == null) {
+            return;
+        }
+        double damage = resolveAbyssalRiftCorruptionDamage(state.custom());
+        if (damage <= 0.0) {
+            return;
+        }
+        UUID targetId = candidate.getUniqueId();
+        Player owner = Bukkit.getPlayer(state.ownerId());
+        candidate.setNoDamageTicks(0);
+        if (owner != null
+                && owner.isOnline()
+                && session.isParticipant(owner.getUniqueId())
+                && session.isInArenaWorld(owner.getWorld())
+                && session.getTeam(owner.getUniqueId()) == state.team()) {
+            session.recordCombat(owner.getUniqueId(), targetId);
+            candidate.damage(damage, owner);
+        } else {
+            candidate.damage(damage);
+        }
+        session.recordDamage(targetId);
+    }
+
+    private void applyAbyssalRiftRegenerationHeal(AbyssalRiftState state, Player candidate) {
+        if (state == null || candidate == null || candidate.isDead()) {
+            return;
+        }
+        double healAmount = resolveAbyssalRiftRegenerationHeal(state.custom());
+        if (healAmount <= 0.0) {
+            return;
+        }
+        double currentHealth = candidate.getHealth();
+        double maxHealth = candidate.getMaxHealth();
+        if (currentHealth >= maxHealth) {
+            return;
+        }
+        candidate.setHealth(Math.min(maxHealth, currentHealth + healAmount));
+        candidate.getWorld().spawnParticle(Particle.HEART,
+                candidate.getLocation().add(0.0, 1.0, 0.0),
+                2,
+                0.25,
+                0.35,
+                0.25,
+                0.0);
+    }
+
+    private double resolveAbyssalRiftCorruptionDamage(CustomItemDefinition custom) {
+        if (custom == null) {
+            return DEFAULT_ABYSSAL_RIFT_CORRUPTION_DAMAGE;
+        }
+        return custom.getDamage() > 0.0 ? custom.getDamage() : DEFAULT_ABYSSAL_RIFT_CORRUPTION_DAMAGE;
+    }
+
+    private double resolveAbyssalRiftRegenerationHeal(CustomItemDefinition custom) {
+        if (custom == null) {
+            return DEFAULT_ABYSSAL_RIFT_REGENERATION_HEAL;
+        }
+        return custom.getHeal() > 0.0 ? custom.getHeal() : DEFAULT_ABYSSAL_RIFT_REGENERATION_HEAL;
+    }
+
+    private ItemStack createAbyssalRiftDisplayItem(CustomItemDefinition custom, AbyssalRiftVariant variant) {
         ItemStack stack = new ItemStack(custom.getMaterial());
         ItemMeta meta = stack.getItemMeta();
-        meta.setItemModel(ABYSSAL_RIFT_ITEM_MODEL);
-        meta.displayName(Component.text(ABYSSAL_RIFT_NAME, NamedTextColor.DARK_AQUA));
+        meta.setItemModel(variant.itemModel());
+        meta.displayName(Component.text(variant.displayName(), NamedTextColor.DARK_AQUA));
         meta.setHideTooltip(true);
         stack.setItemMeta(meta);
         return stack;
@@ -2033,7 +2267,7 @@ final class GameSessionCustomItemRuntime {
         Location base = interaction.getLocation();
         if (titleStand != null) {
             titleStand.teleport(base.clone().add(0.0, ABYSSAL_RIFT_NAME_Y_OFFSET, 0.0));
-            titleStand.customName(Component.text(ABYSSAL_RIFT_NAME, NamedTextColor.DARK_AQUA));
+            titleStand.customName(Component.text(state.variant().displayName(), NamedTextColor.DARK_AQUA));
         }
         if (healthStand != null) {
             healthStand.teleport(base.clone().add(0.0, ABYSSAL_RIFT_HEALTH_Y_OFFSET, 0.0));
@@ -2138,6 +2372,17 @@ final class GameSessionCustomItemRuntime {
         return normalized.isEmpty() ? null : normalized;
     }
 
+    private AbyssalRiftVariant resolveAbyssalRiftVariant(CustomItemDefinition custom) {
+        String customId = custom == null ? null : normalizeItemId(custom.getId());
+        if (ABYSSAL_RIFT_REGENERATION_ITEM_ID.equals(customId)) {
+            return AbyssalRiftVariant.REGENERATION;
+        }
+        if (ABYSSAL_RIFT_CORRUPTION_ITEM_ID.equals(customId)) {
+            return AbyssalRiftVariant.CORRUPTION;
+        }
+        return AbyssalRiftVariant.DOMINATION;
+    }
+
     private BlockPoint toPoint(Block block) {
         return new BlockPoint(block.getX(), block.getY(), block.getZ());
     }
@@ -2148,12 +2393,40 @@ final class GameSessionCustomItemRuntime {
     private record TowerChestPlacement(Block block, char cell) {
     }
 
+    private record ProximityMineState(UUID ownerId, TeamColor team) {
+    }
+
+    private enum AbyssalRiftVariant {
+        DOMINATION(ABYSSAL_RIFT_DOMINATION_NAME, ABYSSAL_RIFT_DOMINATION_ITEM_MODEL),
+        REGENERATION(ABYSSAL_RIFT_REGENERATION_NAME, ABYSSAL_RIFT_REGENERATION_ITEM_MODEL),
+        CORRUPTION(ABYSSAL_RIFT_CORRUPTION_NAME, ABYSSAL_RIFT_CORRUPTION_ITEM_MODEL);
+
+        private final String displayName;
+        private final NamespacedKey itemModel;
+
+        AbyssalRiftVariant(String displayName, NamespacedKey itemModel) {
+            this.displayName = displayName;
+            this.itemModel = itemModel;
+        }
+
+        private String displayName() {
+            return displayName;
+        }
+
+        private NamespacedKey itemModel() {
+            return itemModel;
+        }
+    }
+
     private static final class AbyssalRiftState {
         private final UUID interactionId;
         private final UUID displayId;
         private final UUID titleStandId;
         private final UUID healthStandId;
+        private final UUID ownerId;
         private final TeamColor team;
+        private final CustomItemDefinition custom;
+        private final AbyssalRiftVariant variant;
         private double health;
         private final double maxHealth;
         private final double radius;
@@ -2163,7 +2436,10 @@ final class GameSessionCustomItemRuntime {
                                  UUID displayId,
                                  UUID titleStandId,
                                  UUID healthStandId,
+                                 UUID ownerId,
                                  TeamColor team,
+                                 CustomItemDefinition custom,
+                                 AbyssalRiftVariant variant,
                                  double health,
                                  double maxHealth,
                                  double radius) {
@@ -2171,7 +2447,10 @@ final class GameSessionCustomItemRuntime {
             this.displayId = displayId;
             this.titleStandId = titleStandId;
             this.healthStandId = healthStandId;
+            this.ownerId = ownerId;
             this.team = team;
+            this.custom = custom;
+            this.variant = variant;
             this.health = health;
             this.maxHealth = maxHealth;
             this.radius = radius;
@@ -2193,8 +2472,20 @@ final class GameSessionCustomItemRuntime {
             return healthStandId;
         }
 
+        private UUID ownerId() {
+            return ownerId;
+        }
+
         private TeamColor team() {
             return team;
+        }
+
+        private CustomItemDefinition custom() {
+            return custom;
+        }
+
+        private AbyssalRiftVariant variant() {
+            return variant;
         }
 
         private double health() {
@@ -2229,11 +2520,13 @@ final class GameSessionCustomItemRuntime {
 
     private static final class RailgunChargeState {
         private BukkitTask task;
-        private RailgunPath lastPath;
+        private final RailgunPath path;
+        private final Location lockedLocation;
 
-        private RailgunChargeState(BukkitTask task, RailgunPath lastPath) {
+        private RailgunChargeState(BukkitTask task, RailgunPath path, Location lockedLocation) {
             this.task = task;
-            this.lastPath = lastPath;
+            this.path = path;
+            this.lockedLocation = lockedLocation;
         }
 
         private BukkitTask task() {
@@ -2244,12 +2537,12 @@ final class GameSessionCustomItemRuntime {
             this.task = task;
         }
 
-        private RailgunPath lastPath() {
-            return lastPath;
+        private RailgunPath path() {
+            return path;
         }
 
-        private void setLastPath(RailgunPath lastPath) {
-            this.lastPath = lastPath;
+        private Location lockedLocation() {
+            return lockedLocation;
         }
     }
 

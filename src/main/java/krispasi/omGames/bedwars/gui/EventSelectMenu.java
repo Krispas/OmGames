@@ -24,7 +24,7 @@ import org.bukkit.inventory.meta.ItemMeta;
  */
 public class EventSelectMenu implements InventoryHolder {
     private static final int INVENTORY_SIZE = 27;
-    private static final int[] EVENT_SLOTS = {10, 11, 12, 13, 14, 15, 16};
+    private static final int[] EVENT_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19};
     private static final int AUTO_SLOT = 22;
     private static final int BACK_SLOT = 26;
 
@@ -147,6 +147,7 @@ public class EventSelectMenu implements InventoryHolder {
             case LONG_ARMS -> Material.STICK;
             case MOON_BIG -> Material.RABBIT_FOOT;
             case BLOOD_MOON -> Material.REDSTONE;
+            case CHAOS -> Material.FIREWORK_STAR;
             case IN_THIS_ECONOMY -> Material.IRON_INGOT;
             case APRIL_FOOLS -> Material.NOTE_BLOCK;
         };

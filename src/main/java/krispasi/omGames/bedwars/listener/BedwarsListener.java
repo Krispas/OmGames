@@ -105,6 +105,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerRiptideEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.event.player.PlayerVelocityEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.CraftingInventory;
@@ -509,6 +510,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             if (custom.getType() == CustomItemType.LOCKPICK) {
                 return;
             }
+            if (custom.getType() == CustomItemType.PROXIMITY_MINE) {
+                return;
+            }
             if (!rightClick && custom.getType() != CustomItemType.BRIDGE_ZAPPER) {
                 return;
             }
@@ -568,6 +572,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 }
                 case STEEL_SHELL -> {
                     yield session.activateSteelShell(player, custom);
+                }
+                case PROXIMITY_MINE -> {
+                    yield false;
                 }
                 case CREEPING_ARROW -> {
                     yield false;
@@ -732,6 +739,24 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 return;
             }
             event.setVelocity(new Vector(0.0, 0.0, 0.0));
+            event.setCancelled(true);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onPlayerToggleFlight(PlayerToggleFlightEvent event) {
+        safeHandle("onPlayerToggleFlight", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            Player player = event.getPlayer();
+            if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            if (!session.handleElytraStrikeFlightToggle(player)) {
+                return;
+            }
             event.setCancelled(true);
         });
     }
@@ -1073,6 +1098,18 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             if (session != null) {
                 session.handleElytraStrikeMovement(player);
+                session.handleProximityMineMovement(player);
+                Location railgunChargeLock = session.getRailgunChargeLockedLocation(player);
+                if (railgunChargeLock != null) {
+                    if (to == null
+                            || to.getWorld() != railgunChargeLock.getWorld()
+                            || to.distanceSquared(railgunChargeLock) > 0.0001
+                            || Math.abs(to.getYaw() - railgunChargeLock.getYaw()) > 0.01f
+                            || Math.abs(to.getPitch() - railgunChargeLock.getPitch()) > 0.01f) {
+                        event.setTo(railgunChargeLock);
+                    }
+                    return;
+                }
             }
             if (session == null || !session.isStarting()) {
                 return;
@@ -1153,6 +1190,12 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             if (isPlaceableBedItem(event.getItemInHand())) {
                 BedLocation location = resolvePlacedBedLocation(block);
                 if (location == null || !session.placeTeamBed(player, location)) {
+                    event.setCancelled(true);
+                }
+                return;
+            }
+            if (isProximityMineItem(event.getItemInHand())) {
+                if (!session.placeProximityMine(player, block, event.getItemInHand())) {
                     event.setCancelled(true);
                 }
                 return;
@@ -1357,6 +1400,14 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 TeamColor sourceTeam = session.getTeam(source.getUniqueId());
                 TeamColor victimTeam = session.getTeam(victim.getUniqueId());
                 if (sourceTeam != null && sourceTeam == victimTeam) {
+                    event.setDamage(0.0);
+                    sameTeamTnt = true;
+                }
+            } else if (event.getDamager() instanceof TNTPrimed tnt
+                    && session.isParticipant(victim.getUniqueId())) {
+                TeamColor mineTeam = getProximityMineTntTeam(tnt);
+                TeamColor victimTeam = session.getTeam(victim.getUniqueId());
+                if (mineTeam != null && mineTeam == victimTeam) {
                     event.setDamage(0.0);
                     sameTeamTnt = true;
                 }
@@ -1939,6 +1990,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 syncInvisibilityForViewer(player, session);
             }
             if (isOutsideRunningBedwarsGame(player, session)) {
+                if (!canEditProtectedBedwarsWorld(player, session)) {
+                    restoreOutsideGameBedwarsLobbyState(player);
+                }
                 applyOutsideGameBedwarsBuffs(player);
             }
             deliverPendingLoyaltyTridents(player);

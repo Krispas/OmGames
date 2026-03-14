@@ -772,10 +772,12 @@ public class GameSession extends GameSessionMatchFlowSupport {
     public void removePlacedBlock(BlockPoint point) {
         placedBlocks.remove(point);
         placedBlockItems.remove(point);
+        customItemRuntime.removeProximityMine(point);
     }
 
     public ItemStack removePlacedBlockItem(BlockPoint point) {
         placedBlocks.remove(point);
+        customItemRuntime.removeProximityMine(point);
         return placedBlockItems.remove(point);
     }
 
@@ -1371,6 +1373,22 @@ public class GameSession extends GameSessionMatchFlowSupport {
 
     public void handleElytraStrikeMovement(Player player) {
         customItemRuntime.handleElytraStrikeMovement(player);
+    }
+
+    public void handleProximityMineMovement(Player player) {
+        customItemRuntime.handleProximityMineMovement(player);
+    }
+
+    public boolean placeProximityMine(Player player, Block block, ItemStack item) {
+        return customItemRuntime.placeProximityMine(player, block, item);
+    }
+
+    public Location getRailgunChargeLockedLocation(Player player) {
+        return customItemRuntime.getRailgunChargeLockedLocation(player);
+    }
+
+    public boolean handleElytraStrikeFlightToggle(Player player) {
+        return customItemRuntime.handleElytraStrikeFlightToggle(player);
     }
 
     public boolean isActiveElytraStrikeItem(ItemStack item) {

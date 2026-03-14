@@ -1350,6 +1350,8 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         }
         UUID playerId = player.getUniqueId();
         TeamColor team = getTeam(playerId);
+        boolean participant = isParticipant(playerId);
+        boolean sessionSpectator = isSessionSpectator(player) || isLockedCommandSpectator(playerId);
         cancelRespawnCountdown(playerId);
         removeRespawnProtection(playerId);
         clearTrapImmunity(playerId);
@@ -1360,13 +1362,18 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         clearElytraStrike(player, false, false);
         clearUpgradeEffects(player);
         flushPendingPartyExp(player);
-        if (state == GameState.RUNNING
-                && team != null
-                && isParticipant(playerId)
-                && getBedState(team) == BedState.DESTROYED) {
+        if ((participant || sessionSpectator) && isInArenaWorld(player.getWorld())) {
+            movePlayerToQuitLobby(player);
+        }
+        if (state == GameState.RUNNING && participant) {
             removeParticipant(player);
-            checkTeamEliminated(team);
+            if (team != null) {
+                checkTeamEliminated(team);
+            }
             return;
+        }
+        if (sessionSpectator) {
+            lockedCommandSpectators.remove(playerId);
         }
         restoreSidebar(playerId);
     }
@@ -1483,6 +1490,23 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         syncToolTiers(player);
         hideEditorsFrom(player);
         updateSidebarForPlayer(player);
+    }
+
+    protected void movePlayerToQuitLobby(Player player) {
+        if (player == null) {
+            return;
+        }
+        Location lobby = resolveMapLobbyLocation();
+        if (lobby != null) {
+            player.teleport(lobby);
+            player.setRespawnLocation(lobby, true);
+        }
+        if (player.getGameMode() == GameMode.SPECTATOR) {
+            player.setGameMode(GameMode.SURVIVAL);
+        }
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        player.setGliding(false);
     }
 
     protected void startSidebarUpdates() {

@@ -13,6 +13,10 @@ custom-items:
     velocity: 1.2
     max-blocks: 64
     bridge-width: 1
+  proximity_mine:
+    type: PROXIMITY_MINE
+    material: STONE_PRESSURE_PLATE
+    yield: 4.0
   bed_bug:
     type: BED_BUG
     material: SNOWBALL
@@ -92,20 +96,32 @@ custom-items:
     material: ECHO_SHARD
     health: 30
     range: 10
+  abyssal_rift_corruption:
+    type: ABYSSAL_RIFT
+    material: ECHO_SHARD
+    damage: 2.0
+    health: 30
+    range: 10
+  abyssal_rift_regeneration:
+    type: ABYSSAL_RIFT
+    material: ECHO_SHARD
+    heal: 1.0
+    health: 30
+    range: 10
   elytra_strike:
     type: ELYTRA_STRIKE
     material: ELYTRA
   gigantify_grenade:
     type: GIGANTIFY_GRENADE
     material: FIRE_CHARGE
-    velocity: 1.15
-    lifetime-seconds: 6
+    velocity: 5
+    lifetime-seconds: 10
   railgun_blast:
     type: RAILGUN_BLAST
     material: LIGHTNING_ROD
     damage: 1000
     lifetime-seconds: 5
-    range: 160
+    range: 75
   unstable_teleportation_device:
     type: UNSTABLE_TELEPORTATION_DEVICE
     material: ENDER_EYE

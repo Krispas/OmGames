@@ -53,7 +53,7 @@ public class EggHuntCommand implements CommandExecutor, TabCompleter {
             case "start" -> result = eggHuntManager.start(player);
             case "clear" -> {
                 if (args.length < 2) {
-                    sender.sendMessage(Component.text("Usage: /egghunt clear <near/all>", NamedTextColor.YELLOW));
+                    sender.sendMessage(Component.text("Usage: /egghunt clear <near/all/scoreboard>", NamedTextColor.YELLOW));
                     return true;
                 }
                 String mode = args[1].toLowerCase(Locale.ROOT);
@@ -61,8 +61,10 @@ public class EggHuntCommand implements CommandExecutor, TabCompleter {
                     result = eggHuntManager.clearPointsNear(player);
                 } else if (mode.equals("all")) {
                     result = eggHuntManager.clearAllPoints();
+                } else if (mode.equals("scoreboard")) {
+                    result = eggHuntManager.clearSidebar();
                 } else {
-                    sender.sendMessage(Component.text("Usage: /egghunt clear <near/all>", NamedTextColor.YELLOW));
+                    sender.sendMessage(Component.text("Usage: /egghunt clear <near/all/scoreboard>", NamedTextColor.YELLOW));
                     return true;
                 }
             }
@@ -95,7 +97,7 @@ public class EggHuntCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("clear")) {
             String input = args[1].toLowerCase(Locale.ROOT);
-            return Stream.of("near", "all")
+            return Stream.of("near", "all", "scoreboard")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -104,7 +106,7 @@ public class EggHuntCommand implements CommandExecutor, TabCompleter {
 
     private Component usage() {
         return Component.text(
-                "Usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt clear <near/all>",
+                "Usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt clear <near/all/scoreboard>",
                 NamedTextColor.YELLOW
         );
     }

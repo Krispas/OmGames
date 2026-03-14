@@ -467,6 +467,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         }
         generatorManager = new GeneratorManager(plugin, arena, (GameSession) this);
         syncForgeTiers();
+        applyPreStartGeneratorEventOverrides();
         generatorManager.start();
         startUpgradeTasks();
         startRegenTask();
@@ -531,22 +532,37 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
     }
 
     protected void applyPreMatchEventSetup() {
-        if (activeMatchEvent != BedwarsMatchEventType.BENEVOLENT_UPGRADES) {
+        if (activeMatchEvent == BedwarsMatchEventType.BENEVOLENT_UPGRADES) {
+            List<TeamUpgradeType> pool = new ArrayList<>(BENEVOLENT_UPGRADE_POOL);
+            Collections.shuffle(pool);
+            int count = Math.min(3, pool.size());
+            for (int i = 0; i < count; i++) {
+                TeamUpgradeType type = pool.get(i);
+                benevolentEventUpgrades.add(type);
+                for (TeamColor team : teamsInMatch) {
+                    getUpgradeState(team).setTier(type, type.maxTier());
+                }
+            }
             return;
         }
-        List<TeamUpgradeType> pool = new ArrayList<>(BENEVOLENT_UPGRADE_POOL);
-        Collections.shuffle(pool);
-        int count = Math.min(3, pool.size());
-        for (int i = 0; i < count; i++) {
-            TeamUpgradeType type = pool.get(i);
-            benevolentEventUpgrades.add(type);
-            for (TeamColor team : teamsInMatch) {
-                getUpgradeState(team).setTier(type, type.maxTier());
-            }
+        if (activeMatchEvent != BedwarsMatchEventType.CHAOS) {
+            return;
         }
+        for (TeamColor team : teamsInMatch) {
+            getUpgradeState(team).setTier(TeamUpgradeType.FORGE, TeamUpgradeType.FORGE.maxTier());
+        }
+        tier2Triggered = true;
+        tier3Triggered = true;
     }
 
     protected void applyMatchEventRotatingOverrides() {
+        if (activeMatchEvent == BedwarsMatchEventType.CHAOS) {
+            rotatingItemIds.clear();
+            rotatingUpgradeIds.clear();
+            rotatingItemIds.addAll(getRotatingItemCandidateIds());
+            rotatingUpgradeIds.addAll(getRotatingUpgradeCandidateIds());
+            return;
+        }
         if (activeMatchEvent != BedwarsMatchEventType.APRIL_FOOLS) {
             return;
         }
@@ -577,6 +593,14 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         }
         rotatingItemIds.clear();
         rotatingItemIds.addAll(adjusted);
+    }
+
+    protected void applyPreStartGeneratorEventOverrides() {
+        if (generatorManager == null || activeMatchEvent != BedwarsMatchEventType.CHAOS) {
+            return;
+        }
+        generatorManager.setDiamondTier(3);
+        generatorManager.setEmeraldTier(3);
     }
 
     protected void applyMatchEventToParticipants() {
@@ -1000,6 +1024,8 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         List<TeamColor> aliveTeams = getAliveTeams();
         if (aliveTeams.size() == 1) {
             bedwarsManager.endSession((GameSession) this, aliveTeams.get(0));
+        } else if (aliveTeams.isEmpty()) {
+            bedwarsManager.endSession((GameSession) this, null);
         }
     }
 

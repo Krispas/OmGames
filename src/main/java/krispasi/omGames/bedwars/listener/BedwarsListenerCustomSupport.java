@@ -120,6 +120,8 @@ abstract class BedwarsListenerCustomSupport {
     protected static final String PORTABLE_SHOPKEEPER_NAME = "Portable Shopkeeper";
     protected static final String PORTABLE_SHOPKEEPER_TAG = "bw_portable_shopkeeper";
     protected static final String PLACEABLE_BED_ITEM_ID = "placeable_bed";
+    protected static final String PROXIMITY_MINE_ITEM_ID = "proximity_mine";
+    protected static final String PROXIMITY_MINE_TNT_TAG_PREFIX = "bw_proximity_mine_team_";
     protected static final String RESPAWN_BEACON_ITEM_ID = "respawn_beacon";
     protected static final String GIGANTIFY_GRENADE_ITEM_ID = "gigantify_grenade";
     protected final NamespacedKey customProjectileKey;
@@ -638,6 +640,23 @@ abstract class BedwarsListenerCustomSupport {
         pendingSuccessfulLungingSpearEvents.put(player.getUniqueId(), now + LUNGING_SPEAR_EVENT_LINK_WINDOW_MILLIS);
         player.setCooldown(item.getType(), (int) Math.ceil(LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS / 50.0));
         player.setCooldown(item, (int) Math.ceil(LUNGING_SPEAR_MOVEMENT_COOLDOWN_MILLIS / 50.0));
+    }
+
+    protected boolean isProximityMineItem(ItemStack item) {
+        return PROXIMITY_MINE_ITEM_ID.equalsIgnoreCase(CustomItemData.getId(item));
+    }
+
+    protected TeamColor getProximityMineTntTeam(TNTPrimed tnt) {
+        if (tnt == null) {
+            return null;
+        }
+        for (String tag : tnt.getScoreboardTags()) {
+            if (tag == null || !tag.startsWith(PROXIMITY_MINE_TNT_TAG_PREFIX)) {
+                continue;
+            }
+            return TeamColor.fromKey(tag.substring(PROXIMITY_MINE_TNT_TAG_PREFIX.length()));
+        }
+        return null;
     }
 
     protected boolean isLungingMovementSpear(ItemStack item) {
