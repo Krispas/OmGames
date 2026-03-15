@@ -26,6 +26,7 @@ public class CustomItemDefinition {
     private final double heal;
     private final int uses;
     private final int cooldownSeconds;
+    private final double saveChancePercent;
 
     public CustomItemDefinition(String id,
                                 CustomItemType type,
@@ -43,7 +44,8 @@ public class CustomItemDefinition {
                                 double range,
                                 double heal,
                                 int uses,
-                                int cooldownSeconds) {
+                                int cooldownSeconds,
+                                double saveChancePercent) {
         this.id = id;
         this.type = type;
         this.material = material;
@@ -61,6 +63,7 @@ public class CustomItemDefinition {
         this.heal = heal;
         this.uses = uses;
         this.cooldownSeconds = Math.max(0, cooldownSeconds);
+        this.saveChancePercent = Math.max(0.0, Math.min(100.0, saveChancePercent));
     }
 
     public String getId() {
@@ -129,5 +132,9 @@ public class CustomItemDefinition {
 
     public int getCooldownSeconds() {
         return cooldownSeconds;
+    }
+
+    public double getSaveChancePercent() {
+        return saveChancePercent;
     }
 }

@@ -255,6 +255,7 @@ abstract class GameSessionEffectSupport {
     protected Double previousBorderDamageBuffer;
     protected Integer previousBorderWarningDistance;
     protected boolean statsEnabled = true;
+    protected boolean testMode;
     protected int grantedMatchParticipationPartyExp;
     protected boolean partyExpUnavailableLogged;
     protected boolean matchEventRollEnabled = true;
@@ -263,6 +264,7 @@ abstract class GameSessionEffectSupport {
     protected Long previousWorldTime;
     protected Boolean previousDaylightCycle;
     protected GameSessionCustomItemRuntime customItemRuntime;
+    protected GameSessionTimeCapsuleRuntime timeCapsuleRuntime;
 
 
     protected GameSessionEffectSupport(BedwarsManager bedwarsManager, Arena arena) {

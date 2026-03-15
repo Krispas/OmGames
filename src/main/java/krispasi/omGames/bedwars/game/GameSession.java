@@ -113,6 +113,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
                 pendingRespawns,
                 teamsInMatch,
                 tasks);
+        this.timeCapsuleRuntime = new GameSessionTimeCapsuleRuntime(this, bedwarsManager.getTimeCapsuleService());
     }
 
     public static Title.Times sharedTitleTimes() {
@@ -161,6 +162,14 @@ public class GameSession extends GameSessionMatchFlowSupport {
 
     public void setStatsEnabled(boolean statsEnabled) {
         this.statsEnabled = statsEnabled;
+    }
+
+    public boolean isTestMode() {
+        return testMode;
+    }
+
+    public void setTestMode(boolean testMode) {
+        this.testMode = testMode;
     }
 
     public void applyUpgradesTo(Player player) {
@@ -1369,6 +1378,14 @@ public class GameSession extends GameSessionMatchFlowSupport {
 
     public boolean activateSteelShell(Player player, CustomItemDefinition custom) {
         return customItemRuntime.activateSteelShell(player, custom, plugin);
+    }
+
+    public boolean activateTimeCapsule(Player player, ItemStack item, CustomItemDefinition custom) {
+        return timeCapsuleRuntime != null && timeCapsuleRuntime.activate(player, item, custom);
+    }
+
+    public boolean handleTimeCapsuleInventoryClose(Player player, Inventory inventory) {
+        return timeCapsuleRuntime != null && timeCapsuleRuntime.handleInventoryClose(player, inventory);
     }
 
     public void handleElytraStrikeMovement(Player player) {

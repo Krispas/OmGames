@@ -82,6 +82,10 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 - `src/main/java/krispasi/omGames/bedwars/item/*`
   - Custom item model, loader, and item metadata.
 
+- `src/main/java/krispasi/omGames/bedwars/timecapsule/*`
+  - Time Capsule persistence, item payload metadata, and inventory serialization.
+  - Owns the SQLite-backed pool used by the rotating Time Capsule item.
+
 - `src/main/java/krispasi/omGames/bedwars/stats/*`
   - BedWars stat persistence and lobby leaderboard display.
 
@@ -109,6 +113,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
    - rotating config merge
    - quick-buy DB
    - stats DB
+   - time capsule DB
 4. Start lobby and parkour leaderboards.
 5. Construct `BedwarsSetupManager`.
 6. Register `/bw`.
@@ -121,6 +126,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - stops leaderboards
   - shuts down quick-buy DB
   - shuts down stats DB
+  - shuts down time capsule DB
   - clears dropped items in loaded arena worlds
 
 ### 2.3 Ownership Rules
@@ -132,6 +138,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - `CustomItemConfig`
   - `QuickBuyService`
   - `BedwarsStatsService`
+  - `TimeCapsuleService`
   - lobby/parkour leaderboards
   - temporary BedWars creator allowlist for setup access until restart
 
@@ -278,6 +285,21 @@ Derived display stats:
   - derived from `final_kills / final_deaths`
   - if final deaths are `0`, display it as the raw final kill count ratio instead of storing a separate column
 
+#### 2.7.3 `OmGames.db -> time_capsules`
+
+Table: `time_capsules`
+- `capsule_id TEXT PRIMARY KEY`
+- `queue_type TEXT NOT NULL`
+- `created_by_player_uuid TEXT`
+- `created_at INTEGER NOT NULL`
+- `contents_base64 TEXT NOT NULL`
+
+Queue split:
+- `normal`
+  - used by standard BedWars matches
+- `test`
+  - used by `/bw test start` sessions only
+
 ### 2.8 Config Guide
 
 #### 2.8.1 `bedwars.yml`
@@ -377,6 +399,7 @@ Rotating item notes:
   - UI should show a red warning lore
 - match runtime always rolls `2` rotating items plus `1` rotating upgrade when candidates exist
 - manual prestart rotation selection can choose any subset of rotating items and upgrades
+- when `time_capsule` is active for a match, any available saved reward capsules from that queue should be granted to participants at match start before play begins
 - if `shop.categories.rotating_upgrades` has no upgrade entries, rotating-upgrade selection falls back to upgrade entries found under `shop.categories.rotating`
 - if `shop.categories.rotating_upgrades` does have entries, it is the authoritative upgrade/trap pool and runtime should not also consult legacy upgrade entries under `shop.categories.rotating`
 - rotating trap entries also live under `rotating_upgrades`
@@ -408,6 +431,7 @@ Common definition fields:
 - `range`
 - `uses`
 - `cooldown-seconds`
+- `save-chance-percent`
 - `max-blocks`
 - `bridge-width`
 
@@ -432,6 +456,7 @@ Supported `type` values:
 - `RAILGUN_BLAST`
 - `PROXIMITY_MINE`
 - `LOCKPICK`
+- `TIME_CAPSULE`
 - `UNSTABLE_TELEPORTATION_DEVICE`
 - `MIRACLE_OF_THE_STARS`
 - `TOWER_CHEST`
@@ -484,6 +509,14 @@ Behavior notes:
   - lockpick countdowns and the 60-second access windows should show a timer above the clicked chest that is only visible to the player who triggered that lockpick
   - ender chest target selection starts a 20-second countdown above the chest, then grants 60 seconds where right-clicking that base team's ender chests opens the selected player's fake BedWars ender chest until the timer expires
   - once the ender-chest access timer expires, those enemy ender chests should revert to opening the viewer's own fake ender chest again
+- `TIME_CAPSULE`
+  - rotating held item bought as an `ENDER_CHEST`
+  - right-clicking the bought item opens a 27-slot pack GUI similar to the fake ender chest, consumes that item, and rolls each filled slot independently against `save-chance-percent`
+  - only the winning slots are serialized into SQLite; failed slots are intentionally lost
+  - saved capsules are split into separate `normal` and `test` queues based on whether the source match came from `/bw start` or `/bw test start`
+  - when Time Capsule is active in a later match, participants should receive claimed reward capsules from that same queue at match start
+  - if the queue has fewer saved capsules than participants but at least one exists, claimed rewards may duplicate so every participant still receives one
+  - each claimed source capsule is deleted from SQLite immediately after that match claims it
 - `BRIDGE_BUILDER`
   - right-clicking a block places a piston anchor at the clicked placement position
   - the tunnel should extend from that piston anchor in the player's horizontal facing direction, not from the player's feet

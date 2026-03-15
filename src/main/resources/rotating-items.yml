@@ -26,6 +26,7 @@ shop:
         railgun_blast: 32
         abyssal_rift_corruption: 33
         abyssal_rift_regeneration: 34
+        time_capsule: 37
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -322,6 +323,22 @@ shop:
         limit:
           scope: PLAYER
           amount: 3
+      time_capsule:
+        material: ENDER_CHEST
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 32
+        display-name: "Time Capsule"
+        lore:
+          - "Right-click to pack items"
+          - "for a future match."
+          - "Each filled slot has a"
+          - "50% save chance by default."
+        custom-item: time_capsule
+        limit:
+          scope: PLAYER
+          amount: 1
       thorns_upgrade:
         material: CACTUS
         amount: 1

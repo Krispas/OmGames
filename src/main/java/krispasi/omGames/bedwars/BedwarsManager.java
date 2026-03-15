@@ -19,6 +19,7 @@ import krispasi.omGames.bedwars.lobby.BedwarsParkourLeaderboard;
 import krispasi.omGames.bedwars.shop.QuickBuyService;
 import krispasi.omGames.bedwars.stats.BedwarsLobbyLeaderboard;
 import krispasi.omGames.bedwars.stats.BedwarsStatsService;
+import krispasi.omGames.bedwars.timecapsule.TimeCapsuleService;
 import krispasi.omGames.bedwars.shop.ShopConfig;
 import krispasi.omGames.bedwars.shop.ShopConfigLoader;
 import net.kyori.adventure.text.Component;
@@ -67,6 +68,7 @@ public class BedwarsManager {
     private final JavaPlugin plugin;
     private final QuickBuyService quickBuyService;
     private final BedwarsStatsService statsService;
+    private final TimeCapsuleService timeCapsuleService;
     private final BedwarsLobbyLeaderboard lobbyLeaderboard;
     private final BedwarsLobbyParkour lobbyParkour;
     private final BedwarsParkourLeaderboard parkourLeaderboard;
@@ -83,6 +85,7 @@ public class BedwarsManager {
         this.plugin = plugin;
         this.quickBuyService = new QuickBuyService(plugin);
         this.statsService = new BedwarsStatsService(plugin);
+        this.timeCapsuleService = new TimeCapsuleService(plugin);
         this.lobbyLeaderboard = new BedwarsLobbyLeaderboard(plugin, statsService);
         this.lobbyParkour = new BedwarsLobbyParkour(this);
         this.parkourLeaderboard = new BedwarsParkourLeaderboard(plugin, lobbyParkour);
@@ -140,6 +143,10 @@ public class BedwarsManager {
         statsService.load();
     }
 
+    public void loadTimeCapsules() {
+        timeCapsuleService.load();
+    }
+
     public void startLobbyLeaderboard() {
         lobbyLeaderboard.start();
         parkourLeaderboard.start();
@@ -180,6 +187,10 @@ public class BedwarsManager {
 
     public BedwarsStatsService getStatsService() {
         return statsService;
+    }
+
+    public TimeCapsuleService getTimeCapsuleService() {
+        return timeCapsuleService;
     }
 
     public BedwarsLobbyParkour getLobbyParkour() {
@@ -232,6 +243,7 @@ public class BedwarsManager {
     public void openTeamAssignMenu(Player player, Arena arena, boolean statsEnabled) {
         GameSession session = new GameSession(this, arena);
         session.setStatsEnabled(statsEnabled);
+        session.setTestMode(!statsEnabled);
         session.setMaxTeamSize(1);
         new TeamAssignMenu(this, session).open(player);
     }
@@ -355,6 +367,7 @@ public class BedwarsManager {
         lobbyParkour.shutdown();
         quickBuyService.shutdown();
         statsService.shutdown();
+        timeCapsuleService.shutdown();
         clearDroppedItems();
     }
 

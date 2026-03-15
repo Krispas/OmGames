@@ -75,6 +75,7 @@ public class CustomItemConfigLoader {
         double heal = section.getDouble("heal", 0.0);
         int uses = Math.max(0, section.getInt("uses", type.getDefaultUses()));
         int cooldownSeconds = Math.max(0, section.getInt("cooldown-seconds", type.getDefaultCooldownSeconds()));
+        double saveChancePercent = section.getDouble("save-chance-percent", type.getDefaultSaveChancePercent());
         int maxBlocks = section.getInt("max-blocks", type.getDefaultMaxBlocks());
         int bridgeWidth = section.getInt("bridge-width", type.getDefaultBridgeWidth());
         if (maxBlocks < 0) {
@@ -89,7 +90,7 @@ public class CustomItemConfigLoader {
         String normalizedId = id.toLowerCase(Locale.ROOT);
         return new CustomItemDefinition(normalizedId, type, material, velocity, yield, incendiary,
                 maxBlocks, bridgeWidth, damage, knockback, lifetimeSeconds, health, speed, range, heal, uses,
-                cooldownSeconds);
+                cooldownSeconds, saveChancePercent);
     }
 
     private CustomItemType parseType(String raw) {

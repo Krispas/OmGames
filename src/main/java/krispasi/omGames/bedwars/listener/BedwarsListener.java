@@ -89,6 +89,7 @@ import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
@@ -291,6 +292,26 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             scheduleEquipmentUnbreakable(player, session);
             scheduleToolTierSync(player, session);
+        });
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        safeHandle("onInventoryClose", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null) {
+                return;
+            }
+            if (!(event.getPlayer() instanceof Player player)) {
+                return;
+            }
+            if (!session.handleTimeCapsuleInventoryClose(player, event.getInventory())) {
+                return;
+            }
+            if (session.isParticipant(player.getUniqueId()) && session.isInArenaWorld(player.getWorld())) {
+                scheduleEquipmentUnbreakable(player, session);
+                scheduleToolTierSync(player, session);
+            }
         });
     }
 
@@ -599,6 +620,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 }
                 case UNSTABLE_TELEPORTATION_DEVICE -> {
                     yield session.activateUnstableTeleportationDevice(player, custom);
+                }
+                case TIME_CAPSULE -> {
+                    yield session.activateTimeCapsule(player, item, custom);
                 }
                 case LOCKPICK -> {
                     yield false;

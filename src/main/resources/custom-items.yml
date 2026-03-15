@@ -139,3 +139,7 @@ custom-items:
   lockpick:
     type: LOCKPICK
     material: TRIPWIRE_HOOK
+  time_capsule:
+    type: TIME_CAPSULE
+    material: ENDER_CHEST
+    save-chance-percent: 50

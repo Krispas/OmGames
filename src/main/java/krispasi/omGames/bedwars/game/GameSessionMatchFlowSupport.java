@@ -114,6 +114,15 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         applyMatchEventRotatingOverrides();
         spawnShops();
         startCountdownRemaining = Math.max(0, countdownSeconds);
+        List<UUID> startingParticipants = new ArrayList<>();
+        for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
+            if (entry.getValue() != null) {
+                startingParticipants.add(entry.getKey());
+            }
+        }
+        Map<UUID, ItemStack> startingTimeCapsules = timeCapsuleRuntime != null
+                ? timeCapsuleRuntime.createMatchRewardItems(startingParticipants)
+                : Map.of();
 
         Location respawnLobby = resolveMapLobbyLocation();
         for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
@@ -135,6 +144,11 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             player.setHealth(Math.max(1.0, maxHealth));
             giveStarterKit(player, team);
             applyPermanentItemsWithShield(player, team);
+            ItemStack startingTimeCapsule = startingTimeCapsules.get(player.getUniqueId());
+            if (startingTimeCapsule != null) {
+                giveItem(player, startingTimeCapsule);
+                player.sendMessage(Component.text("You received a Time Capsule from a previous match.", NamedTextColor.YELLOW));
+            }
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
             player.setFlying(false);
@@ -1414,6 +1428,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         despawnShops();
         despawnSummons();
         closeFakeEnderChests();
+        if (timeCapsuleRuntime != null) {
+            timeCapsuleRuntime.closeOpenInventories();
+        }
         clearSidebars();
         for (BukkitTask task : tasks) {
             task.cancel();
@@ -1578,6 +1595,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         activeBedLocations.clear();
         bedBlocks.clear();
         fakeEnderChests.clear();
+        if (timeCapsuleRuntime != null) {
+            timeCapsuleRuntime.reset();
+        }
         previousScoreboards.clear();
         activeScoreboards.clear();
         sidebarLines.clear();
