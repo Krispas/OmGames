@@ -1737,7 +1737,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
 
         lines.add(ChatColor.DARK_GRAY + "   ");
         lines.add(ChatColor.GOLD + "Kills: " + ChatColor.WHITE + getKillCount(player.getUniqueId()));
-        lines.add(ChatColor.AQUA + "Made by Krispasi");
+        lines.add(ChatColor.AQUA + "Made by Codex");
         return lines;
     }
 
