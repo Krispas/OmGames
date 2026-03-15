@@ -1417,6 +1417,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 }
             }
             boolean sameTeamTnt = false;
+            boolean proximityMineTnt = false;
             if (event.getDamager() instanceof TNTPrimed tnt
                     && tnt.getSource() instanceof Player source
                     && session.isParticipant(source.getUniqueId())
@@ -1431,6 +1432,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                     && session.isParticipant(victim.getUniqueId())) {
                 TeamColor mineTeam = getProximityMineTntTeam(tnt);
                 TeamColor victimTeam = session.getTeam(victim.getUniqueId());
+                proximityMineTnt = mineTeam != null;
                 if (mineTeam != null && mineTeam == victimTeam) {
                     event.setDamage(0.0);
                     sameTeamTnt = true;
@@ -1480,7 +1482,16 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 }
             }
             if (!sameTeamTnt && event.getDamager() instanceof TNTPrimed) {
-                event.setDamage(event.getDamage() * TNT_DAMAGE_MULTIPLIER);
+                if (proximityMineTnt) {
+                    CustomItemDefinition mineCustom = getCustomItem(PROXIMITY_MINE_ITEM_ID);
+                    if (mineCustom != null && mineCustom.getDamage() > 0.0) {
+                        event.setDamage(mineCustom.getDamage());
+                    } else {
+                        event.setDamage(event.getDamage() * TNT_DAMAGE_MULTIPLIER);
+                    }
+                } else {
+                    event.setDamage(event.getDamage() * TNT_DAMAGE_MULTIPLIER);
+                }
             }
             if (event.getDamager() instanceof Fireball fireball) {
                 CustomItemDefinition definition = resolveCustomProjectile(fireball);

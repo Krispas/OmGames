@@ -132,12 +132,6 @@ public class ShopMenu implements InventoryHolder {
             ShopItemDefinition item = config.getItem(entry.getValue());
             return item != null && !session.isRotatingItemAvailable(item);
         });
-        if (categoryType == ShopCategoryType.ROTATING) {
-            java.util.Set<String> rotating = session.getRotatingItemIds();
-            if (!rotating.isEmpty()) {
-                entries.entrySet().removeIf(entry -> !rotating.contains(entry.getValue()));
-            }
-        }
         for (Map.Entry<Integer, String> entry : entries.entrySet()) {
             ShopItemDefinition item = config.getItem(entry.getValue());
             if (item == null) {
