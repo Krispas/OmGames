@@ -159,16 +159,19 @@ final class GameSessionProximityMineRuntime {
     private BlockPoint resolveTriggeredMine(Player player, TeamColor playerTeam) {
         Location feet = player.getLocation();
         int centerX = feet.getBlockX();
-        int supportY = feet.clone().subtract(0.0, 0.2, 0.0).getBlockY();
+        int centerY = feet.getBlockY();
         int centerZ = feet.getBlockZ();
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                BlockPoint point = new BlockPoint(centerX + dx, supportY, centerZ + dz);
-                ProximityMineState state = placedProximityMines.get(point);
-                if (state == null || state.team() == playerTeam || !state.isArmed()) {
-                    continue;
+        int[] candidateYs = new int[] {centerY, centerY - 1};
+        for (int candidateY : candidateYs) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    BlockPoint point = new BlockPoint(centerX + dx, candidateY, centerZ + dz);
+                    ProximityMineState state = placedProximityMines.get(point);
+                    if (state == null || state.team() == playerTeam || !state.isArmed()) {
+                        continue;
+                    }
+                    return point;
                 }
-                return point;
             }
         }
         return null;

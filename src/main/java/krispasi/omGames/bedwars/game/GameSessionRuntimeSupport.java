@@ -42,13 +42,6 @@ import org.bukkit.util.Vector;
  */
 
 abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
-    protected static final String ROTATING_PYLON_SELECTION_ID = "abyssal_rift";
-    protected static final List<String> ROTATING_PYLON_ITEM_IDS = List.of(
-            "abyssal_rift",
-            "abyssal_rift_corruption",
-            "abyssal_rift_regeneration");
-    protected static final Set<String> ROTATING_PYLON_ITEM_ID_SET = Set.copyOf(ROTATING_PYLON_ITEM_IDS);
-    protected static final String ROTATING_PYLON_SELECTION_NAME = "Pylons";
 
     protected GameSessionRuntimeSupport(BedwarsManager bedwarsManager, Arena arena) {
         super(bedwarsManager, arena);
@@ -229,21 +222,8 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         return Collections.unmodifiableList(manualRotatingUpgradeIds);
     }
 
-    public boolean isGroupedRotatingItemSelection(String id) {
-        return isPylonRotatingSelectionId(id);
-    }
-
-    public List<String> getGroupedRotatingItemIds(String id) {
-        return isPylonRotatingSelectionId(id) ? ROTATING_PYLON_ITEM_IDS : List.of();
-    }
-
-    public String getRotatingItemSelectionName(String id) {
-        ShopConfig config = bedwarsManager.getShopConfig();
-        return resolveRotatingItemName(id, config != null ? config.getItem(id) : null);
-    }
-
     public boolean toggleManualRotatingItem(String id) {
-        String normalized = normalizeRotatingItemSelectionId(id);
+        String normalized = normalizeItemId(id);
         if (normalized == null) {
             return false;
         }
@@ -306,7 +286,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         Set<String> validItems = new HashSet<>(itemCandidates);
         LinkedHashSet<String> sanitizedItems = new LinkedHashSet<>();
         for (String id : manualRotatingItemIds) {
-            String normalized = normalizeRotatingItemSelectionId(id);
+            String normalized = normalizeItemId(id);
             if (normalized == null || !validItems.contains(normalized)) {
                 continue;
             }
@@ -336,13 +316,12 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         }
         for (String id : category.getEntries().values()) {
             String normalized = normalizeItemId(id);
-            String selectionId = normalizeRotatingItemSelectionId(normalized);
             ShopItemDefinition definition = config != null && normalized != null ? config.getItem(normalized) : null;
-            if (selectionId != null
+            if (normalized != null
                     && definition != null
                     && definition.getBehavior() != ShopItemBehavior.UPGRADE
-                    && !candidates.contains(selectionId)) {
-                candidates.add(selectionId);
+                    && !candidates.contains(normalized)) {
+                candidates.add(normalized);
             }
         }
     }
@@ -381,20 +360,16 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (!rotating) {
             return true;
         }
-        String selectionId = normalizeRotatingItemSelectionId(item.getId());
-        if (selectionId == null) {
-            return false;
-        }
         if (suddenDeathActive && item.isDisabledAfterSuddenDeath()) {
             return false;
         }
         if (rotatingMode == RotatingSelectionMode.MANUAL) {
-            return rotatingItemIds.contains(selectionId);
+            return rotatingItemIds.contains(item.getId());
         }
         if (rotatingItemIds.isEmpty()) {
             return true;
         }
-        return rotatingItemIds.contains(selectionId);
+        return rotatingItemIds.contains(item.getId());
     }
 
     public boolean isRotatingUpgradeAvailable(TeamUpgradeType type) {
@@ -632,9 +607,6 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
 
     protected String resolveRotatingItemName(String id, ShopItemDefinition definition) {
         if (definition != null) {
-            if (isPylonRotatingSelectionId(id)) {
-                return ROTATING_PYLON_SELECTION_NAME;
-            }
             String displayName = definition.getDisplayName();
             if (displayName != null && !displayName.isBlank()) {
                 return displayName;
@@ -687,7 +659,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
     }
 
     protected boolean isRotatingItemCandidate(String id) {
-        String normalized = normalizeRotatingItemSelectionId(id);
+        String normalized = normalizeItemId(id);
         if (normalized == null) {
             return false;
         }
@@ -704,7 +676,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         rotatingItemIds.clear();
         rotatingUpgradeIds.clear();
         for (String id : manualRotatingItemIds) {
-            String normalized = normalizeRotatingItemSelectionId(id);
+            String normalized = normalizeItemId(id);
             if (normalized != null) {
                 rotatingItemIds.add(normalized);
             }
@@ -723,18 +695,6 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         }
         String trimmed = id.trim();
         return trimmed.isBlank() ? null : trimmed;
-    }
-
-    protected String normalizeRotatingItemSelectionId(String id) {
-        String normalized = normalizeItemId(id);
-        if (normalized == null) {
-            return null;
-        }
-        return ROTATING_PYLON_ITEM_ID_SET.contains(normalized) ? ROTATING_PYLON_SELECTION_ID : normalized;
-    }
-
-    protected boolean isPylonRotatingSelectionId(String id) {
-        return ROTATING_PYLON_SELECTION_ID.equals(normalizeRotatingItemSelectionId(id));
     }
 
     public int getRemainingLimit(UUID playerId, ShopItemDefinition item) {
@@ -1777,7 +1737,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
 
         lines.add(ChatColor.DARK_GRAY + "   ");
         lines.add(ChatColor.GOLD + "Kills: " + ChatColor.WHITE + getKillCount(player.getUniqueId()));
-        lines.add(ChatColor.AQUA + "Made by Krispasi");
+        lines.add(ChatColor.AQUA + "Made by Codex");
         return lines;
     }
 

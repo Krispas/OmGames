@@ -17,15 +17,15 @@ shop:
         totem_of_undying: 21
         portable_shopkeeper: 20
         bridge_zapper: 19
-        abyssal_rift: 22
-        abyssal_rift_corruption: 23
-        abyssal_rift_regeneration: 24
-        elytra: 33
-        unstable_teleportation_device: 34
+        railgun_blast: 22
+        elytra: 23
+        unstable_teleportation_device: 24
         gigantify_grenade: 29
         lockpick: 30
         steel_shell: 31
-        railgun_blast: 32
+        abyssal_rift: 32
+        abyssal_rift_corruption: 33
+        abyssal_rift_regeneration: 34
         time_capsule: 37
         woodoo_doll: 38
     rotating_upgrades:
