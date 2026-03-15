@@ -405,7 +405,6 @@ Rotating item notes:
   - UI should show a red warning lore
 - match runtime always rolls `2` rotating items plus `1` rotating upgrade when candidates exist
 - manual prestart rotation selection can choose any subset of rotating items and upgrades
-- the three pylon entries (`abyssal_rift`, `abyssal_rift_corruption`, `abyssal_rift_regeneration`) count as one rotating-item selection in auto/manual rotation; when that selection is active, all three shop entries should be available together
 - when `time_capsule` is active for a match, any available saved reward capsules from that queue should be granted to participants at match start before play begins
 - if `shop.categories.rotating_upgrades` has no upgrade entries, rotating-upgrade selection falls back to upgrade entries found under `shop.categories.rotating`
 - if `shop.categories.rotating_upgrades` does have entries, it is the authoritative upgrade/trap pool and runtime should not also consult legacy upgrade entries under `shop.categories.rotating`
@@ -507,7 +506,6 @@ Behavior notes:
   - bought as a normal placeable block item and placed as a `STONE_PRESSURE_PLATE`
   - should spend 5 seconds priming after placement; while priming it shows a shared floating progress bar above the mine
   - once armed, it should trigger when an enemy player moves onto the mine or the surrounding 3x3 horizontal area, and detonate through the normal TNT explosion path
-  - `custom-items.yml -> proximity_mine.damage` overrides the mine's direct player damage; non-positive values keep the default scaled TNT damage path
   - should use placed-block tracking so it can be broken, dropped, rolled back, and chain-exploded like other BedWars placed blocks
 - `LOCKPICK`
   - rotating held item used on enemy team storage inside that base's radius
