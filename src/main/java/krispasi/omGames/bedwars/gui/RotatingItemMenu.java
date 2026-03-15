@@ -111,7 +111,7 @@ public class RotatingItemMenu implements InventoryHolder {
             boolean selected = definition.getBehavior() == ShopItemBehavior.UPGRADE
                     ? session.getManualRotatingUpgradeIds().contains(id)
                     : session.getManualRotatingItemIds().contains(id);
-            item = decorateSelection(item, id, definition, selected, config);
+            item = decorateSelection(item, definition, selected);
             inventory.setItem(slot, item);
             itemSlots.put(slot, id);
             slot++;
@@ -119,11 +119,7 @@ public class RotatingItemMenu implements InventoryHolder {
         inventory.setItem(BACK_SLOT, buildBackItem());
     }
 
-    private ItemStack decorateSelection(ItemStack item,
-                                        String itemId,
-                                        ShopItemDefinition definition,
-                                        boolean selected,
-                                        ShopConfig config) {
+    private ItemStack decorateSelection(ItemStack item, ShopItemDefinition definition, boolean selected) {
         if (item == null) {
             return null;
         }
@@ -134,15 +130,6 @@ public class RotatingItemMenu implements InventoryHolder {
         List<Component> lore = meta != null && meta.lore() != null
                 ? new ArrayList<>(meta.lore())
                 : new ArrayList<>();
-        if (session.isGroupedRotatingItemSelection(itemId)) {
-            meta.displayName(Component.text(session.getRotatingItemSelectionName(itemId), NamedTextColor.AQUA));
-            lore.add(Component.text("Includes all 3 pylon variants:", NamedTextColor.DARK_GRAY));
-            for (String variantId : session.getGroupedRotatingItemIds(itemId)) {
-                ShopItemDefinition variant = config != null ? config.getItem(variantId) : null;
-                String variantName = variant != null ? variant.getDisplayName() : session.getRotatingItemSelectionName(variantId);
-                lore.add(Component.text(variantName, NamedTextColor.GRAY));
-            }
-        }
         if (definition.getBehavior() == ShopItemBehavior.UPGRADE) {
             lore.add(Component.text("Upgrade", NamedTextColor.DARK_GRAY));
         }
