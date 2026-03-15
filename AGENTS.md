@@ -55,6 +55,8 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionRuntimeSupport.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionMatchFlowSupport.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionCustomItemRuntime.java`
+- `src/main/java/krispasi/omGames/bedwars/game/GameSessionProximityMineRuntime.java`
+- `src/main/java/krispasi/omGames/bedwars/game/GameSessionTimeCapsuleRuntime.java`
   - Internal `GameSession` support/runtime split.
   - Used to keep match logic separated by concern without changing `GameSession` ownership.
   - Do not collapse these back into a single large class.
@@ -330,6 +332,10 @@ Supported event ids:
 - `in-this-economy`
 - `april-fools`
 
+`april-fools` weighting note:
+- if its configured weight is still the normal baseline `1`, treat it as effective weight `7` during April
+- explicit disable via `0` should still stay disabled, and higher custom weights should stay as configured
+
 `moon-big` runtime note:
 - use the gravity attribute for the low-gravity effect
 - only apply `Slow Falling I`
@@ -498,7 +504,8 @@ Behavior notes:
   - the fired beam should stay inside the arena corner bounds, render as roughly a 5-block-thick cylinder, and instantly kill enemy players while still recording normal BedWars combat credit
 - `PROXIMITY_MINE`
   - bought as a normal placeable block item and placed as a `STONE_PRESSURE_PLATE`
-  - should arm on placement, trigger when an enemy player moves onto the mine or the surrounding 3x3 horizontal area, and detonate through the normal TNT explosion path
+  - should spend 5 seconds priming after placement; while priming it shows a shared floating progress bar above the mine
+  - once armed, it should trigger when an enemy player moves onto the mine or the surrounding 3x3 horizontal area, and detonate through the normal TNT explosion path
   - should use placed-block tracking so it can be broken, dropped, rolled back, and chain-exploded like other BedWars placed blocks
 - `LOCKPICK`
   - rotating held item used on enemy team storage inside that base's radius

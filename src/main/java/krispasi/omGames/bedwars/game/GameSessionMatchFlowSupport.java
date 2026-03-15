@@ -1598,6 +1598,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         if (timeCapsuleRuntime != null) {
             timeCapsuleRuntime.reset();
         }
+        if (proximityMineRuntime != null) {
+            proximityMineRuntime.reset();
+        }
         previousScoreboards.clear();
         activeScoreboards.clear();
         sidebarLines.clear();

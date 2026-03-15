@@ -99,7 +99,7 @@ custom-items:
   abyssal_rift_corruption:
     type: ABYSSAL_RIFT
     material: ECHO_SHARD
-    damage: 2.0
+    damage: 1.0
     health: 30
     range: 10
   abyssal_rift_regeneration:

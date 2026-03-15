@@ -1,5 +1,7 @@
 package krispasi.omGames.bedwars.event;
 
+import java.time.LocalDate;
+import java.time.Month;
 import java.util.Locale;
 
 /**
@@ -14,6 +16,8 @@ public enum BedwarsMatchEventType {
     CHAOS("chaos", "Chaos!", "Everything is active and maxed out.", 2),
     IN_THIS_ECONOMY("in-this-economy", "In this economy?!", "The resources dried up.", 3),
     APRIL_FOOLS("april-fools", "April Fools!", "Something is very wrong.", 1);
+
+    private static final int APRIL_FOOLS_APRIL_WEIGHT = 7;
 
     private final String key;
     private final String displayName;
@@ -41,6 +45,16 @@ public enum BedwarsMatchEventType {
 
     public int defaultWeight() {
         return defaultWeight;
+    }
+
+    public int effectiveWeight(int configuredWeight) {
+        int normalized = Math.max(0, configuredWeight);
+        if (this == APRIL_FOOLS
+                && normalized == defaultWeight
+                && LocalDate.now().getMonth() == Month.APRIL) {
+            return APRIL_FOOLS_APRIL_WEIGHT;
+        }
+        return normalized;
     }
 
     public static BedwarsMatchEventType fromKey(String key) {

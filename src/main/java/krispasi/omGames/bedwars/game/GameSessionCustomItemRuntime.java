@@ -160,7 +160,6 @@ final class GameSessionCustomItemRuntime {
     private final Map<UUID, RailgunChargeState> activeRailgunCharges = new HashMap<>();
     private final Map<UUID, RailgunBeamState> activeRailgunBeams = new HashMap<>();
     private final Map<UUID, SteelShellState> activeSteelShells = new HashMap<>();
-    private final Map<BlockPoint, ProximityMineState> placedProximityMines = new HashMap<>();
     private final Map<UUID, Map<String, Long>> customItemCooldownEnds = new HashMap<>();
     private final Map<LockpickAccessKey, Long> chestLockpickAccessEnds = new HashMap<>();
     private final Map<LockpickAccessKey, EnderChestLockpickAccess> enderChestLockpickAccesses = new HashMap<>();
@@ -189,54 +188,8 @@ final class GameSessionCustomItemRuntime {
         clearAllRailgunBlasts();
         clearAbyssalRifts();
         clearAllSteelShells(false);
-        placedProximityMines.clear();
         clearLockpickState();
         customItemCooldownEnds.clear();
-    }
-
-    boolean placeProximityMine(Player player, Block block, ItemStack item) {
-        if (player == null
-                || block == null
-                || item == null
-                || !session.isRunning()
-                || !session.isParticipant(player.getUniqueId())
-                || !session.isInArenaWorld(block.getWorld())) {
-            return false;
-        }
-        TeamColor team = assignments.get(player.getUniqueId());
-        if (team == null || block.getType() != Material.STONE_PRESSURE_PLATE) {
-            return false;
-        }
-        BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
-        session.recordPlacedBlock(point, item);
-        placedProximityMines.put(point, new ProximityMineState(player.getUniqueId(), team));
-        return true;
-    }
-
-    void handleProximityMineMovement(Player player) {
-        if (player == null
-                || !session.isRunning()
-                || !session.isParticipant(player.getUniqueId())
-                || !session.isInArenaWorld(player.getWorld())
-                || player.getGameMode() == GameMode.SPECTATOR) {
-            return;
-        }
-        TeamColor playerTeam = assignments.get(player.getUniqueId());
-        if (playerTeam == null) {
-            return;
-        }
-        BlockPoint triggerPoint = resolveTriggeredProximityMine(player, playerTeam);
-        if (triggerPoint == null) {
-            return;
-        }
-        detonateProximityMine(triggerPoint);
-    }
-
-    void removeProximityMine(BlockPoint point) {
-        if (point == null) {
-            return;
-        }
-        placedProximityMines.remove(point);
     }
 
     boolean hasChestLockpickAccess(UUID playerId, TeamColor baseTeam) {
@@ -1879,61 +1832,6 @@ final class GameSessionCustomItemRuntime {
         }
     }
 
-    private BlockPoint resolveTriggeredProximityMine(Player player, TeamColor playerTeam) {
-        if (player == null || playerTeam == null) {
-            return null;
-        }
-        Location feet = player.getLocation();
-        int centerX = feet.getBlockX();
-        int supportY = feet.clone().subtract(0.0, 0.2, 0.0).getBlockY();
-        int centerZ = feet.getBlockZ();
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                BlockPoint point = new BlockPoint(centerX + dx, supportY, centerZ + dz);
-                ProximityMineState state = placedProximityMines.get(point);
-                if (state == null || state.team() == playerTeam) {
-                    continue;
-                }
-                return point;
-            }
-        }
-        return null;
-    }
-
-    private void detonateProximityMine(BlockPoint point) {
-        if (point == null) {
-            return;
-        }
-        ProximityMineState state = placedProximityMines.remove(point);
-        World world = resolveArenaWorld();
-        if (world == null) {
-            session.removePlacedBlock(point);
-            return;
-        }
-        Block block = world.getBlockAt(point.x(), point.y(), point.z());
-        if (block.getType() == Material.STONE_PRESSURE_PLATE) {
-            block.setType(Material.AIR, false);
-        }
-        session.removePlacedBlock(point);
-        Location spawn = block.getLocation().add(0.5, 0.0, 0.5);
-        world.spawn(spawn, TNTPrimed.class, tnt -> {
-            tnt.setFuseTicks(0);
-            tnt.setIsIncendiary(false);
-            if (state != null && state.team() != null) {
-                tnt.addScoreboardTag("bw_proximity_mine_team_" + state.team().key());
-            }
-            if (state == null || state.ownerId() == null) {
-                return;
-            }
-            Player owner = Bukkit.getPlayer(state.ownerId());
-            if (owner != null && owner.isOnline() && session.isParticipant(owner.getUniqueId())
-                    && session.isInArenaWorld(owner.getWorld())) {
-                tnt.setSource(owner);
-            }
-        });
-        world.playSound(spawn, Sound.ENTITY_TNT_PRIMED, 1.0f, 1.2f);
-    }
-
     private void clearSteelShell(UUID playerId, boolean restorePreviousResistance) {
         if (playerId == null) {
             return;
@@ -2391,9 +2289,6 @@ final class GameSessionCustomItemRuntime {
     }
 
     private record TowerChestPlacement(Block block, char cell) {
-    }
-
-    private record ProximityMineState(UUID ownerId, TeamColor team) {
     }
 
     private enum AbyssalRiftVariant {

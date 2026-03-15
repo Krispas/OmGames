@@ -50,7 +50,7 @@ public class BedwarsMatchEventConfig {
         if (type == null) {
             return 0;
         }
-        return Math.max(0, weights.getOrDefault(type, 0));
+        return type.effectiveWeight(weights.getOrDefault(type, 0));
     }
 
     public boolean hasEligibleEvents() {

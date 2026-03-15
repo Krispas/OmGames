@@ -264,6 +264,7 @@ abstract class GameSessionEffectSupport {
     protected Long previousWorldTime;
     protected Boolean previousDaylightCycle;
     protected GameSessionCustomItemRuntime customItemRuntime;
+    protected GameSessionProximityMineRuntime proximityMineRuntime;
     protected GameSessionTimeCapsuleRuntime timeCapsuleRuntime;
 
 

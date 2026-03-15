@@ -105,6 +105,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
 
     public GameSession(BedwarsManager bedwarsManager, Arena arena) {
         super(bedwarsManager, arena);
+        this.proximityMineRuntime = new GameSessionProximityMineRuntime(this, assignments, tasks);
         this.customItemRuntime = new GameSessionCustomItemRuntime(
                 this,
                 arena,
@@ -781,12 +782,16 @@ public class GameSession extends GameSessionMatchFlowSupport {
     public void removePlacedBlock(BlockPoint point) {
         placedBlocks.remove(point);
         placedBlockItems.remove(point);
-        customItemRuntime.removeProximityMine(point);
+        if (proximityMineRuntime != null) {
+            proximityMineRuntime.remove(point);
+        }
     }
 
     public ItemStack removePlacedBlockItem(BlockPoint point) {
         placedBlocks.remove(point);
-        customItemRuntime.removeProximityMine(point);
+        if (proximityMineRuntime != null) {
+            proximityMineRuntime.remove(point);
+        }
         return placedBlockItems.remove(point);
     }
 
@@ -1393,11 +1398,13 @@ public class GameSession extends GameSessionMatchFlowSupport {
     }
 
     public void handleProximityMineMovement(Player player) {
-        customItemRuntime.handleProximityMineMovement(player);
+        if (proximityMineRuntime != null) {
+            proximityMineRuntime.handleMovement(player);
+        }
     }
 
     public boolean placeProximityMine(Player player, Block block, ItemStack item) {
-        return customItemRuntime.placeProximityMine(player, block, item);
+        return proximityMineRuntime != null && proximityMineRuntime.place(player, block, item);
     }
 
     public Location getRailgunChargeLockedLocation(Player player) {
