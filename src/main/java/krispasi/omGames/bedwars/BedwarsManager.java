@@ -14,6 +14,7 @@ import krispasi.omGames.bedwars.event.BedwarsMatchEventType;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
 import krispasi.omGames.bedwars.item.CustomItemConfigLoader;
+import krispasi.omGames.bedwars.karma.BedwarsKarmaService;
 import krispasi.omGames.bedwars.lobby.BedwarsLobbyParkour;
 import krispasi.omGames.bedwars.lobby.BedwarsParkourLeaderboard;
 import krispasi.omGames.bedwars.shop.QuickBuyService;
@@ -69,6 +70,7 @@ public class BedwarsManager {
     private final QuickBuyService quickBuyService;
     private final BedwarsStatsService statsService;
     private final TimeCapsuleService timeCapsuleService;
+    private final BedwarsKarmaService karmaService;
     private final BedwarsLobbyLeaderboard lobbyLeaderboard;
     private final BedwarsLobbyParkour lobbyParkour;
     private final BedwarsParkourLeaderboard parkourLeaderboard;
@@ -86,6 +88,7 @@ public class BedwarsManager {
         this.quickBuyService = new QuickBuyService(plugin);
         this.statsService = new BedwarsStatsService(plugin);
         this.timeCapsuleService = new TimeCapsuleService(plugin);
+        this.karmaService = new BedwarsKarmaService(plugin);
         this.lobbyLeaderboard = new BedwarsLobbyLeaderboard(plugin, statsService);
         this.lobbyParkour = new BedwarsLobbyParkour(this);
         this.parkourLeaderboard = new BedwarsParkourLeaderboard(plugin, lobbyParkour);
@@ -147,6 +150,10 @@ public class BedwarsManager {
         timeCapsuleService.load();
     }
 
+    public void loadKarma() {
+        karmaService.load();
+    }
+
     public void startLobbyLeaderboard() {
         lobbyLeaderboard.start();
         parkourLeaderboard.start();
@@ -191,6 +198,10 @@ public class BedwarsManager {
 
     public TimeCapsuleService getTimeCapsuleService() {
         return timeCapsuleService;
+    }
+
+    public BedwarsKarmaService getKarmaService() {
+        return karmaService;
     }
 
     public BedwarsLobbyParkour getLobbyParkour() {
@@ -368,6 +379,7 @@ public class BedwarsManager {
         quickBuyService.shutdown();
         statsService.shutdown();
         timeCapsuleService.shutdown();
+        karmaService.shutdown();
         clearDroppedItems();
     }
 

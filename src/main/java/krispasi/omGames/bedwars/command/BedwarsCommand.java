@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.game.GameSession;
+import krispasi.omGames.bedwars.karma.BedwarsKarmaService;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
@@ -252,6 +253,9 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("Usage: /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw game skipphase", NamedTextColor.YELLOW));
             return true;
         }
+        if (args[0].equalsIgnoreCase("karma")) {
+            return handleKarmaCommand(sender, player, args);
+        }
         if (args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("omgames.bw.reload")) {
                 sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
@@ -296,7 +300,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw quick_buy | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw quick_buy | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -304,7 +308,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "quick_buy", "stats", "reload", "setup", "creator")
+            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "karma", "quick_buy", "stats", "reload", "setup", "creator")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -388,6 +392,29 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             String input = args[1].toLowerCase(Locale.ROOT);
             return Stream.of("out", "join", "spectate", "revive", "skipphase")
                     .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("karma")) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Stream.of("add", "cause")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("karma") && args[1].equalsIgnoreCase("add")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return Stream.of("permanent", "temporary")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("karma") && args[1].equalsIgnoreCase("add")) {
+            String input = args[3].toLowerCase(Locale.ROOT);
+            return Stream.concat(
+                            Bukkit.getOnlinePlayers().stream().map(Player::getName),
+                            Arrays.stream(Bukkit.getOfflinePlayers())
+                                    .map(OfflinePlayer::getName)
+                                    .filter(name -> name != null && !name.isBlank()))
+                    .distinct()
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("game") && args[1].equalsIgnoreCase("join")) {
@@ -614,6 +641,89 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             target.getPlayer().sendMessage(Component.text("Your BedWars stats were updated by " + player.getName() + ".",
                     NamedTextColor.YELLOW));
         }
+        return true;
+    }
+
+    private boolean handleKarmaCommand(CommandSender sender, Player player, String[] args) {
+        if (!player.isOp()) {
+            sender.sendMessage(Component.text("Only OP can use /bw karma.", NamedTextColor.RED));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /bw karma add <permanent|temporary> <user> | /bw karma cause",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        String action = args[1].toLowerCase(Locale.ROOT);
+        if (action.equals("cause")) {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                sender.sendMessage(Component.text("Karma cause only works during a running BedWars match.",
+                        NamedTextColor.RED));
+                return true;
+            }
+            int triggered = session.triggerKarmaCause();
+            sender.sendMessage(Component.text("Triggered karma events for " + triggered + " player(s).",
+                    triggered > 0 ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+            return true;
+        }
+        if (!action.equals("add")) {
+            sender.sendMessage(Component.text("Usage: /bw karma add <permanent|temporary> <user> | /bw karma cause",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        if (args.length < 4) {
+            sender.sendMessage(Component.text("Usage: /bw karma add <permanent|temporary> <user>",
+                    NamedTextColor.YELLOW));
+            return true;
+        }
+        String mode = args[2].toLowerCase(Locale.ROOT);
+        if (mode.equals("permanent")) {
+            OfflinePlayer target = resolveKnownPlayer(args[3]);
+            if (target == null || target.getUniqueId() == null) {
+                sender.sendMessage(Component.text("Player not found: " + args[3], NamedTextColor.RED));
+                return true;
+            }
+            BedwarsKarmaService.KarmaChange change = bedwarsManager.getKarmaService()
+                    .addPermanentKarma(target.getUniqueId(), 1);
+            String targetName = resolvePlayerName(target, args[3]);
+            sender.sendMessage(Component.text("Permanent karma for " + targetName + ": "
+                    + change.before() + " -> " + change.after(), NamedTextColor.GREEN));
+            if (target.isOnline() && target.getPlayer() != null && target.getPlayer() != player) {
+                target.getPlayer().sendMessage(Component.text("Your permanent karma was increased to "
+                        + change.after() + ".", NamedTextColor.YELLOW));
+            }
+            return true;
+        }
+        if (mode.equals("temporary")) {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isActive()) {
+                sender.sendMessage(Component.text("No active BedWars session for temporary karma.",
+                        NamedTextColor.RED));
+                return true;
+            }
+            Player target = Bukkit.getPlayer(args[3]);
+            if (target == null) {
+                sender.sendMessage(Component.text("Player must be online for temporary karma.",
+                        NamedTextColor.RED));
+                return true;
+            }
+            if (!session.isParticipant(target.getUniqueId())) {
+                sender.sendMessage(Component.text(target.getName() + " is not in the active BedWars session.",
+                        NamedTextColor.RED));
+                return true;
+            }
+            int after = session.addTemporaryKarma(target.getUniqueId(), 1);
+            sender.sendMessage(Component.text("Temporary karma for " + target.getName() + " is now " + after + ".",
+                    NamedTextColor.GREEN));
+            if (target != player) {
+                target.sendMessage(Component.text("Your temporary karma increased to " + after + ".",
+                        NamedTextColor.YELLOW));
+            }
+            return true;
+        }
+        sender.sendMessage(Component.text("Usage: /bw karma add <permanent|temporary> <user> | /bw karma cause",
+                NamedTextColor.YELLOW));
         return true;
     }
 

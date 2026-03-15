@@ -490,6 +490,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         startMatchEventTasks();
         announceMatchEvent();
         announceCurrentRotatingItems();
+        if (karmaRuntime != null) {
+            karmaRuntime.start(plugin);
+        }
     }
 
     protected void scheduleGameEvents() {
@@ -1431,6 +1434,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         if (timeCapsuleRuntime != null) {
             timeCapsuleRuntime.closeOpenInventories();
         }
+        if (karmaRuntime != null) {
+            karmaRuntime.stop();
+        }
         clearSidebars();
         for (BukkitTask task : tasks) {
             task.cancel();
@@ -1600,6 +1606,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         }
         if (proximityMineRuntime != null) {
             proximityMineRuntime.reset();
+        }
+        if (karmaRuntime != null) {
+            karmaRuntime.reset();
         }
         previousScoreboards.clear();
         activeScoreboards.clear();

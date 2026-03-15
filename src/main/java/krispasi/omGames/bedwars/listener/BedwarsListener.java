@@ -74,6 +74,7 @@ import org.bukkit.event.block.BlockMultiPlaceEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.player.PlayerItemDamageEvent;
@@ -623,6 +624,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 }
                 case TIME_CAPSULE -> {
                     yield session.activateTimeCapsule(player, item, custom);
+                }
+                case WOODOO_DOLL -> {
+                    yield false;
                 }
                 case LOCKPICK -> {
                     yield false;
@@ -1513,6 +1517,19 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             if (!event.isCancelled()
                     && attacker != null
+                    && event.getDamager() instanceof Player
+                    && session.isParticipant(attacker.getUniqueId())
+                    && session.isParticipant(victim.getUniqueId())) {
+                ItemStack heldItem = attacker.getInventory().getItemInMainHand();
+                CustomItemDefinition heldCustom = resolveCustomItem(heldItem);
+                if (heldCustom != null
+                        && heldCustom.getType() == CustomItemType.WOODOO_DOLL
+                        && session.handleWoodooDollHit(attacker, victim)) {
+                    consumeHeldItem(attacker, EquipmentSlot.HAND, heldItem);
+                }
+            }
+            if (!event.isCancelled()
+                    && attacker != null
                     && session.isParticipant(attacker.getUniqueId())
                     && session.isParticipant(victim.getUniqueId())) {
                 TeamColor attackerTeam = session.getTeam(attacker.getUniqueId());
@@ -2031,6 +2048,24 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 applyOutsideGameBedwarsBuffs(player);
             }
             deliverPendingLoyaltyTridents(player);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onKarmaAnvilLand(EntityChangeBlockEvent event) {
+        safeHandle("onKarmaAnvilLand", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            boolean karmaAnvil = session != null
+                    ? session.isKarmaAnvil(event.getEntity())
+                    : event.getEntity().getScoreboardTags().contains("bw_karma_anvil");
+            if (!karmaAnvil) {
+                return;
+            }
+            event.setCancelled(true);
+            if (session != null) {
+                session.clearTrackedKarmaAnvil(event.getEntity().getUniqueId());
+            }
+            event.getEntity().remove();
         });
     }
 

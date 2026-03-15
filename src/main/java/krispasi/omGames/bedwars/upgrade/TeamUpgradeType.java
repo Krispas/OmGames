@@ -24,6 +24,8 @@ public enum TeamUpgradeType {
             List.of("Fire Aspect I on team weapons.")),
     SCALE_DOWN("Scale Down", Material.SPYGLASS, new int[]{2, 4},
             List.of("Shrink your team to 90% and 80% size.")),
+    BROKEN_MIRROR("Broken Mirror", Material.TINTED_GLASS, new int[]{1, 4, 16, 32},
+            List.of("Each level adds 1 temporary karma", "to all enemy players.")),
     FORGE("Forge", Material.FURNACE, new int[]{2, 4, 6, 8},
             List.of("Upgrade your base generator.")),
     HEAL_POOL("Heal Pool", Material.BEACON, new int[]{1},

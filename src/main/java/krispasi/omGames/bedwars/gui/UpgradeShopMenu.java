@@ -42,6 +42,7 @@ public class UpgradeShopMenu implements InventoryHolder {
     private static final int EFFICIENCY_SLOT = 17;
     private static final int FIRE_ASPECT_SLOT = 19;
     private static final int SCALE_DOWN_SLOT = 20;
+    private static final int BROKEN_MIRROR_SLOT = 21;
     private static final int TRAP_SLOT_START = 28;
 
     private final GameSession session;
@@ -108,6 +109,7 @@ public class UpgradeShopMenu implements InventoryHolder {
         setUpgrade(EFFICIENCY_SLOT, TeamUpgradeType.EFFICIENCY);
         setUpgrade(FIRE_ASPECT_SLOT, TeamUpgradeType.FIRE_ASPECT);
         setUpgrade(SCALE_DOWN_SLOT, TeamUpgradeType.SCALE_DOWN);
+        setUpgrade(BROKEN_MIRROR_SLOT, TeamUpgradeType.BROKEN_MIRROR);
 
         int slot = TRAP_SLOT_START;
         for (TrapType trap : TrapType.values()) {

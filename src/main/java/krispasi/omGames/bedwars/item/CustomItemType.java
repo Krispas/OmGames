@@ -27,6 +27,7 @@ public enum CustomItemType {
     TOWER_CHEST(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     STEEL_SHELL(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 10, -1.0, -1.0, -1.0, 0, 0),
     PROXIMITY_MINE(0.0, 4.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
+    WOODOO_DOLL(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     LOCKPICK(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     UNSTABLE_TELEPORTATION_DEVICE(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 30),
     TIME_CAPSULE(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0);

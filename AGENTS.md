@@ -44,7 +44,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 
 - `src/main/java/krispasi/omGames/bedwars/BedwarsManager.java`
   - BedWars service coordinator.
-  - Loads arenas, shop config, custom items, stats, quick-buy, and leaderboards.
+  - Loads arenas, shop config, custom items, stats, quick-buy, karma, and leaderboards.
   - Owns the single active `GameSession`.
 
 - `src/main/java/krispasi/omGames/bedwars/game/GameSession.java`
@@ -55,6 +55,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionRuntimeSupport.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionMatchFlowSupport.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionCustomItemRuntime.java`
+- `src/main/java/krispasi/omGames/bedwars/game/GameSessionKarmaRuntime.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionProximityMineRuntime.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionTimeCapsuleRuntime.java`
   - Internal `GameSession` support/runtime split.
@@ -88,6 +89,10 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - Time Capsule persistence, item payload metadata, and inventory serialization.
   - Owns the SQLite-backed pool used by the rotating Time Capsule item.
 
+- `src/main/java/krispasi/omGames/bedwars/karma/*`
+  - Permanent BedWars karma persistence.
+  - Owns the SQLite-backed permanent karma pool used by the in-match karma runtime.
+
 - `src/main/java/krispasi/omGames/bedwars/stats/*`
   - BedWars stat persistence and lobby leaderboard display.
 
@@ -116,6 +121,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
    - quick-buy DB
    - stats DB
    - time capsule DB
+   - karma DB
 4. Start lobby and parkour leaderboards.
 5. Construct `BedwarsSetupManager`.
 6. Register `/bw`.
@@ -129,6 +135,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - shuts down quick-buy DB
   - shuts down stats DB
   - shuts down time capsule DB
+  - shuts down karma DB
   - clears dropped items in loaded arena worlds
 
 ### 2.3 Ownership Rules
@@ -141,6 +148,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - `QuickBuyService`
   - `BedwarsStatsService`
   - `TimeCapsuleService`
+  - `BedwarsKarmaService`
   - lobby/parkour leaderboards
   - temporary BedWars creator allowlist for setup access until restart
 
@@ -156,6 +164,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - sidebar/scoreboard state
   - rotating selection
   - match events
+  - temporary karma and karma event runtime
   - internal support classes under `bedwars/game/` do not change this ownership; they are implementation detail
 
 - `BedwarsListener` should stay as Bukkit event translation and call into `GameSession` for rules.
@@ -181,6 +190,8 @@ Admin subcommands:
 - `/bw test start`
 - `/bw stop`
 - `/bw tp <arena>|lobby`
+- `/bw karma add <permanent|temporary> <user>`
+- `/bw karma cause`
 - `/bw creator add <user>`
 - `/bw creator remove <user>`
 - `/bw lobby parkour <start|checkpoint [x]|end>`
@@ -201,6 +212,7 @@ Permissions declared in `plugin.yml`:
 
 Temporary creator notes:
 - `/bw creator add <user>` and `/bw creator remove <user>` are OP-only management commands
+- `/bw karma add ...` and `/bw karma cause` are also OP-only management commands
 - temporary creators may use `/bw setup` and `/bw tp`
 - temporary creators may also place/break blocks and use openable blocks in protected BedWars worlds when there is no active session in that world
 - temporary creator access is in-memory only and is cleared on restart/shutdown
@@ -301,6 +313,16 @@ Queue split:
   - used by standard BedWars matches
 - `test`
   - used by `/bw test start` sessions only
+
+#### 2.7.4 `OmGames.db -> bedwars_karma`
+
+Table: `bedwars_karma`
+- `player_uuid TEXT PRIMARY KEY`
+- `karma INTEGER NOT NULL`
+
+Notes:
+- this is permanent BedWars karma
+- temporary karma is match-scoped runtime only and is cleared when the session ends/stops
 
 ### 2.8 Config Guide
 
@@ -405,6 +427,13 @@ Rotating item notes:
   - UI should show a red warning lore
 - match runtime always rolls `2` rotating items plus `1` rotating upgrade when candidates exist
 - manual prestart rotation selection can choose any subset of rotating items and upgrades
+- `woodoo_doll`
+  - rotating held item that adds `10` temporary karma to the enemy player hit
+  - should be consumed on a successful enemy hit
+  - should use `max-carry-amount: 1`
+- `broken_mirror`
+  - rotating team upgrade with `4` levels
+  - each purchased level adds `1` temporary karma to every current enemy participant
 - the three pylon entries (`abyssal_rift`, `abyssal_rift_corruption`, `abyssal_rift_regeneration`) count as one rotating-item selection in auto/manual rotation; when that selection is active, all three shop entries should be available together
 - when `time_capsule` is active for a match, any available saved reward capsules from that queue should be granted to participants at match start before play begins
 - if `shop.categories.rotating_upgrades` has no upgrade entries, rotating-upgrade selection falls back to upgrade entries found under `shop.categories.rotating`
@@ -462,6 +491,7 @@ Supported `type` values:
 - `GIGANTIFY_GRENADE`
 - `RAILGUN_BLAST`
 - `PROXIMITY_MINE`
+- `WOODOO_DOLL`
 - `LOCKPICK`
 - `TIME_CAPSULE`
 - `UNSTABLE_TELEPORTATION_DEVICE`
@@ -509,6 +539,10 @@ Behavior notes:
   - once armed, it should trigger when an enemy player moves onto the mine or the surrounding 3x3 horizontal area, and detonate through the normal TNT explosion path
   - `custom-items.yml -> proximity_mine.damage` overrides the mine's direct player damage; non-positive values keep the default scaled TNT damage path
   - should use placed-block tracking so it can be broken, dropped, rolled back, and chain-exploded like other BedWars placed blocks
+- `WOODOO_DOLL`
+  - rotating held item used as a melee curse item
+  - hitting an enemy player adds `10` temporary karma to that victim
+  - the held item should be consumed immediately after the successful enemy hit
 - `LOCKPICK`
   - rotating held item used on enemy team storage inside that base's radius
   - right-clicking a normal chest/trapped chest starts a 10-second countdown above the chest, then grants that player 60 seconds of access to that base team's normal chests

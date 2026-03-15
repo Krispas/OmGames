@@ -115,6 +115,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
                 teamsInMatch,
                 tasks);
         this.timeCapsuleRuntime = new GameSessionTimeCapsuleRuntime(this, bedwarsManager.getTimeCapsuleService());
+        this.karmaRuntime = new GameSessionKarmaRuntime(this, bedwarsManager.getKarmaService());
     }
 
     public static Title.Times sharedTitleTimes() {
@@ -396,6 +397,9 @@ public class GameSession extends GameSessionMatchFlowSupport {
         restoreSidebar(playerId);
         clearUpgradeEffects(player);
         fakeEnderChests.remove(playerId);
+        if (karmaRuntime != null) {
+            karmaRuntime.handleParticipantRemoved(playerId);
+        }
         if (state == GameState.LOBBY) {
             updateTeamsInMatch();
         }
@@ -465,6 +469,9 @@ public class GameSession extends GameSessionMatchFlowSupport {
             grantRespawnProtection(player);
             if (statsEnabled) {
                 bedwarsManager.getStatsService().addGamePlayed(playerId);
+            }
+            if (karmaRuntime != null) {
+                karmaRuntime.handleParticipantJoined(playerId);
             }
         }
         hideEditorsFrom(player);
@@ -1009,6 +1016,9 @@ public class GameSession extends GameSessionMatchFlowSupport {
         if (type == TeamUpgradeType.FORGE && generatorManager != null) {
             generatorManager.setBaseForgeTier(team, nextTier);
         }
+        if (type == TeamUpgradeType.BROKEN_MIRROR && karmaRuntime != null) {
+            karmaRuntime.applyBrokenMirrorLevel(team);
+        }
         applyTeamUpgradeEffects(team);
         announceTeamUpgrade(team, player, type, nextTier);
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
@@ -1387,6 +1397,40 @@ public class GameSession extends GameSessionMatchFlowSupport {
 
     public boolean activateTimeCapsule(Player player, ItemStack item, CustomItemDefinition custom) {
         return timeCapsuleRuntime != null && timeCapsuleRuntime.activate(player, item, custom);
+    }
+
+    public boolean handleWoodooDollHit(Player attacker, Player victim) {
+        return karmaRuntime != null && karmaRuntime.handleWoodooDollHit(attacker, victim);
+    }
+
+    public int addTemporaryKarma(UUID playerId, int amount) {
+        return karmaRuntime != null ? karmaRuntime.addTemporaryKarma(playerId, amount) : 0;
+    }
+
+    public int getTemporaryKarma(UUID playerId) {
+        return karmaRuntime != null ? karmaRuntime.getTemporaryKarma(playerId) : 0;
+    }
+
+    public int getPermanentKarma(UUID playerId) {
+        return karmaRuntime != null ? karmaRuntime.getPermanentKarma(playerId) : 0;
+    }
+
+    public int getTotalKarma(UUID playerId) {
+        return karmaRuntime != null ? karmaRuntime.getTotalKarma(playerId) : 0;
+    }
+
+    public int triggerKarmaCause() {
+        return karmaRuntime != null ? karmaRuntime.triggerEventsForEligiblePlayers() : 0;
+    }
+
+    public boolean isKarmaAnvil(Entity entity) {
+        return karmaRuntime != null && karmaRuntime.isKarmaAnvil(entity);
+    }
+
+    public void clearTrackedKarmaAnvil(UUID entityId) {
+        if (karmaRuntime != null) {
+            karmaRuntime.clearTrackedAnvil(entityId);
+        }
     }
 
     public boolean handleTimeCapsuleInventoryClose(Player player, Inventory inventory) {

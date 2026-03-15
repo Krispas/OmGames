@@ -266,6 +266,7 @@ abstract class GameSessionEffectSupport {
     protected GameSessionCustomItemRuntime customItemRuntime;
     protected GameSessionProximityMineRuntime proximityMineRuntime;
     protected GameSessionTimeCapsuleRuntime timeCapsuleRuntime;
+    protected GameSessionKarmaRuntime karmaRuntime;
 
 
     protected GameSessionEffectSupport(BedwarsManager bedwarsManager, Arena arena) {
