@@ -17,7 +17,6 @@ import krispasi.omGames.bedwars.item.CustomItemConfigLoader;
 import krispasi.omGames.bedwars.lobby.BedwarsLobbyParkour;
 import krispasi.omGames.bedwars.lobby.BedwarsParkourLeaderboard;
 import krispasi.omGames.bedwars.shop.QuickBuyService;
-import krispasi.omGames.bedwars.storage.BedwarsLegacyDatabaseMigrator;
 import krispasi.omGames.bedwars.stats.BedwarsLobbyLeaderboard;
 import krispasi.omGames.bedwars.stats.BedwarsStatsService;
 import krispasi.omGames.bedwars.shop.ShopConfig;
@@ -82,7 +81,6 @@ public class BedwarsManager {
 
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        BedwarsLegacyDatabaseMigrator.migrate(plugin.getDataFolder(), plugin.getLogger());
         this.quickBuyService = new QuickBuyService(plugin);
         this.statsService = new BedwarsStatsService(plugin);
         this.lobbyLeaderboard = new BedwarsLobbyLeaderboard(plugin, statsService);

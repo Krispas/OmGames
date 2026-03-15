@@ -69,10 +69,6 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - Keep listener code as event translation; do not move BedWars ownership out of `GameSession`.
   - Do not collapse these back into a single large class.
 
-- `src/main/java/krispasi/omGames/bedwars/storage/BedwarsLegacyDatabaseMigrator.java`
-  - Temporary startup migration utility.
-  - Imports legacy BedWars SQLite data into the shared root `OmGames.db`.
-
 - `src/main/java/krispasi/omGames/bedwars/setup/BedwarsSetupManager.java`
   - `/bw setup` workflow.
   - Writes arena metadata back to `bedwars.yml`.
@@ -107,7 +103,6 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
    - `custom-items.yml`
 2. Construct `BedwarsManager`.
 3. Load:
-   - temporary legacy DB migration into `plugins/OmGames/OmGames.db` when needed
    - arenas
    - custom items
    - shop config
@@ -245,20 +240,10 @@ Files:
 - `custom-items.yml`
 - `../OmGames.db`
 
-Temporary legacy DB migration:
-- startup currently imports from `plugins/OmGames/Bedwars/quickbuy.db`
-- startup currently imports from `plugins/OmGames/Bedwars/bedwars-stats.db`
-- migration is one-time into `plugins/OmGames/OmGames.db` and should be removed after the migration window closes
-- this is a temporary explicit exception to the normal no-migration rule
-
 ### 2.7 SQLite
 
 SQLite data currently lives in:
 - `plugins/OmGames/OmGames.db`
-
-Temporary legacy BedWars DB files may still exist during the migration window:
-- `plugins/OmGames/Bedwars/quickbuy.db`
-- `plugins/OmGames/Bedwars/bedwars-stats.db`
 
 #### 2.7.1 `OmGames.db -> quick_buy`
 
