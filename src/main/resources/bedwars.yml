@@ -1,5 +1,5 @@
 leaderboard: 4 73 0.5
-parkour-leaderboard: -40 103 -10
+parkour-leaderboard: -40.5 103 -9.5
 match-events:
   enabled: true
   chance-percent: 40
