@@ -190,6 +190,7 @@ Admin subcommands:
 - `/bw test start`
 - `/bw stop`
 - `/bw tp <arena>|lobby`
+- `/bw karma <user>`
 - `/bw karma add <permanent|temporary> <user>`
 - `/bw karma cause`
 - `/bw creator add <user>`
@@ -212,7 +213,7 @@ Permissions declared in `plugin.yml`:
 
 Temporary creator notes:
 - `/bw creator add <user>` and `/bw creator remove <user>` are OP-only management commands
-- `/bw karma add ...` and `/bw karma cause` are also OP-only management commands
+- `/bw karma <user>`, `/bw karma add ...`, and `/bw karma cause` are also OP-only management commands
 - temporary creators may use `/bw setup` and `/bw tp`
 - temporary creators may also place/break blocks and use openable blocks in protected BedWars worlds when there is no active session in that world
 - temporary creator access is in-memory only and is cleared on restart/shutdown
@@ -536,7 +537,7 @@ Behavior notes:
 - `PROXIMITY_MINE`
   - bought as a normal placeable block item and placed as a `STONE_PRESSURE_PLATE`
   - should spend 5 seconds priming after placement; while priming it shows a shared floating progress bar above the mine
-  - once armed, it should trigger when an enemy player moves onto the mine or the surrounding 3x3 horizontal area, and detonate through the normal TNT explosion path
+  - once armed, it should trigger when an enemy player steps directly onto the mine block, and detonate through the normal TNT explosion path
   - `custom-items.yml -> proximity_mine.damage` overrides the mine's direct player damage; non-positive values keep the default scaled TNT damage path
   - should use placed-block tracking so it can be broken, dropped, rolled back, and chain-exploded like other BedWars placed blocks
 - `WOODOO_DOLL`

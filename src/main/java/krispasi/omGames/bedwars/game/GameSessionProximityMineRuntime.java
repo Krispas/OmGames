@@ -163,16 +163,12 @@ final class GameSessionProximityMineRuntime {
         int centerZ = feet.getBlockZ();
         int[] candidateYs = new int[] {centerY, centerY - 1};
         for (int candidateY : candidateYs) {
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    BlockPoint point = new BlockPoint(centerX + dx, candidateY, centerZ + dz);
-                    ProximityMineState state = placedProximityMines.get(point);
-                    if (state == null || state.team() == playerTeam || !state.isArmed()) {
-                        continue;
-                    }
-                    return point;
-                }
+            BlockPoint point = new BlockPoint(centerX, candidateY, centerZ);
+            ProximityMineState state = placedProximityMines.get(point);
+            if (state == null || state.team() == playerTeam || !state.isArmed()) {
+                continue;
             }
+            return point;
         }
         return null;
     }
