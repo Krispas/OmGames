@@ -7,5 +7,10 @@ public enum SKIN_TYPE {
     AXE,
     HOE,
     SHOVEL,
-    PICKAXE
+    PICKAXE,
+    HELMET,
+    CHESTPLATE,
+    LEGGINGS,
+    BOOTS,
+    ELYTRA
 }
