@@ -333,6 +333,7 @@ Root keys:
 - `leaderboard`
 - `parkour-leaderboard`
 - `match-events`
+- `karma-events`
 - `lobby-parkour`
 - `arenas`
 
@@ -344,6 +345,16 @@ Root keys:
 - `enabled`
 - `chance-percent`
 - `events.<event-id>.weight`
+
+`karma-events` fields:
+- `check-min-seconds`
+- `check-max-seconds`
+- `base-roll-chance-percent`
+- `per-karma-chance-percent`
+
+`karma-events` runtime note:
+- each eligible participant gets a random scheduled karma check between `check-min-seconds` and `check-max-seconds`
+- each check first rolls `base-roll-chance-percent`, then rolls `total karma * per-karma-chance-percent`, capped at `100%`
 
 Supported event ids:
 - `speedrun`

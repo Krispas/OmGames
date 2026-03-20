@@ -12,6 +12,7 @@ import krispasi.omGames.bedwars.config.BedwarsConfigLoader;
 import krispasi.omGames.bedwars.event.BedwarsMatchEventConfig;
 import krispasi.omGames.bedwars.event.BedwarsMatchEventType;
 import krispasi.omGames.bedwars.game.GameSession;
+import krispasi.omGames.bedwars.karma.BedwarsKarmaEventConfig;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
 import krispasi.omGames.bedwars.item.CustomItemConfigLoader;
 import krispasi.omGames.bedwars.karma.BedwarsKarmaService;
@@ -82,6 +83,7 @@ public class BedwarsManager {
     private ShopConfig shopConfig = ShopConfig.empty();
     private CustomItemConfig customItemConfig = CustomItemConfig.empty();
     private BedwarsMatchEventConfig matchEventConfig = BedwarsMatchEventConfig.defaults();
+    private BedwarsKarmaEventConfig karmaEventConfig = BedwarsKarmaEventConfig.defaults();
 
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -111,6 +113,7 @@ public class BedwarsManager {
         BedwarsConfigLoader loader = new BedwarsConfigLoader(configFile, plugin.getLogger());
         arenas = loader.load();
         matchEventConfig = loadMatchEventConfig(configFile);
+        karmaEventConfig = loadKarmaEventConfig(configFile);
         configureLobbyLeaderboard(configFile);
         configureParkourLeaderboard(configFile);
         configureLobbyAmbientWorld(configFile);
@@ -186,6 +189,10 @@ public class BedwarsManager {
 
     public BedwarsMatchEventConfig getMatchEventConfig() {
         return matchEventConfig;
+    }
+
+    public BedwarsKarmaEventConfig getKarmaEventConfig() {
+        return karmaEventConfig;
     }
 
     public QuickBuyService getQuickBuyService() {
@@ -433,6 +440,28 @@ public class BedwarsManager {
             }
         }
         return new BedwarsMatchEventConfig(enabled, chancePercent, weights);
+    }
+
+    private BedwarsKarmaEventConfig loadKarmaEventConfig(File configFile) {
+        BedwarsKarmaEventConfig defaults = BedwarsKarmaEventConfig.defaults();
+        if (!configFile.exists()) {
+            return defaults;
+        }
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+        ConfigurationSection section = config.getConfigurationSection("karma-events");
+        if (section == null) {
+            return defaults;
+        }
+        double minCheckSeconds = section.getDouble("check-min-seconds", defaults.minCheckSeconds());
+        double maxCheckSeconds = section.getDouble("check-max-seconds", defaults.maxCheckSeconds());
+        double baseRollChancePercent = section.getDouble("base-roll-chance-percent", defaults.baseRollChancePercent());
+        double perKarmaChancePercent = section.getDouble("per-karma-chance-percent", defaults.perKarmaChancePercent());
+        return new BedwarsKarmaEventConfig(
+                minCheckSeconds,
+                maxCheckSeconds,
+                baseRollChancePercent,
+                perKarmaChancePercent
+        );
     }
 
     private void configureLobbyLeaderboard(File configFile) {

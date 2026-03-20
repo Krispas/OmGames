@@ -20,6 +20,11 @@ match-events:
       weight: 3
     april-fools:
       weight: 1
+karma-events:
+  check-min-seconds: 10
+  check-max-seconds: 200
+  base-roll-chance-percent: 10
+  per-karma-chance-percent: 10
 lobby-parkour:
   world: bedwars
   start: -9 73 12

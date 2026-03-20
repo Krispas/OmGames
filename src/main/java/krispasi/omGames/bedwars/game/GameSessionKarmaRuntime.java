@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import krispasi.omGames.bedwars.karma.BedwarsKarmaEventConfig;
 import krispasi.omGames.bedwars.karma.BedwarsKarmaService;
 import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
@@ -36,9 +37,6 @@ import org.bukkit.scheduler.BukkitTask;
  */
 class GameSessionKarmaRuntime {
     static final String KARMA_ANVIL_TAG = "bw_karma_anvil";
-    private static final long CHECK_MIN_DELAY_TICKS = 10L * 20L;
-    private static final long CHECK_MAX_DELAY_TICKS = 200L * 20L;
-    private static final double BASE_EVENT_ROLL_CHANCE = 0.10;
     private static final int WOODOO_DOLL_TEMP_KARMA = 10;
     private static final int BROKEN_MIRROR_TEMP_KARMA = 1;
     private static final int KARMA_COST_PER_EVENT = 2;
@@ -206,14 +204,15 @@ class GameSessionKarmaRuntime {
         if (!isEligiblePlayer(playerId, player)) {
             return;
         }
-        if (ThreadLocalRandom.current().nextDouble() >= BASE_EVENT_ROLL_CHANCE) {
+        BedwarsKarmaEventConfig config = session.getBedwarsManager().getKarmaEventConfig();
+        if (ThreadLocalRandom.current().nextDouble() >= config.baseRollChance()) {
             return;
         }
         int totalKarma = getTotalKarma(playerId);
         if (totalKarma <= 0) {
             return;
         }
-        double chance = Math.min(1.0, totalKarma * 0.10);
+        double chance = Math.min(1.0, totalKarma * config.perKarmaChance());
         if (ThreadLocalRandom.current().nextDouble() < chance) {
             triggerRandomEvent(player);
         }
@@ -224,7 +223,12 @@ class GameSessionKarmaRuntime {
             return;
         }
         cancelPlayerCheck(playerId);
-        long delayTicks = ThreadLocalRandom.current().nextLong(CHECK_MIN_DELAY_TICKS, CHECK_MAX_DELAY_TICKS + 1L);
+        BedwarsKarmaEventConfig config = session.getBedwarsManager().getKarmaEventConfig();
+        long minDelayTicks = config.minCheckDelayTicks();
+        long maxDelayTicks = config.maxCheckDelayTicks();
+        long delayTicks = maxDelayTicks <= minDelayTicks
+                ? minDelayTicks
+                : ThreadLocalRandom.current().nextLong(minDelayTicks, maxDelayTicks + 1L);
         BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () ->
                 session.safeRun("karmaCheck", () -> {
                     playerCheckTasks.remove(playerId);
