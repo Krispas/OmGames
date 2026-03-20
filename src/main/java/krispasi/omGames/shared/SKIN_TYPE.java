@@ -12,5 +12,7 @@ public enum SKIN_TYPE {
     CHESTPLATE,
     LEGGINGS,
     BOOTS,
-    ELYTRA
+    ELYTRA,
+    BOW,
+    HAT
 }
