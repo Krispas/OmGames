@@ -48,7 +48,7 @@ public class BedwarsLobbyParkour {
     private static final long ACTION_BAR_UPDATE_TICKS = 2L;
     private static final int CONTROL_SLOT_RESET = 5;
     private static final int CONTROL_SLOT_EXIT = 6;
-    private static final int CONTROL_SLOT_CHECKPOINT = 8;
+    private static final int CONTROL_SLOT_CHECKPOINT = 7;
     private static final String CONTROL_RESET = "reset";
     private static final String CONTROL_EXIT = "exit";
     private static final String CONTROL_CHECKPOINT = "checkpoint";
