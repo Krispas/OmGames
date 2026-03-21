@@ -702,6 +702,7 @@ Do not re-introduce large BedWars god classes; use the existing support/runtime 
 - Only one active `GameSession` should exist at a time.
 - `stop()` cleanup must remove tasks, entities, sidebars, displays, and match-only state.
 - Team lookup is case-insensitive through `TeamColor.fromKey`, but config keys should stay canonical lowercase.
+- Team config keys should use canonical `aqua`; legacy `cyan` should remain accepted where `TeamColor.fromKey` already handles aliases.
 - Keep BedWars config parsing tolerant of legacy casing and aliases where the loaders already support them.
 - Shop + rotating config are both active after reload because of merge behavior.
 - If stats are disabled for a session, progression/wins should not be awarded.
@@ -715,6 +716,8 @@ Do not re-introduce large BedWars god classes; use the existing support/runtime 
 - Party EXP should only be paid to players who are still active participants when the match finishes or who disconnect and later rejoin before rewards are flushed; players who leave and do not finish the match must not receive party EXP.
 - `netherite_spear` movement boost reuse must be hard-blocked for 5 seconds with native `NETHERITE_SPEAR` cooldown plus short follow-up velocity suppression on denied attempts; do not rely on message-only listener gating.
 - Lobby-mode prestart should build a temporary 15x15 barrier platform centered under the resolved `map-lobby` location and restore the original blocks when the session leaves lobby/starts the match.
+- Starting a BedWars lobby from the team-assign menu should only teleport players who are currently assigned in that prestart session; unassigned players shown in the menu must stay where they are.
+- The team-assign start menu should list online players from the selected arena world and from the shared BedWars lobby world so players waiting in `bedwars_lobby` can be assigned before start.
 - Match end cleanup should return all remaining arena spectators to the shared BedWars `lobby.spawn`; `map-lobby` is for prestart/spectate flows, not post-match cleanup.
 - `/bw game spectate` can only be run by a player already standing in the active BedWars world.
 - When there is no active BedWars session, the shared BedWars lobby world should play a `BLOCK_AMETHYST_BLOCK_CHIME` ambient sound at `0 90 0` for players in that world at random intervals between 30 and 60 seconds.

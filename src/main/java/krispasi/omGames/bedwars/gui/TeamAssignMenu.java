@@ -16,6 +16,8 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.ClickType;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -139,7 +141,9 @@ public class TeamAssignMenu implements InventoryHolder {
         if (playerId == null) {
             return;
         }
-        if (event.isLeftClick()) {
+        if (isUnassignClick(event)) {
+            session.assignTeam(playerId, null);
+        } else if (event.isLeftClick()) {
             cycleTeam(playerId, 1);
         } else if (event.isRightClick()) {
             cycleTeam(playerId, -1);
@@ -195,11 +199,23 @@ public class TeamAssignMenu implements InventoryHolder {
     private List<Player> getLobbyPlayers() {
         List<Player> players = new ArrayList<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (session.isInArenaWorld(player.getWorld())) {
+            if (isSelectableLobbyPlayer(player)) {
                 players.add(player);
             }
         }
+        players.sort(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
         return players;
+    }
+
+    private boolean isSelectableLobbyPlayer(Player player) {
+        if (player == null || player.getWorld() == null) {
+            return false;
+        }
+        if (session.isInArenaWorld(player.getWorld())) {
+            return true;
+        }
+        String lobbyWorld = bedwarsManager.getLobbyWorldName();
+        return lobbyWorld != null && lobbyWorld.equalsIgnoreCase(player.getWorld().getName());
     }
 
     private ItemStack buildPlayerItem(Player player) {
@@ -215,7 +231,8 @@ public class TeamAssignMenu implements InventoryHolder {
         meta.lore(List.of(
                 teamLine,
                 Component.text("Left click: next team", NamedTextColor.DARK_GRAY),
-                Component.text("Right click: previous team", NamedTextColor.DARK_GRAY)
+                Component.text("Right click: previous team", NamedTextColor.DARK_GRAY),
+                Component.text("Middle click: unassign", NamedTextColor.DARK_GRAY)
         ));
 
         item.setItemMeta(meta);
@@ -293,7 +310,7 @@ public class TeamAssignMenu implements InventoryHolder {
         } else {
             meta.displayName(Component.text("Start Game", NamedTextColor.GREEN));
             meta.lore(List.of(
-                    Component.text("Teleports players to the map lobby.", NamedTextColor.GRAY),
+                    Component.text("Teleports selected players to the map lobby.", NamedTextColor.GRAY),
                     Component.text("Starts a 20s countdown.", NamedTextColor.DARK_GRAY)
             ));
         }
@@ -482,6 +499,14 @@ public class TeamAssignMenu implements InventoryHolder {
 
     private void toggleTeamPick() {
         session.setTeamPickEnabled(!session.isTeamPickEnabled());
+    }
+
+    private boolean isUnassignClick(InventoryClickEvent event) {
+        if (event == null) {
+            return false;
+        }
+        return event.getClick() == ClickType.MIDDLE
+                || event.getAction() == InventoryAction.CLONE_STACK;
     }
 
     private void cycleTeamSize() {

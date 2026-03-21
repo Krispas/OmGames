@@ -20,11 +20,11 @@ public enum TeamColor {
     WHITE("white", "White", NamedTextColor.WHITE, DyeColor.WHITE, Material.WHITE_WOOL, Material.WHITE_BED),
     BLACK("black", "Black", NamedTextColor.BLACK, DyeColor.BLACK, Material.BLACK_WOOL, Material.BLACK_BED),
     YELLOW("yellow", "Yellow", NamedTextColor.YELLOW, DyeColor.YELLOW, Material.YELLOW_WOOL, Material.YELLOW_BED),
-    CYAN("cyan", "Cyan", NamedTextColor.AQUA, DyeColor.CYAN, Material.CYAN_WOOL, Material.CYAN_BED),
+    AQUA("aqua", "Aqua", NamedTextColor.AQUA, DyeColor.CYAN, Material.CYAN_WOOL, Material.CYAN_BED),
     PINK("pink", "Pink", NamedTextColor.LIGHT_PURPLE, DyeColor.PINK, Material.PINK_WOOL, Material.PINK_BED);
 
     private static final List<TeamColor> ORDERED = List.of(
-            RED, BLUE, LIME, WHITE, BLACK, YELLOW, CYAN, PINK
+            RED, BLUE, LIME, WHITE, BLACK, YELLOW, AQUA, PINK
     );
 
     private final String key;
@@ -79,7 +79,7 @@ public enum TeamColor {
             case WHITE -> ChatColor.WHITE;
             case BLACK -> ChatColor.DARK_GRAY;
             case YELLOW -> ChatColor.YELLOW;
-            case CYAN -> ChatColor.AQUA;
+            case AQUA -> ChatColor.AQUA;
             case PINK -> ChatColor.LIGHT_PURPLE;
         };
     }
@@ -100,6 +100,9 @@ public enum TeamColor {
             return null;
         }
         String normalized = key.trim().toLowerCase(Locale.ROOT);
+        if (normalized.equals("cyan")) {
+            normalized = "aqua";
+        }
         for (TeamColor color : values()) {
             if (color.key.equals(normalized)) {
                 return color;

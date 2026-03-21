@@ -144,7 +144,7 @@ arenas:
       white: 989 51 1604, 989 51 1603
       black: 1068 51 1451, 1067 51 1451
       yellow: 836 51 1525, 837 51 1525
-      cyan: 915 51 1604, 915 51 1603
+      aqua: 915 51 1604, 915 51 1603
       pink: 1068 51 1525, 1067 51 1525
 
     Generators:
@@ -154,7 +154,7 @@ arenas:
       base_gen_white: 989 51 1625
       base_gen_black: 1089 51 1451
       base_gen_yellow: 815 51 1525
-      base_gen_cyan: 915 51 1625
+      base_gen_aqua: 915 51 1625
       base_gen_pink: 1089 51 1525
       diamond_1: 952 51 1564
       diamond_2: 1028 51 1488
@@ -172,7 +172,7 @@ arenas:
       base_white: 989 51 1619
       base_black: 1083 51 1451
       base_yellow: 821 51 1525
-      base_cyan: 915 51 1619
+      base_aqua: 915 51 1619
       base_pink: 1083 51 1525
     Shops:
       red:
@@ -190,7 +190,7 @@ arenas:
       yellow:
         main: 821 51 1516 1.1
         upgrades: 821 51 1534 -179.4
-      cyan:
+      aqua:
         main: 906 51 1619 -89.7
         upgrades: 924 51 1619 90.3
       pink:
@@ -217,7 +217,7 @@ arenas:
       white: -976 59 -938, -976 59 -939
       black: -938 59 -1024, -939 59 -1024
       yellow: -1062 59 -976, -1061 59 -976
-      cyan: -1030 59 -944, -1030 59 -945
+      aqua: -1030 59 -944, -1030 59 -945
       pink: -944 59 -970, -945 59 -970
     generators:
       diamond_1: -972 59 -1022
@@ -235,7 +235,7 @@ arenas:
       base_white: -976 62 -924
       base_black: -924 62 -1024
       base_yellow: -1076 62 -976
-      base_cyan: -1030 62 -930
+      base_aqua: -1030 62 -930
       base_pink: -930 62 -970
     Base_Generators:
       base_gen_red: -970 62 -1075
@@ -244,7 +244,7 @@ arenas:
       base_gen_white: -976 62 -919
       base_gen_black: -919 62 -1024
       base_gen_yellow: -1081 62 -976
-      base_gen_cyan: -1030 62 -925
+      base_gen_aqua: -1030 62 -925
       base_gen_pink: -925 62 -970
     Shops:
       red:
@@ -265,7 +265,7 @@ arenas:
       yellow:
         main: -1076 62 -986 SOUTH
         upgrades: -1076 62 -966 NORTH
-      cyan:
+      aqua:
         main: -1040 62 -930 EAST
         upgrades: -1020 62 -930 WEST
       pink:
@@ -367,7 +367,7 @@ arenas:
       white: -3166 70 131, -3167 70 131
       black: -3267 70 186, -3267 70 185
       yellow: -3221 70 30, -3221 70 31
-      cyan: -3166 70 85, -3167 70 85
+      aqua: -3166 70 85, -3167 70 85
       pink: -3221 70 186, -3221 70 185
     generators:
       diamond_1: -3209 72 143
@@ -385,7 +385,7 @@ arenas:
       base_white: -3154 71 131
       base_black: -3267 71 198
       base_yellow: -3221 71 18
-      base_cyan: -3154 71 85
+      base_aqua: -3154 71 85
       base_pink: -3221 71 198
     Base_Generators:
       base_gen_red: -3338 71 131
@@ -394,7 +394,7 @@ arenas:
       base_gen_white: -3150 71 131
       base_gen_black: -3267 71 202
       base_gen_yellow: -3221 71 14
-      base_gen_cyan: -3150 71 85
+      base_gen_aqua: -3150 71 85
       base_gen_pink: -3221 71 202
     Shops:
       red:
@@ -415,7 +415,7 @@ arenas:
       yellow:
         main: -3213 71 20 WEST
         upgrades: -3227 71 20 EAST
-      cyan:
+      aqua:
         main: -3156 71 93 NORTH
         upgrades: -3156 71 79 SOUTH
       pink:
@@ -517,7 +517,7 @@ arenas:
       white: 907 65 -895, 907 65 -896
       black: 864 65 -1014, 865 65 -1014
       yellow: 1026 65 -938, 1025 65 -938
-      cyan: 983 65 -895, 983 65 -896
+      aqua: 983 65 -895, 983 65 -896
       pink: 864 65 -938, 865 65 -938
     generators:
       diamond_1: 920 64 -1001
@@ -535,7 +535,7 @@ arenas:
       base_white: 907 67 -884
       base_black: 853 67 -1014
       base_yellow: 1037 67 -938
-      base_cyan: 983 67 -884
+      base_aqua: 983 67 -884
       base_pink: 853 67 -938
     Base_Generators:
       base_gen_red: 907 67 -1073
@@ -544,7 +544,7 @@ arenas:
       base_gen_white: 907 67 -879
       base_gen_black: 848 67 -1014
       base_gen_yellow: 1042 67 -938
-      base_gen_cyan: 983 67 -879
+      base_gen_aqua: 983 67 -879
       base_gen_pink: 848 67 -938
     Shops:
       red:
@@ -565,7 +565,7 @@ arenas:
       yellow:
         main: 1037 67 -931 NORTH
         upgrades: 1037 67 -945 SOUTH
-      cyan:
+      aqua:
         main: 976 67 -884 EAST
         upgrades: 990 67 -884 WEST
       pink:
@@ -667,7 +667,7 @@ arenas:
       white: -1039 42 916, -1038 42 916
       black: -915 42 960, -915 42 961
       yellow: -1083 42 1040, -1083 42 1039
-      cyan: -1083 42 960, -1083 42 961
+      aqua: -1083 42 960, -1083 42 961
       pink: -959 42 916, -960 42 916
     generators:
       diamond_1: -912 48 1000
@@ -685,7 +685,7 @@ arenas:
       base_white: -1049 41 909
       base_black: -908 41 950
       base_yellow: -1090 41 1050
-      base_cyan: -1090 41 950
+      base_aqua: -1090 41 950
       base_pink: -949 41 909
     Base_Generators:
       base_gen_red: -912 41 1056
@@ -694,7 +694,7 @@ arenas:
       base_gen_white: -1055 41 913
       base_gen_black: -912 41 944
       base_gen_yellow: -1086 41 1056
-      base_gen_cyan: -1086 41 944
+      base_gen_aqua: -1086 41 944
       base_gen_pink: -943 41 913
     Shops:
       red:
@@ -715,7 +715,7 @@ arenas:
       yellow:
         main: -1096 41 1050 EAST
         upgrades: -1096 41 1048 EAST
-      cyan:
+      aqua:
         main: -1096 41 952 EAST
         upgrades: -1096 41 950 EAST
       pink:
@@ -817,7 +817,7 @@ arenas:
       white: 2506 66 116, 2506 66 115
       black: 2460 66 2, 2461 66 2
       yellow: 2620 66 70, 2619 66 70
-      cyan: 2574 66 116, 2574 66 115
+      aqua: 2574 66 116, 2574 66 115
       pink: 2460 66 70, 2461 66 70
     generators:
       diamond_1: 2501 71 -3
@@ -835,7 +835,7 @@ arenas:
       base_white: 2506 66 125
       base_black: 2451 66 2
       base_yellow: 2629 66 70
-      base_cyan: 2574 66 125
+      base_aqua: 2574 66 125
       base_pink: 2451 66 70
     Base_Generators:
       base_gen_red: 2506 66 -59
@@ -844,7 +844,7 @@ arenas:
       base_gen_white: 2506 66 131
       base_gen_black: 2445 66 2
       base_gen_yellow: 2635 66 70
-      base_gen_cyan: 2574 66 131
+      base_gen_aqua: 2574 66 131
       base_gen_pink: 2445 66 70
     Shops:
       red:
@@ -865,7 +865,7 @@ arenas:
       yellow:
         main: 2631 66 76 NORTH
         upgrades: 2631 66 64 SOUTH
-      cyan:
+      aqua:
         main: 2568 66 127 EAST
         upgrades: 2580 66 127 WEST
       pink:

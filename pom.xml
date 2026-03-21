@@ -6,7 +6,7 @@
 
     <groupId>krispasi</groupId>
     <artifactId>omgames</artifactId>
-    <version>0.4.9</version>
+    <version>0.4.96</version>
     <packaging>jar</packaging>
 
     <name>omgames</name>

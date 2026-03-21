@@ -67,8 +67,12 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         startCountdownRemaining = lobbyCountdownRemaining;
 
         Location lobby = resolveMapLobbyLocation();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (!isInArenaWorld(player.getWorld())) {
+        for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
+            if (entry.getValue() == null) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null) {
                 continue;
             }
             if (lobby != null) {
