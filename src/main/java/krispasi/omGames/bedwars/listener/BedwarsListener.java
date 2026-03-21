@@ -71,6 +71,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockMultiPlaceEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
@@ -2072,6 +2073,23 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 session.clearTrackedKarmaAnvil(event.getEntity().getUniqueId());
             }
             event.getEntity().remove();
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onKarmaLightningIgnite(BlockIgniteEvent event) {
+        safeHandle("onKarmaLightningIgnite", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            if (!session.isInArenaWorld(event.getBlock().getWorld())) {
+                return;
+            }
+            if (!session.isKarmaLightning(event.getIgnitingEntity())) {
+                return;
+            }
+            event.setCancelled(true);
         });
     }
 

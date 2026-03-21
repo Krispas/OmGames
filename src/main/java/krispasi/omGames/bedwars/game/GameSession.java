@@ -1452,6 +1452,10 @@ public class GameSession extends GameSessionMatchFlowSupport {
         return karmaRuntime != null && karmaRuntime.isKarmaAnvil(entity);
     }
 
+    public boolean isKarmaLightning(Entity entity) {
+        return karmaRuntime != null && karmaRuntime.isKarmaLightning(entity);
+    }
+
     public void clearTrackedKarmaAnvil(UUID entityId) {
         if (karmaRuntime != null) {
             karmaRuntime.clearTrackedAnvil(entityId);

@@ -37,6 +37,7 @@ import org.bukkit.scheduler.BukkitTask;
  */
 class GameSessionKarmaRuntime {
     static final String KARMA_ANVIL_TAG = "bw_karma_anvil";
+    static final String KARMA_LIGHTNING_TAG = "bw_karma_lightning";
     private static final int WOODOO_DOLL_TEMP_KARMA = 10;
     private static final int BROKEN_MIRROR_TEMP_KARMA = 1;
     private static final int KARMA_COST_PER_EVENT = 2;
@@ -50,6 +51,7 @@ class GameSessionKarmaRuntime {
     private final Map<UUID, Integer> temporaryKarma = new HashMap<>();
     private final Map<UUID, BukkitTask> playerCheckTasks = new HashMap<>();
     private final Set<UUID> activeKarmaAnvils = new java.util.HashSet<>();
+    private final Set<UUID> activeKarmaLightning = new java.util.HashSet<>();
     private JavaPlugin plugin;
 
     GameSessionKarmaRuntime(GameSession session, BedwarsKarmaService service) {
@@ -71,6 +73,7 @@ class GameSessionKarmaRuntime {
     void stop() {
         cancelPlayerChecks();
         clearActiveAnvils();
+        activeKarmaLightning.clear();
         plugin = null;
     }
 
@@ -193,6 +196,12 @@ class GameSessionKarmaRuntime {
         return entity != null && entity.getScoreboardTags().contains(KARMA_ANVIL_TAG);
     }
 
+    boolean isKarmaLightning(Entity entity) {
+        return entity != null
+                && (entity.getScoreboardTags().contains(KARMA_LIGHTNING_TAG)
+                || activeKarmaLightning.contains(entity.getUniqueId()));
+    }
+
     void clearTrackedAnvil(UUID entityId) {
         if (entityId != null) {
             activeKarmaAnvils.remove(entityId);
@@ -300,7 +309,11 @@ class GameSessionKarmaRuntime {
         if (strike == null) {
             return false;
         }
+        strike.addScoreboardTag(KARMA_LIGHTNING_TAG);
+        activeKarmaLightning.add(strike.getUniqueId());
         if (plugin != null) {
+            plugin.getServer().getScheduler().runTaskLater(plugin,
+                    () -> activeKarmaLightning.remove(strike.getUniqueId()), 40L);
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 clearNearbyFire(location);
                 player.setFireTicks(0);
