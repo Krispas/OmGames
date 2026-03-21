@@ -206,8 +206,8 @@ Admin subcommands:
 - `/bw setup <arena> [key]`
 - `/bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]`
 - `/bw give <rotating-item>`
-- `/bw time capsule view <user> [time_id]`
-- `/bw test time capsule view <user> [time_id]`
+- `/bw time_capsule view <user> [time_id]`
+- `/bw test_time_capsule view <user> [time_id]`
 
 Permissions declared in `plugin.yml`:
 - `omgames.bw.start`
@@ -221,8 +221,8 @@ Temporary creator notes:
 - in normal matches, only `krispasi_2` may use `/bw give <rotating-item>`
 - in test matches, any OP player may use `/bw give <rotating-item>`
 - `/bw give <rotating-item>` only works after the match countdown has started; it should not work during the pre-match lobby state
-- `/bw time capsule view <user> [time_id]` is also OP-only
-- `/bw test time capsule view <user> [time_id]` is also OP-only
+- `/bw time_capsule view <user> [time_id]` is also OP-only
+- `/bw test_time_capsule view <user> [time_id]` is also OP-only
 - temporary creators may use `/bw setup` and `/bw tp`
 - temporary creators may also place/break blocks and use openable blocks in protected BedWars worlds when there is no active session in that world
 - temporary creator access is in-memory only and is cleared on restart/shutdown
@@ -569,7 +569,7 @@ Behavior notes:
   - bought as a normal placeable block item and placed as a `STONE_PRESSURE_PLATE`
   - should spend 5 seconds priming after placement; while priming it shows a shared floating progress bar above the mine
   - once armed, it should trigger when an enemy player steps directly onto the mine block, using only the lowest `0.8` blocks of vertical trigger height above the mine, and detonate through the normal TNT explosion path
-  - `custom-items.yml -> proximity_mine.damage` overrides the mine's direct player damage; non-positive values keep the default scaled TNT damage path
+  - `custom-items.yml -> proximity_mine.damage` overrides the mine's direct player damage as the exact dealt hit; non-positive values keep the default scaled TNT damage path
   - should use placed-block tracking so it can be broken, dropped, rolled back, and chain-exploded like other BedWars placed blocks
 - `WOODOO_DOLL`
   - rotating held item used as a melee curse item
@@ -591,10 +591,10 @@ Behavior notes:
   - saved capsules are split into separate `normal` and `test` queues based on whether the source match came from `/bw start` or `/bw test start`
   - when Time Capsule is active in a later match, participants should receive claimed reward capsules from that same queue at match start
   - claimed reward capsules should identify which player packed them when that creator is known
-  - `/bw time capsule view <user>` should list only the creator's currently stored normal-queue capsules, using ids in `MM_dd_HH_mm_ss` format
-  - `/bw time capsule view <user> <time_id>` should open a read-only view of that current normal-queue capsule
-  - `/bw test time capsule view <user>` should list only the creator's currently stored test-queue capsules, using ids in `MM_dd_HH_mm_ss` format
-  - `/bw test time capsule view <user> <time_id>` should open a read-only view of that current test-queue capsule
+  - `/bw time_capsule view <user>` should list only the creator's currently stored normal-queue capsules, using ids in `MM_dd_HH_mm_ss` format
+  - `/bw time_capsule view <user> <time_id>` should open a read-only view of that current normal-queue capsule
+  - `/bw test_time_capsule view <user>` should list only the creator's currently stored test-queue capsules, using ids in `MM_dd_HH_mm_ss` format
+  - `/bw test_time_capsule view <user> <time_id>` should open a read-only view of that current test-queue capsule
   - if the queue has fewer saved capsules than participants but at least one exists, claimed rewards may duplicate so every participant still receives one
   - each claimed source capsule is deleted from SQLite immediately after that match claims it
 - `BRIDGE_BUILDER`

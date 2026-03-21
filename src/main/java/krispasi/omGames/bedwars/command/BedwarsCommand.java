@@ -91,13 +91,13 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         if (args.length > 0 && args[0].equalsIgnoreCase("give")) {
             return handleGiveCommand(sender, player, args);
         }
-        if (args.length > 0 && args[0].equalsIgnoreCase("time")) {
-            return handleTimeCapsuleCommand(sender, player, args, TimeCapsuleQueueType.NORMAL, 1);
+        if (args.length > 0 && args[0].equalsIgnoreCase("time_capsule")) {
+            return handleTimeCapsuleCommand(sender, player, args, TimeCapsuleQueueType.NORMAL,
+                    "/bw time_capsule view");
         }
-        if (args.length > 1
-                && args[0].equalsIgnoreCase("test")
-                && args[1].equalsIgnoreCase("time")) {
-            return handleTimeCapsuleCommand(sender, player, args, TimeCapsuleQueueType.TEST, 2);
+        if (args.length > 0 && args[0].equalsIgnoreCase("test_time_capsule")) {
+            return handleTimeCapsuleCommand(sender, player, args, TimeCapsuleQueueType.TEST,
+                    "/bw test_time_capsule view");
         }
         if (!player.isOp() && !temporaryCreator) {
             sender.sendMessage(Component.text("Only OP can use this command (except /bw stats and /bw quick-buy).", NamedTextColor.RED));
@@ -133,7 +133,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             if (args.length < 2 || !args[1].equalsIgnoreCase("start")) {
-                sender.sendMessage(Component.text("Usage: /bw test start | /bw test time capsule view <user> [time_id]",
+                sender.sendMessage(Component.text("Usage: /bw test start | /bw test_time_capsule view <user> [time_id]",
                         NamedTextColor.YELLOW));
                 return true;
             }
@@ -333,7 +333,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test time capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <rotating_item> | /bw time capsule view <user> [time_id] | /bw quick_buy | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test_time_capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <rotating_item> | /bw time_capsule view <user> [time_id] | /bw quick_buy | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -341,7 +341,8 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "karma", "give", "time", "quick_buy", "stats", "reload", "setup", "creator")
+            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "karma", "give", "time_capsule",
+                            "test_time_capsule", "quick_buy", "stats", "reload", "setup", "creator")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -351,39 +352,56 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                     .filter(option -> input == null || option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
-        if (args.length == 2 && args[0].equalsIgnoreCase("time")) {
+        if (args.length == 2 && args[0].equalsIgnoreCase("time_capsule")) {
             String input = args[1].toLowerCase(Locale.ROOT);
-            return Stream.of("capsule")
-                    .filter(option -> option.startsWith(input))
-                    .toList();
-        }
-        if (args.length == 3
-                && args[0].equalsIgnoreCase("time")
-                && args[1].equalsIgnoreCase("capsule")) {
-            String input = args[2].toLowerCase(Locale.ROOT);
             return Stream.of("view")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
-        if (args.length == 4
-                && args[0].equalsIgnoreCase("time")
-                && args[1].equalsIgnoreCase("capsule")
-                && args[2].equalsIgnoreCase("view")) {
-            String input = args[3].toLowerCase(Locale.ROOT);
+        if (args.length == 3
+                && args[0].equalsIgnoreCase("time_capsule")
+                && args[1].equalsIgnoreCase("view")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
             return getKnownPlayerNames()
                     .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
-        if (args.length == 5
-                && args[0].equalsIgnoreCase("time")
-                && args[1].equalsIgnoreCase("capsule")
-                && args[2].equalsIgnoreCase("view")) {
-            OfflinePlayer target = resolveKnownPlayer(args[3]);
+        if (args.length == 4
+                && args[0].equalsIgnoreCase("time_capsule")
+                && args[1].equalsIgnoreCase("view")) {
+            OfflinePlayer target = resolveKnownPlayer(args[2]);
             if (target == null || target.getUniqueId() == null) {
                 return List.of();
             }
-            String input = args[4].toLowerCase(Locale.ROOT);
+            String input = args[3].toLowerCase(Locale.ROOT);
             return getCurrentCapsules(target.getUniqueId(), TimeCapsuleQueueType.NORMAL).stream()
+                    .map(capsule -> formatFullTimeId(capsule.createdAt()))
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
+                    .toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("test_time_capsule")) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Stream.of("view")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3
+                && args[0].equalsIgnoreCase("test_time_capsule")
+                && args[1].equalsIgnoreCase("view")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return getKnownPlayerNames()
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
+                    .toList();
+        }
+        if (args.length == 4
+                && args[0].equalsIgnoreCase("test_time_capsule")
+                && args[1].equalsIgnoreCase("view")) {
+            OfflinePlayer target = resolveKnownPlayer(args[2]);
+            if (target == null || target.getUniqueId() == null) {
+                return List.of();
+            }
+            String input = args[3].toLowerCase(Locale.ROOT);
+            return getCurrentCapsules(target.getUniqueId(), TimeCapsuleQueueType.TEST).stream()
                     .map(capsule -> formatFullTimeId(capsule.createdAt()))
                     .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
@@ -777,21 +795,15 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                                              Player player,
                                              String[] args,
                                              TimeCapsuleQueueType queueType,
-                                             int pathOffset) {
-        String commandPath = queueType == TimeCapsuleQueueType.TEST
-                ? "/bw test time capsule view"
-                : "/bw time capsule view";
-        int capsuleIndex = pathOffset;
-        int viewIndex = pathOffset + 1;
-        int userIndex = pathOffset + 2;
-        int timeIdIndex = pathOffset + 3;
+                                             String commandPath) {
+        int viewIndex = 1;
+        int userIndex = 2;
+        int timeIdIndex = 3;
         if (!player.isOp()) {
             sender.sendMessage(Component.text("Only OP can use " + commandPath + ".", NamedTextColor.RED));
             return true;
         }
-        if (args.length < userIndex + 1
-                || !args[capsuleIndex].equalsIgnoreCase("capsule")
-                || !args[viewIndex].equalsIgnoreCase("view")) {
+        if (args.length < userIndex + 1 || !args[viewIndex].equalsIgnoreCase("view")) {
             sender.sendMessage(Component.text("Usage: " + commandPath + " <user> [time_id]", NamedTextColor.YELLOW));
             return true;
         }

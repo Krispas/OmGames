@@ -1393,6 +1393,21 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
         return itemId.equalsIgnoreCase(ShopItemData.getId(item)) ? item.getAmount() : 0;
     }
 
+    @SuppressWarnings("deprecation")
+    protected void setExactEventDamage(EntityDamageEvent event, double damage) {
+        if (event == null) {
+            return;
+        }
+        double normalizedDamage = Math.max(0.0, damage);
+        event.setDamage(normalizedDamage);
+        for (EntityDamageEvent.DamageModifier modifier : EntityDamageEvent.DamageModifier.values()) {
+            if (modifier == EntityDamageEvent.DamageModifier.BASE || !event.isApplicable(modifier)) {
+                continue;
+            }
+            event.setDamage(modifier, 0.0);
+        }
+    }
+
     protected void scheduleEquipmentUnbreakable(Player player, GameSession session) {
         if (player == null || session == null) {
             return;

@@ -1499,7 +1499,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 if (proximityMineTnt) {
                     CustomItemDefinition mineCustom = getCustomItem(PROXIMITY_MINE_ITEM_ID);
                     if (mineCustom != null && mineCustom.getDamage() > 0.0) {
-                        event.setDamage(mineCustom.getDamage());
+                        setExactEventDamage(event, mineCustom.getDamage());
                     } else {
                         event.setDamage(event.getDamage() * TNT_DAMAGE_MULTIPLIER);
                     }
