@@ -22,7 +22,7 @@ match-events:
       weight: 1
 karma-events:
   check-min-seconds: 10
-  check-max-seconds: 200
+  check-max-seconds: 100
   base-roll-chance-percent: 10
   per-karma-chance-percent: 10
 lobby-parkour:
@@ -704,7 +704,7 @@ arenas:
         main: -1049 41 903 SOUTH
         upgrades: -1047 41 903 SOUTH
       black:
-        main: -902 41 1048 WEST
+        main: -902 41 950 WEST
         upgrades: -902 41 952 WEST
       yellow:
         main: -1096 41 1050 EAST

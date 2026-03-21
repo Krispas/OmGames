@@ -69,7 +69,7 @@ abstract class GameSessionEffectSupport {
     protected static final double APRIL_FOOLS_SCALE_MULTIPLIER = 0.5;
     protected static final double LONG_ARMS_RANGE_BONUS = 10.0;
     protected static final double BLOOD_MOON_HEALTH_MULTIPLIER = 0.5;
-    protected static final double MOON_BIG_JUMP_MULTIPLIER = 2.5;
+    protected static final double MOON_BIG_GRAVITY = 0.01;
     protected static final double BLOOD_MOON_LIFESTEAL_RATIO = 1.0;
     protected static final Duration TITLE_FADE_IN = Duration.ofMillis(300);
     protected static final Duration TITLE_STAY = Duration.ofSeconds(3);
@@ -1098,7 +1098,7 @@ abstract class GameSessionEffectSupport {
                     "BLOCK_INTERACTION_RANGE",
                     "PLAYER_BLOCK_INTERACTION_RANGE");
             case MOON_BIG -> {
-                setAttributeToDefaultMultiplier(player, 0.6, "GRAVITY", "GENERIC_GRAVITY");
+                setAttributeToValue(player, MOON_BIG_GRAVITY, "GRAVITY", "GENERIC_GRAVITY");
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,
                         Integer.MAX_VALUE,
                         0,
@@ -1183,6 +1183,15 @@ abstract class GameSessionEffectSupport {
             return false;
         }
         instance.setBaseValue(instance.getDefaultValue() + bonus);
+        return true;
+    }
+
+    protected boolean setAttributeToValue(LivingEntity entity, double value, String... attributeNames) {
+        org.bukkit.attribute.AttributeInstance instance = resolveAttributeInstance(entity, attributeNames);
+        if (instance == null) {
+            return false;
+        }
+        instance.setBaseValue(value);
         return true;
     }
 

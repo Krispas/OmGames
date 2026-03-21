@@ -311,12 +311,21 @@ public class GameSession extends GameSessionMatchFlowSupport {
         queuePartyExp(playerId, PARTY_EXP_KILL);
         Player player = Bukkit.getPlayer(playerId);
         if (player != null) {
+            rewardMatchEventKillResources(player);
             updateSidebarForPlayer(player);
         }
     }
 
     public void rewardFinalKill(UUID playerId) {
         queuePartyExp(playerId, PARTY_EXP_FINAL_KILL);
+    }
+
+    private void rewardMatchEventKillResources(Player player) {
+        if (player == null || activeMatchEvent != BedwarsMatchEventType.IN_THIS_ECONOMY) {
+            return;
+        }
+        giveItem(player, new ItemStack(Material.DIAMOND));
+        giveItem(player, new ItemStack(Material.EMERALD));
     }
 
     public void finalizePartyExpRewards(TeamColor winner) {

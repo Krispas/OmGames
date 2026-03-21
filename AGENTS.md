@@ -384,11 +384,13 @@ Supported event ids:
 
 `moon-big` runtime note:
 - use the gravity attribute for the low-gravity effect
+- set player gravity to `0.01` from the vanilla default `0.08`
 - only apply `Slow Falling I`
 
 `in-this-economy` runtime note:
 - `fireball`, `bed_bug`, and `dream_defender` stay purchasable at `4x` their normal price
 - diamond and emerald map generators should drop gold instead, keeping their slower generator cadence
+- each player kill should also reward the killer with `1` diamond and `1` emerald
 
 `chaos` runtime note:
 - all rotating items and rotating upgrades should be active for that match, regardless of the normal `2 items + 1 upgrade` auto-roll
@@ -429,6 +431,7 @@ Common item fields:
 Notes:
 - `knockback-bonus` adds an `ATTACK_KNOCKBACK` item attribute modifier on the held weapon.
 - `max-carry-amount` caps how many copies of that shop item a player may carry at once; purchases and dropped-item pickup should both respect it.
+- `max-carry-amount` should also block moving extra copies from team chests or fake ender chests back into player inventory, while still allowing players to store extra copies inside those chests.
 - Use config changes for shop balancing first.
 - Shop UI border slots are reserved.
   - Avoid putting category entries on the outer top/bottom rows or the far left/right columns.

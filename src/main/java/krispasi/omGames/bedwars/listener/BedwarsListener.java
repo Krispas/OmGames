@@ -243,9 +243,12 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             if (!session.isInArenaWorld(player.getWorld()) || !session.isParticipant(player.getUniqueId())) {
                 return;
             }
-            if (isStorageInventory(topInventory) && shouldBlockContainerMove(event, player, topInventory)) {
-                event.setCancelled(true);
-                return;
+            if (isStorageInventory(topInventory)) {
+                if (shouldBlockContainerMove(event, player, topInventory)
+                        || shouldBlockCarryLimitedStorageMove(event, player, session, topInventory)) {
+                    event.setCancelled(true);
+                    return;
+                }
             }
             if (event.getSlotType() == InventoryType.SlotType.ARMOR) {
                 event.setCancelled(true);

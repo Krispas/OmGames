@@ -1242,6 +1242,157 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
         return false;
     }
 
+    protected boolean shouldBlockCarryLimitedStorageMove(InventoryClickEvent event,
+                                                         Player player,
+                                                         GameSession session,
+                                                         Inventory topInventory) {
+        if (event == null || player == null || session == null || topInventory == null) {
+            return false;
+        }
+        InventoryAction action = event.getAction();
+        if (action == InventoryAction.NOTHING || action == InventoryAction.UNKNOWN) {
+            return false;
+        }
+        if (action == InventoryAction.COLLECT_TO_CURSOR) {
+            return shouldBlockCarryLimitedCollectToCursor(event, player, session, topInventory);
+        }
+        Inventory clickedInventory = event.getClickedInventory();
+        if (clickedInventory == null || !clickedInventory.equals(topInventory)) {
+            return false;
+        }
+        ShopItemDefinition definition = resolveCarryLimitedShopItem(event.getCurrentItem());
+        if (definition == null) {
+            return false;
+        }
+        int incomingAmount = resolveStorageWithdrawAmount(event);
+        if (incomingAmount <= 0) {
+            return false;
+        }
+        int allowedAmount = session.getRemainingCarryAmount(player.getUniqueId(), definition);
+        if (allowedAmount < 0) {
+            return false;
+        }
+        allowedAmount -= countShopItemAmount(event.getCursor(), definition.getId());
+        if (isHotbarStorageSwapAction(action)) {
+            allowedAmount += countHotbarOutgoingAmount(player, definition.getId(), event.getHotbarButton());
+        }
+        if (action == InventoryAction.SWAP_WITH_CURSOR) {
+            allowedAmount += countShopItemAmount(event.getCursor(), definition.getId());
+        }
+        if (incomingAmount <= Math.max(0, allowedAmount)) {
+            return false;
+        }
+        player.sendActionBar(Component.text("You cannot carry more of that item.", NamedTextColor.RED));
+        return true;
+    }
+
+    protected boolean shouldBlockCarryLimitedCollectToCursor(InventoryClickEvent event,
+                                                             Player player,
+                                                             GameSession session,
+                                                             Inventory topInventory) {
+        ShopItemDefinition definition = resolveCarryLimitedShopItem(event.getCurrentItem());
+        if (definition == null) {
+            definition = resolveCarryLimitedShopItem(event.getCursor());
+        }
+        if (definition == null) {
+            return false;
+        }
+        int allowedAmount = session.getRemainingCarryAmount(player.getUniqueId(), definition);
+        if (allowedAmount < 0) {
+            return false;
+        }
+        allowedAmount -= countShopItemAmount(event.getCursor(), definition.getId());
+        if (countInventoryShopItem(topInventory, definition.getId()) <= Math.max(0, allowedAmount)) {
+            return false;
+        }
+        player.sendActionBar(Component.text("You cannot carry more of that item.", NamedTextColor.RED));
+        return true;
+    }
+
+    protected ShopItemDefinition resolveCarryLimitedShopItem(ItemStack stack) {
+        if (stack == null || stack.getType() == Material.AIR) {
+            return null;
+        }
+        ShopConfig shopConfig = bedwarsManager.getShopConfig();
+        if (shopConfig == null) {
+            return null;
+        }
+        String itemId = ShopItemData.getId(stack);
+        if (itemId == null || itemId.isBlank()) {
+            return null;
+        }
+        ShopItemDefinition definition = shopConfig.getItem(itemId);
+        if (definition == null || definition.getMaxCarryAmount() <= 0) {
+            return null;
+        }
+        return definition;
+    }
+
+    protected int resolveStorageWithdrawAmount(InventoryClickEvent event) {
+        ItemStack current = event.getCurrentItem();
+        if (current == null || current.getType() == Material.AIR) {
+            return 0;
+        }
+        InventoryAction action = event.getAction();
+        if (action == InventoryAction.HOTBAR_SWAP || isLegacyHotbarMoveAndReadd(action)) {
+            return current.getAmount();
+        }
+        return switch (action) {
+            case MOVE_TO_OTHER_INVENTORY, SWAP_WITH_CURSOR -> current.getAmount();
+            case PICKUP_ALL -> Math.min(current.getAmount(), resolveCursorCapacity(event.getCursor(), current));
+            case PICKUP_HALF -> Math.min((current.getAmount() + 1) / 2, resolveCursorCapacity(event.getCursor(), current));
+            case PICKUP_ONE -> Math.min(1, resolveCursorCapacity(event.getCursor(), current));
+            case PICKUP_SOME -> Math.min(current.getAmount(), resolveCursorCapacity(event.getCursor(), current));
+            default -> 0;
+        };
+    }
+
+    protected boolean isHotbarStorageSwapAction(InventoryAction action) {
+        return action == InventoryAction.HOTBAR_SWAP || isLegacyHotbarMoveAndReadd(action);
+    }
+
+    protected boolean isLegacyHotbarMoveAndReadd(InventoryAction action) {
+        return action != null && "HOTBAR_MOVE_AND_READD".equals(action.name());
+    }
+
+    protected int resolveCursorCapacity(ItemStack cursor, ItemStack current) {
+        if (current == null || current.getType() == Material.AIR) {
+            return 0;
+        }
+        if (cursor == null || cursor.getType() == Material.AIR) {
+            return current.getMaxStackSize();
+        }
+        if (!cursor.isSimilar(current)) {
+            return 0;
+        }
+        return Math.max(0, current.getMaxStackSize() - cursor.getAmount());
+    }
+
+    protected int countHotbarOutgoingAmount(Player player, String itemId, int hotbarButton) {
+        if (player == null || itemId == null || itemId.isBlank() || hotbarButton < 0) {
+            return 0;
+        }
+        return countShopItemAmount(player.getInventory().getItem(hotbarButton), itemId);
+    }
+
+    protected int countInventoryShopItem(Inventory inventory, String itemId) {
+        if (inventory == null || itemId == null || itemId.isBlank()) {
+            return 0;
+        }
+        int count = 0;
+        for (ItemStack item : inventory.getContents()) {
+            count += countShopItemAmount(item, itemId);
+        }
+        return count;
+    }
+
+    protected int countShopItemAmount(ItemStack item, String itemId) {
+        if (item == null || item.getType() == Material.AIR || itemId == null || itemId.isBlank()) {
+            return 0;
+        }
+        return itemId.equalsIgnoreCase(ShopItemData.getId(item)) ? item.getAmount() : 0;
+    }
+
     protected void scheduleEquipmentUnbreakable(Player player, GameSession session) {
         if (player == null || session == null) {
             return;
