@@ -10,6 +10,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class TimeCapsuleItemData {
     private static final NamespacedKey CONTENTS_KEY =
             new NamespacedKey(JavaPlugin.getProvidingPlugin(TimeCapsuleItemData.class), "time_capsule_contents");
+    private static final NamespacedKey SOURCE_PLAYER_NAME_KEY =
+            new NamespacedKey(JavaPlugin.getProvidingPlugin(TimeCapsuleItemData.class), "time_capsule_source_player_name");
 
     private TimeCapsuleItemData() {
     }
@@ -26,6 +28,18 @@ public final class TimeCapsuleItemData {
         container.set(CONTENTS_KEY, PersistentDataType.STRING, encodedContents);
     }
 
+    public static void applySourcePlayerName(ItemMeta meta, String sourcePlayerName) {
+        if (meta == null) {
+            return;
+        }
+        PersistentDataContainer container = meta.getPersistentDataContainer();
+        if (sourcePlayerName == null || sourcePlayerName.isBlank()) {
+            container.remove(SOURCE_PLAYER_NAME_KEY);
+            return;
+        }
+        container.set(SOURCE_PLAYER_NAME_KEY, PersistentDataType.STRING, sourcePlayerName);
+    }
+
     public static String getContents(ItemStack stack) {
         if (stack == null) {
             return null;
@@ -35,5 +49,16 @@ public final class TimeCapsuleItemData {
             return null;
         }
         return meta.getPersistentDataContainer().get(CONTENTS_KEY, PersistentDataType.STRING);
+    }
+
+    public static String getSourcePlayerName(ItemStack stack) {
+        if (stack == null) {
+            return null;
+        }
+        ItemMeta meta = stack.getItemMeta();
+        if (meta == null) {
+            return null;
+        }
+        return meta.getPersistentDataContainer().get(SOURCE_PLAYER_NAME_KEY, PersistentDataType.STRING);
     }
 }

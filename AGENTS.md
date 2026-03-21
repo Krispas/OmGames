@@ -205,6 +205,7 @@ Admin subcommands:
 - `/bw setup new <arena>`
 - `/bw setup <arena> [key]`
 - `/bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]`
+- `/bw time capsule view <user> [time_id]`
 
 Permissions declared in `plugin.yml`:
 - `omgames.bw.start`
@@ -214,6 +215,7 @@ Permissions declared in `plugin.yml`:
 Temporary creator notes:
 - `/bw creator add <user>` and `/bw creator remove <user>` are OP-only management commands
 - `/bw karma <user>`, `/bw karma add ...`, and `/bw karma cause` are also OP-only management commands
+- `/bw time capsule view <user> [time_id]` is also OP-only
 - temporary creators may use `/bw setup` and `/bw tp`
 - temporary creators may also place/break blocks and use openable blocks in protected BedWars worlds when there is no active session in that world
 - temporary creator access is in-memory only and is cleared on restart/shutdown
@@ -570,6 +572,9 @@ Behavior notes:
   - only the winning slots are serialized into SQLite; failed slots are intentionally lost
   - saved capsules are split into separate `normal` and `test` queues based on whether the source match came from `/bw start` or `/bw test start`
   - when Time Capsule is active in a later match, participants should receive claimed reward capsules from that same queue at match start
+  - claimed reward capsules should identify which player packed them when that creator is known
+  - `/bw time capsule view <user>` should list only the creator's currently stored capsules, using ids in `queue:MM_dd_HH_mm_ss` format
+  - `/bw time capsule view <user> <time_id>` should open a read-only view of that currently stored capsule; plain `MM_dd_HH_mm_ss` or short `MM_dd_mm_ss` matching may still be accepted if it resolves uniquely
   - if the queue has fewer saved capsules than participants but at least one exists, claimed rewards may duplicate so every participant still receives one
   - each claimed source capsule is deleted from SQLite immediately after that match claims it
 - `BRIDGE_BUILDER`

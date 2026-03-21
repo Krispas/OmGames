@@ -17,7 +17,7 @@ custom-items:
     type: PROXIMITY_MINE
     material: STONE_PRESSURE_PLATE
     yield: 4.0
-    damage: 0.0
+    damage: 16.0
   woodoo_doll:
     type: WOODOO_DOLL
     material: RABBIT_FOOT

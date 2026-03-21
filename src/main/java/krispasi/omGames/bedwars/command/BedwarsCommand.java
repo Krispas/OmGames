@@ -1,15 +1,25 @@
 package krispasi.omGames.bedwars.command;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.game.GameSession;
+import krispasi.omGames.bedwars.gui.TimeCapsuleViewMenu;
 import krispasi.omGames.bedwars.karma.BedwarsKarmaService;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
 import krispasi.omGames.bedwars.stats.BedwarsPlayerStats;
 import krispasi.omGames.bedwars.stats.BedwarsStatsService;
+import krispasi.omGames.bedwars.timecapsule.TimeCapsuleSerialization;
+import krispasi.omGames.bedwars.timecapsule.TimeCapsuleService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -22,9 +32,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import java.util.List;
-import java.util.Locale;
-import java.util.stream.Stream;
+import org.bukkit.inventory.ItemStack;
 
 /**
  * Command executor and tab completer for {@code /bw}.
@@ -34,6 +42,12 @@ import java.util.stream.Stream;
  * @see krispasi.omGames.bedwars.setup.BedwarsSetupManager
  */
 public class BedwarsCommand implements CommandExecutor, TabCompleter {
+    private static final int TIME_CAPSULE_SIZE = 27;
+    private static final DateTimeFormatter FULL_TIME_ID_FORMATTER =
+            DateTimeFormatter.ofPattern("MM_dd_HH_mm_ss");
+    private static final DateTimeFormatter SHORT_TIME_ID_FORMATTER =
+            DateTimeFormatter.ofPattern("MM_dd_mm_ss");
+
     private final BedwarsManager bedwarsManager;
     private final BedwarsSetupManager setupManager;
 
@@ -66,6 +80,9 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length > 0 && args[0].equalsIgnoreCase("karma")) {
             return handleKarmaCommand(sender, player, args);
+        }
+        if (args.length > 0 && args[0].equalsIgnoreCase("time")) {
+            return handleTimeCapsuleCommand(sender, player, args);
         }
         if (!player.isOp() && !temporaryCreator) {
             sender.sendMessage(Component.text("Only OP can use this command (except /bw stats and /bw quick-buy).", NamedTextColor.RED));
@@ -300,7 +317,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw quick_buy | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw time capsule view <user> [time_id] | /bw quick_buy | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -308,8 +325,48 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "karma", "quick_buy", "stats", "reload", "setup", "creator")
+            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "karma", "time", "quick_buy", "stats", "reload", "setup", "creator")
                     .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("time")) {
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Stream.of("capsule")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3
+                && args[0].equalsIgnoreCase("time")
+                && args[1].equalsIgnoreCase("capsule")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return Stream.of("view")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 4
+                && args[0].equalsIgnoreCase("time")
+                && args[1].equalsIgnoreCase("capsule")
+                && args[2].equalsIgnoreCase("view")) {
+            String input = args[3].toLowerCase(Locale.ROOT);
+            return getKnownPlayerNames()
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
+                    .toList();
+        }
+        if (args.length == 5
+                && args[0].equalsIgnoreCase("time")
+                && args[1].equalsIgnoreCase("capsule")
+                && args[2].equalsIgnoreCase("view")) {
+            OfflinePlayer target = resolveKnownPlayer(args[3]);
+            if (target == null || target.getUniqueId() == null) {
+                return List.of();
+            }
+            String input = args[4].toLowerCase(Locale.ROOT);
+            return bedwarsManager.getTimeCapsuleService().getCurrentCapsulesByCreator(target.getUniqueId()).stream()
+                    .flatMap(capsule -> Stream.of(
+                            formatFullTimeId(capsule.createdAt()),
+                            formatQualifiedTimeId(capsule)))
+                    .distinct()
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
         if (args.length == 2 && isCreatorCommand(args[0])) {
@@ -607,6 +664,69 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean handleTimeCapsuleCommand(CommandSender sender, Player player, String[] args) {
+        if (!player.isOp()) {
+            sender.sendMessage(Component.text("Only OP can use /bw time capsule view.", NamedTextColor.RED));
+            return true;
+        }
+        if (args.length < 3
+                || !args[1].equalsIgnoreCase("capsule")
+                || !args[2].equalsIgnoreCase("view")) {
+            sender.sendMessage(Component.text("Usage: /bw time capsule view <user> [time_id]", NamedTextColor.YELLOW));
+            return true;
+        }
+        if (args.length < 4) {
+            sender.sendMessage(Component.text("Usage: /bw time capsule view <user> [time_id]", NamedTextColor.YELLOW));
+            return true;
+        }
+        OfflinePlayer target = resolveKnownPlayer(args[3]);
+        if (target == null || target.getUniqueId() == null) {
+            sender.sendMessage(Component.text("Player not found: " + args[3], NamedTextColor.RED));
+            return true;
+        }
+        String targetName = resolvePlayerName(target, args[3]);
+        List<TimeCapsuleService.VisibleTimeCapsule> capsules = bedwarsManager.getTimeCapsuleService()
+                .getCurrentCapsulesByCreator(target.getUniqueId());
+        if (capsules.isEmpty()) {
+            sender.sendMessage(Component.text("No current Time Capsules found for " + targetName + ".", NamedTextColor.RED));
+            return true;
+        }
+        if (args.length == 4) {
+            sendAvailableCapsules(sender, targetName, capsules);
+            return true;
+        }
+        String requestedTimeId = args[4];
+        List<TimeCapsuleService.VisibleTimeCapsule> matches = capsules.stream()
+                .filter(capsule -> matchesTimeId(capsule, requestedTimeId))
+                .toList();
+        if (matches.isEmpty()) {
+            sender.sendMessage(Component.text("No current Time Capsule found for " + targetName
+                    + " with time id " + requestedTimeId + ".", NamedTextColor.RED));
+            sendAvailableCapsules(sender, targetName, capsules);
+            return true;
+        }
+        if (matches.size() > 1) {
+            sender.sendMessage(Component.text("Multiple current Time Capsules match " + requestedTimeId
+                    + ". Use the queue-qualified id shown below.", NamedTextColor.RED));
+            sendAvailableCapsules(sender, targetName, matches);
+            return true;
+        }
+        TimeCapsuleService.VisibleTimeCapsule capsule = matches.getFirst();
+        ItemStack[] contents;
+        try {
+            contents = TimeCapsuleSerialization.deserialize(capsule.contentsBase64(), TIME_CAPSULE_SIZE);
+        } catch (IOException | IllegalArgumentException ex) {
+            bedwarsManager.getPlugin().getLogger().warning("Failed to view stored Time Capsule for "
+                    + target.getUniqueId() + ": " + ex.getMessage());
+            sender.sendMessage(Component.text("That Time Capsule could not be opened.", NamedTextColor.RED));
+            return true;
+        }
+        new TimeCapsuleViewMenu(contents).open(player);
+        sender.sendMessage(Component.text("Viewing " + targetName + "'s " + capsule.queueType().key()
+                + " Time Capsule " + formatFullTimeId(capsule.createdAt()) + ".", NamedTextColor.GREEN));
+        return true;
+    }
+
     private boolean handleStatsModifyCommand(CommandSender sender, Player player, String[] args) {
         if (!player.isOp()) {
             sender.sendMessage(Component.text("Only OP can use /bw stats modify.", NamedTextColor.RED));
@@ -753,6 +873,48 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("Usage: /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause",
                 NamedTextColor.YELLOW));
         return true;
+    }
+
+    private void sendAvailableCapsules(CommandSender sender,
+                                       String targetName,
+                                       List<TimeCapsuleService.VisibleTimeCapsule> capsules) {
+        sender.sendMessage(Component.text("Current Time Capsules for " + targetName
+                + " (id format: MM_dd_HH_mm_ss or queue:MM_dd_HH_mm_ss):", NamedTextColor.YELLOW));
+        for (TimeCapsuleService.VisibleTimeCapsule capsule : capsules) {
+            sender.sendMessage(Component.text("- " + formatQualifiedTimeId(capsule), NamedTextColor.GRAY));
+        }
+    }
+
+    private boolean matchesTimeId(TimeCapsuleService.VisibleTimeCapsule capsule, String requestedTimeId) {
+        if (capsule == null) {
+            return false;
+        }
+        if (requestedTimeId == null || requestedTimeId.isBlank()) {
+            return false;
+        }
+        String normalized = requestedTimeId.trim();
+        if (formatQualifiedTimeId(capsule).equalsIgnoreCase(normalized)
+                || formatQualifiedShortTimeId(capsule).equalsIgnoreCase(normalized)) {
+            return true;
+        }
+        return formatFullTimeId(capsule.createdAt()).equalsIgnoreCase(normalized)
+                || formatShortTimeId(capsule.createdAt()).equalsIgnoreCase(normalized);
+    }
+
+    private String formatFullTimeId(long createdAt) {
+        return FULL_TIME_ID_FORMATTER.format(Instant.ofEpochMilli(createdAt).atZone(ZoneId.systemDefault()));
+    }
+
+    private String formatShortTimeId(long createdAt) {
+        return SHORT_TIME_ID_FORMATTER.format(Instant.ofEpochMilli(createdAt).atZone(ZoneId.systemDefault()));
+    }
+
+    private String formatQualifiedTimeId(TimeCapsuleService.VisibleTimeCapsule capsule) {
+        return capsule.queueType().key() + ":" + formatFullTimeId(capsule.createdAt());
+    }
+
+    private String formatQualifiedShortTimeId(TimeCapsuleService.VisibleTimeCapsule capsule) {
+        return capsule.queueType().key() + ":" + formatShortTimeId(capsule.createdAt());
     }
 
     private ParsedStatOperation parseStatOperation(String operationToken, String amountToken) {

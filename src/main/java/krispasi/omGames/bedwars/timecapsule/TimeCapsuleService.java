@@ -30,7 +30,7 @@ public class TimeCapsuleService {
             )
             """;
     private static final String SELECT_SQL = """
-            SELECT capsule_id, contents_base64
+            SELECT capsule_id, created_by_player_uuid, contents_base64
             FROM time_capsules
             WHERE queue_type = ?
             """;
@@ -43,6 +43,12 @@ public class TimeCapsuleService {
               contents_base64
             )
             VALUES (?, ?, ?, ?, ?)
+            """;
+    private static final String SELECT_BY_CREATOR_SQL = """
+            SELECT queue_type, created_at, contents_base64
+            FROM time_capsules
+            WHERE created_by_player_uuid = ?
+            ORDER BY created_at DESC
             """;
     private static final String DELETE_SQL = "DELETE FROM time_capsules WHERE capsule_id = ?";
 
@@ -90,7 +96,7 @@ public class TimeCapsuleService {
         }
     }
 
-    public List<String> claimRandomCapsules(TimeCapsuleQueueType queueType, int amount) {
+    public List<ClaimedTimeCapsule> claimRandomCapsules(TimeCapsuleQueueType queueType, int amount) {
         if (queueType == null || amount <= 0) {
             return List.of();
         }
@@ -110,27 +116,27 @@ public class TimeCapsuleService {
             }
 
             Collections.shuffle(storedCapsules);
-            List<String> claimedContents = new ArrayList<>(amount);
+            List<ClaimedTimeCapsule> claimedCapsules = new ArrayList<>(amount);
             Set<String> consumedIds = new LinkedHashSet<>();
             if (storedCapsules.size() >= amount) {
                 for (int i = 0; i < amount; i++) {
                     StoredTimeCapsule capsule = storedCapsules.get(i);
-                    claimedContents.add(capsule.contentsBase64());
+                    claimedCapsules.add(new ClaimedTimeCapsule(capsule.contentsBase64(), capsule.creatorId()));
                     consumedIds.add(capsule.capsuleId());
                 }
             } else {
                 for (StoredTimeCapsule capsule : storedCapsules) {
-                    claimedContents.add(capsule.contentsBase64());
+                    claimedCapsules.add(new ClaimedTimeCapsule(capsule.contentsBase64(), capsule.creatorId()));
                     consumedIds.add(capsule.capsuleId());
                 }
-                while (claimedContents.size() < amount) {
+                while (claimedCapsules.size() < amount) {
                     StoredTimeCapsule capsule = storedCapsules.get(ThreadLocalRandom.current().nextInt(storedCapsules.size()));
-                    claimedContents.add(capsule.contentsBase64());
+                    claimedCapsules.add(new ClaimedTimeCapsule(capsule.contentsBase64(), capsule.creatorId()));
                 }
             }
             deleteCapsules(consumedIds);
             connection.commit();
-            return List.copyOf(claimedContents);
+            return List.copyOf(claimedCapsules);
         } catch (SQLException ex) {
             rollbackQuietly();
             logger.log(Level.WARNING, "Failed to claim time capsules for queue " + queueType.key(), ex);
@@ -140,6 +146,35 @@ public class TimeCapsuleService {
         }
     }
 
+    public List<VisibleTimeCapsule> getCurrentCapsulesByCreator(UUID creatorId) {
+        if (creatorId == null) {
+            return List.of();
+        }
+        if (connection == null) {
+            logger.warning("Time capsule database is not available.");
+            return List.of();
+        }
+        List<VisibleTimeCapsule> capsules = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement(SELECT_BY_CREATOR_SQL)) {
+            statement.setString(1, creatorId.toString());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    TimeCapsuleQueueType queueType = parseQueueType(resultSet.getString("queue_type"));
+                    long createdAt = resultSet.getLong("created_at");
+                    String contentsBase64 = resultSet.getString("contents_base64");
+                    if (queueType == null || contentsBase64 == null || contentsBase64.isBlank()) {
+                        continue;
+                    }
+                    capsules.add(new VisibleTimeCapsule(queueType, createdAt, contentsBase64));
+                }
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load current time capsules for " + creatorId, ex);
+            return List.of();
+        }
+        return List.copyOf(capsules);
+    }
+
     private List<StoredTimeCapsule> loadCapsules(TimeCapsuleQueueType queueType) throws SQLException {
         List<StoredTimeCapsule> storedCapsules = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(SELECT_SQL)) {
@@ -147,15 +182,39 @@ public class TimeCapsuleService {
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
                     String capsuleId = resultSet.getString("capsule_id");
+                    UUID creatorId = parseUuid(resultSet.getString("created_by_player_uuid"));
                     String contentsBase64 = resultSet.getString("contents_base64");
                     if (capsuleId == null || capsuleId.isBlank() || contentsBase64 == null || contentsBase64.isBlank()) {
                         continue;
                     }
-                    storedCapsules.add(new StoredTimeCapsule(capsuleId, contentsBase64));
+                    storedCapsules.add(new StoredTimeCapsule(capsuleId, creatorId, contentsBase64));
                 }
             }
         }
         return storedCapsules;
+    }
+
+    private UUID parseUuid(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private TimeCapsuleQueueType parseQueueType(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        for (TimeCapsuleQueueType type : TimeCapsuleQueueType.values()) {
+            if (type.key().equalsIgnoreCase(raw)) {
+                return type;
+            }
+        }
+        return null;
     }
 
     private void deleteCapsules(Set<String> capsuleIds) throws SQLException {
@@ -233,6 +292,12 @@ public class TimeCapsuleService {
         connection = null;
     }
 
-    private record StoredTimeCapsule(String capsuleId, String contentsBase64) {
+    public record ClaimedTimeCapsule(String contentsBase64, UUID creatorId) {
+    }
+
+    public record VisibleTimeCapsule(TimeCapsuleQueueType queueType, long createdAt, String contentsBase64) {
+    }
+
+    private record StoredTimeCapsule(String capsuleId, UUID creatorId, String contentsBase64) {
     }
 }

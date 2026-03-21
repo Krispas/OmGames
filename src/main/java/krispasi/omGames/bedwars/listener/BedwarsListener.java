@@ -26,6 +26,7 @@ import krispasi.omGames.bedwars.gui.RotatingItemMenu;
 import krispasi.omGames.bedwars.gui.ShopMenu;
 import krispasi.omGames.bedwars.gui.TeamAssignMenu;
 import krispasi.omGames.bedwars.gui.TeamPickMenu;
+import krispasi.omGames.bedwars.gui.TimeCapsuleViewMenu;
 import krispasi.omGames.bedwars.gui.UpgradeShopMenu;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -226,6 +227,10 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 menu.handleClick(event);
                 return;
             }
+            if (topInventory.getHolder() instanceof TimeCapsuleViewMenu menu) {
+                menu.handleClick(event);
+                return;
+            }
 
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null || !session.isActive()) {
@@ -263,7 +268,8 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                     || topInventory.getHolder() instanceof RotatingItemMenu
                     || topInventory.getHolder() instanceof ShopMenu
                     || topInventory.getHolder() instanceof UpgradeShopMenu
-                    || topInventory.getHolder() instanceof LockpickTargetMenu) {
+                    || topInventory.getHolder() instanceof LockpickTargetMenu
+                    || topInventory.getHolder() instanceof TimeCapsuleViewMenu) {
                 event.setCancelled(true);
                 return;
             }

@@ -21,6 +21,7 @@ import krispasi.omGames.bedwars.timecapsule.TimeCapsuleService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -111,7 +112,7 @@ final class GameSessionTimeCapsuleRuntime {
         if (recipients.isEmpty()) {
             return Map.of();
         }
-        List<String> claimedCapsules = service.claimRandomCapsules(resolveQueueType(), recipients.size());
+        List<TimeCapsuleService.ClaimedTimeCapsule> claimedCapsules = service.claimRandomCapsules(resolveQueueType(), recipients.size());
         if (claimedCapsules.isEmpty()) {
             return Map.of();
         }
@@ -119,7 +120,12 @@ final class GameSessionTimeCapsuleRuntime {
         for (int i = 0; i < recipients.size() && i < claimedCapsules.size(); i++) {
             UUID playerId = recipients.get(i);
             TeamColor team = session.getTeam(playerId);
-            rewards.put(playerId, buildRewardItem(definition, team, claimedCapsules.get(i)));
+            TimeCapsuleService.ClaimedTimeCapsule capsule = claimedCapsules.get(i);
+            rewards.put(playerId, buildRewardItem(
+                    definition,
+                    team,
+                    capsule.contentsBase64(),
+                    resolveSourcePlayerName(capsule.creatorId())));
         }
         return rewards;
     }
@@ -208,17 +214,41 @@ final class GameSessionTimeCapsuleRuntime {
         }
     }
 
-    private ItemStack buildRewardItem(ShopItemDefinition definition, TeamColor team, String encodedContents) {
+    private ItemStack buildRewardItem(ShopItemDefinition definition,
+                                      TeamColor team,
+                                      String encodedContents,
+                                      String sourcePlayerName) {
         ItemStack reward = definition.createPurchaseItem(team);
         ItemMeta meta = reward.getItemMeta();
         List<Component> lore = meta.lore();
         List<Component> updatedLore = lore == null ? new ArrayList<>() : new ArrayList<>(lore);
         updatedLore.add(Component.text("Packed in a previous match.", NamedTextColor.GRAY));
+        if (sourcePlayerName != null && !sourcePlayerName.isBlank()) {
+            updatedLore.add(Component.text("Packed by " + sourcePlayerName + ".", NamedTextColor.YELLOW));
+        } else {
+            updatedLore.add(Component.text("Packed by an unknown player.", NamedTextColor.YELLOW));
+        }
         updatedLore.add(Component.text("Right-click to unpack it.", NamedTextColor.DARK_GRAY));
         meta.lore(updatedLore);
         TimeCapsuleItemData.applyContents(meta, encodedContents);
+        TimeCapsuleItemData.applySourcePlayerName(meta, sourcePlayerName);
         reward.setItemMeta(meta);
         return reward;
+    }
+
+    private String resolveSourcePlayerName(UUID creatorId) {
+        if (creatorId == null) {
+            return null;
+        }
+        Player online = Bukkit.getPlayer(creatorId);
+        if (online != null && online.getName() != null && !online.getName().isBlank()) {
+            return online.getName();
+        }
+        OfflinePlayer offline = Bukkit.getOfflinePlayer(creatorId);
+        if (offline.getName() != null && !offline.getName().isBlank()) {
+            return offline.getName();
+        }
+        return null;
     }
 
     private void clearStaleState(UUID playerId, Inventory currentInventory) {

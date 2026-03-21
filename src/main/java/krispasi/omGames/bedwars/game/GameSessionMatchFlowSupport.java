@@ -12,6 +12,7 @@ import krispasi.omGames.bedwars.gui.*;
 import krispasi.omGames.bedwars.item.*;
 import krispasi.omGames.bedwars.model.*;
 import krispasi.omGames.bedwars.shop.*;
+import krispasi.omGames.bedwars.timecapsule.TimeCapsuleItemData;
 import krispasi.omGames.bedwars.upgrade.*;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -147,7 +148,14 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             ItemStack startingTimeCapsule = startingTimeCapsules.get(player.getUniqueId());
             if (startingTimeCapsule != null) {
                 giveItem(player, startingTimeCapsule);
-                player.sendMessage(Component.text("You received a Time Capsule from a previous match.", NamedTextColor.YELLOW));
+                String sourcePlayerName = TimeCapsuleItemData.getSourcePlayerName(startingTimeCapsule);
+                if (sourcePlayerName != null && !sourcePlayerName.isBlank()) {
+                    player.sendMessage(Component.text("You received ", NamedTextColor.YELLOW)
+                            .append(Component.text(sourcePlayerName, NamedTextColor.AQUA))
+                            .append(Component.text("'s Time Capsule from a previous match.", NamedTextColor.YELLOW)));
+                } else {
+                    player.sendMessage(Component.text("You received a Time Capsule from a previous match.", NamedTextColor.YELLOW));
+                }
             }
             player.setGameMode(GameMode.SURVIVAL);
             player.setAllowFlight(false);
