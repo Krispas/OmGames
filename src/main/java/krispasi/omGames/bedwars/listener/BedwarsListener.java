@@ -1988,7 +1988,10 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             if (session.isPendingRespawn(player.getUniqueId()) || session.isEliminated(player.getUniqueId())) {
                 Location mapLobby = session.getArena().getMapLobbyLocation();
-                Location lobby = mapLobby != null ? mapLobby : session.getArena().getLobbyLocation();
+                Location lobby = mapLobby;
+                if (lobby == null && session.getArena().getCenter() != null) {
+                    lobby = session.getArena().getCenter().toLocation(player.getWorld());
+                }
                 if (lobby != null) {
                     event.setRespawnLocation(lobby);
                 }

@@ -1,5 +1,16 @@
-leaderboard: 4 73 0.5
-parkour-leaderboard: -40.5 103 -9.5
+lobby:
+  world: bedwars_lobby
+  spawn: 0 73 0
+leaderboard:
+  world: bedwars_lobby
+  x: 4
+  y: 73
+  z: 0.5
+parkour-leaderboard:
+  world: bedwars_lobby
+  x: -40.5
+  y: 103
+  z: -9.5
 match-events:
   enabled: true
   chance-percent: 40
@@ -26,13 +37,13 @@ karma-events:
   base-roll-chance-percent: 10
   per-karma-chance-percent: 10
 lobby-parkour:
-  world: bedwars
+  world: bedwars_lobby
   start: -9 73 12
   checkpoints:
     '1': -15 79 -16
-    '2': 23 88 0
+    '2': -30 89 -17
     '3': 17 91 20
-    '4': 25 96 20
+    '4': 0 51 -500
     '5': -19 90 -19
   end: -47 100 -10
 arenas:
@@ -121,7 +132,6 @@ arenas:
     world: bedwars
     center: 952 68 1488
     center-radius: 51
-    game-lobby: 0 73 0
     map-lobby: 952 120 1488
     corner_1: 787 22 1324
     corner_2: 1126 100 1624
@@ -196,7 +206,6 @@ arenas:
     corner_1: -908 34 -897
     corner_2: -1099 99 -1108
     base-radius: 21
-    game-lobby: 0 73 0
     map-lobby: -1000 120 -1000
     anti-build:
       base-generator-radius: 10
@@ -347,7 +356,6 @@ arenas:
     corner_1: -3350 0 215
     corner_2: -3121 127 -12
     base-radius: 17
-    game-lobby: 0 73 0
     map-lobby: -3244 135 108
     anti-build:
       base-generator-radius: 4
@@ -498,7 +506,6 @@ arenas:
     corner_1: 1058 0 -1088
     corner_2: 819 126 -845
     base-radius: 18
-    game-lobby: 0 73 0
     map-lobby: 945 134 -976
     anti-build:
       base-generator-radius: 10
@@ -649,7 +656,6 @@ arenas:
     corner_1: -881 0 880
     corner_2: -1130 105 1136
     base-radius: 16
-    game-lobby: 0 73 0
     map-lobby: -999 121 1000
     anti-build:
       base-generator-radius: 6
@@ -800,7 +806,6 @@ arenas:
     corner_1: 2654 109 156
     corner_2: 2419 1 -82
     base-radius: 15
-    game-lobby: 0 73 0
     map-lobby: 2540 118 36
     anti-build:
       base-generator-radius: 12

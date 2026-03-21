@@ -1246,7 +1246,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             world.getBlockAt(point.x(), point.y(), point.z()).setType(Material.AIR, false);
         }
         restoreBeds();
-        Location lobby = arena.getLobbyLocation();
+        Location lobby = bedwarsManager.getLobbyLocation();
         Set<UUID> relocatedPlayers = new HashSet<>();
         for (UUID playerId : assignments.keySet()) {
             Player player = Bukkit.getPlayer(playerId);

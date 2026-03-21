@@ -27,7 +27,7 @@ import org.bukkit.scheduler.BukkitTask;
  * while players are near the configured anchor location.</p>
  */
 public class BedwarsLobbyLeaderboard {
-    private static final String[] FALLBACK_WORLD_NAMES = {"bw", "bedwars"};
+    private static final String[] FALLBACK_WORLD_NAMES = {"bedwars_lobby", "bw", "bedwars"};
     private static final String DISPLAY_TAG = "bw_lobby_leaderboard";
     private static final int TOP_LIMIT = 10;
     private static final long CHECK_INTERVAL_TICKS = 20L;

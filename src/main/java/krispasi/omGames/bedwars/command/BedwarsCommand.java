@@ -1306,24 +1306,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     }
 
     private Location resolveBedwarsLobbyLocation() {
-        GameSession session = bedwarsManager.getActiveSession();
-        if (session != null && session.getArena() != null) {
-            World activeWorld = session.getArena().getWorld();
-            if (activeWorld != null) {
-                return new Location(activeWorld, 0.0, 73.0, 0.0);
-            }
-        }
-        World bedwarsWorld = Bukkit.getWorld("bedwars");
-        if (bedwarsWorld != null) {
-            return new Location(bedwarsWorld, 0.0, 73.0, 0.0);
-        }
-        for (Arena arena : bedwarsManager.getArenas()) {
-            World world = arena.getWorld();
-            if (world != null) {
-                return new Location(world, 0.0, 73.0, 0.0);
-            }
-        }
-        return null;
+        return bedwarsManager.getLobbyLocation();
     }
 
     private Location resolveArenaLobbyLocation(Arena arena) {
@@ -1334,7 +1317,8 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         if (mapLobby != null) {
             return mapLobby;
         }
-        return arena.getLobbyLocation();
+        World world = arena.getWorld();
+        return world != null && arena.getCenter() != null ? arena.getCenter().toLocation(world) : null;
     }
 
     private boolean handleLobbyParkourCommand(CommandSender sender, Player player, String[] args) {

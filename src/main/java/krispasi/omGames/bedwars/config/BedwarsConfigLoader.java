@@ -70,17 +70,16 @@ public class BedwarsConfigLoader {
             int centerRadius = arenaSection.getInt("center-radius", DEFAULT_CENTER_RADIUS);
             BlockPoint corner1 = parseOptionalPoint(arenaSection.getString("corner_1"));
             BlockPoint corner2 = parseOptionalPoint(arenaSection.getString("corner_2"));
-            BlockPoint gameLobby = parseOptionalPoint(arenaSection.getString("game-lobby"));
             BlockPoint mapLobby = parseOptionalPoint(arenaSection.getString("map-lobby"));
-            if (gameLobby == null && center != null && arenaSection.contains("lobby-height")) {
+            if (mapLobby == null && center != null && arenaSection.contains("lobby-height")) {
                 int lobbyHeight = arenaSection.getInt("lobby-height", 0);
-                gameLobby = new BlockPoint(center.x(), lobbyHeight, center.z());
-            }
-            if (gameLobby == null) {
-                gameLobby = center;
+                mapLobby = new BlockPoint(center.x(), lobbyHeight, center.z());
             }
             if (mapLobby == null) {
-                mapLobby = gameLobby;
+                mapLobby = parseOptionalPoint(arenaSection.getString("game-lobby"));
+            }
+            if (mapLobby == null) {
+                mapLobby = center;
             }
             int baseRadius = arenaSection.getInt("base-radius", 0);
             int baseGeneratorRadius = arenaSection.getInt("anti-build.base-generator-radius", 0);
@@ -234,7 +233,6 @@ public class BedwarsConfigLoader {
                     worldName,
                     center,
                     centerRadius,
-                    gameLobby,
                     mapLobby,
                     baseRadius,
                     corner1,

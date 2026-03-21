@@ -44,6 +44,7 @@ import krispasi.omGames.bedwars.gui.MapSelectMenu;
 import krispasi.omGames.bedwars.gui.ShopMenu;
 import krispasi.omGames.bedwars.gui.TeamAssignMenu;
 import krispasi.omGames.bedwars.model.Arena;
+import krispasi.omGames.bedwars.model.BlockPoint;
 import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.shop.ShopCategoryType;
 
@@ -56,7 +57,8 @@ import krispasi.omGames.bedwars.shop.ShopCategoryType;
  * @see krispasi.omGames.bedwars.game.GameSession
  */
 public class BedwarsManager {
-    private static final int DEFAULT_CENTER_RADIUS = 32;
+    private static final String DEFAULT_LOBBY_WORLD_NAME = "bedwars_lobby";
+    private static final BlockPoint DEFAULT_LOBBY_SPAWN = new BlockPoint(0, 73, 0);
     private static final double DEFAULT_LEADERBOARD_X = 4.0;
     private static final double DEFAULT_LEADERBOARD_Y = 73.0;
     private static final double DEFAULT_LEADERBOARD_Z = -1.0;
@@ -78,6 +80,8 @@ public class BedwarsManager {
     private final Set<UUID> temporaryCreators = new HashSet<>();
     private Map<String, Arena> arenas = Map.of();
     private GameSession activeSession;
+    private String sharedLobbyWorldName = DEFAULT_LOBBY_WORLD_NAME;
+    private BlockPoint sharedLobbySpawn = DEFAULT_LOBBY_SPAWN;
     private String lobbyAmbientWorldName;
     private BukkitTask lobbyAmbientChimeTask;
     private ShopConfig shopConfig = ShopConfig.empty();
@@ -114,6 +118,7 @@ public class BedwarsManager {
         arenas = loader.load();
         matchEventConfig = loadMatchEventConfig(configFile);
         karmaEventConfig = loadKarmaEventConfig(configFile);
+        configureSharedLobby(configFile);
         configureLobbyLeaderboard(configFile);
         configureParkourLeaderboard(configFile);
         configureLobbyAmbientWorld(configFile);
@@ -175,6 +180,20 @@ public class BedwarsManager {
         return plugin;
     }
 
+    public String getLobbyWorldName() {
+        return resolveConfiguredLobbyWorldName();
+    }
+
+    public Location getLobbyLocation() {
+        String worldName = resolveConfiguredLobbyWorldName();
+        World world = worldName != null ? Bukkit.getWorld(worldName) : null;
+        if (world == null) {
+            return null;
+        }
+        BlockPoint spawn = sharedLobbySpawn != null ? sharedLobbySpawn : DEFAULT_LOBBY_SPAWN;
+        return spawn.toLocation(world);
+    }
+
     public GameSession getActiveSession() {
         return activeSession;
     }
@@ -234,6 +253,10 @@ public class BedwarsManager {
     }
 
     public boolean isBedwarsWorld(String worldName) {
+        String lobbyWorld = resolveConfiguredLobbyWorldName();
+        if (lobbyWorld != null && lobbyWorld.equalsIgnoreCase(worldName)) {
+            return true;
+        }
         for (Arena arena : arenas.values()) {
             if (arena.getWorldName().equalsIgnoreCase(worldName)) {
                 return true;
@@ -464,6 +487,30 @@ public class BedwarsManager {
         );
     }
 
+    private void configureSharedLobby(File configFile) {
+        sharedLobbyWorldName = DEFAULT_LOBBY_WORLD_NAME;
+        sharedLobbySpawn = DEFAULT_LOBBY_SPAWN;
+        if (!configFile.exists()) {
+            return;
+        }
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+        ConfigurationSection section = config.getConfigurationSection("lobby");
+        if (section == null) {
+            return;
+        }
+        String configuredWorld = trimToNull(section.getString("world"));
+        if (configuredWorld != null) {
+            sharedLobbyWorldName = configuredWorld;
+        }
+        BlockPoint configuredSpawn = parseOptionalPoint(section.getString("spawn"));
+        if (configuredSpawn == null) {
+            configuredSpawn = parseOptionalPoint(section.getString("location"));
+        }
+        if (configuredSpawn != null) {
+            sharedLobbySpawn = configuredSpawn;
+        }
+    }
+
     private void configureLobbyLeaderboard(File configFile) {
         String worldName = null;
         double x = DEFAULT_LEADERBOARD_X;
@@ -516,6 +563,9 @@ public class BedwarsManager {
             }
         }
 
+        if (worldName == null || worldName.isBlank()) {
+            worldName = resolveConfiguredLobbyWorldName();
+        }
         if (worldName == null || worldName.isBlank()) {
             worldName = resolveLeaderboardWorldFallback();
         }
@@ -576,13 +626,19 @@ public class BedwarsManager {
             worldName = resolveLobbyParkourWorld(configFile);
         }
         if (worldName == null || worldName.isBlank()) {
+            worldName = resolveConfiguredLobbyWorldName();
+        }
+        if (worldName == null || worldName.isBlank()) {
             worldName = resolveLeaderboardWorldFallback();
         }
         parkourLeaderboard.configureAnchor(worldName, x, y, z);
     }
 
     private void configureLobbyAmbientWorld(File configFile) {
-        String worldName = resolveLobbyParkourWorld(configFile);
+        String worldName = resolveConfiguredLobbyWorldName();
+        if (worldName == null || worldName.isBlank()) {
+            worldName = resolveLobbyParkourWorld(configFile);
+        }
         if (worldName == null || worldName.isBlank()) {
             worldName = resolveLeaderboardWorldFallback();
         }
@@ -637,9 +693,9 @@ public class BedwarsManager {
     }
 
     private String resolveLeaderboardWorldFallback() {
-        World preferred = Bukkit.getWorld("bedwars");
-        if (preferred != null) {
-            return preferred.getName();
+        String lobbyWorld = resolveConfiguredLobbyWorldName();
+        if (lobbyWorld != null) {
+            return lobbyWorld;
         }
         for (Arena arena : arenas.values()) {
             World world = arena.getWorld();
@@ -655,6 +711,14 @@ public class BedwarsManager {
             return secondary.getName();
         }
         return null;
+    }
+
+    private String resolveConfiguredLobbyWorldName() {
+        String configured = trimToNull(sharedLobbyWorldName);
+        if (configured != null) {
+            return configured;
+        }
+        return trimToNull(DEFAULT_LOBBY_WORLD_NAME);
     }
 
     private void startLobbyAmbientChimeLoop() {
@@ -716,6 +780,25 @@ public class BedwarsManager {
             return null;
         }
         return Bukkit.getWorld(fallback);
+    }
+
+    private BlockPoint parseOptionalPoint(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return BlockPoint.parse(value);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
 }

@@ -1514,10 +1514,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (player == null) {
             return;
         }
-        Location lobby = arena.getLobbyLocation();
-        if (lobby == null) {
-            lobby = resolveMapLobbyLocation();
-        }
+        Location lobby = bedwarsManager.getLobbyLocation();
         if (lobby != null) {
             player.teleport(lobby);
             player.setRespawnLocation(lobby, true);
@@ -1767,7 +1764,8 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (mapLobby != null) {
             return mapLobby;
         }
-        return arena.getLobbyLocation();
+        World world = arena.getWorld();
+        return world != null && arena.getCenter() != null ? arena.getCenter().toLocation(world) : null;
     }
 
     protected String buildEventLine() {

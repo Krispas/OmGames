@@ -7,7 +7,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.game.GameSession;
-import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.gui.*;
 import krispasi.omGames.bedwars.item.*;
 import krispasi.omGames.bedwars.model.*;
@@ -1554,7 +1553,7 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
         if (player == null) {
             return;
         }
-        Location lobby = resolveArenaLobbyForWorld(player.getWorld());
+        Location lobby = bedwarsManager.getLobbyLocation();
         if (lobby != null) {
             player.teleport(lobby);
             player.setRespawnLocation(lobby, true);
@@ -1563,34 +1562,6 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
         player.setAllowFlight(false);
         player.setFlying(false);
         player.setGliding(false);
-    }
-
-    protected Location resolveArenaLobbyForWorld(World world) {
-        Arena arena = resolveArenaForWorld(world);
-        if (arena == null) {
-            return null;
-        }
-        Location lobby = arena.getLobbyLocation();
-        if (lobby != null) {
-            return lobby;
-        }
-        return arena.getMapLobbyLocation();
-    }
-
-    protected Arena resolveArenaForWorld(World world) {
-        if (world == null) {
-            return null;
-        }
-        String worldName = world.getName();
-        if (worldName == null || worldName.isBlank()) {
-            return null;
-        }
-        for (Arena arena : bedwarsManager.getArenas()) {
-            if (arena.getWorldName() != null && arena.getWorldName().equalsIgnoreCase(worldName)) {
-                return arena;
-            }
-        }
-        return null;
     }
 
     protected ItemStack makeUnbreakable(ItemStack item) {

@@ -83,9 +83,13 @@ public class BedwarsLobbyParkour {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
         ConfigurationSection section = config.getConfigurationSection(CONFIG_ROOT);
         if (section == null) {
+            worldName = bedwarsManager.getLobbyWorldName();
             return;
         }
         worldName = trimToNull(section.getString(CONFIG_WORLD));
+        if (worldName == null) {
+            worldName = bedwarsManager.getLobbyWorldName();
+        }
         startPlate = parsePoint(section.getString(CONFIG_START));
         endPlate = parsePoint(section.getString(CONFIG_END));
         ConfigurationSection checkpoints = section.getConfigurationSection(CONFIG_CHECKPOINTS);

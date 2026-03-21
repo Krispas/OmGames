@@ -149,6 +149,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - `BedwarsStatsService`
   - `TimeCapsuleService`
   - `BedwarsKarmaService`
+  - shared BedWars lobby world/spawn config
   - lobby/parkour leaderboards
   - temporary BedWars creator allowlist for setup access until restart
 
@@ -339,6 +340,7 @@ Notes:
 #### 2.8.1 `bedwars.yml`
 
 Root keys:
+- `lobby`
 - `leaderboard`
 - `parkour-leaderboard`
 - `match-events`
@@ -346,8 +348,22 @@ Root keys:
 - `lobby-parkour`
 - `arenas`
 
+`lobby` fields:
+- `world`
+- `spawn`
+
+`lobby` runtime note:
+- shared BedWars lobby defaults to world `bedwars_lobby`
+- `/bw tp lobby`, match-end cleanup, arena quit/join safety snaps, ambient chime, lobby leaderboards, and lobby parkour should all resolve from this shared lobby config
+- per-arena `game-lobby` is no longer part of the active schema
+
+`leaderboard` world fallback:
+- if no explicit world is set on `leaderboard`, use `lobby.world` first
+- only then fall back to the generic BedWars leaderboard world resolution
+
 `parkour-leaderboard` world fallback:
 - if no explicit world is set on `parkour-leaderboard`, use `lobby-parkour.world` first
+- if `lobby-parkour.world` is missing, use `lobby.world`
 - only then fall back to the generic BedWars leaderboard world resolution
 
 `match-events` fields:
@@ -636,7 +652,7 @@ Manager: `BedwarsSetupManager`
 
 Create arena:
 - `/bw setup new <arenaId>`
-  - seeds `game-lobby` to `0 73 0` in the arena world by default
+  - seeds `map-lobby` to the executor's current location by default
 
 Status:
 - `/bw setup <arenaId>`
@@ -650,7 +666,6 @@ Apply keys:
 - `base-radius <int>`
 - `anti-build.base-generator-radius <int>`
 - `anti-build.advanced-generator-radius <int>`
-- `game-lobby`
 - `map-lobby`
 - `<team>.bed`
 - `<team>.spawn`
@@ -695,14 +710,14 @@ Do not re-introduce large BedWars god classes; use the existing support/runtime 
 - During a running BedWars match, normal chests/trapped chests inside a team's base radius are locked to that team until that team's bed is destroyed; afterward they are open to everyone.
 - If a pending respawn later turns into a true elimination because respawns are no longer allowed, final-death and final-kill stats should still resolve from that original death.
 - If a running participant quits while their bed is still alive, or while they still have respawn grace from a pre-bed-break death, keep their team assignment so they can rejoin that running match; otherwise remove them immediately, and if that was the last remaining player on their team, normal team-elimination and win-resolution must still happen from that quit.
-- If a participant or spectator quits from the active arena world, move them to the arena `game-lobby` before logout so reconnecting does not leave them stranded on the map.
-- If a player joins while outside the running match but still inside a BedWars arena world, non-editor players should be snapped back to that arena's `game-lobby` first as a safety net.
+- If a participant or spectator quits from the active arena world, move them to the shared BedWars `lobby.spawn` before logout so reconnecting does not leave them stranded on the map.
+- If a player joins while outside the running match but still inside a BedWars arena world, non-editor players should be snapped back to the shared BedWars `lobby.spawn` first as a safety net.
 - Party EXP should only be paid to players who are still active participants when the match finishes or who disconnect and later rejoin before rewards are flushed; players who leave and do not finish the match must not receive party EXP.
 - `netherite_spear` movement boost reuse must be hard-blocked for 5 seconds with native `NETHERITE_SPEAR` cooldown plus short follow-up velocity suppression on denied attempts; do not rely on message-only listener gating.
 - Lobby-mode prestart should build a temporary 15x15 barrier platform centered under the resolved `map-lobby` location and restore the original blocks when the session leaves lobby/starts the match.
-- Match end cleanup should return all remaining arena spectators to the arena `game-lobby`; `map-lobby` is for prestart/spectate flows, not post-match cleanup.
+- Match end cleanup should return all remaining arena spectators to the shared BedWars `lobby.spawn`; `map-lobby` is for prestart/spectate flows, not post-match cleanup.
 - `/bw game spectate` can only be run by a player already standing in the active BedWars world.
-- When there is no active BedWars session, the main BedWars lobby world should play a `BLOCK_AMETHYST_BLOCK_CHIME` ambient sound at `0 90 0` for players in that world at random intervals between 30 and 60 seconds.
+- When there is no active BedWars session, the shared BedWars lobby world should play a `BLOCK_AMETHYST_BLOCK_CHIME` ambient sound at `0 90 0` for players in that world at random intervals between 30 and 60 seconds.
 - Players put into spectator mode by `/bw game spectate` are locked to the active BedWars world until `/bw game out` or session end.
 - BedWars full-screen titles should use one shared timing window with fade-in and fade-out instead of per-feature custom lengths.
 - Active lobby parkour runs should keep the current timer in the action bar; the redstone reset control should instantly restart the run, the last-checkpoint control should instantly restart the run until a real checkpoint has been reached, and only the exit control should apply the temporary pressure-plate lock.

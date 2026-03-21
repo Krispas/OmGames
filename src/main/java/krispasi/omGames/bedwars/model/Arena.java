@@ -24,7 +24,6 @@ public class Arena {
     private final String worldName;
     private final BlockPoint center;
     private final int centerRadius;
-    private final BlockPoint gameLobby;
     private final BlockPoint mapLobby;
     private final int baseRadius;
     private final BlockPoint corner1;
@@ -43,7 +42,6 @@ public class Arena {
                  String worldName,
                  BlockPoint center,
                  int centerRadius,
-                 BlockPoint gameLobby,
                  BlockPoint mapLobby,
                  int baseRadius,
                  BlockPoint corner1,
@@ -61,7 +59,6 @@ public class Arena {
         this.worldName = Objects.requireNonNull(worldName, "worldName");
         this.center = center;
         this.centerRadius = centerRadius;
-        this.gameLobby = gameLobby;
         this.mapLobby = mapLobby;
         this.baseRadius = baseRadius;
         this.corner1 = corner1;
@@ -91,10 +88,6 @@ public class Arena {
 
     public int getCenterRadius() {
         return centerRadius;
-    }
-
-    public BlockPoint getGameLobby() {
-        return gameLobby;
     }
 
     public BlockPoint getMapLobby() {
@@ -169,15 +162,15 @@ public class Arena {
         return point.toLocation(world);
     }
 
-    public Location getLobbyLocation() {
-        return toLobbyLocation(gameLobby);
-    }
-
     public Location getMapLobbyLocation() {
-        return toLobbyLocation(mapLobby);
+        Location lobby = toLocation(mapLobby);
+        if (lobby != null) {
+            return lobby;
+        }
+        return toLocation(center);
     }
 
-    private Location toLobbyLocation(BlockPoint point) {
+    private Location toLocation(BlockPoint point) {
         World world = getWorld();
         if (world == null || point == null) {
             return null;
