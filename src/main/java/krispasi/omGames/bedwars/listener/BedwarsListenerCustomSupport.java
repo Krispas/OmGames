@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import krispasi.omGames.bedwars.BedwarsManager;
+import krispasi.omGames.bedwars.event.BedwarsMatchEventType;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.gui.*;
 import krispasi.omGames.bedwars.item.*;
@@ -108,6 +109,8 @@ abstract class BedwarsListenerCustomSupport {
     protected static final int GIGANTIFY_SHRINK_TICKS = 60;
     protected static final int GIGANTIFY_TOTAL_TICKS =
             GIGANTIFY_GROWTH_TICKS + GIGANTIFY_SUSTAIN_TICKS + GIGANTIFY_SHRINK_TICKS;
+    protected static final int APRIL_FOOLS_BRIDGE_EGG_PILLAR_BLOCKS = 30;
+    protected static final long APRIL_FOOLS_BRIDGE_EGG_PILLAR_INTERVAL_TICKS = 2L;
     protected static final double GIGANTIFY_MAX_SCALE_MULTIPLIER = 2.5;
     protected static final Particle.DustOptions GIGANTIFY_PARTICLE =
             new DustOptions(Color.fromRGB(190, 90, 255), 1.3f);
@@ -1462,6 +1465,10 @@ abstract class BedwarsListenerCustomSupport {
         if (team == null) {
             return;
         }
+        if (session.getActiveMatchEvent() == BedwarsMatchEventType.APRIL_FOOLS) {
+            launchAprilFoolsBridgeEggPillar(player, session, team);
+            return;
+        }
         int maxBlocks = Math.max(1, custom.getMaxBlocks());
         int width = Math.max(1, custom.getBridgeWidth());
         Egg egg = player.launchProjectile(Egg.class);
@@ -1489,6 +1496,90 @@ abstract class BedwarsListenerCustomSupport {
                 placed += placeBridgeBlocks(session, team, egg.getLocation(), egg.getVelocity(), width, remaining);
             }
         }.runTaskTimer(bedwarsManager.getPlugin(), 0L, 1L);
+    }
+
+    protected void launchAprilFoolsBridgeEggPillar(Player player, GameSession session, TeamColor team) {
+        if (player == null || session == null || team == null) {
+            return;
+        }
+        Location start = player.getLocation();
+        World world = start.getWorld();
+        if (world == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        int columnX = start.getBlockX();
+        int columnY = start.getBlockY();
+        int columnZ = start.getBlockZ();
+        Material wool = team.wool();
+        new BukkitRunnable() {
+            private int placed;
+
+            @Override
+            public void run() {
+                Player online = Bukkit.getPlayer(playerId);
+                GameSession active = bedwarsManager.getActiveSession();
+                if (online == null
+                        || !online.isOnline()
+                        || online.isDead()
+                        || active == null
+                        || active != session
+                        || !active.isRunning()
+                        || !active.isParticipant(playerId)
+                        || active.getTeam(playerId) != team
+                        || !active.isInArenaWorld(online.getWorld())) {
+                    cancel();
+                    return;
+                }
+                if (placed >= APRIL_FOOLS_BRIDGE_EGG_PILLAR_BLOCKS) {
+                    online.setFallDistance(0.0f);
+                    cancel();
+                    return;
+                }
+                int targetY = columnY + placed;
+                BlockPoint pillarPoint = new BlockPoint(columnX, targetY, columnZ);
+                BlockPoint feetPoint = new BlockPoint(columnX, targetY + 1, columnZ);
+                BlockPoint headPoint = new BlockPoint(columnX, targetY + 2, columnZ);
+                if (!active.isInsideMap(pillarPoint)
+                        || !active.isInsideMap(feetPoint)
+                        || !active.isInsideMap(headPoint)
+                        || active.isPlacementBlocked(pillarPoint)) {
+                    cancel();
+                    return;
+                }
+                Block pillarBlock = online.getWorld().getBlockAt(columnX, targetY, columnZ);
+                Block feetBlock = online.getWorld().getBlockAt(columnX, targetY + 1, columnZ);
+                Block headBlock = online.getWorld().getBlockAt(columnX, targetY + 2, columnZ);
+                if (!pillarBlock.getType().isAir()
+                        || !feetBlock.getType().isAir()
+                        || !headBlock.getType().isAir()) {
+                    cancel();
+                    return;
+                }
+                pillarBlock.setType(wool, false);
+                active.recordPlacedBlock(pillarPoint, new ItemStack(wool));
+                Location next = new Location(online.getWorld(),
+                        columnX + 0.5,
+                        targetY + 1.0,
+                        columnZ + 0.5,
+                        online.getLocation().getYaw(),
+                        online.getLocation().getPitch());
+                online.setVelocity(new Vector(0.0, 0.0, 0.0));
+                online.teleport(next);
+                online.setFallDistance(0.0f);
+                online.getWorld().playSound(
+                        pillarBlock.getLocation().add(0.5, 0.5, 0.5),
+                        Sound.BLOCK_WOOL_PLACE,
+                        0.9f,
+                        1.1f
+                );
+                placed++;
+            }
+        }.runTaskTimer(
+                bedwarsManager.getPlugin(),
+                0L,
+                APRIL_FOOLS_BRIDGE_EGG_PILLAR_INTERVAL_TICKS
+        );
     }
 
     protected boolean launchBedBug(Player player, GameSession session, CustomItemDefinition custom) {

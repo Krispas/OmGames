@@ -1,5 +1,6 @@
 package krispasi.omGames.bedwars.item;
 
+import java.util.UUID;
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -16,6 +17,8 @@ public final class CustomItemData {
             new NamespacedKey(JavaPlugin.getProvidingPlugin(CustomItemData.class), "custom_item");
     private static final NamespacedKey USES_KEY =
             new NamespacedKey(JavaPlugin.getProvidingPlugin(CustomItemData.class), "custom_item_uses");
+    private static final NamespacedKey INSTANCE_KEY =
+            new NamespacedKey(JavaPlugin.getProvidingPlugin(CustomItemData.class), "custom_item_instance");
 
     private CustomItemData() {
     }
@@ -61,5 +64,16 @@ public final class CustomItemData {
             return;
         }
         container.set(USES_KEY, PersistentDataType.INTEGER, uses);
+    }
+
+    public static void markUnique(ItemMeta meta) {
+        if (meta == null) {
+            return;
+        }
+        meta.getPersistentDataContainer().set(
+                INSTANCE_KEY,
+                PersistentDataType.STRING,
+                UUID.randomUUID().toString()
+        );
     }
 }

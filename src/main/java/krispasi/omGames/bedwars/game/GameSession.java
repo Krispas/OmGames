@@ -1372,6 +1372,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
             if (meta == null) {
                 return;
             }
+            CustomItemData.markUnique(meta);
             CustomItemData.setUses(meta, custom.getUses());
             updateUsesLore(meta, custom.getUses());
             item.setItemMeta(meta);

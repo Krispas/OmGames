@@ -379,6 +379,9 @@ Supported event ids:
 - if its configured weight is still the normal baseline `1`, treat it as effective weight `7` during April
 - explicit disable via `0` should still stay disabled, and higher custom weights should stay as configured
 
+`april-fools` runtime note:
+- bridge egg should not launch a projectile; using it should instead pillar the user upward `30` blocks over time while building a vertical team-wool column under them
+
 `moon-big` runtime note:
 - use the gravity attribute for the low-gravity effect
 - only apply `Slow Falling I`
