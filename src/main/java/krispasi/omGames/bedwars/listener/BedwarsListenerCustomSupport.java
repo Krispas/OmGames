@@ -1096,7 +1096,8 @@ abstract class BedwarsListenerCustomSupport {
                         continue;
                     }
                     Block block = world.getBlockAt(x, y, z);
-                    if (block.getType().isAir()) {
+                    Material blockType = block.getType();
+                    if (blockType.isAir() || blockType == Material.RED_CONCRETE) {
                         continue;
                     }
                     BlockPoint point = new BlockPoint(x, y, z);

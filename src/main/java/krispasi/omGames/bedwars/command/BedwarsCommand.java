@@ -16,8 +16,14 @@ import krispasi.omGames.bedwars.karma.BedwarsKarmaService;
 import krispasi.omGames.bedwars.model.Arena;
 import krispasi.omGames.bedwars.model.TeamColor;
 import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
+import krispasi.omGames.bedwars.shop.ShopCategory;
+import krispasi.omGames.bedwars.shop.ShopCategoryType;
+import krispasi.omGames.bedwars.shop.ShopConfig;
+import krispasi.omGames.bedwars.shop.ShopItemBehavior;
+import krispasi.omGames.bedwars.shop.ShopItemDefinition;
 import krispasi.omGames.bedwars.stats.BedwarsPlayerStats;
 import krispasi.omGames.bedwars.stats.BedwarsStatsService;
+import krispasi.omGames.bedwars.timecapsule.TimeCapsuleQueueType;
 import krispasi.omGames.bedwars.timecapsule.TimeCapsuleSerialization;
 import krispasi.omGames.bedwars.timecapsule.TimeCapsuleService;
 import net.kyori.adventure.text.Component;
@@ -42,6 +48,7 @@ import org.bukkit.inventory.ItemStack;
  * @see krispasi.omGames.bedwars.setup.BedwarsSetupManager
  */
 public class BedwarsCommand implements CommandExecutor, TabCompleter {
+    private static final String NORMAL_ROTATING_GIVE_ACCOUNT = "krispasi_2";
     private static final int TIME_CAPSULE_SIZE = 27;
     private static final DateTimeFormatter FULL_TIME_ID_FORMATTER =
             DateTimeFormatter.ofPattern("MM_dd_HH_mm_ss");
@@ -81,8 +88,16 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         if (args.length > 0 && args[0].equalsIgnoreCase("karma")) {
             return handleKarmaCommand(sender, player, args);
         }
+        if (args.length > 0 && args[0].equalsIgnoreCase("give")) {
+            return handleGiveCommand(sender, player, args);
+        }
         if (args.length > 0 && args[0].equalsIgnoreCase("time")) {
-            return handleTimeCapsuleCommand(sender, player, args);
+            return handleTimeCapsuleCommand(sender, player, args, TimeCapsuleQueueType.NORMAL, 1);
+        }
+        if (args.length > 1
+                && args[0].equalsIgnoreCase("test")
+                && args[1].equalsIgnoreCase("time")) {
+            return handleTimeCapsuleCommand(sender, player, args, TimeCapsuleQueueType.TEST, 2);
         }
         if (!player.isOp() && !temporaryCreator) {
             sender.sendMessage(Component.text("Only OP can use this command (except /bw stats and /bw quick-buy).", NamedTextColor.RED));
@@ -118,7 +133,8 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
             if (args.length < 2 || !args[1].equalsIgnoreCase("start")) {
-                sender.sendMessage(Component.text("Usage: /bw test start", NamedTextColor.YELLOW));
+                sender.sendMessage(Component.text("Usage: /bw test start | /bw test time capsule view <user> [time_id]",
+                        NamedTextColor.YELLOW));
                 return true;
             }
             bedwarsManager.openMapSelect(player, false);
@@ -317,7 +333,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw time capsule view <user> [time_id] | /bw quick_buy | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test time capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <rotating_item> | /bw time capsule view <user> [time_id] | /bw quick_buy | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -325,8 +341,14 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "karma", "time", "quick_buy", "stats", "reload", "setup", "creator")
+            return Stream.of("start", "test", "stop", "tp", "lobby", "game", "karma", "give", "time", "quick_buy", "stats", "reload", "setup", "creator")
                     .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("give")) {
+            String input = normalizeRotatingGiveId(args[1]);
+            return getRotatingGiveCandidateIds(sender).stream()
+                    .filter(option -> input == null || option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("time")) {
@@ -361,11 +383,8 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 return List.of();
             }
             String input = args[4].toLowerCase(Locale.ROOT);
-            return bedwarsManager.getTimeCapsuleService().getCurrentCapsulesByCreator(target.getUniqueId()).stream()
-                    .flatMap(capsule -> Stream.of(
-                            formatFullTimeId(capsule.createdAt()),
-                            formatQualifiedTimeId(capsule)))
-                    .distinct()
+            return getCurrentCapsules(target.getUniqueId(), TimeCapsuleQueueType.NORMAL).stream()
+                    .map(capsule -> formatFullTimeId(capsule.createdAt()))
                     .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
@@ -441,8 +460,50 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("test")) {
             String input = args[1].toLowerCase(Locale.ROOT);
-            return Stream.of("start")
+            return Stream.of("start", "time")
                     .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3
+                && args[0].equalsIgnoreCase("test")
+                && args[1].equalsIgnoreCase("time")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return Stream.of("capsule")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 4
+                && args[0].equalsIgnoreCase("test")
+                && args[1].equalsIgnoreCase("time")
+                && args[2].equalsIgnoreCase("capsule")) {
+            String input = args[3].toLowerCase(Locale.ROOT);
+            return Stream.of("view")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 5
+                && args[0].equalsIgnoreCase("test")
+                && args[1].equalsIgnoreCase("time")
+                && args[2].equalsIgnoreCase("capsule")
+                && args[3].equalsIgnoreCase("view")) {
+            String input = args[4].toLowerCase(Locale.ROOT);
+            return getKnownPlayerNames()
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
+                    .toList();
+        }
+        if (args.length == 6
+                && args[0].equalsIgnoreCase("test")
+                && args[1].equalsIgnoreCase("time")
+                && args[2].equalsIgnoreCase("capsule")
+                && args[3].equalsIgnoreCase("view")) {
+            OfflinePlayer target = resolveKnownPlayer(args[4]);
+            if (target == null || target.getUniqueId() == null) {
+                return List.of();
+            }
+            String input = args[5].toLowerCase(Locale.ROOT);
+            return getCurrentCapsules(target.getUniqueId(), TimeCapsuleQueueType.TEST).stream()
+                    .map(capsule -> formatFullTimeId(capsule.createdAt()))
+                    .filter(option -> option.toLowerCase(Locale.ROOT).startsWith(input))
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("game")) {
@@ -664,51 +725,110 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    private boolean handleTimeCapsuleCommand(CommandSender sender, Player player, String[] args) {
+    private boolean handleGiveCommand(CommandSender sender, Player player, String[] args) {
+        GameSession session = bedwarsManager.getActiveSession();
+        if (session == null || !session.isActive()) {
+            sender.sendMessage(Component.text("No active BedWars session.", NamedTextColor.RED));
+            return true;
+        }
+        if (session.isLobby()) {
+            sender.sendMessage(Component.text("You can only use /bw give after the match countdown has started.",
+                    NamedTextColor.RED));
+            return true;
+        }
+        if (!canUseRotatingGive(player, session)) {
+            if (session.isTestMode()) {
+                sender.sendMessage(Component.text("Only OP can use /bw give in test BedWars matches.",
+                        NamedTextColor.RED));
+            } else {
+                sender.sendMessage(Component.text("Only " + NORMAL_ROTATING_GIVE_ACCOUNT
+                        + " can use /bw give in normal BedWars matches.", NamedTextColor.RED));
+            }
+            return true;
+        }
+        if (!session.isParticipant(player.getUniqueId()) || !session.isInArenaWorld(player.getWorld())) {
+            sender.sendMessage(Component.text("You must be in the active BedWars session to use /bw give.",
+                    NamedTextColor.RED));
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /bw give <rotating_item>", NamedTextColor.YELLOW));
+            return true;
+        }
+        String requestedId = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).trim();
+        ShopItemDefinition definition = resolveRotatingGiveDefinition(requestedId);
+        if (definition == null) {
+            sender.sendMessage(Component.text("Unknown rotating item: " + requestedId + ".", NamedTextColor.RED));
+            return true;
+        }
+        if (session.isSuddenDeathActive() && definition.isDisabledAfterSuddenDeath()) {
+            sender.sendMessage(Component.text("That rotating item is disabled after sudden death.", NamedTextColor.RED));
+            return true;
+        }
+        if (!session.giveAdminRotatingItem(player, definition)) {
+            sender.sendMessage(Component.text("Could not give that rotating item right now.", NamedTextColor.RED));
+            return true;
+        }
+        sender.sendMessage(Component.text("Given " + describeRotatingGiveItem(definition) + ".", NamedTextColor.GREEN));
+        return true;
+    }
+
+    private boolean handleTimeCapsuleCommand(CommandSender sender,
+                                             Player player,
+                                             String[] args,
+                                             TimeCapsuleQueueType queueType,
+                                             int pathOffset) {
+        String commandPath = queueType == TimeCapsuleQueueType.TEST
+                ? "/bw test time capsule view"
+                : "/bw time capsule view";
+        int capsuleIndex = pathOffset;
+        int viewIndex = pathOffset + 1;
+        int userIndex = pathOffset + 2;
+        int timeIdIndex = pathOffset + 3;
         if (!player.isOp()) {
-            sender.sendMessage(Component.text("Only OP can use /bw time capsule view.", NamedTextColor.RED));
+            sender.sendMessage(Component.text("Only OP can use " + commandPath + ".", NamedTextColor.RED));
             return true;
         }
-        if (args.length < 3
-                || !args[1].equalsIgnoreCase("capsule")
-                || !args[2].equalsIgnoreCase("view")) {
-            sender.sendMessage(Component.text("Usage: /bw time capsule view <user> [time_id]", NamedTextColor.YELLOW));
+        if (args.length < userIndex + 1
+                || !args[capsuleIndex].equalsIgnoreCase("capsule")
+                || !args[viewIndex].equalsIgnoreCase("view")) {
+            sender.sendMessage(Component.text("Usage: " + commandPath + " <user> [time_id]", NamedTextColor.YELLOW));
             return true;
         }
-        if (args.length < 4) {
-            sender.sendMessage(Component.text("Usage: /bw time capsule view <user> [time_id]", NamedTextColor.YELLOW));
+        if (args.length < userIndex + 1) {
+            sender.sendMessage(Component.text("Usage: " + commandPath + " <user> [time_id]", NamedTextColor.YELLOW));
             return true;
         }
-        OfflinePlayer target = resolveKnownPlayer(args[3]);
+        OfflinePlayer target = resolveKnownPlayer(args[userIndex]);
         if (target == null || target.getUniqueId() == null) {
-            sender.sendMessage(Component.text("Player not found: " + args[3], NamedTextColor.RED));
+            sender.sendMessage(Component.text("Player not found: " + args[userIndex], NamedTextColor.RED));
             return true;
         }
-        String targetName = resolvePlayerName(target, args[3]);
-        List<TimeCapsuleService.VisibleTimeCapsule> capsules = bedwarsManager.getTimeCapsuleService()
-                .getCurrentCapsulesByCreator(target.getUniqueId());
+        String targetName = resolvePlayerName(target, args[userIndex]);
+        List<TimeCapsuleService.VisibleTimeCapsule> capsules = getCurrentCapsules(target.getUniqueId(), queueType);
         if (capsules.isEmpty()) {
-            sender.sendMessage(Component.text("No current Time Capsules found for " + targetName + ".", NamedTextColor.RED));
+            sender.sendMessage(Component.text("No current " + queueLabel(queueType) + " Time Capsules found for "
+                    + targetName + ".", NamedTextColor.RED));
             return true;
         }
-        if (args.length == 4) {
-            sendAvailableCapsules(sender, targetName, capsules);
+        if (args.length == userIndex + 1) {
+            sendAvailableCapsules(sender, targetName, capsules, queueType);
             return true;
         }
-        String requestedTimeId = args[4];
+        String requestedTimeId = args[timeIdIndex];
         List<TimeCapsuleService.VisibleTimeCapsule> matches = capsules.stream()
                 .filter(capsule -> matchesTimeId(capsule, requestedTimeId))
                 .toList();
         if (matches.isEmpty()) {
-            sender.sendMessage(Component.text("No current Time Capsule found for " + targetName
+            sender.sendMessage(Component.text("No current " + queueLabel(queueType) + " Time Capsule found for " + targetName
                     + " with time id " + requestedTimeId + ".", NamedTextColor.RED));
-            sendAvailableCapsules(sender, targetName, capsules);
+            sendAvailableCapsules(sender, targetName, capsules, queueType);
             return true;
         }
         if (matches.size() > 1) {
-            sender.sendMessage(Component.text("Multiple current Time Capsules match " + requestedTimeId
-                    + ". Use the queue-qualified id shown below.", NamedTextColor.RED));
-            sendAvailableCapsules(sender, targetName, matches);
+            sender.sendMessage(Component.text("Multiple current " + queueLabel(queueType)
+                    + " Time Capsules match " + requestedTimeId + ".", NamedTextColor.RED));
+            sendAvailableCapsules(sender, targetName, matches, queueType);
             return true;
         }
         TimeCapsuleService.VisibleTimeCapsule capsule = matches.getFirst();
@@ -722,7 +842,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         new TimeCapsuleViewMenu(contents).open(player);
-        sender.sendMessage(Component.text("Viewing " + targetName + "'s " + capsule.queueType().key()
+        sender.sendMessage(Component.text("Viewing " + targetName + "'s " + queueLabel(queueType)
                 + " Time Capsule " + formatFullTimeId(capsule.createdAt()) + ".", NamedTextColor.GREEN));
         return true;
     }
@@ -875,14 +995,102 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean canUseRotatingGive(Player player, GameSession session) {
+        if (player == null || session == null || !session.isActive()) {
+            return false;
+        }
+        if (session.isTestMode()) {
+            return player.isOp();
+        }
+        String name = player.getName();
+        return name != null && name.equalsIgnoreCase(NORMAL_ROTATING_GIVE_ACCOUNT);
+    }
+
+    private List<String> getRotatingGiveCandidateIds(CommandSender sender) {
+        GameSession session = bedwarsManager.getActiveSession();
+        if (sender instanceof Player player && session != null && session.isActive() && !canUseRotatingGive(player, session)) {
+            return List.of();
+        }
+        if (session != null && session.isActive()) {
+            return session.getRotatingItemCandidateIds();
+        }
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return List.of();
+        }
+        ShopCategory category = config.getCategory(ShopCategoryType.ROTATING);
+        if (category == null || category.getEntries().isEmpty()) {
+            return List.of();
+        }
+        return category.getEntries().values().stream()
+                .map(this::normalizeRotatingGiveId)
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .filter(id -> {
+                    ShopItemDefinition definition = config.getItem(id);
+                    return definition != null && definition.getBehavior() != ShopItemBehavior.UPGRADE;
+                })
+                .toList();
+    }
+
+    private ShopItemDefinition resolveRotatingGiveDefinition(String rawItemId) {
+        String normalized = normalizeRotatingGiveId(rawItemId);
+        if (normalized == null) {
+            return null;
+        }
+        if (!getRotatingGiveCandidateIds(null).contains(normalized)) {
+            return null;
+        }
+        ShopConfig config = bedwarsManager.getShopConfig();
+        if (config == null) {
+            return null;
+        }
+        ShopItemDefinition definition = config.getItem(normalized);
+        if (definition == null || definition.getBehavior() == ShopItemBehavior.UPGRADE) {
+            return null;
+        }
+        return definition;
+    }
+
+    private String normalizeRotatingGiveId(String rawItemId) {
+        if (rawItemId == null) {
+            return null;
+        }
+        String trimmed = rawItemId.trim().toLowerCase(Locale.ROOT);
+        if (trimmed.isBlank()) {
+            return null;
+        }
+        return trimmed.replaceAll("[\\s-]+", "_");
+    }
+
+    private String describeRotatingGiveItem(ShopItemDefinition definition) {
+        if (definition == null) {
+            return "rotating item";
+        }
+        String displayName = definition.getDisplayName();
+        return displayName != null && !displayName.isBlank() ? displayName : definition.getId();
+    }
+
     private void sendAvailableCapsules(CommandSender sender,
                                        String targetName,
-                                       List<TimeCapsuleService.VisibleTimeCapsule> capsules) {
-        sender.sendMessage(Component.text("Current Time Capsules for " + targetName
-                + " (id format: MM_dd_HH_mm_ss or queue:MM_dd_HH_mm_ss):", NamedTextColor.YELLOW));
+                                       List<TimeCapsuleService.VisibleTimeCapsule> capsules,
+                                       TimeCapsuleQueueType queueType) {
+        sender.sendMessage(Component.text("Current " + queueLabel(queueType) + " Time Capsules for " + targetName
+                + " (id format: MM_dd_HH_mm_ss):", NamedTextColor.YELLOW));
         for (TimeCapsuleService.VisibleTimeCapsule capsule : capsules) {
-            sender.sendMessage(Component.text("- " + formatQualifiedTimeId(capsule), NamedTextColor.GRAY));
+            sender.sendMessage(Component.text("- " + formatFullTimeId(capsule.createdAt()), NamedTextColor.GRAY));
         }
+    }
+
+    private List<TimeCapsuleService.VisibleTimeCapsule> getCurrentCapsules(java.util.UUID creatorId,
+                                                                           TimeCapsuleQueueType queueType) {
+        return bedwarsManager.getTimeCapsuleService().getCurrentCapsulesByCreator(creatorId).stream()
+                .filter(capsule -> capsule.queueType() == queueType)
+                .toList();
+    }
+
+    private String queueLabel(TimeCapsuleQueueType queueType) {
+        return queueType == TimeCapsuleQueueType.TEST ? "test" : "normal";
     }
 
     private boolean matchesTimeId(TimeCapsuleService.VisibleTimeCapsule capsule, String requestedTimeId) {

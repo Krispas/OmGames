@@ -957,7 +957,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
             }
             return false;
         }
-        if (!applyPurchase(player, item)) {
+        if (!grantPurchasedItem(player, item)) {
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             return false;
         }
@@ -969,6 +969,31 @@ public class GameSession extends GameSessionMatchFlowSupport {
         }
         player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.2f);
         return true;
+    }
+
+    public boolean giveAdminRotatingItem(Player player, ShopItemDefinition item) {
+        if (player == null || item == null) {
+            return false;
+        }
+        if (isLobby()) {
+            return false;
+        }
+        if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
+            return false;
+        }
+        if (item.getBehavior() == ShopItemBehavior.UPGRADE) {
+            return false;
+        }
+        if (!getRotatingItemCandidateIds().contains(item.getId())) {
+            return false;
+        }
+        if (isShopItemBlockedByMatchEvent(item)) {
+            return false;
+        }
+        if (suddenDeathActive && item.isDisabledAfterSuddenDeath()) {
+            return false;
+        }
+        return grantPurchasedItem(player, item);
     }
 
     private boolean isShopItemBlockedByMatchEvent(ShopItemDefinition item) {
@@ -1237,7 +1262,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
         return true;
     }
 
-    private boolean applyPurchase(Player player, ShopItemDefinition item) {
+    private boolean grantPurchasedItem(Player player, ShopItemDefinition item) {
         TeamColor team = getTeam(player.getUniqueId());
         ShopItemBehavior behavior = item.getBehavior();
         CustomItemDefinition custom = resolveCustomPurchaseDefinition(item);

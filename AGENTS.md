@@ -205,7 +205,9 @@ Admin subcommands:
 - `/bw setup new <arena>`
 - `/bw setup <arena> [key]`
 - `/bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount]`
+- `/bw give <rotating-item>`
 - `/bw time capsule view <user> [time_id]`
+- `/bw test time capsule view <user> [time_id]`
 
 Permissions declared in `plugin.yml`:
 - `omgames.bw.start`
@@ -215,7 +217,12 @@ Permissions declared in `plugin.yml`:
 Temporary creator notes:
 - `/bw creator add <user>` and `/bw creator remove <user>` are OP-only management commands
 - `/bw karma <user>`, `/bw karma add ...`, and `/bw karma cause` are also OP-only management commands
+- `/bw give <rotating-item>` is self-target only
+- in normal matches, only `krispasi_2` may use `/bw give <rotating-item>`
+- in test matches, any OP player may use `/bw give <rotating-item>`
+- `/bw give <rotating-item>` only works after the match countdown has started; it should not work during the pre-match lobby state
 - `/bw time capsule view <user> [time_id]` is also OP-only
+- `/bw test time capsule view <user> [time_id]` is also OP-only
 - temporary creators may use `/bw setup` and `/bw tp`
 - temporary creators may also place/break blocks and use openable blocks in protected BedWars worlds when there is no active session in that world
 - temporary creator access is in-memory only and is cleared on restart/shutdown
@@ -441,6 +448,7 @@ Rotating item notes:
   - UI should show a red warning lore
 - match runtime always rolls `2` rotating items plus `1` rotating upgrade when candidates exist
 - manual prestart rotation selection can choose any subset of rotating items and upgrades
+- `/bw give <rotating-item>` may grant the caller any rotating item candidate from `shop.categories.rotating`, even if that item is not part of the current match rotation
 - `woodoo_doll`
   - rotating held item that adds `10` temporary karma to the enemy player hit
   - should be consumed on a successful enemy hit
@@ -517,6 +525,8 @@ Behavior notes:
 - `FLAMETHROWER`
   - cone attack in front of the player
   - uses particles for the area preview and directly damages/ignites targets in the cone
+- `TACTICAL_NUKE`
+  - its temporary countdown block override should skip existing `RED_CONCRETE` blocks entirely
 - `ABYSSAL_RIFT`
   - fixed deployable aura
   - `abyssal_rift` / `Abyssal Rift: Domination` uses model `om:rift1` and buffs allies while weakening enemies in the radius
@@ -573,8 +583,10 @@ Behavior notes:
   - saved capsules are split into separate `normal` and `test` queues based on whether the source match came from `/bw start` or `/bw test start`
   - when Time Capsule is active in a later match, participants should receive claimed reward capsules from that same queue at match start
   - claimed reward capsules should identify which player packed them when that creator is known
-  - `/bw time capsule view <user>` should list only the creator's currently stored capsules, using ids in `queue:MM_dd_HH_mm_ss` format
-  - `/bw time capsule view <user> <time_id>` should open a read-only view of that currently stored capsule; plain `MM_dd_HH_mm_ss` or short `MM_dd_mm_ss` matching may still be accepted if it resolves uniquely
+  - `/bw time capsule view <user>` should list only the creator's currently stored normal-queue capsules, using ids in `MM_dd_HH_mm_ss` format
+  - `/bw time capsule view <user> <time_id>` should open a read-only view of that current normal-queue capsule
+  - `/bw test time capsule view <user>` should list only the creator's currently stored test-queue capsules, using ids in `MM_dd_HH_mm_ss` format
+  - `/bw test time capsule view <user> <time_id>` should open a read-only view of that current test-queue capsule
   - if the queue has fewer saved capsules than participants but at least one exists, claimed rewards may duplicate so every participant still receives one
   - each claimed source capsule is deleted from SQLite immediately after that match claims it
 - `BRIDGE_BUILDER`
