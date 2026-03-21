@@ -558,7 +558,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                     if (!canUseFireball(player)) {
                         yield false;
                     }
-                    launchFireball(player, custom);
+                    launchFireball(player, session, custom);
                     yield true;
                 }
                 case BRIDGE_EGG -> {
@@ -2153,6 +2153,10 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
     public void onEntityDismount(EntityDismountEvent event) {
         safeHandle("onEntityDismount", () -> {
             if (!(event.getEntity() instanceof Player player)) {
+                return;
+            }
+            if (isAprilFoolsMountedFireball(event.getDismounted())) {
+                event.setCancelled(true);
                 return;
             }
             if (!(event.getDismounted() instanceof LivingEntity living)) {

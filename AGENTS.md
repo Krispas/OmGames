@@ -381,11 +381,13 @@ Supported event ids:
 
 `april-fools` runtime note:
 - bridge egg should not launch a projectile; using it should instead pillar the user upward `30` blocks over time while building a vertical team-wool column under them
+- fireball should seat its thrower on the launched projectile and manual dismount attempts should be blocked while that fireball exists
 
 `moon-big` runtime note:
 - use the gravity attribute for the low-gravity effect
 - set player gravity to `0.01` from the vanilla default `0.08`
-- only apply `Slow Falling I`
+- do not use Feather Falling or Jump Boost as the event mechanic
+- players who disconnect during the event must have gravity reset on quit, and rejoining participants during the same running match must receive the event gravity again
 
 `in-this-economy` runtime note:
 - `fireball`, `bed_bug`, and `dream_defender` stay purchasable at `4x` their normal price
@@ -566,7 +568,7 @@ Behavior notes:
 - `PROXIMITY_MINE`
   - bought as a normal placeable block item and placed as a `STONE_PRESSURE_PLATE`
   - should spend 5 seconds priming after placement; while priming it shows a shared floating progress bar above the mine
-  - once armed, it should trigger when an enemy player steps directly onto the mine block, and detonate through the normal TNT explosion path
+  - once armed, it should trigger when an enemy player steps directly onto the mine block, using only the lowest `0.8` blocks of vertical trigger height above the mine, and detonate through the normal TNT explosion path
   - `custom-items.yml -> proximity_mine.damage` overrides the mine's direct player damage; non-positive values keep the default scaled TNT damage path
   - should use placed-block tracking so it can be broken, dropped, rolled back, and chain-exploded like other BedWars placed blocks
 - `WOODOO_DOLL`

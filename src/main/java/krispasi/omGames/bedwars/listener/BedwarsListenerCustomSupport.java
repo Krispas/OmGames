@@ -111,6 +111,7 @@ abstract class BedwarsListenerCustomSupport {
             GIGANTIFY_GROWTH_TICKS + GIGANTIFY_SUSTAIN_TICKS + GIGANTIFY_SHRINK_TICKS;
     protected static final int APRIL_FOOLS_BRIDGE_EGG_PILLAR_BLOCKS = 30;
     protected static final long APRIL_FOOLS_BRIDGE_EGG_PILLAR_INTERVAL_TICKS = 2L;
+    protected static final String APRIL_FOOLS_FIREBALL_RIDE_TAG = "bw_april_fools_fireball_ride";
     protected static final double GIGANTIFY_MAX_SCALE_MULTIPLIER = 2.5;
     protected static final Particle.DustOptions GIGANTIFY_PARTICLE =
             new DustOptions(Color.fromRGB(190, 90, 255), 1.3f);
@@ -287,12 +288,36 @@ abstract class BedwarsListenerCustomSupport {
         return matchesCustomItem(main, usedItem);
     }
 
-    protected void launchFireball(Player player, CustomItemDefinition custom) {
+    protected void launchFireball(Player player, GameSession session, CustomItemDefinition custom) {
         Fireball fireball = player.launchProjectile(Fireball.class);
         fireball.setIsIncendiary(custom.isIncendiary());
         fireball.setYield(custom.getYield());
         fireball.setVelocity(player.getLocation().getDirection().normalize().multiply(custom.getVelocity()));
         fireball.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
+        if (session != null && session.getActiveMatchEvent() == BedwarsMatchEventType.APRIL_FOOLS) {
+            mountAprilFoolsFireball(player, fireball);
+        }
+    }
+
+    protected void mountAprilFoolsFireball(Player player, Fireball fireball) {
+        if (player == null || fireball == null) {
+            return;
+        }
+        fireball.addScoreboardTag(APRIL_FOOLS_FIREBALL_RIDE_TAG);
+        fireball.addPassenger(player);
+        bedwarsManager.getPlugin().getServer().getScheduler().runTask(bedwarsManager.getPlugin(), () -> {
+            if (!player.isOnline() || !fireball.isValid() || fireball.isDead()) {
+                return;
+            }
+            if (!fireball.getPassengers().contains(player)) {
+                fireball.addPassenger(player);
+            }
+        });
+    }
+
+    protected boolean isAprilFoolsMountedFireball(Entity entity) {
+        return entity instanceof Fireball
+                && entity.getScoreboardTags().contains(APRIL_FOOLS_FIREBALL_RIDE_TAG);
     }
 
     protected void startLoyaltyTridentVoidTracker(Trident trident, UUID ownerId, ItemStack tridentItem) {

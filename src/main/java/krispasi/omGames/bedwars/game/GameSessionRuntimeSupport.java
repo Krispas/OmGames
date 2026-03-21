@@ -1499,6 +1499,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         }
         grantRespawnProtection(player);
         applyPermanentItemsWithShield(player, team);
+        applyTeamUpgrades(player, team);
         player.setFireTicks(0);
         player.setFallDistance(0.0f);
         player.setFoodLevel(20);

@@ -29,6 +29,7 @@ final class GameSessionProximityMineRuntime {
     private static final long PROXIMITY_MINE_DISPLAY_UPDATE_TICKS = 5L;
     private static final int PROXIMITY_MINE_BAR_SEGMENTS = 10;
     private static final double PROXIMITY_MINE_DISPLAY_Y_OFFSET = 1.2;
+    private static final double PROXIMITY_MINE_TRIGGER_HEIGHT = 0.8;
     private static final String PROXIMITY_MINE_DISPLAY_TAG = "bw_proximity_mine_display";
 
     private final GameSession session;
@@ -165,12 +166,23 @@ final class GameSessionProximityMineRuntime {
         for (int candidateY : candidateYs) {
             BlockPoint point = new BlockPoint(centerX, candidateY, centerZ);
             ProximityMineState state = placedProximityMines.get(point);
-            if (state == null || state.team() == playerTeam || !state.isArmed()) {
+            if (state == null
+                    || state.team() == playerTeam
+                    || !state.isArmed()
+                    || !isWithinTriggerHeight(feet, point)) {
                 continue;
             }
             return point;
         }
         return null;
+    }
+
+    private boolean isWithinTriggerHeight(Location feet, BlockPoint point) {
+        if (feet == null || point == null) {
+            return false;
+        }
+        double relativeY = feet.getY() - point.y();
+        return relativeY >= 0.0 && relativeY <= PROXIMITY_MINE_TRIGGER_HEIGHT;
     }
 
     private void detonate(BlockPoint point) {

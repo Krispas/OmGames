@@ -66,6 +66,7 @@ abstract class GameSessionEffectSupport {
     protected static final double DEFAULT_PLAYER_SCALE = 1.0;
     protected static final double SCALE_DOWN_TIER_ONE = 0.9;
     protected static final double SCALE_DOWN_TIER_TWO = 0.8;
+    protected static final double DEFAULT_PLAYER_GRAVITY = 0.08;
     protected static final double APRIL_FOOLS_SCALE_MULTIPLIER = 0.5;
     protected static final double LONG_ARMS_RANGE_BONUS = 10.0;
     protected static final double BLOOD_MOON_HEALTH_MULTIPLIER = 0.5;
@@ -1097,15 +1098,7 @@ abstract class GameSessionEffectSupport {
             case LONG_ARMS -> setAttributeToDefaultPlus(player, LONG_ARMS_RANGE_BONUS,
                     "BLOCK_INTERACTION_RANGE",
                     "PLAYER_BLOCK_INTERACTION_RANGE");
-            case MOON_BIG -> {
-                setAttributeToValue(player, MOON_BIG_GRAVITY, "GRAVITY", "GENERIC_GRAVITY");
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING,
-                        Integer.MAX_VALUE,
-                        0,
-                        true,
-                        false,
-                        true));
-            }
+            case MOON_BIG -> setAttributeToValue(player, MOON_BIG_GRAVITY, "GRAVITY", "GENERIC_GRAVITY");
             case BLOOD_MOON -> {
                 setAttributeToDefaultMultiplier(player, BLOOD_MOON_HEALTH_MULTIPLIER,
                         "MAX_HEALTH",
@@ -1324,7 +1317,7 @@ abstract class GameSessionEffectSupport {
         }
         resetAttributeToDefault(player, "BLOCK_INTERACTION_RANGE", "PLAYER_BLOCK_INTERACTION_RANGE");
         resetAttributeToDefault(player, "JUMP_STRENGTH", "GENERIC_JUMP_STRENGTH");
-        resetAttributeToDefault(player, "GRAVITY", "GENERIC_GRAVITY");
+        setAttributeToValue(player, DEFAULT_PLAYER_GRAVITY, "GRAVITY", "GENERIC_GRAVITY");
         resetAttributeToDefault(player, "MAX_HEALTH", "GENERIC_MAX_HEALTH");
         applyScale(player, DEFAULT_PLAYER_SCALE);
         clampPlayerHealthToMax(player);
