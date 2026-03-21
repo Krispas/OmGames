@@ -276,6 +276,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         }
         grantPendingRespawnGrace(team);
         destroyBed(team);
+        removeDisconnectedParticipantsWithoutRespawnGrace(team);
         broadcast(Component.text("The ", NamedTextColor.RED)
                 .append(team.displayComponent())
                 .append(Component.text(" bed was destroyed!", NamedTextColor.RED)));
@@ -1072,11 +1073,27 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             return true;
         }
         for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
-            if (entry.getValue() == team && !eliminatedPlayers.contains(entry.getKey())) {
+            UUID playerId = entry.getKey();
+            if (entry.getValue() == team
+                    && !eliminatedPlayers.contains(playerId)
+                    && (!disconnectedParticipants.contains(playerId)
+                    || respawnGracePlayers.contains(playerId))) {
                 return true;
             }
         }
         return false;
+    }
+
+    protected void removeDisconnectedParticipantsWithoutRespawnGrace(TeamColor team) {
+        if (team == null) {
+            return;
+        }
+        for (UUID playerId : new ArrayList<>(disconnectedParticipants)) {
+            if (assignments.get(playerId) != team || respawnGracePlayers.contains(playerId)) {
+                continue;
+            }
+            removeParticipant(playerId);
+        }
     }
 
     protected boolean hasPlayers(TeamColor team) {
@@ -1201,6 +1218,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         for (TeamColor team : teamsInMatch) {
             if (getBedState(team) == BedState.ALIVE) {
                 destroyBed(team);
+                removeDisconnectedParticipantsWithoutRespawnGrace(team);
                 changed = true;
             }
         }
@@ -1624,6 +1642,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         rotatingItemIds.clear();
         rotatingUpgradeIds.clear();
         customItemRuntime.reset();
+        disconnectedParticipants.clear();
         killCounts.clear();
         pendingPartyExp.clear();
         teamPurchaseCounts.clear();

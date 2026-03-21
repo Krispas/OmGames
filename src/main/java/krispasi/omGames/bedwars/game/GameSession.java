@@ -365,10 +365,14 @@ public class GameSession extends GameSessionMatchFlowSupport {
         if (player == null) {
             return false;
         }
-        UUID playerId = player.getUniqueId();
+        return removeParticipant(player.getUniqueId());
+    }
+
+    public boolean removeParticipant(UUID playerId) {
         if (!isParticipant(playerId)) {
             return false;
         }
+        Player player = Bukkit.getPlayer(playerId);
         assignments.remove(playerId);
         eliminatedPlayers.remove(playerId);
         pendingRespawns.remove(playerId);
@@ -383,11 +387,13 @@ public class GameSession extends GameSessionMatchFlowSupport {
         playerPurchaseCounts.remove(playerId);
         pendingDeathKillCredits.remove(playerId);
         lockedCommandSpectators.remove(playerId);
+        disconnectedParticipants.remove(playerId);
         lastCombatTimes.remove(playerId);
         lastDamagers.remove(playerId);
         lastDamagerTimes.remove(playerId);
         lastDamageTimes.remove(playerId);
         lastRegenTimes.remove(playerId);
+        pendingPartyExp.remove(playerId);
         cancelRespawnCountdown(playerId);
         removeRespawnProtection(playerId);
         BukkitTask respawnTask = respawnTasks.remove(playerId);
@@ -395,7 +401,9 @@ public class GameSession extends GameSessionMatchFlowSupport {
             respawnTask.cancel();
         }
         restoreSidebar(playerId);
-        clearUpgradeEffects(player);
+        if (player != null) {
+            clearUpgradeEffects(player);
+        }
         fakeEnderChests.remove(playerId);
         if (karmaRuntime != null) {
             karmaRuntime.handleParticipantRemoved(playerId);

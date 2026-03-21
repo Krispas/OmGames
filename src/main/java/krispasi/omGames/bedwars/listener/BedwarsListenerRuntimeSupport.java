@@ -1404,11 +1404,11 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
         if (arena == null) {
             return null;
         }
-        Location mapLobby = arena.getMapLobbyLocation();
-        if (mapLobby != null) {
-            return mapLobby;
+        Location lobby = arena.getLobbyLocation();
+        if (lobby != null) {
+            return lobby;
         }
-        return arena.getLobbyLocation();
+        return arena.getMapLobbyLocation();
     }
 
     protected Arena resolveArenaForWorld(World world) {

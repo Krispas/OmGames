@@ -1352,6 +1352,8 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         TeamColor team = getTeam(playerId);
         boolean participant = isParticipant(playerId);
         boolean sessionSpectator = isSessionSpectator(player) || isLockedCommandSpectator(playerId);
+        boolean canReturnToRunningMatch = state == GameState.RUNNING && participant
+                && canRejoinRunningParticipant(playerId, team);
         cancelRespawnCountdown(playerId);
         removeRespawnProtection(playerId);
         clearTrapImmunity(playerId);
@@ -1361,12 +1363,16 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         }
         clearElytraStrike(player, false, false);
         clearUpgradeEffects(player);
-        flushPendingPartyExp(player);
         if ((participant || sessionSpectator) && isInArenaWorld(player.getWorld())) {
             movePlayerToQuitLobby(player);
         }
         if (state == GameState.RUNNING && participant) {
-            removeParticipant(player);
+            if (canReturnToRunningMatch) {
+                disconnectedParticipants.add(playerId);
+                restoreSidebar(playerId);
+                return;
+            }
+            removeParticipant(playerId);
             if (team != null) {
                 checkTeamEliminated(team);
             }
@@ -1375,6 +1381,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (sessionSpectator) {
             lockedCommandSpectators.remove(playerId);
         }
+        disconnectedParticipants.remove(playerId);
         restoreSidebar(playerId);
     }
 
@@ -1383,6 +1390,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
             return;
         }
         UUID playerId = player.getUniqueId();
+        boolean wasDisconnected = disconnectedParticipants.remove(playerId);
         if (isLockedCommandSpectator(playerId)) {
             Location spectate = resolveMapLobbyLocation();
             setSpectator(player);
@@ -1485,8 +1493,17 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         player.setGameMode(GameMode.SURVIVAL);
         player.setAllowFlight(false);
         player.setFlying(false);
+        if (wasDisconnected) {
+            player.getInventory().clear();
+            giveStarterKit(player, team);
+        }
         grantRespawnProtection(player);
         applyPermanentItemsWithShield(player, team);
+        player.setFireTicks(0);
+        player.setFallDistance(0.0f);
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
+        player.setHealth(Math.max(1.0, player.getMaxHealth()));
         syncToolTiers(player);
         hideEditorsFrom(player);
         updateSidebarForPlayer(player);
@@ -1496,7 +1513,10 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (player == null) {
             return;
         }
-        Location lobby = resolveMapLobbyLocation();
+        Location lobby = arena.getLobbyLocation();
+        if (lobby == null) {
+            lobby = resolveMapLobbyLocation();
+        }
         if (lobby != null) {
             player.teleport(lobby);
             player.setRespawnLocation(lobby, true);
@@ -1793,11 +1813,24 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
     protected int countAlivePlayers(TeamColor team) {
         int count = 0;
         for (Map.Entry<UUID, TeamColor> entry : assignments.entrySet()) {
-            if (entry.getValue() == team && !eliminatedPlayers.contains(entry.getKey())) {
+            if (entry.getValue() == team
+                    && !eliminatedPlayers.contains(entry.getKey())
+                    && (!disconnectedParticipants.contains(entry.getKey())
+                    || respawnGracePlayers.contains(entry.getKey()))) {
                 count++;
             }
         }
         return count;
+    }
+
+    protected boolean canRejoinRunningParticipant(UUID playerId, TeamColor team) {
+        if (playerId == null || team == null || eliminatedPlayers.contains(playerId)) {
+            return false;
+        }
+        if (respawnGracePlayers.contains(playerId)) {
+            return true;
+        }
+        return getBedState(team) == BedState.ALIVE;
     }
 
     protected EventInfo getNextEventInfo() {

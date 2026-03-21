@@ -686,9 +686,10 @@ Do not re-introduce large BedWars god classes; use the existing support/runtime 
 - Outside a running BedWars match, players should not be able to rotate, take from, or break item frames in protected BedWars worlds unless they are allowed editors.
 - During a running BedWars match, normal chests/trapped chests inside a team's base radius are locked to that team until that team's bed is destroyed; afterward they are open to everyone.
 - If a pending respawn later turns into a true elimination because respawns are no longer allowed, final-death and final-kill stats should still resolve from that original death.
-- If a running participant quits, they should be removed from the match immediately; if that was the last remaining player on their team, normal team-elimination and win-resolution must still happen from that quit.
-- If a participant or spectator quits from the active arena world, move them to the arena lobby state before logout so reconnecting does not leave them stranded on the map.
-- If a player joins while outside the running match but still inside a BedWars arena world, non-editor players should be snapped back to that arena's lobby on join as a safety net.
+- If a running participant quits while their bed is still alive, or while they still have respawn grace from a pre-bed-break death, keep their team assignment so they can rejoin that running match; otherwise remove them immediately, and if that was the last remaining player on their team, normal team-elimination and win-resolution must still happen from that quit.
+- If a participant or spectator quits from the active arena world, move them to the arena `game-lobby` before logout so reconnecting does not leave them stranded on the map.
+- If a player joins while outside the running match but still inside a BedWars arena world, non-editor players should be snapped back to that arena's `game-lobby` first as a safety net.
+- Party EXP should only be paid to players who are still active participants when the match finishes or who disconnect and later rejoin before rewards are flushed; players who leave and do not finish the match must not receive party EXP.
 - `netherite_spear` movement boost reuse must be hard-blocked for 5 seconds with native `NETHERITE_SPEAR` cooldown plus short follow-up velocity suppression on denied attempts; do not rely on message-only listener gating.
 - Lobby-mode prestart should build a temporary 15x15 barrier platform centered under the resolved `map-lobby` location and restore the original blocks when the session leaves lobby/starts the match.
 - Match end cleanup should return all remaining arena spectators to the arena `game-lobby`; `map-lobby` is for prestart/spectate flows, not post-match cleanup.
