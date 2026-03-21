@@ -1,6 +1,7 @@
 package krispasi.omGames;
 
 import krispasi.omGames.shared.SKIN_TYPE;
+import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
@@ -50,11 +51,13 @@ public class OmVeinsAPI {
      * Function responsible for returning a player's available Om skins,
      * grouped and sorted by {@link SKIN_TYPE}.
      *
-     * <p>The returned strings are the right parts of the skin IDs.
-     * The left part is always {@code "om"}, so the full ID is
-     * {@code "om:" + suffix}.</p>
+     * <p>Each entry is a {@link Pair} of {@code (left, right)} parts of the skin ID.
+     * The left part is always present and is the full skin ID. The right part is
+     * optional and is only populated when the skin is an Equipable; in that case
+     * it contains the right-side token of the equipable ID so that
+     * {@code left} is {@code "om:" + right}.</p>
      */
-    private static Function<Player, Map<SKIN_TYPE, ArrayList<String>>> getPlayerSkinsFunction;
+    private static Function<Player, Map<SKIN_TYPE, ArrayList<Pair<String, String>>>> getPlayerSkinsFunction;
 
     /**
      * Checks whether all required consumers are set.
@@ -127,14 +130,18 @@ public class OmVeinsAPI {
     /**
      * Registers the function responsible for returning a player's available Om skins.
      *
-     * <p>The function must return a map grouped by {@link SKIN_TYPE}. Each value is a list
-     * of skin ID suffixes (right part only). The full ID is always {@code "om:" + suffix}.</p>
+     * <p>The function must return a map grouped by {@link SKIN_TYPE}. Each value is a list of
+     * {@link Pair} entries {@code (left, right)} representing the skin ID.</p>
+     *
+     * <p>{@code left} is always present and is the full skin ID. {@code right} is optional and
+     * is only populated when the skin is an Equipable; in that case {@code right} is the
+     * right-side token of the equipable ID so that {@code left} is {@code "om:" + right}.</p>
      *
      * <p>Returned data is expected to be sorted by {@link SKIN_TYPE}.</p>
      *
      * @param consumer function returning player's skins grouped by type
      */
-    public static void setGetPlayerSkinsFunction(Function<Player, Map<SKIN_TYPE, ArrayList<String>>> consumer) {
+    public static void setGetPlayerSkinsFunction(Function<Player, Map<SKIN_TYPE, ArrayList<Pair<String, String>>>> consumer) {
         getPlayerSkinsFunction = consumer;
         OmGames.getInstance().getLogger().info("OmVeins API: GetPlayerSkinsConsumer consumer set!");
         checkIfDone();
@@ -143,17 +150,19 @@ public class OmVeinsAPI {
     /**
      * Returns the player's available Om skins grouped by {@link SKIN_TYPE}.
      *
-     * <p>Each string is the right part of the skin ID; the left part is always {@code "om"},
-     * so the full ID is {@code "om:" + suffix}.</p>
+     * <p>Each entry is a {@link Pair} of {@code (left, right)} representing the skin ID.
+     * {@code left} is always present and is the full skin ID. {@code right} is optional and
+     * is only populated when the skin is an Equipable; in that case {@code right} is the
+     * right-side token of the equipable ID so that {@code left} is {@code "om:" + right}.</p>
      *
      * <p>Result is expected to be sorted by {@link SKIN_TYPE}.</p>
      *
      * @param player player whose skins should be returned
-     * @return map of skin type to list of skin ID suffixes
+     * @return map of skin type to list of skin ID pairs
      *
      * @throws IllegalStateException if the API has not been initialized
      */
-    public static Map<SKIN_TYPE, ArrayList<String>> getPlayerSkins(Player player){
+    public static Map<SKIN_TYPE, ArrayList<Pair<String, String>>> getPlayerSkins(Player player){
         if (!initialized) {
             notInitializedWarning();
         }
