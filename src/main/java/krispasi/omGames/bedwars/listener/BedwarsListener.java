@@ -132,7 +132,6 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 import org.bukkit.Sound;
 import org.bukkit.potion.PotionEffect;
-import java.lang.reflect.Method;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.EnumSet;
 import java.util.ArrayList;

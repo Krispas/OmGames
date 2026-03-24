@@ -97,13 +97,13 @@ abstract class GameSessionEffectSupport {
             TeamUpgradeType.FORGE,
             TeamUpgradeType.HEAL_POOL
     );
-    protected static final Set<Material> SWORD_MATERIALS = materialSet(
-            "WOODEN_SWORD",
-            "STONE_SWORD",
-            "IRON_SWORD",
-            "DIAMOND_SWORD",
-            "MACE",
-            "NETHERITE_SPEAR"
+    protected static final Set<Material> SWORD_MATERIALS = EnumSet.of(
+            Material.WOODEN_SWORD,
+            Material.STONE_SWORD,
+            Material.IRON_SWORD,
+            Material.DIAMOND_SWORD,
+            Material.MACE,
+            Material.NETHERITE_SPEAR
     );
     protected static final Set<Material> WOODEN_SWORD_ONLY = EnumSet.of(Material.WOODEN_SWORD);
     protected static final Set<Material> BOW_MATERIALS = EnumSet.of(Material.BOW);
@@ -135,19 +135,19 @@ abstract class GameSessionEffectSupport {
             Material.DIAMOND_AXE,
             Material.SHEARS
     );
-    protected static final Set<Material> ATTACK_MATERIALS = materialSet(
-            "WOODEN_SWORD",
-            "STONE_SWORD",
-            "IRON_SWORD",
-            "DIAMOND_SWORD",
-            "MACE",
-            "NETHERITE_SPEAR",
-            "WOODEN_AXE",
-            "STONE_AXE",
-            "IRON_AXE",
-            "GOLDEN_AXE",
-            "DIAMOND_AXE",
-            "TRIDENT"
+    protected static final Set<Material> ATTACK_MATERIALS = EnumSet.of(
+            Material.WOODEN_SWORD,
+            Material.STONE_SWORD,
+            Material.IRON_SWORD,
+            Material.DIAMOND_SWORD,
+            Material.MACE,
+            Material.NETHERITE_SPEAR,
+            Material.WOODEN_AXE,
+            Material.STONE_AXE,
+            Material.IRON_AXE,
+            Material.GOLDEN_AXE,
+            Material.DIAMOND_AXE,
+            Material.TRIDENT
     );
     protected static final int START_COUNTDOWN_SECONDS = 5;
     protected static final int RESPAWN_DELAY_SECONDS = 5;
@@ -538,23 +538,6 @@ abstract class GameSessionEffectSupport {
                 teamsInMatch.add(team);
             }
         }
-    }
-
-    private static Set<Material> materialSet(String... materialNames) {
-        EnumSet<Material> materials = EnumSet.noneOf(Material.class);
-        if (materialNames == null) {
-            return Collections.unmodifiableSet(materials);
-        }
-        for (String materialName : materialNames) {
-            if (materialName == null || materialName.isBlank()) {
-                continue;
-            }
-            Material material = Material.matchMaterial(materialName);
-            if (material != null) {
-                materials.add(material);
-            }
-        }
-        return Collections.unmodifiableSet(materials);
     }
 
     protected void initializeTeamUpgrades() {

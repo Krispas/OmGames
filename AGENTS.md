@@ -30,6 +30,9 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 - Prefer extracting support/runtime/helper classes by concern while preserving ownership boundaries and cleanup invariants.
 - If defaults need to change, update the resource files in `src/main/resources/`.
 - If an existing server config needs the new defaults, the expected workflow is to delete that file and let the plugin recreate it.
+- Target Paper `1.21.11` only; do not keep backward-compatibility shims for older Minecraft/Paper versions.
+- Preserve saved data compatibility (configs/SQLite/player data) so existing servers can be updated without data loss.
+- Prefer native Bukkit/Paper APIs; only use reflection when no public API exists and the cost is justified.
 - Do not touch `OmVeinsAPI`.
 - Do not use `OmVeinsAPI` during server startup.
 

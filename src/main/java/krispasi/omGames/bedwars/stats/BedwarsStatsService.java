@@ -470,11 +470,6 @@ public class BedwarsStatsService {
         if (parent != null) {
             parent.mkdirs();
         }
-        try {
-            Class.forName("org.sqlite.JDBC");
-        } catch (ClassNotFoundException ex) {
-            logger.log(Level.SEVERE, "SQLite driver not found.", ex);
-        }
         connection = DriverManager.getConnection("jdbc:sqlite:" + databaseFile.getAbsolutePath());
         try (Statement statement = connection.createStatement()) {
             statement.execute("PRAGMA busy_timeout = 5000");

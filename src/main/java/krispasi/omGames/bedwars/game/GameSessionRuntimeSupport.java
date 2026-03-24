@@ -1077,9 +1077,12 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
             return;
         }
         String base = armorBase(definition.getMaterial());
-        Material leggings = Material.matchMaterial(base + "_LEGGINGS");
-        Material boots = Material.matchMaterial(base + "_BOOTS");
-        if (leggings == null || boots == null) {
+        Material leggings;
+        Material boots;
+        try {
+            leggings = Material.valueOf(base + "_LEGGINGS");
+            boots = Material.valueOf(base + "_BOOTS");
+        } catch (IllegalArgumentException ex) {
             return;
         }
         org.bukkit.Color color = team.dyeColor().getColor();

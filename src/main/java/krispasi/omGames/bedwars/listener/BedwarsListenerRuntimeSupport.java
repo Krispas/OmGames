@@ -1,7 +1,6 @@
 package krispasi.omGames.bedwars.listener;
 
 import io.papermc.paper.event.player.PlayerArmSwingEvent;
-import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -69,28 +68,10 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
             return;
         }
         DyeColor dyeColor = team != null ? team.dyeColor() : null;
-        invokeBooleanSetter(entity, "setHasHarness", true);
-        invokeBooleanSetter(entity, "setHasCarryingHarness", true);
-        invokeBooleanSetter(entity, "setHarnessed", true);
-        invokeBooleanSetter(entity, "setHarness", true);
-        invokeBooleanSetter(entity, "setSaddled", true);
-        if (dyeColor != null) {
-            invokeObjectSetter(entity, "setHarnessColor", DyeColor.class, dyeColor);
-            invokeObjectSetter(entity, "setHarnessColour", DyeColor.class, dyeColor);
-            invokeObjectSetter(entity, "setHarnessDyeColor", DyeColor.class, dyeColor);
-        }
         ItemStack harness = createHarnessItem(team, dyeColor);
         if (harness != null) {
-            invokeObjectSetter(entity, "setHarness", ItemStack.class, harness);
-            invokeObjectSetter(entity, "setHarnessItem", ItemStack.class, harness);
-            invokeObjectSetter(entity, "setCarryingHarnessItem", ItemStack.class, harness);
-            invokeObjectSetter(entity, "setSaddle", ItemStack.class, harness);
-            invokeObjectSetter(entity, "setHarnessMaterial", Material.class, harness.getType());
-            invokeObjectSetter(entity, "setHarness", Material.class, harness.getType());
             applyHarnessEquipment(entity, harness);
         }
-        applyHarnessByReflection(entity, harness, dyeColor);
-        applyHappyGhastHarnessNms(entity, harness, dyeColor);
     }
 
     protected void scheduleHappyGhastHarness(LivingEntity entity, TeamColor team) {
@@ -104,34 +85,18 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
     }
 
     protected ItemStack createHarnessItem(TeamColor team, DyeColor dyeColor) {
-        if (team != null) {
-            Material teamMaterial = Material.matchMaterial(team.key().toUpperCase(Locale.ROOT) + "_HARNESS");
-            if (teamMaterial != null) {
-                return new ItemStack(teamMaterial);
-            }
-        }
+        Material material = null;
         if (dyeColor != null) {
-            Material dyeMaterial = Material.matchMaterial(dyeColor.name() + "_HARNESS");
-            if (dyeMaterial != null) {
-                return new ItemStack(dyeMaterial);
+            try {
+                material = Material.valueOf(dyeColor.name() + "_HARNESS");
+            } catch (IllegalArgumentException ignored) {
+                material = null;
             }
         }
-        Material material = Material.matchMaterial("WHITE_HARNESS");
         if (material == null) {
-            material = Material.matchMaterial("HAPPY_GHAST_HARNESS");
+            material = Material.WHITE_HARNESS;
         }
-        if (material == null) {
-            material = Material.matchMaterial("GHAST_HARNESS");
-        }
-        if (material != null) {
-            return new ItemStack(material);
-        }
-        for (Material candidate : Material.values()) {
-            if (candidate.name().endsWith("_HARNESS")) {
-                return new ItemStack(candidate);
-            }
-        }
-        return null;
+        return new ItemStack(material);
     }
 
     protected void applyHarnessEquipment(LivingEntity entity, ItemStack harness) {
@@ -143,218 +108,7 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
             return;
         }
         equipment.setChestplate(harness);
-        EquipmentSlot bodySlot = resolveEquipmentSlot("BODY");
-        if (bodySlot != null) {
-            equipment.setItem(bodySlot, harness);
-        }
-    }
-
-    protected EquipmentSlot resolveEquipmentSlot(String name) {
-        if (name == null) {
-            return null;
-        }
-        try {
-            return EquipmentSlot.valueOf(name);
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
-    }
-
-    protected void applyHarnessByReflection(LivingEntity entity, ItemStack harness, DyeColor dyeColor) {
-        if (entity == null) {
-            return;
-        }
-        Method[] methods = entity.getClass().getMethods();
-        Method[] declared = entity.getClass().getDeclaredMethods();
-        for (Method method : concatMethods(methods, declared)) {
-            String name = method.getName().toLowerCase(Locale.ROOT);
-            if (!name.contains("harness") && !name.contains("saddle")) {
-                continue;
-            }
-            if (method.getParameterCount() != 1) {
-                continue;
-            }
-            Class<?> param = method.getParameterTypes()[0];
-            Object arg = null;
-            if (harness != null && param.isAssignableFrom(ItemStack.class)) {
-                arg = harness;
-            } else if (harness != null && param.isAssignableFrom(Material.class)) {
-                arg = harness.getType();
-            } else if (dyeColor != null && param.isAssignableFrom(DyeColor.class)) {
-                arg = dyeColor;
-            } else if (dyeColor != null && "org.bukkit.Color".equals(param.getName())) {
-                arg = dyeColor.getColor();
-            } else if (dyeColor != null && param == String.class) {
-                arg = dyeColor.name();
-            } else if (param == boolean.class) {
-                arg = Boolean.TRUE;
-            }
-            if (arg == null) {
-                continue;
-            }
-            try {
-                method.setAccessible(true);
-                method.invoke(entity, arg);
-            } catch (ReflectiveOperationException ignored) {
-            }
-        }
-    }
-
-    protected boolean invokeBooleanSetter(Object target, String methodName, boolean value) {
-        if (target == null || methodName == null) {
-            return false;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName, boolean.class);
-            method.invoke(target, value);
-            return true;
-        } catch (ReflectiveOperationException ignored) {
-            try {
-                Method method = target.getClass().getDeclaredMethod(methodName, boolean.class);
-                method.setAccessible(true);
-                method.invoke(target, value);
-                return true;
-            } catch (ReflectiveOperationException ignoredAgain) {
-                return false;
-            }
-        }
-    }
-
-    protected boolean invokeObjectSetter(Object target, String methodName, Class<?> argType, Object value) {
-        if (target == null || methodName == null || argType == null) {
-            return false;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName, argType);
-            method.invoke(target, value);
-            return true;
-        } catch (ReflectiveOperationException ignored) {
-            try {
-                Method method = target.getClass().getDeclaredMethod(methodName, argType);
-                method.setAccessible(true);
-                method.invoke(target, value);
-                return true;
-            } catch (ReflectiveOperationException ignoredAgain) {
-                return false;
-            }
-        }
-    }
-
-    protected Method[] concatMethods(Method[] first, Method[] second) {
-        int firstLen = first != null ? first.length : 0;
-        int secondLen = second != null ? second.length : 0;
-        Method[] combined = new Method[firstLen + secondLen];
-        if (firstLen > 0) {
-            System.arraycopy(first, 0, combined, 0, firstLen);
-        }
-        if (secondLen > 0) {
-            System.arraycopy(second, 0, combined, firstLen, secondLen);
-        }
-        return combined;
-    }
-
-    protected void applyHappyGhastHarnessNms(LivingEntity entity, ItemStack harness, DyeColor dyeColor) {
-        if (entity == null) {
-            return;
-        }
-        try {
-            Method getHandle = entity.getClass().getMethod("getHandle");
-            Object handle = getHandle.invoke(entity);
-            if (handle == null) {
-                return;
-            }
-            Object nmsStack = toNmsItem(harness);
-            Object nmsDye = resolveNmsDyeColor(dyeColor);
-            Method[] methods = concatMethods(handle.getClass().getMethods(), handle.getClass().getDeclaredMethods());
-            for (Method method : methods) {
-                String name = method.getName().toLowerCase(Locale.ROOT);
-                if (!name.contains("harness") && !name.contains("saddle")) {
-                    continue;
-                }
-                if (method.getParameterCount() != 1) {
-                    continue;
-                }
-                Class<?> param = method.getParameterTypes()[0];
-                Object arg = null;
-                if (nmsStack != null && param.isInstance(nmsStack)) {
-                    arg = nmsStack;
-                } else if (nmsStack != null && param.getName().endsWith("ItemStack")) {
-                    arg = nmsStack;
-                } else if (nmsDye != null && param.isInstance(nmsDye)) {
-                    arg = nmsDye;
-                } else if (dyeColor != null && param == String.class) {
-                    arg = dyeColor.name();
-                } else if (param == boolean.class) {
-                    arg = Boolean.TRUE;
-                } else if (param == int.class) {
-                    arg = 1;
-                }
-                if (arg == null) {
-                    continue;
-                }
-                try {
-                    method.setAccessible(true);
-                    method.invoke(handle, arg);
-                } catch (ReflectiveOperationException ignored) {
-                }
-            }
-            for (var field : handle.getClass().getDeclaredFields()) {
-                String name = field.getName().toLowerCase(Locale.ROOT);
-                if (!name.contains("harness") && !name.contains("saddle")) {
-                    continue;
-                }
-                field.setAccessible(true);
-                Class<?> type = field.getType();
-                if (type == boolean.class) {
-                    field.setBoolean(handle, true);
-                } else if (type == int.class) {
-                    field.setInt(handle, 1);
-                } else if (nmsStack != null && type.isInstance(nmsStack)) {
-                    field.set(handle, nmsStack);
-                } else if (nmsDye != null && type.isInstance(nmsDye)) {
-                    field.set(handle, nmsDye);
-                }
-            }
-        } catch (ReflectiveOperationException ignored) {
-        }
-    }
-
-    protected Object toNmsItem(ItemStack item) {
-        if (item == null) {
-            return null;
-        }
-        try {
-            String version = getCraftBukkitVersion();
-            if (version == null) {
-                return null;
-            }
-            Class<?> craftItem = Class.forName("org.bukkit.craftbukkit." + version + ".inventory.CraftItemStack");
-            Method asNmsCopy = craftItem.getMethod("asNMSCopy", ItemStack.class);
-            return asNmsCopy.invoke(null, item);
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
-    }
-
-    protected Object resolveNmsDyeColor(DyeColor dyeColor) {
-        if (dyeColor == null) {
-            return null;
-        }
-        try {
-            Class<?> dyeClass = Class.forName("net.minecraft.world.item.DyeColor");
-            return Enum.valueOf((Class) dyeClass, dyeColor.name());
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
-    }
-
-    protected String getCraftBukkitVersion() {
-        String name = Bukkit.getServer().getClass().getPackage().getName();
-        int index = name.lastIndexOf('.');
-        if (index < 0) {
-            return null;
-        }
-        return name.substring(index + 1);
+        equipment.setItem(EquipmentSlot.BODY, harness);
     }
 
     protected void spawnBedBug(GameSession session, TeamColor team, Location location, CustomItemDefinition custom) {
@@ -592,15 +346,7 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
         if (entity == null) {
             return 1.6;
         }
-        try {
-            Method method = entity.getClass().getMethod("getHeight");
-            Object value = method.invoke(entity);
-            if (value instanceof Number number) {
-                return number.doubleValue();
-            }
-        } catch (ReflectiveOperationException ignored) {
-        }
-        return 1.6;
+        return entity.getHeight();
     }
 
     protected String resolveSummonDisplayName(org.bukkit.entity.Entity entity) {
@@ -782,127 +528,47 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
     }
 
     protected void applyHappyGhastSpeed(LivingEntity entity, double speedMultiplier) {
-        try {
-            Class<?> attributeClass = Class.forName("org.bukkit.attribute.Attribute");
-            Method getAttribute = LivingEntity.class.getMethod("getAttribute", attributeClass);
-            Object movement = resolveAttribute(attributeClass, "GENERIC_MOVEMENT_SPEED");
-            scaleAttributeValue(entity, getAttribute, movement, speedMultiplier);
-            Object flying = resolveAttribute(attributeClass, "GENERIC_FLYING_SPEED");
-            scaleAttributeValue(entity, getAttribute, flying, speedMultiplier);
-        } catch (ReflectiveOperationException ignored) {
-        }
+        scaleAttributeValue(entity, Attribute.MOVEMENT_SPEED, speedMultiplier);
+        scaleAttributeValue(entity, Attribute.FLYING_SPEED, speedMultiplier);
     }
 
     protected void applyEntitySpeed(LivingEntity entity, double speed) {
-        try {
-            Class<?> attributeClass = Class.forName("org.bukkit.attribute.Attribute");
-            Method getAttribute = LivingEntity.class.getMethod("getAttribute", attributeClass);
-            Object movement = resolveAttribute(attributeClass, "GENERIC_MOVEMENT_SPEED");
-            applyAttributeValue(entity, getAttribute, movement, speed);
-            Object flying = resolveAttribute(attributeClass, "GENERIC_FLYING_SPEED");
-            applyAttributeValue(entity, getAttribute, flying, speed);
-        } catch (ReflectiveOperationException ignored) {
-        }
-    }
-
-    protected void scaleAttributeValue(LivingEntity entity,
-                                       Method getAttribute,
-                                       Object attribute,
-                                       double multiplier) {
-        if (entity == null || getAttribute == null || attribute == null) {
-            return;
-        }
-        try {
-            Object instance = getAttribute.invoke(entity, attribute);
-            if (instance == null) {
-                return;
-            }
-            Method getBaseValue = instance.getClass().getMethod("getBaseValue");
-            Object current = getBaseValue.invoke(instance);
-            if (!(current instanceof Number number)) {
-                return;
-            }
-            Method setBaseValue = instance.getClass().getMethod("setBaseValue", double.class);
-            setBaseValue.invoke(instance, Math.max(0.0, number.doubleValue() * multiplier));
-        } catch (ReflectiveOperationException ignored) {
-        }
+        applyAttributeValue(entity, Attribute.MOVEMENT_SPEED, speed);
+        applyAttributeValue(entity, Attribute.FLYING_SPEED, speed);
     }
 
     protected void applyEntityRange(LivingEntity entity, double range) {
-        try {
-            Class<?> attributeClass = Class.forName("org.bukkit.attribute.Attribute");
-            Method getAttribute = LivingEntity.class.getMethod("getAttribute", attributeClass);
-            Object followRange = resolveAttribute(attributeClass, "GENERIC_FOLLOW_RANGE");
-            applyAttributeValue(entity, getAttribute, followRange, range);
-        } catch (ReflectiveOperationException ignored) {
-        }
+        applyAttributeValue(entity, Attribute.FOLLOW_RANGE, range);
     }
 
     protected void applyEntityKnockbackResistance(LivingEntity entity, double resistance) {
-        try {
-            Class<?> attributeClass = Class.forName("org.bukkit.attribute.Attribute");
-            Method getAttribute = LivingEntity.class.getMethod("getAttribute", attributeClass);
-            Object knockbackResistance = resolveAttribute(attributeClass, "KNOCKBACK_RESISTANCE");
-            applyAttributeValue(entity, getAttribute, knockbackResistance, resistance);
-        } catch (ReflectiveOperationException ignored) {
-        }
+        applyAttributeValue(entity, Attribute.KNOCKBACK_RESISTANCE, resistance);
     }
 
-    protected Object resolveAttribute(Class<?> attributeClass, String name) {
-        if (attributeClass == null || name == null || name.isBlank()) {
-            return null;
-        }
-        String normalized = name.trim().toLowerCase(Locale.ROOT);
-        if (normalized.contains(":")) {
-            NamespacedKey key = NamespacedKey.fromString(normalized);
-            if (key != null) {
-                Attribute attribute = Registry.ATTRIBUTE.get(key);
-                if (attribute != null && attributeClass.isInstance(attribute)) {
-                    return attribute;
-                }
-            }
-        }
-        String keyName = normalized;
-        if (keyName.startsWith("generic_")) {
-            keyName = keyName.substring("generic_".length());
-        } else if (keyName.startsWith("player_")) {
-            keyName = keyName.substring("player_".length());
-        }
-        Attribute attribute = Registry.ATTRIBUTE.get(NamespacedKey.minecraft(keyName));
-        if (attribute != null && attributeClass.isInstance(attribute)) {
-            return attribute;
-        }
-        try {
-            return Enum.valueOf((Class) attributeClass, name);
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
-    }
-
-    protected void applyAttributeValue(LivingEntity entity,
-                                     Method getAttribute,
-                                     Object attribute,
-                                     double value) {
-        if (entity == null || getAttribute == null || attribute == null) {
+    protected void scaleAttributeValue(LivingEntity entity, Attribute attribute, double multiplier) {
+        if (entity == null || attribute == null) {
             return;
         }
-        try {
-            Object instance = getAttribute.invoke(entity, attribute);
-            if (instance == null) {
-                return;
-            }
-            Method setBaseValue = instance.getClass().getMethod("setBaseValue", double.class);
-            setBaseValue.invoke(instance, value);
-        } catch (ReflectiveOperationException ignored) {
+        AttributeInstance instance = entity.getAttribute(attribute);
+        if (instance == null) {
+            return;
         }
+        instance.setBaseValue(Math.max(0.0, instance.getBaseValue() * multiplier));
+    }
+
+    protected void applyAttributeValue(LivingEntity entity, Attribute attribute, double value) {
+        if (entity == null || attribute == null) {
+            return;
+        }
+        AttributeInstance instance = entity.getAttribute(attribute);
+        if (instance == null) {
+            return;
+        }
+        instance.setBaseValue(value);
     }
 
     protected EntityType resolveHappyGhastType() {
-        try {
-            return EntityType.valueOf("HAPPY_GHAST");
-        } catch (IllegalArgumentException ex) {
-            return EntityType.GHAST;
-        }
+        return EntityType.HAPPY_GHAST;
     }
 
     protected CustomItemDefinition getCustomItem(String id) {
@@ -1333,7 +999,7 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
             return 0;
         }
         InventoryAction action = event.getAction();
-        if (action == InventoryAction.HOTBAR_SWAP || isLegacyHotbarMoveAndReadd(action)) {
+        if (action == InventoryAction.HOTBAR_SWAP) {
             return current.getAmount();
         }
         return switch (action) {
@@ -1347,11 +1013,7 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
     }
 
     protected boolean isHotbarStorageSwapAction(InventoryAction action) {
-        return action == InventoryAction.HOTBAR_SWAP || isLegacyHotbarMoveAndReadd(action);
-    }
-
-    protected boolean isLegacyHotbarMoveAndReadd(InventoryAction action) {
-        return action != null && "HOTBAR_MOVE_AND_READD".equals(action.name());
+        return action == InventoryAction.HOTBAR_SWAP;
     }
 
     protected int resolveCursorCapacity(ItemStack cursor, ItemStack current) {
