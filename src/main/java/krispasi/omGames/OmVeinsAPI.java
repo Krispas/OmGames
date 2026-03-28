@@ -1,13 +1,10 @@
 package krispasi.omGames;
 
-import krispasi.omGames.shared.SKIN_TYPE;
-import org.apache.commons.lang3.tuple.Pair;
+import krispasi.omGames.shared.Skin;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Level;
 
@@ -49,15 +46,12 @@ public class OmVeinsAPI {
 
     /**
      * Function responsible for returning a player's available Om skins,
-     * grouped and sorted by {@link SKIN_TYPE}.
+     * keyed by model id in the form {@code om:<id_in_string>}.
      *
-     * <p>Each entry is a {@link Pair} of {@code (left, right)} parts of the skin ID.
-     * The left part is always present and is the full skin ID. The right part is
-     * optional and is only populated when the skin is an Equipable; in that case
-     * it contains the right-side token of the equipable ID so that
-     * {@code left} is {@code "om:" + right}.</p>
+     * <p>Each value is a {@link Skin} instance. Wearable skins (armor/elytra)
+     * are returned as {@code SkinEquipment} instances.</p>
      */
-    private static Function<Player, Map<SKIN_TYPE, ArrayList<Pair<String, String>>>> getPlayerSkinsFunction;
+    private static Function<Player, Map<String, Skin>> getPlayerSkinsFunction;
 
     /**
      * Checks whether all required consumers are set.
@@ -130,39 +124,33 @@ public class OmVeinsAPI {
     /**
      * Registers the function responsible for returning a player's available Om skins.
      *
-     * <p>The function must return a map grouped by {@link SKIN_TYPE}. Each value is a list of
-     * {@link Pair} entries {@code (left, right)} representing the skin ID.</p>
+     * <p>The function must return a map keyed by model id in the form
+     * {@code om:<id_in_string>}.</p>
      *
-     * <p>{@code left} is always present and is the full skin ID. {@code right} is optional and
-     * is only populated when the skin is an Equipable; in that case {@code right} is the
-     * right-side token of the equipable ID so that {@code left} is {@code "om:" + right}.</p>
+     * <p>Each value is a {@link Skin} instance. Wearable skins (armor/elytra)
+     * are returned as {@code SkinEquipment} instances.</p>
      *
-     * <p>Returned data is expected to be sorted by {@link SKIN_TYPE}.</p>
-     *
-     * @param consumer function returning player's skins grouped by type
+     * @param consumer function returning player's skins keyed by model id
      */
-    public static void setGetPlayerSkinsFunction(Function<Player, Map<SKIN_TYPE, ArrayList<Pair<String, String>>>> consumer) {
+    public static void setGetPlayerSkinsFunction(Function<Player, Map<String, Skin>> consumer) {
         getPlayerSkinsFunction = consumer;
         OmGames.getInstance().getLogger().info("OmVeins API: GetPlayerSkinsConsumer consumer set!");
         checkIfDone();
     }
 
     /**
-     * Returns the player's available Om skins grouped by {@link SKIN_TYPE}.
+     * Returns the player's available Om skins keyed by model id.
      *
-     * <p>Each entry is a {@link Pair} of {@code (left, right)} representing the skin ID.
-     * {@code left} is always present and is the full skin ID. {@code right} is optional and
-     * is only populated when the skin is an Equipable; in that case {@code right} is the
-     * right-side token of the equipable ID so that {@code left} is {@code "om:" + right}.</p>
-     *
-     * <p>Result is expected to be sorted by {@link SKIN_TYPE}.</p>
+     * <p>Keys are formatted as {@code om:<id_in_string>}. Each value is a {@link Skin}
+     * instance; wearable skins (armor/elytra) are returned as
+     * {@code SkinEquipment} instances.</p>
      *
      * @param player player whose skins should be returned
-     * @return map of skin type to list of skin ID pairs
+     * @return map of model id to skin metadata
      *
      * @throws IllegalStateException if the API has not been initialized
      */
-    public static Map<SKIN_TYPE, ArrayList<Pair<String, String>>> getPlayerSkins(Player player){
+    public static Map<String, Skin> getPlayerSkins(Player player){
         if (!initialized) {
             notInitializedWarning();
         }
