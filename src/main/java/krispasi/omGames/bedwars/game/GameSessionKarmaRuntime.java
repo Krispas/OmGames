@@ -20,10 +20,7 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
-import org.bukkit.block.Block;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.LightningStrike;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TNTPrimed;
@@ -289,7 +286,6 @@ class GameSessionKarmaRuntime {
             case EXPLOSION -> triggerExplosion(player);
             case LIGHTNING_STRIKE -> triggerLightningStrike(player);
             case WEAKNESS -> applyWeakness(player);
-            case ANVIL_FALL -> triggerAnvilFall(player);
             case SLOWNESS -> applySlowness(player);
             case CONFUSION -> applyConfusion(player);
             case SPONTANEOUS_COMBUSTION -> applyCombustion(player);
@@ -327,36 +323,6 @@ class GameSessionKarmaRuntime {
 
     private boolean applyWeakness(Player player) {
         player.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, WEAKNESS_DURATION_TICKS, 0, true, true, true), true);
-        return true;
-    }
-
-    private boolean triggerAnvilFall(Player player) {
-        Location base = player.getLocation();
-        for (int y = 1; y <= 10; y++) {
-            Block block = base.getWorld().getBlockAt(base.getBlockX(), base.getBlockY() + y, base.getBlockZ());
-            if (!block.getType().isAir()) {
-                return false;
-            }
-        }
-        Location spawn = new Location(base.getWorld(), base.getX(), base.getY() + 10.0, base.getZ(), base.getYaw(), base.getPitch());
-        BlockData anvilData = Material.ANVIL.createBlockData();
-        FallingBlock falling = base.getWorld().spawnFallingBlock(spawn, anvilData);
-        falling.addScoreboardTag(KARMA_ANVIL_TAG);
-        falling.setDropItem(false);
-        falling.setHurtEntities(true);
-        try {
-            falling.setCancelDrop(true);
-        } catch (NoSuchMethodError ignored) {
-        }
-        activeKarmaAnvils.add(falling.getUniqueId());
-        if (plugin != null) {
-            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-                activeKarmaAnvils.remove(falling.getUniqueId());
-                if (falling.isValid()) {
-                    falling.remove();
-                }
-            }, 80L);
-        }
         return true;
     }
 
@@ -467,7 +433,6 @@ class GameSessionKarmaRuntime {
         EXPLOSION("Explosion"),
         LIGHTNING_STRIKE("Lightning Strike"),
         WEAKNESS("Weakness"),
-        ANVIL_FALL("Anvil Fall"),
         SLOWNESS("Slowness"),
         CONFUSION("Confusion"),
         SPONTANEOUS_COMBUSTION("Spontaneous Combustion");

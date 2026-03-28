@@ -124,6 +124,7 @@ abstract class BedwarsListenerCustomSupport {
     protected static final String PORTABLE_SHOPKEEPER_TAG = "bw_portable_shopkeeper";
     protected static final String PLACEABLE_BED_ITEM_ID = "placeable_bed";
     protected static final String PROXIMITY_MINE_ITEM_ID = "proximity_mine";
+    protected static final String RIDING_FIREBALL_ITEM_ID = "riding_fireball";
     protected static final String PROXIMITY_MINE_TNT_TAG_PREFIX = "bw_proximity_mine_team_";
     protected static final String RESPAWN_BEACON_ITEM_ID = "respawn_beacon";
     protected static final String GIGANTIFY_GRENADE_ITEM_ID = "gigantify_grenade";
@@ -273,10 +274,19 @@ abstract class BedwarsListenerCustomSupport {
     protected void launchFireball(Player player, GameSession session, CustomItemDefinition custom) {
         Fireball fireball = player.launchProjectile(Fireball.class);
         fireball.setIsIncendiary(custom.isIncendiary());
-        fireball.setYield(custom.getYield());
-        fireball.setVelocity(player.getLocation().getDirection().normalize().multiply(custom.getVelocity()));
+        double velocity = custom.getVelocity();
+        double yield = custom.getYield();
+        if (RIDING_FIREBALL_ITEM_ID.equalsIgnoreCase(custom.getId())
+                && session != null
+                && session.getActiveMatchEvent() == BedwarsMatchEventType.APRIL_FOOLS) {
+            velocity *= 2.0;
+            yield *= 2.0;
+        }
+        fireball.setYield((float) yield);
+        fireball.setVelocity(player.getLocation().getDirection().normalize().multiply(velocity));
         fireball.getPersistentDataContainer().set(customProjectileKey, PersistentDataType.STRING, custom.getId());
-        if (session != null && session.getActiveMatchEvent() == BedwarsMatchEventType.APRIL_FOOLS) {
+        if (RIDING_FIREBALL_ITEM_ID.equalsIgnoreCase(custom.getId())
+                || (session != null && session.getActiveMatchEvent() == BedwarsMatchEventType.APRIL_FOOLS)) {
             mountAprilFoolsFireball(player, fireball);
         }
     }

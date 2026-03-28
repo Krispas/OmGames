@@ -846,23 +846,21 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 return;
             }
             ItemStack consumed = event.getItem();
+            handlePotionBottleCleanup(event);
             String customId = CustomItemData.getId(consumed);
             if (customId == null || !customId.equalsIgnoreCase("magic_milk")) {
                 return;
             }
             CustomItemDefinition custom = bedwarsManager.getCustomItemConfig().getItem(customId);
             if (custom == null || custom.getType() != CustomItemType.MAGIC_MILK) {
-                handlePotionBottleCleanup(event);
                 return;
             }
             int immunitySeconds = Math.max(0, custom.getLifetimeSeconds());
             if (immunitySeconds <= 0) {
-                handlePotionBottleCleanup(event);
                 return;
             }
             session.grantTrapImmunity(player.getUniqueId(), immunitySeconds);
             player.sendMessage(Component.text("Magic Milk activated! Trap immunity for " + immunitySeconds + "s.", NamedTextColor.AQUA));
-            handlePotionBottleCleanup(event);
         });
     }
 
@@ -2144,7 +2142,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 return;
             }
             event.setCancelled(true);
-            double newHealth = living.getHealth() - 15.0;
+            double newHealth = living.getHealth() - 6.0;
             if (newHealth <= 0.0) {
                 living.setHealth(0.0);
             } else {

@@ -28,6 +28,7 @@ shop:
         abyssal_rift_regeneration: 34
         time_capsule: 37
         woodoo_doll: 38
+        riding_fireball: 39
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -354,6 +355,19 @@ shop:
           - "Consumed on hit."
         custom-item: woodoo_doll
         max-carry-amount: 1
+      riding_fireball:
+        material: FIRE_CHARGE
+        amount: 1
+        cost:
+          material: GOLD
+          amount: 256
+        display-name: "Riding Fireball"
+        lore:
+          - "Ride a fireball forward."
+          - "Doubles range and power"
+          - "during April Fools."
+        custom-item: riding_fireball
+        max-carry-amount: 4
       thorns_upgrade:
         material: CACTUS
         amount: 1

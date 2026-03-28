@@ -7,6 +7,14 @@ custom-items:
     incendiary: false
     damage: 4.0
     knockback: 0.4
+  riding_fireball:
+    type: FIREBALL
+    material: FIRE_CHARGE
+    velocity: 1.15
+    yield: 2.5
+    incendiary: false
+    damage: 4.0
+    knockback: 0.4
   bridge_egg:
     type: BRIDGE_EGG
     material: EGG
