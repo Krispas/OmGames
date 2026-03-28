@@ -48,6 +48,22 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         super(bedwarsManager, arena);
     }
 
+    private static final List<Material> MOON_BIG_DEBRIS_MATERIALS = List.of(
+            Material.BASALT,
+            Material.DEEPSLATE,
+            Material.COBBLED_DEEPSLATE
+    );
+    private static final List<AsteroidLootEntry> MOON_BIG_ASTEROID_LOOT_POOL = List.of(
+            new AsteroidLootEntry(Material.IRON_INGOT, 8, 24),
+            new AsteroidLootEntry(Material.GOLD_INGOT, 4, 16),
+            new AsteroidLootEntry(Material.DIAMOND, 1, 3),
+            new AsteroidLootEntry(Material.EMERALD, 1, 2),
+            new AsteroidLootEntry(Material.ARROW, 8, 20),
+            new AsteroidLootEntry(Material.TNT, 1, 3),
+            new AsteroidLootEntry(Material.GOLDEN_APPLE, 1, 2),
+            new AsteroidLootEntry(Material.ENDER_PEARL, 1, 2)
+    );
+
     public void startLobby(JavaPlugin plugin, Player initiator, int lobbySeconds) {
         this.plugin = plugin;
         stopInternal();
@@ -650,6 +666,19 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         if (activeMatchEvent == null || plugin == null) {
             return;
         }
+        if (activeMatchEvent == BedwarsMatchEventType.MOON_BIG) {
+            prepareBloodMoonWorld();
+            startMoonBigAsteroidLoop();
+            BukkitTask task = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+                World world = arena.getWorld();
+                if (world == null) {
+                    return;
+                }
+                world.setTime(18000L);
+            }, 0L, 40L);
+            tasks.add(task);
+            return;
+        }
         if (activeMatchEvent == BedwarsMatchEventType.BLOOD_MOON) {
             prepareBloodMoonWorld();
             BukkitTask task = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
@@ -708,6 +737,266 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         }
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
         world.setTime(18000L);
+    }
+
+    protected void startMoonBigAsteroidLoop() {
+        BedwarsMoonBigConfig config = bedwarsManager.getMoonBigConfig();
+        if (config == null) {
+            return;
+        }
+        scheduleNextMoonBigAsteroid(config);
+    }
+
+    protected void scheduleNextMoonBigAsteroid(BedwarsMoonBigConfig config) {
+        if (plugin == null || config == null) {
+            return;
+        }
+        double intervalSeconds = resolveMoonBigAsteroidIntervalSeconds(config);
+        if (intervalSeconds <= 0.0) {
+            return;
+        }
+        long delayTicks = Math.max(1L, Math.round(intervalSeconds * 20.0));
+        BukkitTask task = plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            safeRun("moonBigAsteroid", () -> {
+                if (!isRunning() || activeMatchEvent != BedwarsMatchEventType.MOON_BIG) {
+                    return;
+                }
+                spawnMoonBigAsteroid(config);
+                scheduleNextMoonBigAsteroid(config);
+            });
+        }, delayTicks);
+        tasks.add(task);
+    }
+
+    protected double resolveMoonBigAsteroidIntervalSeconds(BedwarsMoonBigConfig config) {
+        if (config == null) {
+            return 0.0;
+        }
+        double elapsedSeconds = 0.0;
+        if (matchStartMillis > 0L) {
+            elapsedSeconds = Math.max(0.0, (System.currentTimeMillis() - matchStartMillis) / 1000.0);
+        }
+        int totalDuration = 0;
+        if (arena != null && arena.getEventSettings() != null) {
+            totalDuration = Math.max(0, arena.getEventSettings().getGameEndDelay());
+        }
+        double ratio = totalDuration > 0 ? Math.min(1.0, elapsedSeconds / totalDuration) : 1.0;
+        double minInterval = lerp(config.startIntervalMinSeconds(), config.endIntervalMinSeconds(), ratio);
+        double maxInterval = lerp(config.startIntervalMaxSeconds(), config.endIntervalMaxSeconds(), ratio);
+        if (maxInterval < minInterval) {
+            double swap = minInterval;
+            minInterval = maxInterval;
+            maxInterval = swap;
+        }
+        if (maxInterval <= 0.0) {
+            return 0.0;
+        }
+        if (Math.abs(maxInterval - minInterval) < 0.0001) {
+            return Math.max(0.0, maxInterval);
+        }
+        return ThreadLocalRandom.current().nextDouble(minInterval, maxInterval);
+    }
+
+    protected void spawnMoonBigAsteroid(BedwarsMoonBigConfig config) {
+        World world = arena.getWorld();
+        BlockPoint corner1 = arena.getCorner1();
+        BlockPoint corner2 = arena.getCorner2();
+        if (world == null || corner1 == null || corner2 == null || config == null) {
+            return;
+        }
+        int minX = Math.min(corner1.x(), corner2.x());
+        int maxX = Math.max(corner1.x(), corner2.x());
+        int minZ = Math.min(corner1.z(), corner2.z());
+        int maxZ = Math.max(corner1.z(), corner2.z());
+        int x = ThreadLocalRandom.current().nextInt(minX, maxX + 1);
+        int z = ThreadLocalRandom.current().nextInt(minZ, maxZ + 1);
+        int groundY = world.getHighestBlockYAt(x, z);
+        if (groundY < world.getMinHeight()) {
+            return;
+        }
+        Block groundBlock = world.getBlockAt(x, groundY, z);
+        if (groundBlock.getType().isAir()) {
+            return;
+        }
+        int radius = ThreadLocalRandom.current().nextInt(config.radiusMin(), config.radiusMax() + 1);
+        int spawnY = Math.min(world.getMaxHeight() - 2, groundY + config.spawnHeightAboveGround());
+        if (spawnY <= groundY + 1) {
+            return;
+        }
+        Location start = new Location(world, x + 0.5, spawnY + 0.5, z + 0.5);
+        spawnMoonBigAsteroidEntity(world, start, groundY, radius, config);
+    }
+
+    protected void spawnMoonBigAsteroidEntity(World world,
+                                              Location start,
+                                              int groundY,
+                                              int radius,
+                                              BedwarsMoonBigConfig config) {
+        if (world == null || start == null || config == null) {
+            return;
+        }
+        FallingBlock asteroid = world.spawnFallingBlock(start, Material.MAGMA_BLOCK.createBlockData());
+        asteroid.setGravity(false);
+        asteroid.setDropItem(false);
+        asteroid.setHurtEntities(false);
+        asteroid.setInvulnerable(true);
+        asteroid.setPersistent(true);
+        asteroid.addScoreboardTag(MOON_BIG_ASTEROID_TAG);
+        try {
+            asteroid.setCancelDrop(true);
+        } catch (NoSuchMethodError ignored) {
+        }
+
+        double speedPerTick = config.fallSpeedBlocksPerSecond() / 20.0;
+        BukkitTask task = new BukkitRunnable() {
+            @Override
+            public void run() {
+                safeRun("moonBigAsteroidTick", () -> {
+                    if (!isRunning() || activeMatchEvent != BedwarsMatchEventType.MOON_BIG || !asteroid.isValid()) {
+                        asteroid.remove();
+                        cancel();
+                        return;
+                    }
+                    Location current = asteroid.getLocation();
+                    double nextY = current.getY() - speedPerTick;
+                    if (nextY <= world.getMinHeight()) {
+                        handleMoonBigAsteroidImpact(current, radius, config);
+                        asteroid.remove();
+                        cancel();
+                        return;
+                    }
+                    Location next = current.clone();
+                    next.setY(nextY);
+                    Block block = world.getBlockAt(next);
+                    if (!block.isPassable() || block.getY() <= groundY) {
+                        Location impact = block.getLocation().add(0.5, 1.0, 0.5);
+                        handleMoonBigAsteroidImpact(impact, radius, config);
+                        asteroid.remove();
+                        cancel();
+                        return;
+                    }
+                    asteroid.teleport(next);
+                    spawnMoonBigAsteroidParticles(world, next);
+                });
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+        tasks.add(task);
+    }
+
+    protected void spawnMoonBigAsteroidParticles(World world, Location location) {
+        if (world == null || location == null) {
+            return;
+        }
+        world.spawnParticle(Particle.FLAME, location, 6, 0.2, 0.2, 0.2, 0.01);
+        world.spawnParticle(Particle.SMOKE_LARGE, location, 3, 0.2, 0.2, 0.2, 0.01);
+    }
+
+    protected void handleMoonBigAsteroidImpact(Location location, int radius, BedwarsMoonBigConfig config) {
+        if (location == null || config == null) {
+            return;
+        }
+        World world = location.getWorld();
+        if (world == null) {
+            return;
+        }
+        float power = (float) (radius * config.explosionPowerMultiplier());
+        world.createExplosion(location, power, false, false);
+        world.spawnParticle(Particle.EXPLOSION, location, 1);
+        world.playSound(location, Sound.ENTITY_GENERIC_EXPLODE, 3.0f, 0.9f);
+        placeMoonBigAsteroidDebris(location, radius, config);
+    }
+
+    protected void placeMoonBigAsteroidDebris(Location impact,
+                                              int radius,
+                                              BedwarsMoonBigConfig config) {
+        if (impact == null || config == null) {
+            return;
+        }
+        World world = impact.getWorld();
+        if (world == null) {
+            return;
+        }
+        int centerX = impact.getBlockX();
+        int centerY = impact.getBlockY();
+        int centerZ = impact.getBlockZ();
+        double missingChance = config.missingBlockChance();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (dx * dx + dy * dy + dz * dz > radius * radius) {
+                        continue;
+                    }
+                    if (ThreadLocalRandom.current().nextDouble() < missingChance) {
+                        continue;
+                    }
+                    int x = centerX + dx;
+                    int y = centerY + dy;
+                    int z = centerZ + dz;
+                    Block block = world.getBlockAt(x, y, z);
+                    if (!block.getType().isAir()) {
+                        continue;
+                    }
+                    Material material = MOON_BIG_DEBRIS_MATERIALS.get(
+                            ThreadLocalRandom.current().nextInt(MOON_BIG_DEBRIS_MATERIALS.size()));
+                    block.setType(material, false);
+                    placedBlocks.add(new BlockPoint(x, y, z));
+                }
+            }
+        }
+        if (ThreadLocalRandom.current().nextDouble() < config.crateChance()) {
+            placeMoonBigAsteroidCrate(world, centerX, centerY, centerZ);
+        }
+    }
+
+    protected void placeMoonBigAsteroidCrate(World world, int centerX, int centerY, int centerZ) {
+        if (world == null) {
+            return;
+        }
+        Block crateBlock = world.getBlockAt(centerX, centerY, centerZ);
+        if (!crateBlock.getType().isAir()) {
+            return;
+        }
+        crateBlock.setType(Material.BARREL, false);
+        placedBlocks.add(new BlockPoint(crateBlock.getX(), crateBlock.getY(), crateBlock.getZ()));
+        BlockState state = crateBlock.getState();
+        if (state instanceof Barrel barrel) {
+            barrel.setCustomName("Asteroid Crate");
+            fillMoonBigAsteroidCrate(barrel);
+            barrel.update();
+        }
+    }
+
+    protected void fillMoonBigAsteroidCrate(Barrel barrel) {
+        if (barrel == null) {
+            return;
+        }
+        Inventory inventory = barrel.getInventory();
+        inventory.clear();
+        List<AsteroidLootEntry> pool = new ArrayList<>(MOON_BIG_ASTEROID_LOOT_POOL);
+        Collections.shuffle(pool);
+        int count = Math.min(pool.size(), ThreadLocalRandom.current().nextInt(3, 6));
+        for (int i = 0; i < count; i++) {
+            AsteroidLootEntry entry = pool.get(i);
+            int amount = entry.rollAmount();
+            if (amount <= 0) {
+                continue;
+            }
+            inventory.addItem(new ItemStack(entry.material(), amount));
+        }
+    }
+
+    protected double lerp(double start, double end, double t) {
+        double clamped = Math.max(0.0, Math.min(1.0, t));
+        return start + (end - start) * clamped;
+    }
+
+    private record AsteroidLootEntry(Material material, int minAmount, int maxAmount) {
+        int rollAmount() {
+            if (maxAmount <= minAmount) {
+                return Math.max(0, minAmount);
+            }
+            return ThreadLocalRandom.current().nextInt(minAmount, maxAmount + 1);
+        }
     }
 
     protected void restoreMatchEventWorldState() {
@@ -1576,7 +1865,8 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
                     || entity.getScoreboardTags().contains(CREEPING_CREEPER_TAG)
                     || entity.getScoreboardTags().contains(ABYSSAL_RIFT_TAG)
                     || entity.getScoreboardTags().contains(ABYSSAL_RIFT_DISPLAY_TAG)
-                    || entity.getScoreboardTags().contains(ABYSSAL_RIFT_NAME_TAG)) {
+                    || entity.getScoreboardTags().contains(ABYSSAL_RIFT_NAME_TAG)
+                    || entity.getScoreboardTags().contains(MOON_BIG_ASTEROID_TAG)) {
                 entity.remove();
             }
         }

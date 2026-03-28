@@ -62,6 +62,7 @@ abstract class GameSessionEffectSupport {
     public static final String ABYSSAL_RIFT_TAG = "bw_abyssal_rift";
     public static final String ABYSSAL_RIFT_DISPLAY_TAG = "bw_abyssal_rift_display";
     public static final String ABYSSAL_RIFT_NAME_TAG = "bw_abyssal_rift_nameplate";
+    public static final String MOON_BIG_ASTEROID_TAG = "bw_moon_big_asteroid";
     public static final String ELYTRA_STRIKE_ACTIVE_ITEM_ID = "elytra_strike_active";
     protected static final double DEFAULT_PLAYER_SCALE = 1.0;
     protected static final double SCALE_DOWN_TIER_ONE = 0.9;

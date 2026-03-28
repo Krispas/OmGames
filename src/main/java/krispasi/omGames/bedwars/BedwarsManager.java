@@ -7,6 +7,7 @@ import krispasi.omGames.bedwars.skin.BedwarsSkinSelection;
 import krispasi.omGames.bedwars.config.BedwarsConfigLoader;
 import krispasi.omGames.bedwars.event.BedwarsMatchEventConfig;
 import krispasi.omGames.bedwars.event.BedwarsMatchEventType;
+import krispasi.omGames.bedwars.event.BedwarsMoonBigConfig;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.karma.BedwarsKarmaEventConfig;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
@@ -86,6 +87,7 @@ public class BedwarsManager {
     private CustomItemConfig customItemConfig = CustomItemConfig.empty();
     private BedwarsMatchEventConfig matchEventConfig = BedwarsMatchEventConfig.defaults();
     private BedwarsKarmaEventConfig karmaEventConfig = BedwarsKarmaEventConfig.defaults();
+    private BedwarsMoonBigConfig moonBigConfig = BedwarsMoonBigConfig.defaults();
 
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -116,6 +118,7 @@ public class BedwarsManager {
         arenas = loader.load();
         matchEventConfig = loadMatchEventConfig(configFile);
         karmaEventConfig = loadKarmaEventConfig(configFile);
+        moonBigConfig = loadMoonBigConfig(configFile);
         configureSharedLobby(configFile);
         configureLobbyLeaderboard(configFile);
         configureParkourLeaderboard(configFile);
@@ -253,6 +256,10 @@ public class BedwarsManager {
 
     public BedwarsKarmaEventConfig getKarmaEventConfig() {
         return karmaEventConfig;
+    }
+
+    public BedwarsMoonBigConfig getMoonBigConfig() {
+        return moonBigConfig;
     }
 
     public QuickBuyService getQuickBuyService() {
@@ -564,6 +571,50 @@ public class BedwarsManager {
                 maxCheckSeconds,
                 baseRollChancePercent,
                 perKarmaChancePercent
+        );
+    }
+
+    private BedwarsMoonBigConfig loadMoonBigConfig(File configFile) {
+        BedwarsMoonBigConfig defaults = BedwarsMoonBigConfig.defaults();
+        if (!configFile.exists()) {
+            return defaults;
+        }
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
+        ConfigurationSection section = config.getConfigurationSection("match-events");
+        if (section == null) {
+            return defaults;
+        }
+        ConfigurationSection moonBig = section.getConfigurationSection("moon-big");
+        if (moonBig == null) {
+            return defaults;
+        }
+        ConfigurationSection asteroids = moonBig.getConfigurationSection("asteroids");
+        if (asteroids == null) {
+            return defaults;
+        }
+        double fallSpeed = asteroids.getDouble("fall-speed-blocks-per-second", defaults.fallSpeedBlocksPerSecond());
+        int startMin = asteroids.getInt("start-interval-min-seconds", defaults.startIntervalMinSeconds());
+        int startMax = asteroids.getInt("start-interval-max-seconds", defaults.startIntervalMaxSeconds());
+        int endMin = asteroids.getInt("end-interval-min-seconds", defaults.endIntervalMinSeconds());
+        int endMax = asteroids.getInt("end-interval-max-seconds", defaults.endIntervalMaxSeconds());
+        int radiusMin = asteroids.getInt("radius-min", defaults.radiusMin());
+        int radiusMax = asteroids.getInt("radius-max", defaults.radiusMax());
+        double missingChance = asteroids.getDouble("missing-block-chance", defaults.missingBlockChance());
+        double crateChance = asteroids.getDouble("crate-chance", defaults.crateChance());
+        int spawnHeight = asteroids.getInt("spawn-height-above-ground", defaults.spawnHeightAboveGround());
+        double explosionMultiplier = asteroids.getDouble("explosion-power-multiplier", defaults.explosionPowerMultiplier());
+        return new BedwarsMoonBigConfig(
+                fallSpeed,
+                startMin,
+                startMax,
+                endMin,
+                endMax,
+                radiusMin,
+                radiusMax,
+                missingChance,
+                crateChance,
+                spawnHeight,
+                explosionMultiplier
         );
     }
 

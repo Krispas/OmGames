@@ -377,6 +377,17 @@ Root keys:
 - `enabled`
 - `chance-percent`
 - `events.<event-id>.weight`
+- `moon-big.asteroids.fall-speed-blocks-per-second`
+- `moon-big.asteroids.start-interval-min-seconds`
+- `moon-big.asteroids.start-interval-max-seconds`
+- `moon-big.asteroids.end-interval-min-seconds`
+- `moon-big.asteroids.end-interval-max-seconds`
+- `moon-big.asteroids.radius-min`
+- `moon-big.asteroids.radius-max`
+- `moon-big.asteroids.missing-block-chance`
+- `moon-big.asteroids.crate-chance`
+- `moon-big.asteroids.spawn-height-above-ground`
+- `moon-big.asteroids.explosion-power-multiplier`
 
 `karma-events` fields:
 - `check-min-seconds`
@@ -411,6 +422,7 @@ Supported event ids:
 - set player gravity to `0.01` from the vanilla default `0.08`
 - do not use Feather Falling or Jump Boost as the event mechanic
 - players who disconnect during the event must have gravity reset on quit, and rejoining participants during the same running match must receive the event gravity again
+- lock the world to nighttime and spawn falling asteroids that explode without block damage, leaving debris (basalt/deepslate/cobbled deepslate) and a rare loot crate barrel
 
 `in-this-economy` runtime note:
 - `fireball`, `bed_bug`, and `dream_defender` stay purchasable at `4x` their normal price

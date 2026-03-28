@@ -31,6 +31,19 @@ match-events:
       weight: 3
     april-fools:
       weight: 1
+  moon-big:
+    asteroids:
+      fall-speed-blocks-per-second: 3.0
+      start-interval-min-seconds: 60
+      start-interval-max-seconds: 90
+      end-interval-min-seconds: 1
+      end-interval-max-seconds: 3
+      radius-min: 2
+      radius-max: 5
+      missing-block-chance: 0.3
+      crate-chance: 0.05
+      spawn-height-above-ground: 60
+      explosion-power-multiplier: 1.0
 karma-events:
   check-min-seconds: 10
   check-max-seconds: 100
