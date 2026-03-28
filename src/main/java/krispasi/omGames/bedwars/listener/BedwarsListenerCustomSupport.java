@@ -1,7 +1,6 @@
 package krispasi.omGames.bedwars.listener;
 
 import io.papermc.paper.event.player.PlayerArmSwingEvent;
-import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -58,17 +57,17 @@ abstract class BedwarsListenerCustomSupport {
             Material.IRON_SWORD,
             Material.DIAMOND_SWORD
     );
-    protected static final Set<Material> WEAPON_MATERIALS = materialSet(
-            "WOODEN_SWORD",
-            "STONE_SWORD",
-            "IRON_SWORD",
-            "DIAMOND_SWORD",
-            "BOW",
-            "CROSSBOW",
-            "MACE",
-            "NETHERITE_SPEAR",
-            "TRIDENT",
-            "SHIELD"
+    protected static final Set<Material> WEAPON_MATERIALS = EnumSet.of(
+            Material.WOODEN_SWORD,
+            Material.STONE_SWORD,
+            Material.IRON_SWORD,
+            Material.DIAMOND_SWORD,
+            Material.BOW,
+            Material.CROSSBOW,
+            Material.MACE,
+            Material.NETHERITE_SPEAR,
+            Material.TRIDENT,
+            Material.SHIELD
     );
     protected static final EnumSet<Material> TOOL_MATERIALS = EnumSet.of(
             Material.WOODEN_PICKAXE,
@@ -143,23 +142,6 @@ abstract class BedwarsListenerCustomSupport {
     protected final Map<UUID, Long> blockedLungingSpearVelocityUntil = new HashMap<>();
     protected final Map<UUID, BukkitTask> gigantifyTasks = new HashMap<>();
     protected final Map<UUID, Long> voidTotemFallProtection = new HashMap<>();
-
-    private static Set<Material> materialSet(String... materialNames) {
-        EnumSet<Material> materials = EnumSet.noneOf(Material.class);
-        if (materialNames == null) {
-            return Collections.unmodifiableSet(materials);
-        }
-        for (String materialName : materialNames) {
-            if (materialName == null || materialName.isBlank()) {
-                continue;
-            }
-            Material material = Material.matchMaterial(materialName);
-            if (material != null) {
-                materials.add(material);
-            }
-        }
-        return Collections.unmodifiableSet(materials);
-    }
 
 
     protected BedwarsListenerCustomSupport(BedwarsManager bedwarsManager) {
@@ -375,21 +357,13 @@ abstract class BedwarsListenerCustomSupport {
         if (trident == null) {
             return null;
         }
-        try {
-            Method getItemStack = trident.getClass().getMethod("getItemStack");
-            Object value = getItemStack.invoke(trident);
-            if (value instanceof ItemStack stack) {
-                return stack.clone();
-            }
-        } catch (ReflectiveOperationException ignored) {
+        ItemStack stack = trident.getItemStack();
+        if (stack != null && stack.getType() != Material.AIR) {
+            return stack.clone();
         }
-        try {
-            Method getItem = trident.getClass().getMethod("getItem");
-            Object value = getItem.invoke(trident);
-            if (value instanceof ItemStack stack) {
-                return stack.clone();
-            }
-        } catch (ReflectiveOperationException ignored) {
+        stack = trident.getItem();
+        if (stack != null && stack.getType() != Material.AIR) {
+            return stack.clone();
         }
         return new ItemStack(Material.TRIDENT);
     }
@@ -1826,8 +1800,7 @@ abstract class BedwarsListenerCustomSupport {
         if (player == null) {
             return;
         }
-        // Paper 1.21 exposes Attribute.SCALE directly. Older API targets may still need
-        // a reflective fallback here if this BedWars runtime is ever backported.
+        // Paper 1.21 exposes Attribute.SCALE directly.
         AttributeInstance attribute = player.getAttribute(Attribute.SCALE);
         if (attribute == null) {
             return;

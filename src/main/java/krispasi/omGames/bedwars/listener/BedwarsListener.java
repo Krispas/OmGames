@@ -24,6 +24,8 @@ import krispasi.omGames.bedwars.gui.EventSelectMenu;
 import krispasi.omGames.bedwars.gui.LockpickTargetMenu;
 import krispasi.omGames.bedwars.gui.RotatingItemMenu;
 import krispasi.omGames.bedwars.gui.ShopMenu;
+import krispasi.omGames.bedwars.gui.SkinSelectMenu;
+import krispasi.omGames.bedwars.gui.SkinTypeMenu;
 import krispasi.omGames.bedwars.gui.TeamAssignMenu;
 import krispasi.omGames.bedwars.gui.TeamPickMenu;
 import krispasi.omGames.bedwars.gui.TimeCapsuleViewMenu;
@@ -132,7 +134,6 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 import org.bukkit.Sound;
 import org.bukkit.potion.PotionEffect;
-import java.lang.reflect.Method;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.EnumSet;
 import java.util.ArrayList;
@@ -232,6 +233,22 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 menu.handleClick(event);
                 return;
             }
+            if (topInventory.getHolder() instanceof SkinTypeMenu menu) {
+                if (event.getRawSlot() >= topInventory.getSize()) {
+                    event.setCancelled(true);
+                    return;
+                }
+                menu.handleClick(event);
+                return;
+            }
+            if (topInventory.getHolder() instanceof SkinSelectMenu menu) {
+                if (event.getRawSlot() >= topInventory.getSize()) {
+                    event.setCancelled(true);
+                    return;
+                }
+                menu.handleClick(event);
+                return;
+            }
 
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null || !session.isActive()) {
@@ -273,7 +290,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                     || topInventory.getHolder() instanceof ShopMenu
                     || topInventory.getHolder() instanceof UpgradeShopMenu
                     || topInventory.getHolder() instanceof LockpickTargetMenu
-                    || topInventory.getHolder() instanceof TimeCapsuleViewMenu) {
+                    || topInventory.getHolder() instanceof TimeCapsuleViewMenu
+                    || topInventory.getHolder() instanceof SkinTypeMenu
+                    || topInventory.getHolder() instanceof SkinSelectMenu) {
                 event.setCancelled(true);
                 return;
             }

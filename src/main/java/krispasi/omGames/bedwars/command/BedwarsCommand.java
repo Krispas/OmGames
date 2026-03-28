@@ -7,10 +7,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import krispasi.omGames.OmVeinsAPI;
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.game.GameSession;
+import krispasi.omGames.bedwars.gui.SkinTypeMenu;
 import krispasi.omGames.bedwars.gui.TimeCapsuleViewMenu;
 import krispasi.omGames.bedwars.karma.BedwarsKarmaService;
 import krispasi.omGames.bedwars.model.Arena;
@@ -26,6 +29,7 @@ import krispasi.omGames.bedwars.stats.BedwarsStatsService;
 import krispasi.omGames.bedwars.timecapsule.TimeCapsuleQueueType;
 import krispasi.omGames.bedwars.timecapsule.TimeCapsuleSerialization;
 import krispasi.omGames.bedwars.timecapsule.TimeCapsuleService;
+import krispasi.omGames.shared.Skin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -81,6 +85,9 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             bedwarsManager.openQuickBuyEditor(player);
             return true;
         }
+        if (args.length > 0 && args[0].equalsIgnoreCase("skins")) {
+            return handleSkinsCommand(player);
+        }
         boolean temporaryCreator = bedwarsManager.isTemporaryCreator(player.getUniqueId());
         if (args.length > 0 && isCreatorCommand(args[0])) {
             return handleCreatorCommand(sender, player, args);
@@ -100,7 +107,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                     "/bw test_time_capsule view");
         }
         if (!player.isOp() && !temporaryCreator) {
-            sender.sendMessage(Component.text("Only OP can use this command (except /bw stats and /bw quick-buy).", NamedTextColor.RED));
+            sender.sendMessage(Component.text("Only OP can use this command (except /bw stats, /bw quick-buy, and /bw skins).", NamedTextColor.RED));
             return true;
         }
         if (!sender.hasPermission("omgames.bw.start")
@@ -333,7 +340,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test_time_capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <rotating_item> | /bw time_capsule view <user> [time_id] | /bw quick_buy | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test_time_capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <rotating_item> | /bw time_capsule view <user> [time_id] | /bw quick_buy | /bw skins | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -342,7 +349,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
             return Stream.of("start", "test", "stop", "tp", "lobby", "game", "karma", "give", "time_capsule",
-                            "test_time_capsule", "quick_buy", "stats", "reload", "setup", "creator")
+                            "test_time_capsule", "quick_buy", "skins", "stats", "reload", "setup", "creator")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -1303,6 +1310,32 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 || arg.equalsIgnoreCase("quick-buy")
                 || arg.equalsIgnoreCase("quck-buy")
                 || arg.equalsIgnoreCase("quck_buy");
+    }
+
+    private boolean handleSkinsCommand(Player player) {
+        if (!OmVeinsAPI.isInitialized()) {
+            player.sendMessage(Component.text("OmVeins skins are not available right now.", NamedTextColor.RED));
+            return true;
+        }
+        GameSession session = bedwarsManager.getActiveSession();
+        if (session != null && session.isActive()
+                && session.isParticipant(player.getUniqueId())
+                && !session.isLobby()) {
+            player.sendMessage(Component.text("You can only change skins in the lobby.", NamedTextColor.RED));
+            return true;
+        }
+        Map<String, Skin> skins = OmVeinsAPI.getPlayerSkins(player);
+        if (skins == null || skins.isEmpty()) {
+            player.sendMessage(Component.text("You do not have any skins to choose from.", NamedTextColor.GRAY));
+            return true;
+        }
+        SkinTypeMenu menu = new SkinTypeMenu(bedwarsManager, player, skins);
+        if (!menu.hasSkins()) {
+            player.sendMessage(Component.text("No BedWars-compatible skins found.", NamedTextColor.GRAY));
+            return true;
+        }
+        menu.open(player);
+        return true;
     }
 
     private Location resolveBedwarsLobbyLocation() {
