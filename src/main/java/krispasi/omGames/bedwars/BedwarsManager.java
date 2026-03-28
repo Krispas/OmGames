@@ -1,13 +1,9 @@
 package krispasi.omGames.bedwars;
 
 import java.io.File;
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import krispasi.omGames.bedwars.skin.BedwarsSkinSelection;
 import krispasi.omGames.bedwars.config.BedwarsConfigLoader;
 import krispasi.omGames.bedwars.event.BedwarsMatchEventConfig;
 import krispasi.omGames.bedwars.event.BedwarsMatchEventType;
@@ -24,6 +20,7 @@ import krispasi.omGames.bedwars.stats.BedwarsStatsService;
 import krispasi.omGames.bedwars.timecapsule.TimeCapsuleService;
 import krispasi.omGames.bedwars.shop.ShopConfig;
 import krispasi.omGames.bedwars.shop.ShopConfigLoader;
+import krispasi.omGames.shared.SKIN_TYPE;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -77,6 +74,7 @@ public class BedwarsManager {
     private final BedwarsLobbyLeaderboard lobbyLeaderboard;
     private final BedwarsLobbyParkour lobbyParkour;
     private final BedwarsParkourLeaderboard parkourLeaderboard;
+    private final Map<UUID, EnumMap<SKIN_TYPE, BedwarsSkinSelection>> skinSelections = new HashMap<>();
     private final Set<UUID> temporaryCreators = new HashSet<>();
     private Map<String, Arena> arenas = Map.of();
     private GameSession activeSession;
@@ -162,6 +160,49 @@ public class BedwarsManager {
         karmaService.load();
     }
 
+    public void loadSkins() {
+        skinSelections.clear();
+        File file = getBedwarsConfigFile("skins.yml");
+        if (!file.exists()) {
+            return;
+        }
+        YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+        ConfigurationSection root = config.getConfigurationSection("skins");
+        if (root == null) {
+            return;
+        }
+        for (String playerKey : root.getKeys(false)) {
+            UUID playerId = parseUuid(playerKey);
+            if (playerId == null) {
+                continue;
+            }
+            ConfigurationSection playerSection = root.getConfigurationSection(playerKey);
+            if (playerSection == null) {
+                continue;
+            }
+            EnumMap<SKIN_TYPE, BedwarsSkinSelection> selections = new EnumMap<>(SKIN_TYPE.class);
+            for (String typeKey : playerSection.getKeys(false)) {
+                SKIN_TYPE type = parseSkinType(typeKey);
+                if (type == null) {
+                    continue;
+                }
+                ConfigurationSection typeSection = playerSection.getConfigurationSection(typeKey);
+                if (typeSection == null) {
+                    continue;
+                }
+                String model = trimToNull(typeSection.getString("model"));
+                String equipment = trimToNull(typeSection.getString("equipment"));
+                if (model == null) {
+                    continue;
+                }
+                selections.put(type, new BedwarsSkinSelection(model, equipment));
+            }
+            if (!selections.isEmpty()) {
+                skinSelections.put(playerId, selections);
+            }
+        }
+    }
+
     public void startLobbyLeaderboard() {
         lobbyLeaderboard.start();
         parkourLeaderboard.start();
@@ -232,6 +273,43 @@ public class BedwarsManager {
 
     public BedwarsLobbyParkour getLobbyParkour() {
         return lobbyParkour;
+    }
+
+    public BedwarsSkinSelection getSkinSelection(UUID playerId, SKIN_TYPE type) {
+        if (playerId == null || type == null) {
+            return null;
+        }
+        EnumMap<SKIN_TYPE, BedwarsSkinSelection> selections = skinSelections.get(playerId);
+        return selections != null ? selections.get(type) : null;
+    }
+
+    public void setSkinSelection(UUID playerId, SKIN_TYPE type, BedwarsSkinSelection selection) {
+        if (playerId == null || type == null) {
+            return;
+        }
+        if (selection == null) {
+            clearSkinSelection(playerId, type);
+            return;
+        }
+        skinSelections
+                .computeIfAbsent(playerId, ignored -> new EnumMap<>(SKIN_TYPE.class))
+                .put(type, selection);
+        saveSkins();
+    }
+
+    public void clearSkinSelection(UUID playerId, SKIN_TYPE type) {
+        if (playerId == null || type == null) {
+            return;
+        }
+        EnumMap<SKIN_TYPE, BedwarsSkinSelection> selections = skinSelections.get(playerId);
+        if (selections == null) {
+            return;
+        }
+        selections.remove(type);
+        if (selections.isEmpty()) {
+            skinSelections.remove(playerId);
+        }
+        saveSkins();
     }
 
     public boolean addTemporaryCreator(UUID playerId) {
@@ -410,6 +488,8 @@ public class BedwarsManager {
         statsService.shutdown();
         timeCapsuleService.shutdown();
         karmaService.shutdown();
+        saveSkins();
+        skinSelections.clear();
         clearDroppedItems();
     }
 
@@ -799,6 +879,57 @@ public class BedwarsManager {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void saveSkins() {
+        File file = getBedwarsConfigFile("skins.yml");
+        YamlConfiguration config = new YamlConfiguration();
+        ConfigurationSection root = config.createSection("skins");
+        for (Map.Entry<UUID, EnumMap<SKIN_TYPE, BedwarsSkinSelection>> entry : skinSelections.entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null || entry.getValue().isEmpty()) {
+                continue;
+            }
+            ConfigurationSection playerSection = root.createSection(entry.getKey().toString());
+            for (Map.Entry<SKIN_TYPE, BedwarsSkinSelection> skinEntry : entry.getValue().entrySet()) {
+                SKIN_TYPE type = skinEntry.getKey();
+                BedwarsSkinSelection selection = skinEntry.getValue();
+                if (type == null || selection == null || selection.modelId() == null || selection.modelId().isBlank()) {
+                    continue;
+                }
+                ConfigurationSection typeSection = playerSection.createSection(type.name().toLowerCase(Locale.ROOT));
+                typeSection.set("model", selection.modelId());
+                if (selection.equipmentModelId() != null && !selection.equipmentModelId().isBlank()) {
+                    typeSection.set("equipment", selection.equipmentModelId());
+                }
+            }
+        }
+        try {
+            config.save(file);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Failed to save BedWars skins.yml: " + ex.getMessage());
+        }
+    }
+
+    private UUID parseUuid(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private SKIN_TYPE parseSkinType(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return SKIN_TYPE.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
 }

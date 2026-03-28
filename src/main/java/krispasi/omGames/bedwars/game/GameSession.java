@@ -1285,7 +1285,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
         CustomItemDefinition custom = resolveCustomPurchaseDefinition(item);
         return switch (behavior) {
             case BLOCK, UTILITY, POTION -> {
-                giveItem(player, createPurchaseItem(item, team));
+                giveItem(player, createPurchaseItem(player, item, team));
                 if (behavior == ShopItemBehavior.UTILITY
                         && team != null
                         && hasTeamUpgrade(team, TeamUpgradeType.FIRE_ASPECT)
@@ -1298,7 +1298,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
                 if (item.getMaterial() != Material.WOODEN_SWORD) {
                     removeItems(player, WOODEN_SWORD_ONLY);
                 }
-                giveItem(player, createPurchaseItem(item, team));
+                giveItem(player, createPurchaseItem(player, item, team));
                 if (team != null && hasTeamUpgrade(team, TeamUpgradeType.SHARPNESS)) {
                     applySharpness(player);
                 }
@@ -1309,14 +1309,14 @@ public class GameSession extends GameSessionMatchFlowSupport {
             }
             case BOW -> {
                 removeItems(player, BOW_MATERIALS);
-                giveItem(player, createPurchaseItem(item, team));
+                giveItem(player, createPurchaseItem(player, item, team));
                 yield true;
             }
             case CROSSBOW -> {
                 if (countItem(player, Material.CROSSBOW) >= 3) {
                     yield false;
                 }
-                giveItem(player, createPurchaseItem(item, team));
+                giveItem(player, createPurchaseItem(player, item, team));
                 yield true;
             }
             case ARMOR -> applyTierUpgrade(player, item, armorTiers, ShopItemBehavior.ARMOR);
@@ -1339,10 +1339,10 @@ public class GameSession extends GameSessionMatchFlowSupport {
         return bedwarsManager.getCustomItemConfig().getItem(customId);
     }
 
-    private ItemStack createPurchaseItem(ShopItemDefinition item, TeamColor team) {
+    private ItemStack createPurchaseItem(Player player, ShopItemDefinition item, TeamColor team) {
         ItemStack stack = createEventAdjustedPurchaseItem(item, team);
         applyCustomItemMetadata(stack, item);
-        return stack;
+        return applySkinsToItem(player, stack);
     }
 
     private ItemStack createEventAdjustedPurchaseItem(ShopItemDefinition item, TeamColor team) {
