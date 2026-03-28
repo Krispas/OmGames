@@ -43,6 +43,7 @@ public final class OmGames extends JavaPlugin {
         bedwarsManager.loadStats();
         bedwarsManager.loadTimeCapsules();
         bedwarsManager.loadKarma();
+        bedwarsManager.loadSkins();
         bedwarsManager.startLobbyLeaderboard();
         setupManager = new BedwarsSetupManager(this, bedwarsManager);
         eggHuntManager = new EggHuntManager(this);

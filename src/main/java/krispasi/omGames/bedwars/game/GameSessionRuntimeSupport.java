@@ -4,8 +4,8 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
-import krispasi.omGames.OmVeinsAPI;
 import krispasi.omGames.bedwars.BedwarsManager;
+import krispasi.omGames.bedwars.skin.BedwarsSkinSelection;
 import krispasi.omGames.bedwars.event.*;
 import krispasi.omGames.bedwars.generator.*;
 import krispasi.omGames.bedwars.gui.*;
@@ -13,6 +13,7 @@ import krispasi.omGames.bedwars.item.*;
 import krispasi.omGames.bedwars.model.*;
 import krispasi.omGames.bedwars.shop.*;
 import krispasi.omGames.bedwars.upgrade.*;
+import krispasi.omGames.shared.SKIN_TYPE;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -25,6 +26,7 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.*;
+import org.bukkit.inventory.meta.components.EquippableComponent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.*;
 import org.bukkit.scheduler.*;
@@ -930,10 +932,10 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
             return;
         }
         org.bukkit.Color color = team.dyeColor().getColor();
-        player.getInventory().setHelmet(colorLeatherArmor(Material.LEATHER_HELMET, color));
-        player.getInventory().setChestplate(colorLeatherArmor(Material.LEATHER_CHESTPLATE, color));
-        player.getInventory().setLeggings(colorLeatherArmor(Material.LEATHER_LEGGINGS, color));
-        player.getInventory().setBoots(colorLeatherArmor(Material.LEATHER_BOOTS, color));
+        player.getInventory().setHelmet(applySkinsToItem(player, colorLeatherArmor(Material.LEATHER_HELMET, color)));
+        player.getInventory().setChestplate(applySkinsToItem(player, colorLeatherArmor(Material.LEATHER_CHESTPLATE, color)));
+        player.getInventory().setLeggings(applySkinsToItem(player, colorLeatherArmor(Material.LEATHER_LEGGINGS, color)));
+        player.getInventory().setBoots(applySkinsToItem(player, colorLeatherArmor(Material.LEATHER_BOOTS, color)));
     }
 
     protected boolean applyTierUpgrade(Player player,
@@ -989,7 +991,8 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
             return;
         }
         removeItems(player, removeSet);
-        giveItem(player, definition.createPurchaseItem(team));
+        ItemStack item = definition.createPurchaseItem(team);
+        giveItem(player, applySkinsToItem(player, item));
     }
 
     protected int resolveToolTier(Player player, ShopConfig config, ShopItemBehavior behavior) {
@@ -1086,15 +1089,200 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
             return;
         }
         org.bukkit.Color color = team.dyeColor().getColor();
-        player.getInventory().setHelmet(colorLeatherArmor(Material.LEATHER_HELMET, color));
-        player.getInventory().setChestplate(colorLeatherArmor(Material.LEATHER_CHESTPLATE, color));
+        player.getInventory().setHelmet(applySkinsToItem(player, colorLeatherArmor(Material.LEATHER_HELMET, color)));
+        player.getInventory().setChestplate(applySkinsToItem(player, colorLeatherArmor(Material.LEATHER_CHESTPLATE, color)));
         if ("LEATHER".equals(base)) {
-            player.getInventory().setLeggings(colorLeatherArmor(leggings, color));
-            player.getInventory().setBoots(colorLeatherArmor(boots, color));
+            player.getInventory().setLeggings(applySkinsToItem(player, colorLeatherArmor(leggings, color)));
+            player.getInventory().setBoots(applySkinsToItem(player, colorLeatherArmor(boots, color)));
         } else {
-            player.getInventory().setLeggings(makeUnbreakable(new ItemStack(leggings)));
-            player.getInventory().setBoots(makeUnbreakable(new ItemStack(boots)));
+            player.getInventory().setLeggings(applySkinsToItem(player, makeUnbreakable(new ItemStack(leggings))));
+            player.getInventory().setBoots(applySkinsToItem(player, makeUnbreakable(new ItemStack(boots))));
         }
+    }
+
+    protected ItemStack applySkinsToItem(Player player, ItemStack item) {
+        if (player == null || item == null || item.getType() == Material.AIR) {
+            return item;
+        }
+        Material material = item.getType();
+        if (material == Material.DIAMOND_SWORD) {
+            return applySkinForType(player, item, SKIN_TYPE.SWORD);
+        }
+        if (material == Material.NETHERITE_SPEAR) {
+            return applySkinForType(player, item, SKIN_TYPE.SPEAR);
+        }
+        if (material == Material.DIAMOND_AXE) {
+            return applySkinForType(player, item, SKIN_TYPE.AXE);
+        }
+        if (material == Material.BOW) {
+            return applySkinForType(player, item, SKIN_TYPE.BOW);
+        }
+        if (isPunchingStick(item)) {
+            return applySkinForType(player, item, SKIN_TYPE.PUNCHING_STICK);
+        }
+        if (material == Material.ELYTRA) {
+            return applySkinForType(player, item, SKIN_TYPE.ELYTRA);
+        }
+        if (isHelmetMaterial(material)) {
+            BedwarsSkinSelection hatSelection = bedwarsManager.getSkinSelection(player.getUniqueId(), SKIN_TYPE.HAT);
+            if (hatSelection == null || hatSelection.modelId() == null || hatSelection.modelId().isBlank()) {
+                return item;
+            }
+            ItemStack hat = applyHatMaterial(item);
+            return applySkinForType(player, hat, SKIN_TYPE.HAT);
+        }
+        if (material == Material.DIAMOND_LEGGINGS) {
+            return applySkinForType(player, item, SKIN_TYPE.LEGGINGS);
+        }
+        if (material == Material.DIAMOND_BOOTS) {
+            return applySkinForType(player, item, SKIN_TYPE.BOOTS);
+        }
+        return item;
+    }
+
+    protected ItemStack applySkinForType(Player player,
+                                         ItemStack item,
+                                         SKIN_TYPE type) {
+        if (player == null || item == null || type == null) {
+            return item;
+        }
+        UUID playerId = player.getUniqueId();
+        BedwarsSkinSelection selection = resolveSkinSelection(playerId, type);
+        if (selection == null || selection.modelId() == null || selection.modelId().isBlank()) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return item;
+        }
+        NamespacedKey modelKey = NamespacedKey.fromString(normalizeModelId(selection.modelId()));
+        if (modelKey != null) {
+            meta.setItemModel(modelKey);
+        }
+        if (selection.hasEquipmentModel()) {
+            EquippableComponent equippable = resolveEquippableComponent(item, meta);
+            if (equippable != null) {
+                NamespacedKey equipKey = NamespacedKey.fromString(normalizeModelId(selection.equipmentModelId()));
+                if (equipKey != null) {
+                    equippable.setModel(equipKey);
+                }
+                EquipmentSlot slot = resolveEquipSlot(item != null ? item.getType() : null);
+                if (slot != null) {
+                    equippable.setSlot(slot);
+                }
+                meta.setEquippable(equippable);
+            }
+        }
+        meta.setEnchantmentGlintOverride(false);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private BedwarsSkinSelection resolveSkinSelection(UUID playerId, SKIN_TYPE type) {
+        if (playerId == null || type == null) {
+            return null;
+        }
+        return bedwarsManager.getSkinSelection(playerId, type);
+    }
+
+    private EquippableComponent resolveEquippableComponent(ItemStack item, ItemMeta meta) {
+        if (meta != null) {
+            EquippableComponent equippable = meta.getEquippable();
+            if (equippable != null) {
+                return equippable;
+            }
+        }
+        ItemMeta defaults = item != null ? Bukkit.getItemFactory().getItemMeta(item.getType()) : null;
+        return defaults != null ? defaults.getEquippable() : null;
+    }
+
+    private boolean isHelmetMaterial(Material material) {
+        if (material == null) {
+            return false;
+        }
+        return material.name().endsWith("_HELMET");
+    }
+
+    private ItemStack applyHatMaterial(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) {
+            return item;
+        }
+        if (item.getType() == Material.CARVED_PUMPKIN) {
+            return item;
+        }
+        ItemStack hat = new ItemStack(Material.CARVED_PUMPKIN, item.getAmount());
+        ItemMeta sourceMeta = item.getItemMeta();
+        ItemMeta hatMeta = hat.getItemMeta();
+        if (sourceMeta != null && hatMeta != null) {
+            copyHatMeta(sourceMeta, hatMeta);
+            hat.setItemMeta(hatMeta);
+        }
+        return hat;
+    }
+
+    private void copyHatMeta(ItemMeta source, ItemMeta target) {
+        if (source == null || target == null) {
+            return;
+        }
+        target.displayName(source.displayName());
+        target.lore(source.lore());
+        target.setUnbreakable(source.isUnbreakable());
+        target.addItemFlags(source.getItemFlags().toArray(new ItemFlag[0]));
+        target.setCustomModelData(source.hasCustomModelData() ? source.getCustomModelData() : null);
+        if (source.hasEnchants()) {
+            for (Map.Entry<Enchantment, Integer> entry : source.getEnchants().entrySet()) {
+                target.addEnchant(entry.getKey(), entry.getValue(), true);
+            }
+        }
+        if (source.hasAttributeModifiers()) {
+            target.setAttributeModifiers(source.getAttributeModifiers());
+        } else {
+            ItemMeta leatherDefaults = Bukkit.getItemFactory().getItemMeta(Material.LEATHER_HELMET);
+            if (leatherDefaults != null && leatherDefaults.hasAttributeModifiers()) {
+                target.setAttributeModifiers(leatherDefaults.getAttributeModifiers());
+            }
+        }
+    }
+
+    private EquipmentSlot resolveEquipSlot(Material material) {
+        if (material == null) {
+            return null;
+        }
+        if (material == Material.ELYTRA) {
+            return EquipmentSlot.CHEST;
+        }
+        if (material.name().endsWith("_HELMET") || material == Material.CARVED_PUMPKIN) {
+            return EquipmentSlot.HEAD;
+        }
+        if (material.name().endsWith("_CHESTPLATE")) {
+            return EquipmentSlot.CHEST;
+        }
+        if (material.name().endsWith("_LEGGINGS")) {
+            return EquipmentSlot.LEGS;
+        }
+        if (material.name().endsWith("_BOOTS")) {
+            return EquipmentSlot.FEET;
+        }
+        return null;
+    }
+
+    private boolean isPunchingStick(ItemStack item) {
+        if (item == null || item.getType() != Material.STICK) {
+            return false;
+        }
+        String id = ShopItemData.getId(item);
+        return id != null && id.equalsIgnoreCase("knockback_stick");
+    }
+
+    private String normalizeModelId(String modelId) {
+        if (modelId == null || modelId.isBlank()) {
+            return modelId;
+        }
+        String trimmed = modelId.trim();
+        if (trimmed.contains(":")) {
+            return trimmed;
+        }
+        return "om:" + trimmed;
     }
 
     protected ItemStack makeUnbreakable(ItemStack item) {

@@ -125,6 +125,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
    - stats DB
    - time capsule DB
    - karma DB
+   - skin selections
 4. Start lobby and parkour leaderboards.
 5. Construct `BedwarsSetupManager`.
 6. Register `/bw`.
@@ -152,6 +153,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
   - `BedwarsStatsService`
   - `TimeCapsuleService`
   - `BedwarsKarmaService`
+  - persistent BedWars skin selections
   - shared BedWars lobby world/spawn config
   - lobby/parkour leaderboards
   - temporary BedWars creator allowlist for setup access until restart
@@ -188,6 +190,7 @@ Implemented in `BedwarsCommand`.
 Public subcommands:
 - `/bw stats [user]`
 - `/bw quick_buy`
+- `/bw skins`
 
 Admin subcommands:
 - `/bw start`
@@ -273,6 +276,7 @@ Files:
 - `shop.yml`
 - `rotating-items.yml`
 - `custom-items.yml`
+- `skins.yml`
 - `../OmGames.db`
 
 ### 2.7 SQLite
