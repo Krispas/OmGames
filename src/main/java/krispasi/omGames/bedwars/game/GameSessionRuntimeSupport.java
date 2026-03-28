@@ -1111,7 +1111,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (material == Material.NETHERITE_SPEAR) {
             return applySkinForType(player, item, SKIN_TYPE.SPEAR);
         }
-        if (AXE_MATERIALS.contains(material)) {
+        if (material == Material.DIAMOND_AXE) {
             return applySkinForType(player, item, SKIN_TYPE.AXE);
         }
         if (material == Material.BOW) {

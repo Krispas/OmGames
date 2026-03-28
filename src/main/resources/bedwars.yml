@@ -41,8 +41,8 @@ match-events:
       radius-min: 2
       radius-max: 5
       missing-block-chance: 0.3
-      crate-chance: 0.05
-      spawn-height-above-ground: 60
+      crate-chance: 0.25
+      spawn-height-above-ground: 120
       explosion-power-multiplier: 1.0
 karma-events:
   check-min-seconds: 10

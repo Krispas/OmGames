@@ -5,15 +5,15 @@ package krispasi.omGames.bedwars.event;
  */
 public class BedwarsMoonBigConfig {
     private static final double DEFAULT_FALL_SPEED_BLOCKS_PER_SECOND = 3.0;
-    private static final int DEFAULT_START_INTERVAL_MIN_SECONDS = 60;
-    private static final int DEFAULT_START_INTERVAL_MAX_SECONDS = 90;
+    private static final int DEFAULT_START_INTERVAL_MIN_SECONDS = 15;
+    private static final int DEFAULT_START_INTERVAL_MAX_SECONDS = 30;
     private static final int DEFAULT_END_INTERVAL_MIN_SECONDS = 1;
-    private static final int DEFAULT_END_INTERVAL_MAX_SECONDS = 3;
+    private static final int DEFAULT_END_INTERVAL_MAX_SECONDS = 2;
     private static final int DEFAULT_RADIUS_MIN = 2;
-    private static final int DEFAULT_RADIUS_MAX = 5;
+    private static final int DEFAULT_RADIUS_MAX = 8;
     private static final double DEFAULT_MISSING_BLOCK_CHANCE = 0.30;
-    private static final double DEFAULT_CRATE_CHANCE = 0.05;
-    private static final int DEFAULT_SPAWN_HEIGHT_ABOVE_GROUND = 60;
+    private static final double DEFAULT_CRATE_CHANCE = 0.25;
+    private static final int DEFAULT_SPAWN_HEIGHT_ABOVE_GROUND = 120;
     private static final double DEFAULT_EXPLOSION_POWER_MULTIPLIER = 1.0;
 
     private final double fallSpeedBlocksPerSecond;
