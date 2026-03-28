@@ -862,14 +862,17 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             CustomItemDefinition custom = bedwarsManager.getCustomItemConfig().getItem(customId);
             if (custom == null || custom.getType() != CustomItemType.MAGIC_MILK) {
+                handlePotionBottleCleanup(event);
                 return;
             }
             int immunitySeconds = Math.max(0, custom.getLifetimeSeconds());
             if (immunitySeconds <= 0) {
+                handlePotionBottleCleanup(event);
                 return;
             }
             session.grantTrapImmunity(player.getUniqueId(), immunitySeconds);
             player.sendMessage(Component.text("Magic Milk activated! Trap immunity for " + immunitySeconds + "s.", NamedTextColor.AQUA));
+            handlePotionBottleCleanup(event);
         });
     }
 
@@ -2094,6 +2097,22 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 return;
             }
             event.setCancelled(true);
+            Location impact = event.getEntity().getLocation();
+            World world = impact.getWorld();
+            if (world != null) {
+                world.spawnParticle(Particle.EXPLOSION, impact, 1);
+                world.playSound(impact, Sound.ENTITY_GENERIC_EXPLODE, 1.4f, 1.0f);
+                double radius = 3.5;
+                for (org.bukkit.entity.Entity entity : world.getNearbyEntities(impact, radius, radius, radius)) {
+                    if (!(entity instanceof LivingEntity living)) {
+                        continue;
+                    }
+                    if (living instanceof Player player && player.getGameMode() == GameMode.SPECTATOR) {
+                        continue;
+                    }
+                    living.damage(12.0);
+                }
+            }
             if (session != null) {
                 session.clearTrackedKarmaAnvil(event.getEntity().getUniqueId());
             }
@@ -2115,6 +2134,56 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 return;
             }
             event.setCancelled(true);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGHEST)
+    public void onKarmaLightningDamage(EntityDamageByEntityEvent event) {
+        safeHandle("onKarmaLightningDamage", () -> {
+            if (!(event.getDamager() instanceof org.bukkit.entity.LightningStrike strike)) {
+                return;
+            }
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session == null || !session.isRunning()) {
+                return;
+            }
+            if (!session.isKarmaLightning(strike)) {
+                return;
+            }
+            if (!(event.getEntity() instanceof LivingEntity living)) {
+                return;
+            }
+            event.setCancelled(true);
+            double newHealth = living.getHealth() - 15.0;
+            if (newHealth <= 0.0) {
+                living.setHealth(0.0);
+            } else {
+                living.setHealth(newHealth);
+            }
+        });
+    }
+
+    private void handlePotionBottleCleanup(PlayerItemConsumeEvent event) {
+        ItemStack consumed = event.getItem();
+        if (consumed == null || consumed.getType() != Material.POTION) {
+            return;
+        }
+        Player player = event.getPlayer();
+        EquipmentSlot hand = event.getHand();
+        if (hand == null) {
+            return;
+        }
+        Bukkit.getScheduler().runTask(bedwarsManager.getPlugin(), () -> {
+            ItemStack held = hand == EquipmentSlot.OFF_HAND
+                    ? player.getInventory().getItemInOffHand()
+                    : player.getInventory().getItemInMainHand();
+            if (held != null && held.getType() == Material.GLASS_BOTTLE) {
+                if (hand == EquipmentSlot.OFF_HAND) {
+                    player.getInventory().setItemInOffHand(null);
+                } else {
+                    player.getInventory().setItemInMainHand(null);
+                }
+            }
         });
     }
 

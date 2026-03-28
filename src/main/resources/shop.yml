@@ -510,7 +510,7 @@ shop:
       amount: 1
       cost:
         material: IRON
-        amount: 30
+        amount: 64
       display-name: "Placeable Mine"
       lore:
         - "Explodes when an enemy"
