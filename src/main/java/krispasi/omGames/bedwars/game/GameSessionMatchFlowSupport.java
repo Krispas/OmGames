@@ -888,7 +888,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             return;
         }
         world.spawnParticle(Particle.FLAME, location, 6, 0.2, 0.2, 0.2, 0.01);
-        world.spawnParticle(Particle.SMOKE_LARGE, location, 3, 0.2, 0.2, 0.2, 0.01);
+        world.spawnParticle(Particle.SMOKE, location, 3, 0.2, 0.2, 0.2, 0.01);
     }
 
     protected void handleMoonBigAsteroidImpact(Location location, int radius, BedwarsMoonBigConfig config) {
