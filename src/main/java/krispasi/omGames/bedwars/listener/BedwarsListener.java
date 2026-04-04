@@ -3,6 +3,7 @@ package krispasi.omGames.bedwars.listener;
 import io.papermc.paper.event.player.PlayerArmSwingEvent;
 import io.papermc.paper.event.player.PrePlayerAttackEntityEvent;
 import krispasi.omGames.bedwars.BedwarsManager;
+import krispasi.omGames.bedwars.event.BedwarsMatchEventType;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.item.CustomItemConfig;
 import krispasi.omGames.bedwars.item.CustomItemData;
@@ -1632,6 +1633,12 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 }
                 if (session.hasRespawnProtection(player.getUniqueId())) {
                     event.setCancelled(true);
+                    return;
+                }
+                if (event.getCause() == EntityDamageEvent.DamageCause.FALL
+                        && session.getActiveMatchEvent() == BedwarsMatchEventType.MOON_BIG) {
+                    event.setCancelled(true);
+                    player.setFallDistance(0.0f);
                     return;
                 }
                 if (event.getCause() == EntityDamageEvent.DamageCause.FALL
