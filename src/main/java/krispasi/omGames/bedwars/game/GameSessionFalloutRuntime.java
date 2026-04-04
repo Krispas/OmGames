@@ -182,6 +182,11 @@ final class GameSessionFalloutRuntime {
         }
 
         private Double resolveDefaultValue(GameSession session, Player player) {
+            // Paper reports a higher native default here than BedWars uses for players.
+            // Keep Fallout aligned to the normal BedWars movement baseline on reset/rejoin.
+            if (this == MOVEMENT_SPEED) {
+                return fallbackDefault;
+            }
             if (session == null || player == null) {
                 return null;
             }
