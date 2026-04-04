@@ -141,6 +141,13 @@ custom-items:
   miracle_of_the_stars:
     type: MIRACLE_OF_THE_STARS
     material: NETHER_STAR
+  spinjitzu:
+    type: SPINJITZU
+    material: BLAZE_POWDER
+    lifetime-seconds: 10
+    damage: 3.0
+    speed: 0.02
+    range: 1.0
   tower_chest:
     type: TOWER_CHEST
     material: CHEST

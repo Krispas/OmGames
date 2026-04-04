@@ -81,6 +81,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -105,7 +106,9 @@ public class GameSession extends GameSessionMatchFlowSupport {
 
     public GameSession(BedwarsManager bedwarsManager, Arena arena) {
         super(bedwarsManager, arena);
+        this.moonBigAsteroidRuntime = new GameSessionMoonBigAsteroidRuntime(this, tasks);
         this.proximityMineRuntime = new GameSessionProximityMineRuntime(this, assignments, tasks);
+        this.spinjitzuRuntime = new GameSessionSpinjitzuRuntime(this, assignments, tasks);
         this.customItemRuntime = new GameSessionCustomItemRuntime(
                 this,
                 arena,
@@ -382,6 +385,9 @@ public class GameSession extends GameSessionMatchFlowSupport {
             return false;
         }
         Player player = Bukkit.getPlayer(playerId);
+        if (spinjitzuRuntime != null) {
+            spinjitzuRuntime.clear(playerId);
+        }
         assignments.remove(playerId);
         eliminatedPlayers.remove(playerId);
         pendingRespawns.remove(playerId);
@@ -943,9 +949,10 @@ public class GameSession extends GameSessionMatchFlowSupport {
         if (!isActive() || !isParticipant(player.getUniqueId()) || !isInArenaWorld(player.getWorld())) {
             return false;
         }
-        if (item != null && isShopItemBlockedByMatchEvent(item)) {
+        String blockedByMatchEventReason = getShopItemBlockedByMatchEventReason(item);
+        if (blockedByMatchEventReason != null) {
             player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
-            player.sendMessage(Component.text("This item is disabled by the current match event.", NamedTextColor.RED));
+            player.sendMessage(Component.text(blockedByMatchEventReason, NamedTextColor.RED));
             return false;
         }
         if (!isRotatingItemAvailable(item)) {
@@ -1004,20 +1011,13 @@ public class GameSession extends GameSessionMatchFlowSupport {
         if (!getRotatingItemCandidateIds().contains(item.getId())) {
             return false;
         }
-        if (isShopItemBlockedByMatchEvent(item)) {
+        if (getShopItemBlockedByMatchEventReason(item) != null) {
             return false;
         }
         if (suddenDeathActive && item.isDisabledAfterSuddenDeath()) {
             return false;
         }
         return grantPurchasedItem(player, item);
-    }
-
-    private boolean isShopItemBlockedByMatchEvent(ShopItemDefinition item) {
-        if (item == null || activeMatchEvent != BedwarsMatchEventType.IN_THIS_ECONOMY) {
-            return false;
-        }
-        return IN_THIS_ECONOMY_BANNED_ITEMS.contains(item.getId());
     }
 
     public boolean handleUpgradePurchase(Player player, TeamUpgradeType type) {
@@ -1434,8 +1434,16 @@ public class GameSession extends GameSessionMatchFlowSupport {
         return customItemRuntime.activateMiracleOfTheStars(player, custom, plugin);
     }
 
+    public boolean activateSpinjitzu(Player player, CustomItemDefinition custom) {
+        return spinjitzuRuntime != null && spinjitzuRuntime.activate(player, custom);
+    }
+
     public boolean activateSteelShell(Player player, CustomItemDefinition custom) {
         return customItemRuntime.activateSteelShell(player, custom, plugin);
+    }
+
+    public boolean isSpinjitzuDamageImmune(Player player, EntityDamageEvent.DamageCause cause) {
+        return spinjitzuRuntime != null && spinjitzuRuntime.isDamageImmune(player, cause);
     }
 
     public boolean activateTimeCapsule(Player player, ItemStack item, CustomItemDefinition custom) {

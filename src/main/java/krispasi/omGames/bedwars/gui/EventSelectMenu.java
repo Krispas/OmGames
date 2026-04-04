@@ -20,11 +20,12 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 /**
- * Inventory UI for forcing a specific match event before the game starts.
+ * Inventory UI for selecting the prestart match-event mode before the game starts.
  */
 public class EventSelectMenu implements InventoryHolder {
     private static final int INVENTORY_SIZE = 27;
     private static final int[] EVENT_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19};
+    private static final int FORCE_RANDOM_SLOT = 21;
     private static final int AUTO_SLOT = 22;
     private static final int BACK_SLOT = 26;
 
@@ -37,7 +38,7 @@ public class EventSelectMenu implements InventoryHolder {
         this.session = session;
         this.viewerId = viewer.getUniqueId();
         this.inventory = Bukkit.createInventory(this, INVENTORY_SIZE,
-                Component.text("Force Event", NamedTextColor.GOLD));
+                Component.text("Event Mode", NamedTextColor.GOLD));
         build();
     }
 
@@ -69,8 +70,17 @@ public class EventSelectMenu implements InventoryHolder {
             new TeamAssignMenu(session.getBedwarsManager(), session).open(player);
             return;
         }
+        if (slot == FORCE_RANDOM_SLOT) {
+            BedwarsMatchEventConfig config = session.getBedwarsManager().getMatchEventConfig();
+            if (config == null || !config.hasEligibleEvents()) {
+                return;
+            }
+            session.setForcedRandomMatchEvent(true);
+            new TeamAssignMenu(session.getBedwarsManager(), session).open(player);
+            return;
+        }
         if (slot == AUTO_SLOT) {
-            session.setForcedMatchEvent(null);
+            session.clearForcedMatchEventSelection();
             new TeamAssignMenu(session.getBedwarsManager(), session).open(player);
             return;
         }
@@ -88,6 +98,7 @@ public class EventSelectMenu implements InventoryHolder {
 
         BedwarsMatchEventConfig config = session.getBedwarsManager().getMatchEventConfig();
         BedwarsMatchEventType forced = session.getForcedMatchEvent();
+        boolean forcedRandom = session.isForcedRandomMatchEvent();
         BedwarsMatchEventType[] events = BedwarsMatchEventType.values();
         for (int i = 0; i < events.length && i < EVENT_SLOTS.length; i++) {
             BedwarsMatchEventType type = events[i];
@@ -95,7 +106,8 @@ public class EventSelectMenu implements InventoryHolder {
             inventory.setItem(slot, buildEventItem(type, config, forced == type));
             eventSlots.put(slot, type);
         }
-        inventory.setItem(AUTO_SLOT, buildAutoItem(config, forced == null));
+        inventory.setItem(FORCE_RANDOM_SLOT, buildForceRandomItem(config, forcedRandom));
+        inventory.setItem(AUTO_SLOT, buildAutoItem(config, forced == null && !forcedRandom));
         inventory.setItem(BACK_SLOT, buildBackItem());
     }
 
@@ -107,6 +119,24 @@ public class EventSelectMenu implements InventoryHolder {
         lore.add(Component.text(type.subtitle(), NamedTextColor.GRAY));
         lore.add(Component.text("Weight: " + weightFor(config, type), NamedTextColor.DARK_GRAY));
         lore.add(Component.text(selected ? "Forced for this match" : "Click to force this event",
+                selected ? NamedTextColor.GREEN : NamedTextColor.GRAY));
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack buildForceRandomItem(BedwarsMatchEventConfig config, boolean selected) {
+        ItemStack item = new ItemStack(selected ? Material.NETHER_STAR : Material.FIRE_CHARGE);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(Component.text("Force Random", selected ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+        List<Component> lore = new ArrayList<>();
+        if (config == null || !config.hasEligibleEvents()) {
+            lore.add(Component.text("No weighted events can roll right now", NamedTextColor.RED));
+        } else {
+            lore.add(Component.text("Chance: 100%", NamedTextColor.GRAY));
+            lore.add(Component.text("Uses the weighted event list", NamedTextColor.DARK_GRAY));
+        }
+        lore.add(Component.text(selected ? "Guaranteed random event for this match" : "Click to force a guaranteed random roll",
                 selected ? NamedTextColor.GREEN : NamedTextColor.GRAY));
         meta.lore(lore);
         item.setItemMeta(meta);

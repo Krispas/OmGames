@@ -24,6 +24,7 @@ public enum CustomItemType {
     GIGANTIFY_GRENADE(1.15, 0.0f, false, 0, 1, 0.0, 0.0, 6, -1.0, -1.0, -1.0, 0, 0),
     RAILGUN_BLAST(0.0, 0.0f, false, 0, 1, 1000.0, 0.0, 5, -1.0, -1.0, 75.0, 0, 0),
     MIRACLE_OF_THE_STARS(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
+    SPINJITZU(0.0, 0.0f, false, 0, 1, 3.0, 0.0, 10, -1.0, 0.02, 1.0, 0, 0),
     TOWER_CHEST(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     STEEL_SHELL(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 10, -1.0, -1.0, -1.0, 0, 0),
     PROXIMITY_MINE(0.0, 4.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),

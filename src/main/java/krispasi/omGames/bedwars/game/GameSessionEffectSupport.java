@@ -262,12 +262,15 @@ abstract class GameSessionEffectSupport {
     protected int grantedMatchParticipationPartyExp;
     protected boolean partyExpUnavailableLogged;
     protected boolean matchEventRollEnabled = true;
+    protected boolean forcedRandomMatchEvent;
     protected BedwarsMatchEventType forcedMatchEvent;
     protected BedwarsMatchEventType activeMatchEvent;
     protected Long previousWorldTime;
     protected Boolean previousDaylightCycle;
     protected GameSessionCustomItemRuntime customItemRuntime;
     protected GameSessionProximityMineRuntime proximityMineRuntime;
+    protected GameSessionSpinjitzuRuntime spinjitzuRuntime;
+    protected GameSessionMoonBigAsteroidRuntime moonBigAsteroidRuntime;
     protected GameSessionTimeCapsuleRuntime timeCapsuleRuntime;
     protected GameSessionKarmaRuntime karmaRuntime;
 

@@ -357,6 +357,7 @@ public class TeamAssignMenu implements InventoryHolder {
         boolean globallyEnabled = config != null && config.isEnabled();
         boolean enabled = globallyEnabled && session.isMatchEventRollEnabled();
         BedwarsMatchEventType forced = session.getForcedMatchEvent();
+        boolean forcedRandom = session.isForcedRandomMatchEvent();
         ItemStack item = new ItemStack(enabled ? Material.AMETHYST_SHARD : Material.BARRIER);
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text("Game Events", enabled ? NamedTextColor.GREEN : NamedTextColor.RED));
@@ -368,12 +369,20 @@ public class TeamAssignMenu implements InventoryHolder {
                     enabled ? NamedTextColor.GREEN : NamedTextColor.RED));
             if (forced != null) {
                 lore.add(Component.text("Mode: Forced - " + forced.displayName(), NamedTextColor.YELLOW));
+            } else if (forcedRandom) {
+                if (config.hasEligibleEvents()) {
+                    lore.add(Component.text("Mode: Forced random", NamedTextColor.YELLOW));
+                    lore.add(Component.text("Chance: 100%", NamedTextColor.DARK_GRAY));
+                } else {
+                    lore.add(Component.text("Mode: Forced random unavailable", NamedTextColor.RED));
+                    lore.add(Component.text("Weighted pool is empty", NamedTextColor.DARK_GRAY));
+                }
             } else if (config.hasEligibleEvents()) {
                 lore.add(Component.text("Mode: Auto random", NamedTextColor.GRAY));
                 lore.add(Component.text("Chance: " + formatChance(config.chancePercent()), NamedTextColor.DARK_GRAY));
             } else {
                 lore.add(Component.text("Mode: Auto pool empty", NamedTextColor.RED));
-                lore.add(Component.text("Right click to force an event", NamedTextColor.DARK_GRAY));
+                lore.add(Component.text("Right click to choose an event mode", NamedTextColor.DARK_GRAY));
             }
         }
         BedwarsMatchEventType active = session.getActiveMatchEvent();
@@ -382,7 +391,7 @@ public class TeamAssignMenu implements InventoryHolder {
         }
         lore.add(Component.text("Left click: toggle", NamedTextColor.GRAY));
         if (globallyEnabled) {
-            lore.add(Component.text("Right click: choose event", NamedTextColor.DARK_GRAY));
+            lore.add(Component.text("Right click: choose event mode", NamedTextColor.DARK_GRAY));
         }
         meta.lore(lore);
         item.setItemMeta(meta);

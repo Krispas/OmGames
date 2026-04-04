@@ -74,6 +74,18 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         return matchEventRollEnabled;
     }
 
+    public boolean isForcedRandomMatchEvent() {
+        return forcedRandomMatchEvent;
+    }
+
+    public void setForcedRandomMatchEvent(boolean forcedRandomMatchEvent) {
+        this.forcedRandomMatchEvent = forcedRandomMatchEvent;
+        if (forcedRandomMatchEvent) {
+            forcedMatchEvent = null;
+            matchEventRollEnabled = true;
+        }
+    }
+
     public BedwarsMatchEventType getForcedMatchEvent() {
         return forcedMatchEvent;
     }
@@ -81,8 +93,14 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
     public void setForcedMatchEvent(BedwarsMatchEventType forcedMatchEvent) {
         this.forcedMatchEvent = forcedMatchEvent;
         if (forcedMatchEvent != null) {
+            forcedRandomMatchEvent = false;
             matchEventRollEnabled = true;
         }
+    }
+
+    public void clearForcedMatchEventSelection() {
+        forcedRandomMatchEvent = false;
+        forcedMatchEvent = null;
     }
 
     public BedwarsMatchEventType getActiveMatchEvent() {
@@ -106,6 +124,24 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
             return new ShopCost(cost.material(), cost.amount() * IN_THIS_ECONOMY_PRICE_MULTIPLIER);
         }
         return cost;
+    }
+
+    public boolean isShopItemBlockedByMatchEvent(ShopItemDefinition item) {
+        return getShopItemBlockedByMatchEventReason(item) != null;
+    }
+
+    public String getShopItemBlockedByMatchEventReason(ShopItemDefinition item) {
+        if (item == null || activeMatchEvent == null) {
+            return null;
+        }
+        if (activeMatchEvent == BedwarsMatchEventType.MOON_BIG && item.getMaterial() == Material.MACE) {
+            return "Disabled during " + activeMatchEvent.displayName();
+        }
+        if (activeMatchEvent == BedwarsMatchEventType.IN_THIS_ECONOMY
+                && IN_THIS_ECONOMY_BANNED_ITEMS.contains(item.getId())) {
+            return "Disabled during " + activeMatchEvent.displayName();
+        }
+        return null;
     }
 
     public Material adjustGeneratedResourceMaterial(GeneratorType generatorType, Material baseMaterial) {
@@ -1207,10 +1243,12 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (item == null || item.getType() == Material.AIR) {
             return item;
         }
-        if (item.getType() == Material.CARVED_PUMPKIN) {
+        // Carved pumpkins intentionally hide wearers from the vanilla locator bar.
+        // Keep BedWars hats on a normal helmet base so cosmetic hats stay visible there.
+        if (item.getType() != Material.CARVED_PUMPKIN) {
             return item;
         }
-        ItemStack hat = new ItemStack(Material.CARVED_PUMPKIN, item.getAmount());
+        ItemStack hat = new ItemStack(Material.LEATHER_HELMET, item.getAmount());
         ItemMeta sourceMeta = item.getItemMeta();
         ItemMeta hatMeta = hat.getItemMeta();
         if (sourceMeta != null && hatMeta != null) {
@@ -1528,6 +1566,9 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
     public void handleWorldChange(Player player) {
         if (!isInArenaWorld(player.getWorld())) {
             clearElytraStrike(player, false, false);
+            if (spinjitzuRuntime != null) {
+                spinjitzuRuntime.clear(player.getUniqueId());
+            }
             clearUpgradeEffects(player);
         } else if (isParticipant(player.getUniqueId())) {
             applyTeamUpgrades(player, getTeam(player.getUniqueId()));
@@ -1553,6 +1594,9 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
             task.cancel();
         }
         clearElytraStrike(player, false, false);
+        if (spinjitzuRuntime != null) {
+            spinjitzuRuntime.clear(playerId);
+        }
         clearUpgradeEffects(player);
         if ((participant || sessionSpectator) && isInArenaWorld(player.getWorld())) {
             movePlayerToQuitLobby(player);

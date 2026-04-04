@@ -29,6 +29,7 @@ shop:
         time_capsule: 37
         woodoo_doll: 38
         riding_fireball: 39
+        spinjitzu: 40
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -368,6 +369,19 @@ shop:
           - "during April Fools."
         custom-item: riding_fireball
         max-carry-amount: 4
+      spinjitzu:
+        material: BLAZE_POWDER
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 2
+        display-name: "Spinjitzu"
+        lore:
+          - "Become an invulnerable"
+          - "fiery tornado for 10s."
+          - "Hover, climb, and burn"
+          - "nearby enemies on contact."
+        custom-item: spinjitzu
       thorns_upgrade:
         material: CACTUS
         amount: 1

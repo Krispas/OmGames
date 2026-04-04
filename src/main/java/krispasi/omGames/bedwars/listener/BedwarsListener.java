@@ -638,6 +638,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 case MIRACLE_OF_THE_STARS -> {
                     yield session.activateMiracleOfTheStars(player, custom);
                 }
+                case SPINJITZU -> {
+                    yield session.activateSpinjitzu(player, custom);
+                }
                 case UNSTABLE_TELEPORTATION_DEVICE -> {
                     yield session.activateUnstableTeleportationDevice(player, custom);
                 }
@@ -1469,6 +1472,10 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                     && session.hasRespawnProtection(attacker.getUniqueId())) {
                 session.removeRespawnProtection(attacker.getUniqueId());
             }
+            if (session.isSpinjitzuDamageImmune(victim, event.getCause())) {
+                event.setCancelled(true);
+                return;
+            }
             boolean sameTeamFireball = false;
             if (attacker != null
                     && session.isParticipant(attacker.getUniqueId())
@@ -1619,6 +1626,10 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             boolean participant = session.isParticipant(player.getUniqueId());
             if (participant) {
+                if (session.isSpinjitzuDamageImmune(player, event.getCause())) {
+                    event.setCancelled(true);
+                    return;
+                }
                 if (session.hasRespawnProtection(player.getUniqueId())) {
                     event.setCancelled(true);
                     return;
@@ -2143,11 +2154,8 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             event.setCancelled(true);
             double newHealth = living.getHealth() - 6.0;
-            if (newHealth <= 0.0) {
-                living.setHealth(0.0);
-            } else {
-                living.setHealth(newHealth);
-            }
+            double minimumHealth = Math.min(1.0, living.getMaxHealth());
+            living.setHealth(Math.max(minimumHealth, newHealth));
         });
     }
 

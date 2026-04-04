@@ -160,6 +160,7 @@ public class ShopMenu implements InventoryHolder {
             }
             display = applyLimitLore(display, item);
             display = applyCarryLimitLore(display, item);
+            display = applyMatchEventBlockLore(display, item);
             inventory.setItem(slot, display);
             itemSlots.put(slot, item);
         }
@@ -336,6 +337,30 @@ public class ShopMenu implements InventoryHolder {
             lore.add(Component.text("Can carry more: " + remaining,
                     remaining > 0 ? NamedTextColor.GREEN : NamedTextColor.RED));
         }
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack applyMatchEventBlockLore(ItemStack item, ShopItemDefinition definition) {
+        if (item == null || definition == null) {
+            return item;
+        }
+        String blockedReason = session.getShopItemBlockedByMatchEventReason(definition);
+        if (blockedReason == null || blockedReason.isBlank()) {
+            return item;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return item;
+        }
+        java.util.List<Component> lore = meta.lore();
+        if (lore == null) {
+            lore = new java.util.ArrayList<>();
+        } else {
+            lore = new java.util.ArrayList<>(lore);
+        }
+        lore.add(Component.text(blockedReason, NamedTextColor.RED));
         meta.lore(lore);
         item.setItemMeta(meta);
         return item;

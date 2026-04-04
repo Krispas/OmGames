@@ -58,6 +58,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionRuntimeSupport.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionMatchFlowSupport.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionCustomItemRuntime.java`
+- `src/main/java/krispasi/omGames/bedwars/game/GameSessionSpinjitzuRuntime.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionKarmaRuntime.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionProximityMineRuntime.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionTimeCapsuleRuntime.java`
@@ -416,12 +417,15 @@ Supported event ids:
 `april-fools` runtime note:
 - bridge egg should not launch a projectile; using it should instead pillar the user upward `30` blocks over time while building a vertical team-wool column under them
 - fireball should seat its thrower on the launched projectile and manual dismount attempts should be blocked while that fireball exists
+- the April Fools rotating-item override should auto-include both `bedrock` and `riding_fireball` when those rotating candidates exist
 
 `moon-big` runtime note:
 - use the gravity attribute for the low-gravity effect
 - set player gravity to `0.01` from the vanilla default `0.08`
 - do not use Feather Falling or Jump Boost as the event mechanic
 - players who disconnect during the event must have gravity reset on quit, and rejoining participants during the same running match must receive the event gravity again
+- moon-big asteroids should animate using temporary solid magma blocks instead of falling-block entities
+- moon-big asteroids should spawn from `y=300`
 - lock the world to nighttime and spawn falling asteroids that explode without block damage, leaving debris (basalt/deepslate/cobbled deepslate) and a rare loot crate barrel
 
 `in-this-economy` runtime note:
@@ -561,6 +565,7 @@ Supported `type` values:
 - `TIME_CAPSULE`
 - `UNSTABLE_TELEPORTATION_DEVICE`
 - `MIRACLE_OF_THE_STARS`
+- `SPINJITZU`
 - `TOWER_CHEST`
 - `STEEL_SHELL`
 
@@ -649,6 +654,13 @@ Behavior notes:
   - purchased as a held item
   - right-click activation recalls alive online teammates to base after 5 seconds
   - must fail once sudden death is active and cancel if sudden death begins during the windup
+- `SPINJITZU`
+  - purchased as a held rotating item using a `BLAZE_POWDER` icon
+  - right-click activation grants 10 seconds of spinjitzu, making the user immune to damage while active
+  - should raise the user's native `STEP_HEIGHT` so 2-block climbs stay smooth instead of faking the climb with teleports
+  - should add a small movement-speed bonus, keep the user hovering about `0.5` blocks above nearby ground, and render a roughly 3-block-tall fiery tornado around them
+  - enemy players inside the configured `range` should take `damage` once per second while touching that tornado
+  - cleanup must restore the player's previous movement speed and step height on death, quit, world/session exit, and natural expiry
 - `TOWER_CHEST`
   - chest deployable that builds a fixed wool tower aligned to player facing
   - uses team wool plus placed ladders, follows the fixed 7-layer popup-tower layout in `GameSession.TOWER_CHEST_LAYERS`, only fills air blocks inside the map, ignores anti-build placement restrictions, and removes the center chest shortly after placement
