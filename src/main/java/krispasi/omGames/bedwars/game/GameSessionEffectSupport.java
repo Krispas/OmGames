@@ -67,6 +67,8 @@ abstract class GameSessionEffectSupport {
     protected static final double DEFAULT_PLAYER_SCALE = 1.0;
     protected static final double SCALE_DOWN_TIER_ONE = 0.9;
     protected static final double SCALE_DOWN_TIER_TWO = 0.8;
+    protected static final double DEFAULT_PLAYER_MOVEMENT_SPEED = 0.1;
+    protected static final double DEFAULT_PLAYER_STEP_HEIGHT = 0.6;
     protected static final double DEFAULT_PLAYER_GRAVITY = 0.08;
     protected static final double APRIL_FOOLS_SCALE_MULTIPLIER = 0.5;
     protected static final double LONG_ARMS_RANGE_BONUS = 10.0;
@@ -1308,6 +1310,8 @@ abstract class GameSessionEffectSupport {
         if (resistance != null) {
             player.removePotionEffect(resistance);
         }
+        setAttributeToValue(player, DEFAULT_PLAYER_MOVEMENT_SPEED, "MOVEMENT_SPEED", "GENERIC_MOVEMENT_SPEED");
+        setAttributeToValue(player, DEFAULT_PLAYER_STEP_HEIGHT, "STEP_HEIGHT", "GENERIC_STEP_HEIGHT");
         resetAttributeToDefault(player, "BLOCK_INTERACTION_RANGE", "PLAYER_BLOCK_INTERACTION_RANGE");
         resetAttributeToDefault(player, "JUMP_STRENGTH", "GENERIC_JUMP_STRENGTH");
         setAttributeToValue(player, DEFAULT_PLAYER_GRAVITY, "GRAVITY", "GENERIC_GRAVITY");

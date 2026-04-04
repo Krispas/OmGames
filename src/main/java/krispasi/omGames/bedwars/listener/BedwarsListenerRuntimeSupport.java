@@ -42,6 +42,8 @@ import org.bukkit.util.Vector;
  */
 
 abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSupport {
+    protected static final double OUTSIDE_GAME_PLAYER_MOVEMENT_SPEED = 0.1;
+    protected static final double OUTSIDE_GAME_PLAYER_STEP_HEIGHT = 0.6;
 
     protected BedwarsListenerRuntimeSupport(BedwarsManager bedwarsManager) {
         super(bedwarsManager);
@@ -1198,6 +1200,7 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
         if (player.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
             return;
         }
+        resetOutsideGameMovementAttributes(player);
         player.setFoodLevel(20);
         player.setSaturation(20.0f);
         player.setExhaustion(0.0f);
@@ -1224,6 +1227,15 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
         player.setAllowFlight(false);
         player.setFlying(false);
         player.setGliding(false);
+        resetOutsideGameMovementAttributes(player);
+    }
+
+    protected void resetOutsideGameMovementAttributes(Player player) {
+        if (player == null) {
+            return;
+        }
+        applyAttributeValue(player, Attribute.MOVEMENT_SPEED, OUTSIDE_GAME_PLAYER_MOVEMENT_SPEED);
+        applyAttributeValue(player, Attribute.STEP_HEIGHT, OUTSIDE_GAME_PLAYER_STEP_HEIGHT);
     }
 
     protected ItemStack makeUnbreakable(ItemStack item) {

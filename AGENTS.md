@@ -271,6 +271,7 @@ High-signal rule APIs:
 
 BedWars runtime files live in:
 - `plugins/OmGames/Bedwars/`
+- `plugins/OmGames/Skins/`
 - `plugins/OmGames/OmGames.db`
 
 Files:
@@ -278,7 +279,7 @@ Files:
 - `shop.yml`
 - `rotating-items.yml`
 - `custom-items.yml`
-- `skins.yml`
+- `../Skins/bedwars.yml`
 - `../OmGames.db`
 
 ### 2.7 SQLite

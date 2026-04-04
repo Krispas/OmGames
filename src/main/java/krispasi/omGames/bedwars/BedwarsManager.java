@@ -56,6 +56,9 @@ import krispasi.omGames.bedwars.shop.ShopCategoryType;
  */
 public class BedwarsManager {
     private static final String DEFAULT_LOBBY_WORLD_NAME = "bedwars_lobby";
+    private static final String SHARED_SKINS_FOLDER = "Skins";
+    private static final String BEDWARS_SKINS_FILE = "bedwars.yml";
+    private static final String LEGACY_BEDWARS_SKINS_FILE = "skins.yml";
     private static final BlockPoint DEFAULT_LOBBY_SPAWN = new BlockPoint(0, 73, 0);
     private static final double DEFAULT_LEADERBOARD_X = 4.0;
     private static final double DEFAULT_LEADERBOARD_Y = 73.0;
@@ -165,7 +168,7 @@ public class BedwarsManager {
 
     public void loadSkins() {
         skinSelections.clear();
-        File file = getBedwarsConfigFile("skins.yml");
+        File file = resolveBedwarsSkinsLoadFile();
         if (!file.exists()) {
             return;
         }
@@ -933,7 +936,11 @@ public class BedwarsManager {
     }
 
     private void saveSkins() {
-        File file = getBedwarsConfigFile("skins.yml");
+        File file = getBedwarsSkinsFile();
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists()) {
+            parent.mkdirs();
+        }
         YamlConfiguration config = new YamlConfiguration();
         ConfigurationSection root = config.createSection("skins");
         for (Map.Entry<UUID, EnumMap<SKIN_TYPE, BedwarsSkinSelection>> entry : skinSelections.entrySet()) {
@@ -959,6 +966,19 @@ public class BedwarsManager {
         } catch (Exception ex) {
             plugin.getLogger().warning("Failed to save BedWars skins.yml: " + ex.getMessage());
         }
+    }
+
+    private File getBedwarsSkinsFile() {
+        return new File(new File(plugin.getDataFolder(), SHARED_SKINS_FOLDER), BEDWARS_SKINS_FILE);
+    }
+
+    private File resolveBedwarsSkinsLoadFile() {
+        File primary = getBedwarsSkinsFile();
+        if (primary.exists()) {
+            return primary;
+        }
+        File legacy = getBedwarsConfigFile(LEGACY_BEDWARS_SKINS_FILE);
+        return legacy.exists() ? legacy : primary;
     }
 
     private UUID parseUuid(String raw) {

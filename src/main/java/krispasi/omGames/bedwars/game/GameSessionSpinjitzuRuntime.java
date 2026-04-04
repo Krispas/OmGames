@@ -23,7 +23,6 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.util.Vector;
 
 final class GameSessionSpinjitzuRuntime {
     private static final double SPINJITZU_HOVER_HEIGHT = 1.5;
@@ -31,6 +30,10 @@ final class GameSessionSpinjitzuRuntime {
     private static final double SPINJITZU_STEP_HEIGHT = 2.0;
     // Multiplies custom-items.yml spinjitzu.speed to tune movement in one place.
     private static final double SPINJITZU_SPEED_MULTIPLIER = 20.0;
+    private static final double SPINJITZU_HOVER_SNAP_DELTA = 0.08;
+    private static final double SPINJITZU_HOVER_HARD_SNAP_DELTA = 1.5;
+    private static final double SPINJITZU_HOVER_ADJUST_FACTOR = 0.55;
+    private static final double SPINJITZU_HOVER_ADJUST_LIMIT = 0.22;
     private static final long SPINJITZU_DAMAGE_COOLDOWN_MILLIS = 1000L;
     private static final int SPINJITZU_SOUND_INTERVAL_TICKS = 8;
 
@@ -202,15 +205,20 @@ final class GameSessionSpinjitzuRuntime {
         }
         Location location = player.getLocation();
         double delta = targetY - location.getY();
-        if (Math.abs(delta) > 0.65) {
+        if (Math.abs(delta) <= SPINJITZU_HOVER_SNAP_DELTA) {
+            return;
+        }
+        if (Math.abs(delta) > SPINJITZU_HOVER_HARD_SNAP_DELTA) {
             Location adjusted = location.clone();
             adjusted.setY(targetY);
             player.teleport(adjusted);
             return;
         }
-        Vector velocity = player.getVelocity();
-        double verticalVelocity = Math.max(-0.18, Math.min(0.22, delta * 0.55));
-        player.setVelocity(new Vector(velocity.getX(), verticalVelocity, velocity.getZ()));
+        double step = Math.max(-SPINJITZU_HOVER_ADJUST_LIMIT,
+                Math.min(SPINJITZU_HOVER_ADJUST_LIMIT, delta * SPINJITZU_HOVER_ADJUST_FACTOR));
+        Location adjusted = location.clone();
+        adjusted.setY(location.getY() + step);
+        player.teleport(adjusted);
     }
 
     private Double resolveHoverTargetY(Player player) {

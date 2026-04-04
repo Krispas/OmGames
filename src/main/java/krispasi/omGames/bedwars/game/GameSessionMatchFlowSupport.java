@@ -1713,6 +1713,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         state = GameState.ENDING;
         removeTemporaryMapLobbyIsland();
         clearAllElytraStrikes(false);
+        if (spinjitzuRuntime != null) {
+            spinjitzuRuntime.reset();
+        }
         clearAbyssalRifts();
         clearEditors();
         releaseForcedChunks();
