@@ -137,7 +137,7 @@ final class GameSessionFalloutRuntime {
         FALL_DAMAGE_MULTIPLIER("fall_damage_multiplier", 0.2, 1.0, 0.0, 100.0),
         GRAVITY("gravity", 0.005, 0.08, 0.01, 0.1),
         KNOCKBACK_RESISTANCE("knockback_resistance", 0.1, 0.0, 0.0, 1.0),
-        MOVEMENT_SPEED("movement_speed", 0.03, 0.7, 0.0, 1024.0),
+        MOVEMENT_SPEED("movement_speed", 0.03, 0.1, 0.0, 1024.0),
         SAFE_FALL_DISTANCE("safe_fall_distance", 0.03, 3.0, 1.5, 1024.0),
         SCALE("scale", 0.01, 1.0, 0.0625, 16.0),
         SNEAKING_SPEED("sneaking_speed", 0.1, 0.3, 0.0, 1.0),

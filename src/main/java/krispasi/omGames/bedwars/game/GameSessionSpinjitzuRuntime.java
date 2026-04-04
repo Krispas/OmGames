@@ -29,6 +29,8 @@ final class GameSessionSpinjitzuRuntime {
     private static final double SPINJITZU_HOVER_HEIGHT = 1.5;
     private static final int SPINJITZU_SUPPORT_SEARCH_DEPTH = 4;
     private static final double SPINJITZU_STEP_HEIGHT = 2.0;
+    // Multiplies custom-items.yml spinjitzu.speed to tune movement in one place.
+    private static final double SPINJITZU_SPEED_MULTIPLIER = 20.0;
     private static final long SPINJITZU_DAMAGE_COOLDOWN_MILLIS = 1000L;
     private static final int SPINJITZU_SOUND_INTERVAL_TICKS = 8;
 
@@ -67,7 +69,7 @@ final class GameSessionSpinjitzuRuntime {
         AttributeInstance stepAttribute = player.getAttribute(Attribute.STEP_HEIGHT);
         Double previousSpeed = speedAttribute != null ? speedAttribute.getBaseValue() : null;
         Double previousStepHeight = stepAttribute != null ? stepAttribute.getBaseValue() : null;
-        double speedBonus = Math.max(0.0, custom.getSpeed());
+        double speedBonus = Math.max(0.0, custom.getSpeed() * SPINJITZU_SPEED_MULTIPLIER);
         if (speedAttribute != null && speedBonus > 0.0) {
             speedAttribute.setBaseValue(previousSpeed + speedBonus);
         }
