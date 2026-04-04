@@ -1298,6 +1298,9 @@ abstract class GameSessionEffectSupport {
         if (player == null) {
             return;
         }
+        if (falloutRuntime != null) {
+            falloutRuntime.clearPlayer(player);
+        }
         player.removePotionEffect(PotionEffectType.HASTE);
         player.removePotionEffect(PotionEffectType.REGENERATION);
         player.removePotionEffect(PotionEffectType.SPEED);
@@ -1317,9 +1320,6 @@ abstract class GameSessionEffectSupport {
         setAttributeToValue(player, DEFAULT_PLAYER_GRAVITY, "GRAVITY", "GENERIC_GRAVITY");
         resetAttributeToDefault(player, "MAX_HEALTH", "GENERIC_MAX_HEALTH");
         applyScale(player, DEFAULT_PLAYER_SCALE);
-        if (falloutRuntime != null) {
-            falloutRuntime.clearPlayer(player);
-        }
         clampPlayerHealthToMax(player);
     }
 

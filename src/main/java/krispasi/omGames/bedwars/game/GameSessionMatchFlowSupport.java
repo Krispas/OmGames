@@ -1232,6 +1232,8 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             player.setFlying(false);
             player.getInventory().clear();
             clearUpgradeEffects(player);
+            setAttributeToValue(player, DEFAULT_PLAYER_MOVEMENT_SPEED, "MOVEMENT_SPEED", "GENERIC_MOVEMENT_SPEED");
+            setAttributeToValue(player, DEFAULT_PLAYER_STEP_HEIGHT, "STEP_HEIGHT", "GENERIC_STEP_HEIGHT");
             giveStarterKit(player, team);
             applyPermanentItemsWithShield(player, team);
             grantRespawnProtection(player);
@@ -1240,7 +1242,13 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             respawnTasks.remove(player.getUniqueId());
             clearPendingDeathCredit(playerId);
             plugin.getServer().getScheduler().runTaskLater(plugin,
-                    () -> applyPermanentItemsWithShield(player, team),
+                    () -> {
+                        applyPermanentItemsWithShield(player, team);
+                        setAttributeToValue(player, DEFAULT_PLAYER_MOVEMENT_SPEED,
+                                "MOVEMENT_SPEED", "GENERIC_MOVEMENT_SPEED");
+                        setAttributeToValue(player, DEFAULT_PLAYER_STEP_HEIGHT,
+                                "STEP_HEIGHT", "GENERIC_STEP_HEIGHT");
+                    },
                     1L);
             if (beaconRevive) {
                 broadcast(Component.text(player.getName(), NamedTextColor.AQUA)
