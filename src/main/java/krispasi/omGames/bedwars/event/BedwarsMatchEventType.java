@@ -13,6 +13,7 @@ public enum BedwarsMatchEventType {
     LONG_ARMS("long-arms", "Long Arms!", "Your block reach is extended.", 3),
     MOON_BIG("moon-big", "MOON BIG!!!", "Jump like the moon owns you.", 3),
     BLOOD_MOON("blood-moon", "Blood Moon!", "The night bites back.", 2),
+    FALLOUT("fallout", "Fallout!", "Everyone is mutating.", 2),
     CHAOS("chaos", "Chaos!", "Everything is active and maxed out.", 2),
     IN_THIS_ECONOMY("in-this-economy", "In this economy?!", "The resources dried up.", 3),
     APRIL_FOOLS("april-fools", "April Fools!", "Something is very wrong.", 1);

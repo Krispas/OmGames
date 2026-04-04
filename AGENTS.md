@@ -58,6 +58,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionRuntimeSupport.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionMatchFlowSupport.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionCustomItemRuntime.java`
+- `src/main/java/krispasi/omGames/bedwars/game/GameSessionFalloutRuntime.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionSpinjitzuRuntime.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionKarmaRuntime.java`
 - `src/main/java/krispasi/omGames/bedwars/game/GameSessionProximityMineRuntime.java`
@@ -406,6 +407,7 @@ Supported event ids:
 - `long-arms`
 - `moon-big`
 - `blood-moon`
+- `fallout`
 - `chaos`
 - `in-this-economy`
 - `april-fools`
@@ -427,6 +429,11 @@ Supported event ids:
 - moon-big asteroids should animate using temporary solid magma blocks instead of falling-block entities
 - moon-big asteroids should spawn from `y=300`
 - lock the world to nighttime and spawn falling asteroids that explode without block damage, leaving debris (basalt/deepslate/cobbled deepslate) and a rare loot crate barrel
+
+`fallout` runtime note:
+- once per second, pick one shared attribute from the Fallout pool and change it up or down for every active participant by its configured step amount
+- Fallout uses one shared match-scoped value per attribute, so all participants always have the same current values and reconnecting players must receive those current values on rejoin
+- Fallout should reset its tracked attributes to their normal defaults on death-to-spectator transitions, quit, world/session exit, and match stop
 
 `in-this-economy` runtime note:
 - `fireball`, `bed_bug`, and `dream_defender` stay purchasable at `4x` their normal price

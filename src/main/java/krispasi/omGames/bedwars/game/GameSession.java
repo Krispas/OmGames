@@ -108,6 +108,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
         super(bedwarsManager, arena);
         this.moonBigAsteroidRuntime = new GameSessionMoonBigAsteroidRuntime(this, tasks);
         this.proximityMineRuntime = new GameSessionProximityMineRuntime(this, assignments, tasks);
+        this.falloutRuntime = new GameSessionFalloutRuntime(this, assignments, tasks);
         this.spinjitzuRuntime = new GameSessionSpinjitzuRuntime(this, assignments, tasks);
         this.customItemRuntime = new GameSessionCustomItemRuntime(
                 this,

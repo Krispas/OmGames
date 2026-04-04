@@ -177,6 +177,7 @@ public class EventSelectMenu implements InventoryHolder {
             case LONG_ARMS -> Material.STICK;
             case MOON_BIG -> Material.RABBIT_FOOT;
             case BLOOD_MOON -> Material.REDSTONE;
+            case FALLOUT -> Material.OMINOUS_BOTTLE;
             case CHAOS -> Material.FIREWORK_STAR;
             case IN_THIS_ECONOMY -> Material.IRON_INGOT;
             case APRIL_FOOLS -> Material.NOTE_BLOCK;

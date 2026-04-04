@@ -723,6 +723,12 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             tasks.add(task);
             return;
         }
+        if (activeMatchEvent == BedwarsMatchEventType.FALLOUT) {
+            if (falloutRuntime != null) {
+                falloutRuntime.start();
+            }
+            return;
+        }
         if (activeMatchEvent == BedwarsMatchEventType.APRIL_FOOLS) {
             BukkitTask task = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
                 World world = arena.getWorld();
@@ -1894,6 +1900,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         }
         if (proximityMineRuntime != null) {
             proximityMineRuntime.reset();
+        }
+        if (falloutRuntime != null) {
+            falloutRuntime.reset();
         }
         if (spinjitzuRuntime != null) {
             spinjitzuRuntime.reset();

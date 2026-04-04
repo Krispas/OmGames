@@ -269,6 +269,7 @@ abstract class GameSessionEffectSupport {
     protected Boolean previousDaylightCycle;
     protected GameSessionCustomItemRuntime customItemRuntime;
     protected GameSessionProximityMineRuntime proximityMineRuntime;
+    protected GameSessionFalloutRuntime falloutRuntime;
     protected GameSessionSpinjitzuRuntime spinjitzuRuntime;
     protected GameSessionMoonBigAsteroidRuntime moonBigAsteroidRuntime;
     protected GameSessionTimeCapsuleRuntime timeCapsuleRuntime;
@@ -967,8 +968,8 @@ abstract class GameSessionEffectSupport {
         if (upgrades.getTier(TeamUpgradeType.FIRE_ASPECT) > 0) {
             applyFireAspect(player);
         }
-        applyMatchEventEffects(player);
         applyScale(player, resolveEffectiveScale(upgrades.getTier(TeamUpgradeType.SCALE_DOWN)));
+        applyMatchEventEffects(player);
     }
 
     protected void applyProtection(Player player, int level) {
@@ -1100,6 +1101,11 @@ abstract class GameSessionEffectSupport {
                             true));
                 }
                 clampPlayerHealthToMax(player);
+            }
+            case FALLOUT -> {
+                if (falloutRuntime != null) {
+                    falloutRuntime.applyTo(player);
+                }
             }
             default -> {
             }
@@ -1307,6 +1313,9 @@ abstract class GameSessionEffectSupport {
         setAttributeToValue(player, DEFAULT_PLAYER_GRAVITY, "GRAVITY", "GENERIC_GRAVITY");
         resetAttributeToDefault(player, "MAX_HEALTH", "GENERIC_MAX_HEALTH");
         applyScale(player, DEFAULT_PLAYER_SCALE);
+        if (falloutRuntime != null) {
+            falloutRuntime.clearPlayer(player);
+        }
         clampPlayerHealthToMax(player);
     }
 
