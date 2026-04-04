@@ -236,6 +236,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         if (spinjitzuRuntime != null) {
             spinjitzuRuntime.clear(playerId);
         }
+        clearUpgradeEffects(player);
         clearCombat(playerId);
         clearTrapImmunity(playerId);
         removeRespawnProtection(playerId);
@@ -265,6 +266,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         }
         Location lobby = resolveMapLobbyLocation();
         if (getBedState(team) == BedState.DESTROYED && eliminatedPlayers.contains(playerId)) {
+            clearUpgradeEffects(player);
             setSpectator(player);
             if (lobby != null) {
                 player.teleport(lobby);
@@ -274,6 +276,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         if (!pendingRespawns.contains(playerId)) {
             return;
         }
+        clearUpgradeEffects(player);
         setSpectator(player);
         if (lobby != null) {
             player.teleport(lobby);
@@ -1213,6 +1216,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
                 }
                 eliminatedPlayers.add(playerId);
                 pendingRespawns.remove(playerId);
+                clearUpgradeEffects(player);
                 setSpectator(player);
                 removeRespawnProtection(playerId);
                 cancelRespawnCountdown(playerId);
@@ -1227,6 +1231,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             player.setAllowFlight(false);
             player.setFlying(false);
             player.getInventory().clear();
+            clearUpgradeEffects(player);
             giveStarterKit(player, team);
             applyPermanentItemsWithShield(player, team);
             grantRespawnProtection(player);

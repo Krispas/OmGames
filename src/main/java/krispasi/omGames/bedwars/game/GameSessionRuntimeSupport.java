@@ -1243,12 +1243,7 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (item == null || item.getType() == Material.AIR) {
             return item;
         }
-        // Carved pumpkins intentionally hide wearers from the vanilla locator bar.
-        // Keep BedWars hats on a normal helmet base so cosmetic hats stay visible there.
-        if (item.getType() != Material.CARVED_PUMPKIN) {
-            return item;
-        }
-        ItemStack hat = new ItemStack(Material.LEATHER_HELMET, item.getAmount());
+        ItemStack hat = new ItemStack(Material.CARVED_PUMPKIN, item.getAmount());
         ItemMeta sourceMeta = item.getItemMeta();
         ItemMeta hatMeta = hat.getItemMeta();
         if (sourceMeta != null && hatMeta != null) {
@@ -1275,9 +1270,9 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (source.hasAttributeModifiers()) {
             target.setAttributeModifiers(source.getAttributeModifiers());
         } else {
-            ItemMeta leatherDefaults = Bukkit.getItemFactory().getItemMeta(Material.LEATHER_HELMET);
-            if (leatherDefaults != null && leatherDefaults.hasAttributeModifiers()) {
-                target.setAttributeModifiers(leatherDefaults.getAttributeModifiers());
+            ItemMeta pumpkinDefaults = Bukkit.getItemFactory().getItemMeta(Material.CARVED_PUMPKIN);
+            if (pumpkinDefaults != null && pumpkinDefaults.hasAttributeModifiers()) {
+                target.setAttributeModifiers(pumpkinDefaults.getAttributeModifiers());
             }
         }
     }
