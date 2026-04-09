@@ -8,7 +8,7 @@ commands:
     usage: /bw start | /bw test start | /bw test_time_capsule view <user> [time_id] | /bw stop | /bw quick_buy | /bw stats | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <rotating_item> | /bw time_capsule view <user> [time_id] | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>
   egghunt:
     description: Egg Hunt event commands
-    usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt clear <near/all>
+    usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt start_test | /egghunt stop | /egghunt clear <near/all/scoreboard>
 permissions:
   omgames.bw.start:
     description: Allows opening the BedWars setup GUI

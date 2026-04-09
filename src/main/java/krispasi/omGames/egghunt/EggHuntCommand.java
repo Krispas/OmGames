@@ -51,6 +51,8 @@ public class EggHuntCommand implements CommandExecutor, TabCompleter {
                 result = eggHuntManager.setTimerSeconds(seconds);
             }
             case "start" -> result = eggHuntManager.start(player);
+            case "start_test" -> result = eggHuntManager.startTest(player);
+            case "stop" -> result = eggHuntManager.stop();
             case "clear" -> {
                 if (args.length < 2) {
                     sender.sendMessage(Component.text("Usage: /egghunt clear <near/all/scoreboard>", NamedTextColor.YELLOW));
@@ -85,7 +87,7 @@ public class EggHuntCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
             String input = args[0].toLowerCase(Locale.ROOT);
-            return Stream.of("add", "prepare", "timer", "start", "clear")
+            return Stream.of("add", "prepare", "timer", "start", "start_test", "stop", "clear")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -106,7 +108,7 @@ public class EggHuntCommand implements CommandExecutor, TabCompleter {
 
     private Component usage() {
         return Component.text(
-                "Usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt clear <near/all/scoreboard>",
+                "Usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt start_test | /egghunt stop | /egghunt clear <near/all/scoreboard>",
                 NamedTextColor.YELLOW
         );
     }

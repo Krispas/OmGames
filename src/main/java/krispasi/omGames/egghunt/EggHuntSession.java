@@ -49,6 +49,7 @@ public class EggHuntSession {
     private final LinkedHashMap<UUID, EggHuntPoint> activeEggs = new LinkedHashMap<>();
     private final ItemStack eggDisplayItem;
     private final int totalTimerSeconds;
+    private final boolean pickupEnabled;
     private BukkitTask countdownTask;
     private BukkitTask timerTask;
     private BukkitTask eggTask;
@@ -62,13 +63,15 @@ public class EggHuntSession {
             Location startLocation,
             Collection<Player> participants,
             List<EggHuntPoint> eggPoints,
-            int timerSeconds
+            int timerSeconds,
+            boolean pickupEnabled
     ) {
         this.manager = manager;
         this.plugin = manager.getPlugin();
         this.startLocation = startLocation.clone();
         this.eggPoints = new ArrayList<>(eggPoints);
         this.totalTimerSeconds = timerSeconds;
+        this.pickupEnabled = pickupEnabled;
         this.secondsRemaining = timerSeconds;
         this.eggDisplayItem = createEggDisplayItem();
         for (Player participant : participants) {
@@ -191,7 +194,9 @@ public class EggHuntSession {
                     return;
                 }
                 tickEggDisplays();
-                checkForCollections();
+                if (pickupEnabled) {
+                    checkForCollections();
+                }
             }
         }.runTaskTimer(plugin, 0L, COLLISION_INTERVAL_TICKS);
 
@@ -215,7 +220,11 @@ public class EggHuntSession {
             if (player == null) {
                 continue;
             }
-            player.sendMessage(Component.text("Egg Hunt started. Collect as many eggs as you can.", NamedTextColor.GOLD));
+            if (pickupEnabled) {
+                player.sendMessage(Component.text("Egg Hunt started. Collect as many eggs as you can.", NamedTextColor.GOLD));
+            } else {
+                player.sendMessage(Component.text("Egg Hunt test started. Eggs are visible but cannot be picked up.", NamedTextColor.GOLD));
+            }
         }
     }
 

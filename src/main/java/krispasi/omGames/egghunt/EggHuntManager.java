@@ -149,6 +149,28 @@ public class EggHuntManager {
     }
 
     public Result start(Player initiator) {
+        return startInternal(initiator, false);
+    }
+
+    public Result startTest(Player initiator) {
+        return startInternal(initiator, true);
+    }
+
+    public Result stop() {
+        if (activeSession == null) {
+            return new Result(false, "Egg Hunt is not running.");
+        }
+        stopActiveSession();
+        sidebarState = SidebarState.READY;
+        sidebarNames.clear();
+        sidebarScores.clear();
+        sidebarDisplaySeconds = timerSeconds;
+        sidebarEggsRemaining = savedPoints.size();
+        refreshSidebar();
+        return new Result(true, "Egg Hunt stopped.");
+    }
+
+    private Result startInternal(Player initiator, boolean testMode) {
         if (initiator == null || initiator.getWorld() == null) {
             return new Result(false, "Only a player in a loaded world can start Egg Hunt.");
         }
@@ -185,13 +207,17 @@ public class EggHuntManager {
                 startLocation,
                 participants,
                 selection.points(),
-                timerSeconds
+                timerSeconds,
+                !testMode
         );
         activeSession.start();
         refreshSidebar();
 
         String message = "Egg Hunt countdown started for " + participants.size()
                 + " players with " + selection.points().size() + " eggs.";
+        if (testMode) {
+            message += " Test mode is active: eggs cannot be picked up.";
+        }
         if (selection.skippedCount() > 0) {
             message += " Skipped " + selection.skippedCount()
                     + " points in unloaded chunks or beyond " + (int) MAX_EGG_DISTANCE + " blocks.";
