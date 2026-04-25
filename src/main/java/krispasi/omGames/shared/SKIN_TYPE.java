@@ -14,5 +14,6 @@ public enum SKIN_TYPE {
     BOOTS,
     ELYTRA,
     BOW,
-    HAT
+    HAT,
+    TCG_DECK
 }
