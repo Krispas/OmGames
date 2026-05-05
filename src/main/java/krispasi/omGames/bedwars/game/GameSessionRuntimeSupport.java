@@ -22,9 +22,12 @@ import org.bukkit.*;
 import org.bukkit.block.*;
 import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.type.Bed;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.*;
 import org.bukkit.inventory.*;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.meta.*;
 import org.bukkit.inventory.meta.components.EquippableComponent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -1275,6 +1278,44 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
                 target.setAttributeModifiers(pumpkinDefaults.getAttributeModifiers());
             }
         }
+        overrideWaypointTransmitRangeForHat(target);
+    }
+
+    private void overrideWaypointTransmitRangeForHat(ItemMeta meta) {
+        if (meta == null) {
+            return;
+        }
+        meta.removeAttributeModifier(Attribute.WAYPOINT_TRANSMIT_RANGE);
+        ItemMeta pumpkinDefaults = Bukkit.getItemFactory().getItemMeta(Material.CARVED_PUMPKIN);
+        Collection<AttributeModifier> defaultWaypointModifiers = pumpkinDefaults != null
+                ? pumpkinDefaults.getAttributeModifiers(Attribute.WAYPOINT_TRANSMIT_RANGE)
+                : null;
+        if (defaultWaypointModifiers != null && !defaultWaypointModifiers.isEmpty()) {
+            for (AttributeModifier modifier : defaultWaypointModifiers) {
+                if (modifier == null) {
+                    continue;
+                }
+                meta.addAttributeModifier(
+                        Attribute.WAYPOINT_TRANSMIT_RANGE,
+                        new AttributeModifier(
+                                modifier.getKey(),
+                                0.0D,
+                                AttributeModifier.Operation.MULTIPLY_SCALAR_1,
+                                modifier.getSlotGroup()
+                        )
+                );
+            }
+            return;
+        }
+        meta.addAttributeModifier(
+                Attribute.WAYPOINT_TRANSMIT_RANGE,
+                new AttributeModifier(
+                        NamespacedKey.minecraft("waypoint_transmit_range"),
+                        0.0D,
+                        AttributeModifier.Operation.MULTIPLY_SCALAR_1,
+                        EquipmentSlotGroup.HEAD
+                )
+        );
     }
 
     private EquipmentSlot resolveEquipSlot(Material material) {
