@@ -2001,6 +2001,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             if (killerId != null && !killerId.equals(player.getUniqueId())) {
                 session.addKill(killerId);
+                session.handleInThisEconomyKill(killerId, player.getUniqueId(), player.getLocation());
                 if (finalDeath) {
                     session.rewardFinalKill(killerId);
                 }

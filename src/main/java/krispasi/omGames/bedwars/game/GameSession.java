@@ -313,23 +313,36 @@ public class GameSession extends GameSessionMatchFlowSupport {
         }
         killCounts.merge(playerId, 1, Integer::sum);
         queuePartyExp(playerId, PARTY_EXP_KILL);
-        Player player = Bukkit.getPlayer(playerId);
-        if (player != null) {
-            rewardMatchEventKillResources(player);
-            updateSidebarForPlayer(player);
+        updateSidebarForPlayer(Bukkit.getPlayer(playerId));
+    }
+
+    public void handleInThisEconomyKill(UUID killerId, UUID victimId, Location dropLocation) {
+        if (activeMatchEvent != BedwarsMatchEventType.IN_THIS_ECONOMY || killerId == null || victimId == null) {
+            return;
         }
+        if (!isParticipant(killerId) || !isParticipant(victimId) || killerId.equals(victimId)) {
+            return;
+        }
+        int victimWorth = Math.max(IN_THIS_ECONOMY_MIN_BOUNTY,
+                inThisEconomyBounties.getOrDefault(victimId, IN_THIS_ECONOMY_MIN_BOUNTY));
+        int killerWorth = Math.max(IN_THIS_ECONOMY_MIN_BOUNTY,
+                inThisEconomyBounties.getOrDefault(killerId, IN_THIS_ECONOMY_MIN_BOUNTY));
+        inThisEconomyBounties.put(victimId, Math.max(IN_THIS_ECONOMY_MIN_BOUNTY, victimWorth - 1));
+        inThisEconomyBounties.put(killerId, Math.max(IN_THIS_ECONOMY_MIN_BOUNTY, killerWorth + 1));
+
+        Player killer = Bukkit.getPlayer(killerId);
+        if (killer != null && killer.isOnline() && isInArenaWorld(killer.getWorld())) {
+            giveItem(killer, new ItemStack(Material.DIAMOND, victimWorth));
+            giveItem(killer, new ItemStack(Material.EMERALD, victimWorth));
+        } else if (dropLocation != null && dropLocation.getWorld() != null) {
+            dropLocation.getWorld().dropItemNaturally(dropLocation, new ItemStack(Material.DIAMOND, victimWorth));
+            dropLocation.getWorld().dropItemNaturally(dropLocation, new ItemStack(Material.EMERALD, victimWorth));
+        }
+        updateSidebars();
     }
 
     public void rewardFinalKill(UUID playerId) {
         queuePartyExp(playerId, PARTY_EXP_FINAL_KILL);
-    }
-
-    private void rewardMatchEventKillResources(Player player) {
-        if (player == null || activeMatchEvent != BedwarsMatchEventType.IN_THIS_ECONOMY) {
-            return;
-        }
-        giveItem(player, new ItemStack(Material.DIAMOND));
-        giveItem(player, new ItemStack(Material.EMERALD));
     }
 
     public void finalizePartyExpRewards(TeamColor winner) {
@@ -400,6 +413,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
         shearsUnlocked.remove(playerId);
         shieldUnlocked.remove(playerId);
         killCounts.remove(playerId);
+        inThisEconomyBounties.remove(playerId);
         playerPurchaseCounts.remove(playerId);
         pendingDeathKillCredits.remove(playerId);
         lockedCommandSpectators.remove(playerId);
@@ -1039,7 +1053,14 @@ public class GameSession extends GameSessionMatchFlowSupport {
     }
 
     public boolean giveAdminRotatingItem(Player player, ShopItemDefinition item) {
+        return giveAdminRotatingItem(player, item, 1);
+    }
+
+    public boolean giveAdminRotatingItem(Player player, ShopItemDefinition item, int amount) {
         if (player == null || item == null) {
+            return false;
+        }
+        if (amount <= 0) {
             return false;
         }
         if (isLobby()) {
@@ -1060,7 +1081,25 @@ public class GameSession extends GameSessionMatchFlowSupport {
         if (suddenDeathActive && item.isDisabledAfterSuddenDeath()) {
             return false;
         }
-        return grantPurchasedItem(player, item);
+        for (int i = 0; i < amount; i++) {
+            if (!grantPurchasedItem(player, item)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean giveAdminRotatingItem(Player requester, Player target, ShopItemDefinition item, int amount) {
+        if (requester == null || target == null || item == null) {
+            return false;
+        }
+        if (!isParticipant(requester.getUniqueId()) || !isInArenaWorld(requester.getWorld())) {
+            return false;
+        }
+        if (!isParticipant(target.getUniqueId()) || !isInArenaWorld(target.getWorld())) {
+            return false;
+        }
+        return giveAdminRotatingItem(target, item, amount);
     }
 
     public boolean handleUpgradePurchase(Player player, TeamUpgradeType type) {

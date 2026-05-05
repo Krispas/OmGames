@@ -340,7 +340,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test_time_capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <rotating_item> | /bw time_capsule view <user> [time_id] | /bw quick_buy | /bw skins | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test_time_capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <player> <rotating_item> <amount> | /bw time_capsule view <user> [time_id] | /bw quick_buy | /bw skins | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -354,9 +354,22 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("give")) {
-            String input = normalizeRotatingGiveId(args[1]);
+            String input = args[1].toLowerCase(Locale.ROOT);
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(name -> name != null && name.toLowerCase(Locale.ROOT).startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("give")) {
+            String input = normalizeRotatingGiveId(args[2]);
             return getRotatingGiveCandidateIds(sender).stream()
                     .filter(option -> input == null || option.toLowerCase(Locale.ROOT).startsWith(input))
+                    .toList();
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("give")) {
+            String input = args[3].toLowerCase(Locale.ROOT);
+            return Stream.of("1", "2", "4", "8", "16", "32", "64")
+                    .filter(option -> option.startsWith(input))
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("time_capsule")) {
@@ -776,11 +789,27 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                     NamedTextColor.RED));
             return true;
         }
-        if (args.length < 2) {
-            sender.sendMessage(Component.text("Usage: /bw give <rotating_item>", NamedTextColor.YELLOW));
+        if (args.length < 4) {
+            sender.sendMessage(Component.text("Usage: /bw give <player> <rotating_item> <amount>", NamedTextColor.YELLOW));
             return true;
         }
-        String requestedId = String.join(" ", Arrays.copyOfRange(args, 1, args.length)).trim();
+        Player target = Bukkit.getPlayer(args[1]);
+        if (target == null) {
+            sender.sendMessage(Component.text("Player not found: " + args[1] + ".", NamedTextColor.RED));
+            return true;
+        }
+        int amount;
+        try {
+            amount = Integer.parseInt(args[3]);
+        } catch (NumberFormatException ex) {
+            sender.sendMessage(Component.text("Amount must be a positive number.", NamedTextColor.RED));
+            return true;
+        }
+        if (amount <= 0) {
+            sender.sendMessage(Component.text("Amount must be a positive number.", NamedTextColor.RED));
+            return true;
+        }
+        String requestedId = args[2];
         ShopItemDefinition definition = resolveRotatingGiveDefinition(requestedId);
         if (definition == null) {
             sender.sendMessage(Component.text("Unknown rotating item: " + requestedId + ".", NamedTextColor.RED));
@@ -790,11 +819,12 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("That rotating item is disabled after sudden death.", NamedTextColor.RED));
             return true;
         }
-        if (!session.giveAdminRotatingItem(player, definition)) {
+        if (!session.giveAdminRotatingItem(player, target, definition, amount)) {
             sender.sendMessage(Component.text("Could not give that rotating item right now.", NamedTextColor.RED));
             return true;
         }
-        sender.sendMessage(Component.text("Given " + describeRotatingGiveItem(definition) + ".", NamedTextColor.GREEN));
+        sender.sendMessage(Component.text("Given " + amount + "x " + describeRotatingGiveItem(definition)
+                + " to " + target.getName() + ".", NamedTextColor.GREEN));
         return true;
     }
 

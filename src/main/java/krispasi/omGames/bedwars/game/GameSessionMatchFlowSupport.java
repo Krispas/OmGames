@@ -510,6 +510,14 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         frozenPlayers.clear();
         matchStartMillis = System.currentTimeMillis();
         startCountdownRemaining = 0;
+        inThisEconomyBounties.clear();
+        if (activeMatchEvent == BedwarsMatchEventType.IN_THIS_ECONOMY) {
+            for (UUID playerId : assignments.keySet()) {
+                if (isParticipant(playerId)) {
+                    inThisEconomyBounties.put(playerId, IN_THIS_ECONOMY_MIN_BOUNTY);
+                }
+            }
+        }
         if (statsEnabled) {
             for (UUID playerId : assignments.keySet()) {
                 bedwarsManager.getStatsService().addGamePlayed(playerId);
@@ -1981,6 +1989,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         customItemRuntime.reset();
         disconnectedParticipants.clear();
         killCounts.clear();
+        inThisEconomyBounties.clear();
         pendingPartyExp.clear();
         teamPurchaseCounts.clear();
         playerPurchaseCounts.clear();

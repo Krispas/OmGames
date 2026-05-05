@@ -188,6 +188,7 @@ public class SkinSelectMenu implements InventoryHolder {
             case SWORD -> Material.DIAMOND_SWORD;
             case SPEAR -> Material.NETHERITE_SPEAR;
             case AXE -> Material.DIAMOND_AXE;
+            case PICKAXE -> Material.DIAMOND_PICKAXE;
             case HELMET -> Material.DIAMOND_HELMET;
             case CHESTPLATE -> Material.DIAMOND_CHESTPLATE;
             case LEGGINGS -> Material.DIAMOND_LEGGINGS;
@@ -205,6 +206,7 @@ public class SkinSelectMenu implements InventoryHolder {
             case SWORD -> "Sword";
             case SPEAR -> "Spear";
             case AXE -> "Axe";
+            case PICKAXE -> "Pickaxe";
             case HELMET -> "Helmet";
             case CHESTPLATE -> "Chestplate";
             case LEGGINGS -> "Leggings";

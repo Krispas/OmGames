@@ -83,12 +83,7 @@ abstract class GameSessionEffectSupport {
     protected static final Title.Times ALERT_TITLE_TIMES =
             DEFAULT_TITLE_TIMES;
     protected static final Set<String> IN_THIS_ECONOMY_BANNED_ITEMS = Set.of();
-    protected static final Set<String> IN_THIS_ECONOMY_PRICE_MULTIPLIED_ITEMS = Set.of(
-            "fireball",
-            "bed_bug",
-            "dream_defender"
-    );
-    protected static final int IN_THIS_ECONOMY_PRICE_MULTIPLIER = 4;
+    protected static final int IN_THIS_ECONOMY_MIN_BOUNTY = 1;
     protected static final List<TeamUpgradeType> BENEVOLENT_UPGRADE_POOL = List.of(
             TeamUpgradeType.PROTECTION,
             TeamUpgradeType.SHARPNESS,
@@ -212,6 +207,7 @@ abstract class GameSessionEffectSupport {
     protected final List<String> manualRotatingUpgradeIds = new ArrayList<>();
     protected RotatingSelectionMode rotatingMode = RotatingSelectionMode.AUTO;
     protected final Map<UUID, Integer> killCounts = new HashMap<>();
+    protected final Map<UUID, Integer> inThisEconomyBounties = new HashMap<>();
     protected final Map<UUID, Integer> pendingPartyExp = new HashMap<>();
     protected final Map<TeamColor, Map<String, Integer>> teamPurchaseCounts = new EnumMap<>(TeamColor.class);
     protected final Map<UUID, Map<String, Integer>> playerPurchaseCounts = new HashMap<>();

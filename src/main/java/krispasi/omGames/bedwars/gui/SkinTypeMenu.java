@@ -35,6 +35,7 @@ public class SkinTypeMenu implements InventoryHolder {
             SKIN_TYPE.SWORD,
             SKIN_TYPE.SPEAR,
             SKIN_TYPE.AXE,
+            SKIN_TYPE.PICKAXE,
             SKIN_TYPE.LEGGINGS,
             SKIN_TYPE.BOOTS,
             SKIN_TYPE.ELYTRA,
@@ -171,6 +172,7 @@ public class SkinTypeMenu implements InventoryHolder {
             case SWORD -> Material.DIAMOND_SWORD;
             case SPEAR -> Material.NETHERITE_SPEAR;
             case AXE -> Material.DIAMOND_AXE;
+            case PICKAXE -> Material.DIAMOND_PICKAXE;
             case LEGGINGS -> Material.DIAMOND_LEGGINGS;
             case BOOTS -> Material.DIAMOND_BOOTS;
             case ELYTRA -> Material.ELYTRA;
@@ -186,6 +188,7 @@ public class SkinTypeMenu implements InventoryHolder {
             case SWORD -> "Swords";
             case SPEAR -> "Spears";
             case AXE -> "Axes";
+            case PICKAXE -> "Pickaxes";
             case LEGGINGS -> "Leggings";
             case BOOTS -> "Boots";
             case ELYTRA -> "Elytra";

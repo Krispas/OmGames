@@ -2,6 +2,7 @@ package krispasi.omGames.bedwars.game;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.Comparator;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import krispasi.omGames.bedwars.BedwarsManager;
@@ -124,10 +125,6 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         }
         if (activeMatchEvent == BedwarsMatchEventType.CHAOS) {
             return resolveChaosShopCost("item:" + item.getId());
-        }
-        if (activeMatchEvent == BedwarsMatchEventType.IN_THIS_ECONOMY
-                && IN_THIS_ECONOMY_PRICE_MULTIPLIED_ITEMS.contains(item.getId())) {
-            return new ShopCost(cost.material(), cost.amount() * IN_THIS_ECONOMY_PRICE_MULTIPLIER);
         }
         return cost;
     }
@@ -1203,6 +1200,9 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (material == Material.DIAMOND_AXE) {
             return applySkinForType(player, item, SKIN_TYPE.AXE);
         }
+        if (material == Material.DIAMOND_PICKAXE) {
+            return applySkinForType(player, item, SKIN_TYPE.PICKAXE);
+        }
         if (material == Material.BOW) {
             return applySkinForType(player, item, SKIN_TYPE.BOW);
         }
@@ -2072,6 +2072,28 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         TeamColor playerTeam = getTeam(player.getUniqueId());
         for (TeamColor team : teamsInMatch) {
             lines.add(buildTeamLine(team, playerTeam));
+        }
+
+        if (activeMatchEvent == BedwarsMatchEventType.IN_THIS_ECONOMY) {
+            lines.add(ChatColor.DARK_GRAY + "    ");
+            lines.add(ChatColor.YELLOW + "Bounties");
+            List<Player> bountyPlayers = new ArrayList<>();
+            for (UUID participantId : assignments.keySet()) {
+                Player participant = Bukkit.getPlayer(participantId);
+                if (participant == null || !participant.isOnline() || !isParticipant(participantId)) {
+                    continue;
+                }
+                bountyPlayers.add(participant);
+            }
+            bountyPlayers.sort(Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
+            for (Player participant : bountyPlayers) {
+                UUID participantId = participant.getUniqueId();
+                int bounty = Math.max(IN_THIS_ECONOMY_MIN_BOUNTY,
+                        inThisEconomyBounties.getOrDefault(participantId, IN_THIS_ECONOMY_MIN_BOUNTY));
+                TeamColor team = getTeam(participantId);
+                ChatColor color = team != null ? team.chatColor() : ChatColor.WHITE;
+                lines.add(color + participant.getName() + ChatColor.GRAY + ": " + ChatColor.AQUA + bounty);
+            }
         }
 
         lines.add(ChatColor.DARK_GRAY + "   ");
