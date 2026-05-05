@@ -9,31 +9,21 @@ import krispasi.omGames.bedwars.item.CustomItemDefinition;
 import krispasi.omGames.bedwars.model.TeamColor;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Bukkit;
-import org.bukkit.GameMode;
-import org.bukkit.Location;
-import org.bukkit.Particle;
-import org.bukkit.Sound;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
 final class GameSessionSpinjitzuRuntime {
-    private static final double SPINJITZU_HOVER_HEIGHT = 1.5;
-    private static final int SPINJITZU_SUPPORT_SEARCH_DEPTH = 4;
     private static final double SPINJITZU_STEP_HEIGHT = 2.0;
-    // Multiplies custom-items.yml spinjitzu.speed to tune movement in one place.
-    private static final double SPINJITZU_SPEED_MULTIPLIER = 20.0;
-    private static final double SPINJITZU_HOVER_SNAP_DELTA = 0.08;
-    private static final double SPINJITZU_HOVER_HARD_SNAP_DELTA = 1.5;
-    private static final double SPINJITZU_HOVER_ADJUST_FACTOR = 0.55;
-    private static final double SPINJITZU_HOVER_ADJUST_LIMIT = 0.22;
+    private static final double SPINJITZU_HORIZONTAL_SPEED_MULTIPLIER = 20.0;
+    private static final double SPINJITZU_MIN_HORIZONTAL_SPEED = 0.3;
+    private static final double SPINJITZU_MAX_HORIZONTAL_SPEED = 1.2;
     private static final long SPINJITZU_DAMAGE_COOLDOWN_MILLIS = 1000L;
     private static final int SPINJITZU_SOUND_INTERVAL_TICKS = 8;
 
@@ -72,7 +62,7 @@ final class GameSessionSpinjitzuRuntime {
         AttributeInstance stepAttribute = player.getAttribute(Attribute.STEP_HEIGHT);
         Double previousSpeed = speedAttribute != null ? speedAttribute.getBaseValue() : null;
         Double previousStepHeight = stepAttribute != null ? stepAttribute.getBaseValue() : null;
-        double speedBonus = Math.max(0.0, custom.getSpeed() * SPINJITZU_SPEED_MULTIPLIER);
+        double speedBonus = Math.max(0.0, custom.getSpeed());
         if (speedAttribute != null && speedBonus > 0.0) {
             speedAttribute.setBaseValue(previousSpeed + speedBonus);
         }
@@ -80,11 +70,13 @@ final class GameSessionSpinjitzuRuntime {
             stepAttribute.setBaseValue(Math.max(previousStepHeight, SPINJITZU_STEP_HEIGHT));
         }
 
-        snapToHoverHeight(player);
         player.setFallDistance(0.0f);
         player.playSound(player.getLocation(), Sound.ITEM_FIRECHARGE_USE, 0.9f, 0.7f);
 
-        SpinjitzuState state = new SpinjitzuState(previousSpeed, previousStepHeight);
+        SpinjitzuState state = new SpinjitzuState(
+                previousSpeed,
+                previousStepHeight,
+                resolveHorizontalSpeed(custom));
         activeStates.put(playerId, state);
 
         long durationTicks = Math.max(1L, custom.getLifetimeSeconds() > 0 ? custom.getLifetimeSeconds() * 20L : 200L);
@@ -104,7 +96,7 @@ final class GameSessionSpinjitzuRuntime {
                     cancel();
                     return;
                 }
-                maintainHover(activePlayer);
+                applyHorizontalVelocity(activePlayer, current);
                 activePlayer.setFallDistance(0.0f);
                 activePlayer.setFireTicks(0);
                 spawnTornadoParticles(activePlayer, elapsedTicks);
@@ -182,67 +174,26 @@ final class GameSessionSpinjitzuRuntime {
                 && !session.isEliminated(player.getUniqueId());
     }
 
-    private void snapToHoverHeight(Player player) {
-        if (player == null) {
-            return;
+    private double resolveHorizontalSpeed(CustomItemDefinition custom) {
+        if (custom == null) {
+            return SPINJITZU_MIN_HORIZONTAL_SPEED;
         }
-        Double targetY = resolveHoverTargetY(player);
-        if (targetY == null) {
-            return;
-        }
-        Location location = player.getLocation();
-        location.setY(targetY);
-        player.teleport(location);
+        double configured = Math.max(0.0, custom.getSpeed()) * SPINJITZU_HORIZONTAL_SPEED_MULTIPLIER;
+        return Math.max(SPINJITZU_MIN_HORIZONTAL_SPEED, Math.min(SPINJITZU_MAX_HORIZONTAL_SPEED, configured));
     }
 
-    private void maintainHover(Player player) {
-        if (player == null) {
+    private void applyHorizontalVelocity(Player player, SpinjitzuState state) {
+        if (player == null || state == null) {
             return;
         }
-        Double targetY = resolveHoverTargetY(player);
-        if (targetY == null) {
+        Vector look = player.getLocation().getDirection();
+        look.setY(0.0);
+        if (look.lengthSquared() < 0.000001) {
             return;
         }
-        Location location = player.getLocation();
-        double delta = targetY - location.getY();
-        if (Math.abs(delta) <= SPINJITZU_HOVER_SNAP_DELTA) {
-            return;
-        }
-        if (Math.abs(delta) > SPINJITZU_HOVER_HARD_SNAP_DELTA) {
-            Location adjusted = location.clone();
-            adjusted.setY(targetY);
-            player.teleport(adjusted);
-            return;
-        }
-        double step = Math.max(-SPINJITZU_HOVER_ADJUST_LIMIT,
-                Math.min(SPINJITZU_HOVER_ADJUST_LIMIT, delta * SPINJITZU_HOVER_ADJUST_FACTOR));
-        Location adjusted = location.clone();
-        adjusted.setY(location.getY() + step);
-        player.teleport(adjusted);
-    }
-
-    private Double resolveHoverTargetY(Player player) {
-        Block support = findSupportBlock(player);
-        return support != null ? support.getY() + SPINJITZU_HOVER_HEIGHT : null;
-    }
-
-    private Block findSupportBlock(Player player) {
-        if (player == null) {
-            return null;
-        }
-        World world = player.getWorld();
-        Location location = player.getLocation();
-        int x = location.getBlockX();
-        int z = location.getBlockZ();
-        int startY = Math.min(world.getMaxHeight() - 1, (int) Math.floor(location.getY() - 0.01));
-        int endY = Math.max(world.getMinHeight(), startY - SPINJITZU_SUPPORT_SEARCH_DEPTH);
-        for (int y = startY; y >= endY; y--) {
-            Block block = world.getBlockAt(x, y, z);
-            if (!block.isPassable()) {
-                return block;
-            }
-        }
-        return null;
+        Vector horizontal = look.normalize().multiply(state.horizontalSpeed());
+        Vector current = player.getVelocity();
+        player.setVelocity(new Vector(horizontal.getX(), current.getY(), horizontal.getZ()));
     }
 
     private void damageNearbyEnemies(Player player, SpinjitzuState state, CustomItemDefinition custom) {
@@ -306,12 +257,14 @@ final class GameSessionSpinjitzuRuntime {
     private static final class SpinjitzuState {
         private final Double previousSpeed;
         private final Double previousStepHeight;
+        private final double horizontalSpeed;
         private final Map<UUID, Long> nextDamageTimes = new HashMap<>();
         private BukkitTask task;
 
-        private SpinjitzuState(Double previousSpeed, Double previousStepHeight) {
+        private SpinjitzuState(Double previousSpeed, Double previousStepHeight, double horizontalSpeed) {
             this.previousSpeed = previousSpeed;
             this.previousStepHeight = previousStepHeight;
+            this.horizontalSpeed = horizontalSpeed;
         }
 
         private Double previousSpeed() {
@@ -320,6 +273,10 @@ final class GameSessionSpinjitzuRuntime {
 
         private Double previousStepHeight() {
             return previousStepHeight;
+        }
+
+        private double horizontalSpeed() {
+            return horizontalSpeed;
         }
 
         private BukkitTask task() {

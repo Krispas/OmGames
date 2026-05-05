@@ -35,6 +35,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 - Prefer native Bukkit/Paper APIs; only use reflection when no public API exists and the cost is justified.
 - Do not touch `OmVeinsAPI`.
 - Do not use `OmVeinsAPI` during server startup.
+- If you copy Bukkit/Paper or similar external reference files into the repo for implementation reference, delete those copied reference files before finishing.
 
 ## 2) BedWars
 
