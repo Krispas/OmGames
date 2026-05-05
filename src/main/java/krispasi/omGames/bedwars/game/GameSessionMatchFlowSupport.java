@@ -859,11 +859,17 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         int centerX = impact.getBlockX();
         int centerY = impact.getBlockY();
         int centerZ = impact.getBlockZ();
+        double crateRoll = ThreadLocalRandom.current().nextDouble();
+        double crateChance = config.crateChance();
+        boolean spawnCrate = crateRoll < crateChance;
         double missingChance = config.missingBlockChance();
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dy = -radius; dy <= radius; dy++) {
                 for (int dz = -radius; dz <= radius; dz++) {
                     if (dx * dx + dy * dy + dz * dz > radius * radius) {
+                        continue;
+                    }
+                    if (spawnCrate && dx == 0 && dy == 0 && dz == 0) {
                         continue;
                     }
                     if (ThreadLocalRandom.current().nextDouble() < missingChance) {
@@ -883,18 +889,32 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
                 }
             }
         }
-        if (ThreadLocalRandom.current().nextDouble() < config.crateChance()) {
-            placeMoonBigAsteroidCrate(world, centerX, centerY, centerZ);
+        if (spawnCrate) {
+            Block crateBlock = placeMoonBigAsteroidCrate(world, centerX, centerY, centerZ);
+            if (crateBlock != null) {
+                broadcast(Component.text(
+                        "Asteroid crate spawned at "
+                                + crateBlock.getX() + ", "
+                                + crateBlock.getY() + ", "
+                                + crateBlock.getZ(),
+                        NamedTextColor.GOLD));
+            }
+        } else {
+            broadcast(Component.text(
+                    "Asteroid crate not spawned: roll=" + String.format(Locale.US, "%.4f", crateRoll)
+                            + " chance=" + String.format(Locale.US, "%.4f", crateChance),
+                    NamedTextColor.GRAY));
         }
     }
 
-    protected void placeMoonBigAsteroidCrate(World world, int centerX, int centerY, int centerZ) {
+    protected Block placeMoonBigAsteroidCrate(World world, int centerX, int centerY, int centerZ) {
         if (world == null) {
-            return;
+            return null;
         }
-        Block crateBlock = world.getBlockAt(centerX, centerY, centerZ);
-        if (!crateBlock.getType().isAir()) {
-            return;
+        int clampedY = Math.max(world.getMinHeight(), Math.min(world.getMaxHeight() - 1, centerY));
+        Block crateBlock = world.getBlockAt(centerX, clampedY, centerZ);
+        if (placedBlocks.contains(new BlockPoint(crateBlock.getX(), crateBlock.getY(), crateBlock.getZ()))) {
+            placedBlocks.remove(new BlockPoint(crateBlock.getX(), crateBlock.getY(), crateBlock.getZ()));
         }
         crateBlock.setType(Material.BARREL, false);
         placedBlocks.add(new BlockPoint(crateBlock.getX(), crateBlock.getY(), crateBlock.getZ()));
@@ -904,6 +924,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             fillMoonBigAsteroidCrate(barrel);
             barrel.update();
         }
+        return crateBlock;
     }
 
     protected void fillMoonBigAsteroidCrate(Barrel barrel) {

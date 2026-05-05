@@ -134,21 +134,22 @@ final class GameSessionMoonBigAsteroidRuntime {
                     for (int step = 0; step < ASTEROID_SUB_STEPS; step++) {
                         double nextY = currentY - speedPerStep;
                         if (nextY <= world.getMinHeight()) {
+                            clearCurrentAsteroid();
                             session.handleMoonBigAsteroidImpact(
                                     new Location(world, centerX + 0.5, currentY, centerZ + 0.5),
                                     radius,
                                     config);
-                            clearCurrentAsteroid();
                             cancel();
                             return;
                         }
                         Set<BlockPoint> nextPositions = resolveAsteroidBlocks(centerX, nextY, centerZ, offsets);
                         BlockPoint collisionPoint = findCollisionPoint(world, nextPositions, currentPositions, groundY);
                         if (collisionPoint != null) {
-                            session.handleMoonBigAsteroidImpact(resolveImpactLocation(world, collisionPoint),
+                            clearCurrentAsteroid();
+                            session.handleMoonBigAsteroidImpact(
+                                    new Location(world, centerX + 0.5, currentY - 1.0, centerZ + 0.5),
                                     radius,
                                     config);
-                            clearCurrentAsteroid();
                             cancel();
                             return;
                         }
