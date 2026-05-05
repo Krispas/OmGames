@@ -1085,12 +1085,11 @@ public class GameSession extends GameSessionMatchFlowSupport {
         }
         TeamUpgradeState state = getUpgradeState(team);
         int currentTier = state.getTier(type);
-        int cost = type.nextCost(currentTier);
-        if (cost < 0) {
+        ShopCost shopCost = getEffectiveUpgradeCost(type, currentTier);
+        if (shopCost == null || !shopCost.isValid()) {
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             return false;
         }
-        ShopCost shopCost = new ShopCost(Material.DIAMOND, cost);
         if (!hasResources(player, shopCost)) {
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             return false;
@@ -1126,12 +1125,11 @@ public class GameSession extends GameSessionMatchFlowSupport {
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             return false;
         }
-        int cost = getTrapCost(team, trap);
-        if (cost < 0) {
+        ShopCost shopCost = getEffectiveTrapCost(team, trap);
+        if (shopCost == null || !shopCost.isValid()) {
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             return false;
         }
-        ShopCost shopCost = new ShopCost(Material.DIAMOND, cost);
         if (!hasResources(player, shopCost)) {
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
             return false;
@@ -1237,19 +1235,23 @@ public class GameSession extends GameSessionMatchFlowSupport {
     }
 
     public int getTrapCost(TeamColor team, TrapType trap) {
+        ShopCost effectiveCost = getEffectiveTrapCost(team, trap);
+        return effectiveCost == null ? -1 : effectiveCost.amount();
+    }
+
+    public ShopCost getEffectiveTrapCost(TeamColor team, TrapType trap) {
         if (team == null || trap == null) {
-            return -1;
+            return null;
         }
         TeamUpgradeState state = getUpgradeState(team);
         int count = state.getTrapCount();
         if (count >= TRAP_MAX_COUNT) {
-            return -1;
+            return null;
         }
         if (trap.oneTimePurchase() && state.hasPurchasedTrap(trap)) {
-            return -1;
+            return null;
         }
-        int baseCost = trap.baseCost(getMaxTeamSize());
-        return baseCost * (1 << count);
+        return getEffectiveTrapCost(trap, count);
     }
 
     public List<TrapType> getActiveTraps(TeamColor team) {

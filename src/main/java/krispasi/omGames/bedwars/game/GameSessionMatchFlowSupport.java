@@ -613,13 +613,6 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
     }
 
     protected void applyMatchEventRotatingOverrides() {
-        if (activeMatchEvent == BedwarsMatchEventType.CHAOS) {
-            rotatingItemIds.clear();
-            rotatingUpgradeIds.clear();
-            rotatingItemIds.addAll(getRotatingItemCandidateIds());
-            rotatingUpgradeIds.addAll(getRotatingUpgradeCandidateIds());
-            return;
-        }
         if (activeMatchEvent != BedwarsMatchEventType.APRIL_FOOLS) {
             return;
         }
@@ -2011,6 +2004,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         pendingDeathKillCredits.clear();
         lockedCommandSpectators.clear();
         benevolentEventUpgrades.clear();
+        chaosShopCosts.clear();
         trapImmunityEnds.clear();
         trapImmunityTasks.clear();
         suddenDeathActive = false;

@@ -232,6 +232,7 @@ abstract class GameSessionEffectSupport {
     protected final Set<UUID> shearsUnlocked = new HashSet<>();
     protected final Set<UUID> shieldUnlocked = new HashSet<>();
     protected final List<TeamUpgradeType> benevolentEventUpgrades = new ArrayList<>();
+    protected final Map<String, ShopCost> chaosShopCosts = new HashMap<>();
     protected boolean suddenDeathActive;
     protected boolean tier2Triggered;
     protected boolean tier3Triggered;

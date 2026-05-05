@@ -432,7 +432,8 @@ public class ShopMenu implements InventoryHolder {
             meta.addEnchant(Enchantment.UNBREAKING, 1, true);
             meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         } else {
-            lore.add(Component.text("Cost: " + type.nextCost(tier) + " Diamonds", NamedTextColor.YELLOW));
+            ShopCost effectiveCost = session.getEffectiveUpgradeCost(type, tier);
+            lore.add(formatCostLine(effectiveCost));
             lore.add(Component.text("Click to purchase", NamedTextColor.GRAY));
         }
         if (item.isDisabledAfterSuddenDeath()) {
@@ -490,6 +491,27 @@ public class ShopMenu implements InventoryHolder {
         }
         item.setItemMeta(meta);
         return item;
+    }
+
+    private Component formatCostLine(ShopCost cost) {
+        if (cost == null || !cost.isValid()) {
+            return Component.text("Unavailable", NamedTextColor.RED);
+        }
+        String name = switch (cost.material()) {
+            case IRON_INGOT -> "Iron";
+            case GOLD_INGOT -> "Gold";
+            case DIAMOND -> "Diamond";
+            case EMERALD -> "Emerald";
+            default -> cost.material().name();
+        };
+        NamedTextColor color = switch (cost.material()) {
+            case IRON_INGOT -> NamedTextColor.GRAY;
+            case GOLD_INGOT -> NamedTextColor.GOLD;
+            case DIAMOND -> NamedTextColor.AQUA;
+            case EMERALD -> NamedTextColor.GREEN;
+            default -> NamedTextColor.YELLOW;
+        };
+        return Component.text("Cost: " + cost.amount() + " " + name, color);
     }
 
     private boolean isCustomizing() {

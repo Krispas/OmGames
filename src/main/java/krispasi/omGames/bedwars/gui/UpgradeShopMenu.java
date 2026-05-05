@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 import krispasi.omGames.bedwars.game.GameSession;
 import krispasi.omGames.bedwars.model.TeamColor;
+import krispasi.omGames.bedwars.shop.ShopCost;
 import krispasi.omGames.bedwars.shop.ShopItemDefinition;
 import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
 import krispasi.omGames.bedwars.upgrade.TrapType;
@@ -180,7 +181,8 @@ public class UpgradeShopMenu implements InventoryHolder {
             meta.addEnchant(Enchantment.UNBREAKING, 1, true);
             meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         } else {
-            lore.add(Component.text("Cost: " + type.nextCost(tier) + " Diamonds", NamedTextColor.YELLOW));
+            ShopCost cost = session.getEffectiveUpgradeCost(type, tier);
+            lore.add(formatCostLine(cost));
             lore.add(Component.text("Click to purchase", NamedTextColor.GRAY));
         }
         if (rotatingDefinition != null && rotatingDefinition.isDisabledAfterSuddenDeath()) {
@@ -194,7 +196,7 @@ public class UpgradeShopMenu implements InventoryHolder {
 
     private ItemStack buildTrapItem(TrapType trap) {
         ShopItemDefinition rotatingDefinition = session.getRotatingTrapDefinition(trap);
-        int cost = session.getTrapCost(team, trap);
+        ShopCost cost = session.getEffectiveTrapCost(team, trap);
         boolean full = session.getActiveTraps(team).size() >= 3;
         boolean purchased = session.hasPurchasedTrap(team, trap) && trap.oneTimePurchase();
         ItemStack item = new ItemStack(trap.icon());
@@ -214,7 +216,7 @@ public class UpgradeShopMenu implements InventoryHolder {
         } else if (full) {
             lore.add(Component.text("No trap slots available", NamedTextColor.RED));
         } else {
-            lore.add(Component.text("Cost: " + cost + " Diamonds", NamedTextColor.YELLOW));
+            lore.add(formatCostLine(cost));
             lore.add(Component.text("Triggers in your base", NamedTextColor.GRAY));
         }
         if (rotatingDefinition != null && rotatingDefinition.isDisabledAfterSuddenDeath()) {
@@ -243,5 +245,26 @@ public class UpgradeShopMenu implements InventoryHolder {
             builder.append(trap.displayName());
         }
         return builder.toString();
+    }
+
+    private Component formatCostLine(ShopCost cost) {
+        if (cost == null || !cost.isValid()) {
+            return Component.text("Unavailable", NamedTextColor.RED);
+        }
+        String name = switch (cost.material()) {
+            case IRON_INGOT -> "Iron";
+            case GOLD_INGOT -> "Gold";
+            case DIAMOND -> "Diamond";
+            case EMERALD -> "Emerald";
+            default -> cost.material().name();
+        };
+        NamedTextColor color = switch (cost.material()) {
+            case IRON_INGOT -> NamedTextColor.GRAY;
+            case GOLD_INGOT -> NamedTextColor.GOLD;
+            case DIAMOND -> NamedTextColor.AQUA;
+            case EMERALD -> NamedTextColor.GREEN;
+            default -> NamedTextColor.YELLOW;
+        };
+        return Component.text("Cost: " + cost.amount() + " " + name, color);
     }
 }

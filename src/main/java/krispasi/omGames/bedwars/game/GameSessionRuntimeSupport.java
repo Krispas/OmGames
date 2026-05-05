@@ -122,11 +122,61 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
         if (cost == null || !cost.isValid()) {
             return cost;
         }
+        if (activeMatchEvent == BedwarsMatchEventType.CHAOS) {
+            return resolveChaosShopCost("item:" + item.getId());
+        }
         if (activeMatchEvent == BedwarsMatchEventType.IN_THIS_ECONOMY
                 && IN_THIS_ECONOMY_PRICE_MULTIPLIED_ITEMS.contains(item.getId())) {
             return new ShopCost(cost.material(), cost.amount() * IN_THIS_ECONOMY_PRICE_MULTIPLIER);
         }
         return cost;
+    }
+
+    public ShopCost getEffectiveUpgradeCost(TeamUpgradeType type, int currentTier) {
+        if (type == null) {
+            return null;
+        }
+        int cost = type.nextCost(currentTier);
+        if (cost < 0) {
+            return null;
+        }
+        if (activeMatchEvent == BedwarsMatchEventType.CHAOS) {
+            return resolveChaosShopCost("upgrade:" + type.name() + ":" + currentTier);
+        }
+        return new ShopCost(Material.DIAMOND, cost);
+    }
+
+    public ShopCost getEffectiveTrapCost(TrapType trap, int trapCount) {
+        if (trap == null || trapCount < 0 || trapCount >= TRAP_MAX_COUNT) {
+            return null;
+        }
+        int baseCost = trap.baseCost(maxTeamSize);
+        int cost = baseCost * (1 << trapCount);
+        if (cost <= 0) {
+            return null;
+        }
+        if (activeMatchEvent == BedwarsMatchEventType.CHAOS) {
+            return resolveChaosShopCost("trap:" + trap.name() + ":" + trapCount);
+        }
+        return new ShopCost(Material.DIAMOND, cost);
+    }
+
+    protected ShopCost resolveChaosShopCost(String key) {
+        if (key == null || key.isBlank()) {
+            return randomChaosShopCost();
+        }
+        return chaosShopCosts.computeIfAbsent(key, ignored -> randomChaosShopCost());
+    }
+
+    protected ShopCost randomChaosShopCost() {
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        int roll = random.nextInt(4);
+        return switch (roll) {
+            case 0 -> new ShopCost(Material.IRON_INGOT, random.nextInt(1, 257+64));
+            case 1 -> new ShopCost(Material.GOLD_INGOT, random.nextInt(1, 33));
+            case 2 -> new ShopCost(Material.EMERALD, random.nextInt(1, 25));
+            default -> new ShopCost(Material.DIAMOND, random.nextInt(1, 17));
+        };
     }
 
     public boolean isShopItemBlockedByMatchEvent(ShopItemDefinition item) {
