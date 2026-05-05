@@ -72,9 +72,6 @@ public class TeamAssignMenu implements InventoryHolder {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-        if (!player.hasPermission("omgames.bw.start")) {
-            return;
-        }
         int slot = event.getRawSlot();
         if (slot == START_SLOT) {
             handleStartClick(player);
@@ -84,7 +81,7 @@ public class TeamAssignMenu implements InventoryHolder {
             if (event.isLeftClick()) {
                 assignRandomTeams();
             } else if (event.isRightClick()) {
-                cycleTeamSize();
+                cycleTeamSize(player);
             }
             refresh();
             return;
@@ -93,7 +90,7 @@ public class TeamAssignMenu implements InventoryHolder {
             if (event.isLeftClick()) {
                 toggleTeamPick();
             } else if (event.isRightClick()) {
-                cycleTeamSize();
+                cycleTeamSize(player);
             }
             refresh();
             return;
@@ -155,6 +152,10 @@ public class TeamAssignMenu implements InventoryHolder {
 
     private void handleStartClick(Player player) {
         if (session.isLobby()) {
+            return;
+        }
+        if (!player.isOp() && session.getMaxTeamSize() == 1) {
+            player.sendMessage(Component.text("Only OP can start solo (1 player per team) games.", NamedTextColor.RED));
             return;
         }
         bedwarsManager.startLobby(player, session, 20);
@@ -518,9 +519,12 @@ public class TeamAssignMenu implements InventoryHolder {
                 || event.getAction() == InventoryAction.CLONE_STACK;
     }
 
-    private void cycleTeamSize() {
+    private void cycleTeamSize(Player actor) {
         int size = session.getMaxTeamSize();
         int next = size >= 4 ? 1 : size + 1;
+        if (!actor.isOp() && next == 1) {
+            next = 2;
+        }
         session.setMaxTeamSize(next);
     }
 

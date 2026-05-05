@@ -157,7 +157,10 @@ final class GameSessionMoonBigAsteroidRuntime {
                         currentPositions = nextPositions;
                         currentY = nextY;
                     }
-                    session.spawnMoonBigAsteroidParticles(world, new Location(world, centerX + 0.5, currentY, centerZ + 0.5));
+                    session.spawnMoonBigAsteroidParticles(
+                            world,
+                            new Location(world, centerX + 0.5, currentY, centerZ + 0.5),
+                            radius);
                 });
             }
 

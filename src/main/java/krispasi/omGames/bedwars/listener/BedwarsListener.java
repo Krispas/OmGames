@@ -23,6 +23,7 @@ import krispasi.omGames.bedwars.shop.ShopItemDefinition;
 import krispasi.omGames.bedwars.gui.MapSelectMenu;
 import krispasi.omGames.bedwars.gui.EventSelectMenu;
 import krispasi.omGames.bedwars.gui.LockpickTargetMenu;
+import krispasi.omGames.bedwars.gui.LobbyMenuVillagerMenu;
 import krispasi.omGames.bedwars.gui.RotatingItemMenu;
 import krispasi.omGames.bedwars.gui.ShopMenu;
 import krispasi.omGames.bedwars.gui.SkinSelectMenu;
@@ -241,6 +242,14 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 menu.handleClick(event);
                 return;
             }
+            if (topInventory.getHolder() instanceof LobbyMenuVillagerMenu menu) {
+                if (event.getRawSlot() >= topInventory.getSize()) {
+                    event.setCancelled(true);
+                    return;
+                }
+                menu.handleClick(event);
+                return;
+            }
 
             GameSession session = bedwarsManager.getActiveSession();
             if (session == null || !session.isActive()) {
@@ -284,7 +293,8 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                     || topInventory.getHolder() instanceof LockpickTargetMenu
                     || topInventory.getHolder() instanceof TimeCapsuleViewMenu
                     || topInventory.getHolder() instanceof SkinTypeMenu
-                    || topInventory.getHolder() instanceof SkinSelectMenu) {
+                    || topInventory.getHolder() instanceof SkinSelectMenu
+                    || topInventory.getHolder() instanceof LobbyMenuVillagerMenu) {
                 event.setCancelled(true);
                 return;
             }
@@ -2259,6 +2269,33 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             session.handlePlayerQuit(event.getPlayer());
             showArmorForPlayer(event.getPlayer(), session);
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onLobbyMenuVillagerInteract(PlayerInteractEntityEvent event) {
+        safeHandle("onLobbyMenuVillagerInteract", () -> {
+            if (!(event.getRightClicked() instanceof Villager villager)) {
+                return;
+            }
+            if (!bedwarsManager.isLobbyMenuVillager(villager)) {
+                return;
+            }
+            event.setCancelled(true);
+            bedwarsManager.openLobbyMenu(event.getPlayer());
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onLobbyMenuVillagerDamage(EntityDamageEvent event) {
+        safeHandle("onLobbyMenuVillagerDamage", () -> {
+            if (!(event.getEntity() instanceof Villager villager)) {
+                return;
+            }
+            if (!bedwarsManager.isLobbyMenuVillager(villager)) {
+                return;
+            }
+            event.setCancelled(true);
         });
     }
 

@@ -21,6 +21,12 @@ import org.bukkit.plugin.java.JavaPlugin;
  * @see krispasi.omGames.bedwars.listener.BedwarsListener
  */
 public final class OmGames extends JavaPlugin {
+    private static final String[] BEDWARS_CONFIG_FILES = {
+            "bedwars.yml",
+            "shop.yml",
+            "rotating-items.yml",
+            "custom-items.yml"
+    };
     private static OmGames instance;
     private BedwarsManager bedwarsManager;
     private BedwarsSetupManager setupManager;
@@ -30,10 +36,7 @@ public final class OmGames extends JavaPlugin {
     public void onEnable() {
         instance = this;
 
-        ensureBedwarsConfig("bedwars.yml");
-        ensureBedwarsConfig("shop.yml");
-        ensureBedwarsConfig("rotating-items.yml");
-        ensureBedwarsConfig("custom-items.yml");
+        synchronizeBedwarsConfigs();
 
         bedwarsManager = new BedwarsManager(this);
         bedwarsManager.loadArenas();
@@ -98,6 +101,42 @@ public final class OmGames extends JavaPlugin {
             java.nio.file.Files.copy(input, target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         } catch (java.io.IOException ex) {
             getLogger().warning("Failed to save Bedwars config " + name + ": " + ex.getMessage());
+        }
+    }
+
+    private void synchronizeBedwarsConfigs() {
+        for (String configName : BEDWARS_CONFIG_FILES) {
+            ensureBedwarsConfig(configName);
+        }
+        String pluginVersion = getDescription().getVersion();
+        java.io.File bedwarsConfig = new java.io.File(new java.io.File(getDataFolder(), "Bedwars"), "bedwars.yml");
+        org.bukkit.configuration.file.YamlConfiguration config =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(bedwarsConfig);
+        String storedVersion = config.getString("config-version");
+        if (storedVersion != null && storedVersion.equalsIgnoreCase(pluginVersion)) {
+            return;
+        }
+        getLogger().info("Detected config version change (" + storedVersion + " -> " + pluginVersion
+                + "). Refreshing BedWars configs from plugin defaults.");
+        for (String configName : BEDWARS_CONFIG_FILES) {
+            copyBedwarsConfig(configName);
+        }
+    }
+
+    private void copyBedwarsConfig(String name) {
+        java.io.File dataFolder = getDataFolder();
+        java.io.File bedwarsFolder = new java.io.File(dataFolder, "Bedwars");
+        if (!bedwarsFolder.exists()) {
+            bedwarsFolder.mkdirs();
+        }
+        java.io.File target = new java.io.File(bedwarsFolder, name);
+        try (java.io.InputStream input = getResource(name)) {
+            if (input == null) {
+                return;
+            }
+            java.nio.file.Files.copy(input, target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (java.io.IOException ex) {
+            getLogger().warning("Failed to refresh Bedwars config " + name + ": " + ex.getMessage());
         }
     }
 

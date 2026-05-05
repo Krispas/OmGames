@@ -12,6 +12,7 @@ import krispasi.omGames.shared.SKIN_TYPE;
 import krispasi.omGames.shared.Skin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -48,7 +49,7 @@ public class SkinSelectMenu implements InventoryHolder {
         this.options = options != null ? options : List.of();
         this.skins = skins != null ? skins : Map.of();
         String title = formatTypeName(type) + " Skins";
-        this.inventory = Bukkit.createInventory(this, SIZE, Component.text(title, NamedTextColor.GOLD));
+        this.inventory = Bukkit.createInventory(this, SIZE, Component.text(title, NamedTextColor.DARK_PURPLE));
         build();
     }
 
@@ -115,6 +116,7 @@ public class SkinSelectMenu implements InventoryHolder {
         ItemMeta meta = item.getItemMeta();
         meta.displayName(option.skin().name());
         List<Component> lore = new ArrayList<>(option.skin().getLore());
+        lore.add(Component.text("Select: ", NamedTextColor.DARK_GRAY).append(option.skin().name()));
         BedwarsSkinSelection current = bedwarsManager.getSkinSelection(viewerId, type);
         if (current != null && current.modelId() != null
                 && current.modelId().equalsIgnoreCase(option.modelId())) {

@@ -1,6 +1,9 @@
+config-version: ${project.version}
+
 lobby:
   world: bedwars_lobby
   spawn: 0 73 0
+  menu-villager:
 leaderboard:
   world: bedwars_lobby
   x: 4

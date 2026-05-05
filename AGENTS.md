@@ -206,6 +206,7 @@ Admin subcommands:
 - `/bw creator add <user>`
 - `/bw creator remove <user>`
 - `/bw lobby parkour <start|checkpoint [x]|end>`
+- `/bw lobby spawnMenuVillager <rotation>`
 - `/bw game out [player]`
 - `/bw game spectate [player]`
 - `/bw game join <team|spectate> [player]`
@@ -362,6 +363,7 @@ Root keys:
 `lobby` fields:
 - `world`
 - `spawn`
+- `menu-villager`
 
 `lobby` runtime note:
 - shared BedWars lobby defaults to world `bedwars_lobby`

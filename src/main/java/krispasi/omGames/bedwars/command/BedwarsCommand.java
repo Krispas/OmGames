@@ -198,7 +198,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                 sender.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
                 return true;
             }
-            return handleLobbyParkourCommand(sender, player, args);
+            return handleLobbyCommand(sender, player, args);
         }
         if (args[0].equalsIgnoreCase("out")) {
             sender.sendMessage(Component.text("Use /bw game out [player].", NamedTextColor.YELLOW));
@@ -340,7 +340,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test_time_capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <player> <rotating_item> <amount> | /bw time_capsule view <user> [time_id] | /bw quick_buy | /bw skins | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test_time_capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw lobby spawnMenuVillager <rotation> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <player> <rotating_item> <amount> | /bw time_capsule view <user> [time_id] | /bw quick_buy | /bw skins | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -475,7 +475,15 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("lobby")) {
             String input = args[1].toLowerCase(Locale.ROOT);
-            return Stream.of("parkour")
+            return Stream.of("parkour", "spawnMenuVillager")
+                    .filter(option -> option.startsWith(input))
+                    .toList();
+        }
+        if (args.length == 3
+                && args[0].equalsIgnoreCase("lobby")
+                && args[1].equalsIgnoreCase("spawnMenuVillager")) {
+            String input = args[2].toLowerCase(Locale.ROOT);
+            return Stream.of("0", "90", "180", "-90")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -1384,9 +1392,27 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         return world != null && arena.getCenter() != null ? arena.getCenter().toLocation(world) : null;
     }
 
-    private boolean handleLobbyParkourCommand(CommandSender sender, Player player, String[] args) {
+    private boolean handleLobbyCommand(CommandSender sender, Player player, String[] args) {
+        if (args.length >= 2 && args[1].equalsIgnoreCase("spawnMenuVillager")) {
+            if (args.length < 3) {
+                sender.sendMessage(Component.text("Usage: /bw lobby spawnMenuVillager <rotation>", NamedTextColor.YELLOW));
+                return true;
+            }
+            float yaw;
+            try {
+                yaw = Float.parseFloat(args[2]);
+            } catch (NumberFormatException ex) {
+                sender.sendMessage(Component.text("Rotation must be a number.", NamedTextColor.RED));
+                return true;
+            }
+            if (!bedwarsManager.spawnLobbyMenuVillager(player, yaw)) {
+                sender.sendMessage(Component.text("Could not spawn lobby menu villager. Check BedWars lobby world/spawn.",
+                        NamedTextColor.RED));
+            }
+            return true;
+        }
         if (args.length < 2 || !args[1].equalsIgnoreCase("parkour")) {
-            sender.sendMessage(Component.text("Usage: /bw lobby parkour <start|checkpoint [x]|end>", NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Usage: /bw lobby parkour <start|checkpoint [x]|end> | /bw lobby spawnMenuVillager <rotation>", NamedTextColor.YELLOW));
             return true;
         }
         if (args.length < 3) {

@@ -1,3 +1,5 @@
+config-version: ${project.version}
+
 custom-items:
   fireball:
     type: FIREBALL

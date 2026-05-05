@@ -1,3 +1,5 @@
+config-version: ${project.version}
+
 shop:
   categories:
     quick_buy:

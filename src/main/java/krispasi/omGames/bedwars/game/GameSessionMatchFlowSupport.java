@@ -807,12 +807,22 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         return ThreadLocalRandom.current().nextDouble(minInterval, maxInterval) * 0.1;
     }
 
-    protected void spawnMoonBigAsteroidParticles(World world, Location location) {
+    protected void spawnMoonBigAsteroidParticles(World world, Location location, int radius) {
         if (world == null || location == null) {
             return;
         }
-        world.spawnParticle(Particle.FLAME, location, 6, 0.2, 0.2, 0.2, 0.01);
-        world.spawnParticle(Particle.SMOKE, location, 3, 0.2, 0.2, 0.2, 0.01);
+        int tailSteps = Math.max(3, radius * 3);
+        double stepDistance = 0.35;
+        for (int step = 0; step <= tailSteps; step++) {
+            double progress = step / (double) tailSteps;
+            double yOffset = step * stepDistance;
+            Location tail = location.clone().add(0.0, yOffset, 0.0);
+            int flameCount = Math.max(1, (int) Math.round((1.0 - progress) * (radius + 2)));
+            int smokeCount = Math.max(1, (int) Math.round((1.0 - progress) * (radius + 1)));
+            double spread = Math.max(0.12, (1.0 - progress) * (radius * 0.22));
+            world.spawnParticle(Particle.FLAME, tail, flameCount, spread, 0.06, spread, 0.01);
+            world.spawnParticle(Particle.SMOKE, tail, smokeCount, spread, 0.06, spread, 0.008);
+        }
     }
 
     protected void handleMoonBigAsteroidImpact(Location location, int radius, BedwarsMoonBigConfig config) {

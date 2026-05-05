@@ -56,7 +56,7 @@ public class SkinTypeMenu implements InventoryHolder {
         this.viewerId = player.getUniqueId();
         this.skins = skins != null ? skins : Map.of();
         this.skinsByType = buildSkinMap(this.skins);
-        this.inventory = Bukkit.createInventory(this, SIZE, Component.text("Skin Preferences", NamedTextColor.GOLD));
+        this.inventory = Bukkit.createInventory(this, SIZE, Component.text("Skin Preferences", NamedTextColor.DARK_PURPLE));
         build();
     }
 
