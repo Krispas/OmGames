@@ -859,9 +859,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         int centerX = impact.getBlockX();
         int centerY = impact.getBlockY();
         int centerZ = impact.getBlockZ();
-        double crateRoll = ThreadLocalRandom.current().nextDouble();
-        double crateChance = config.crateChance();
-        boolean spawnCrate = crateRoll < crateChance;
+        boolean spawnCrate = true;
         double missingChance = config.missingBlockChance();
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dy = -radius; dy <= radius; dy++) {
@@ -890,20 +888,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             }
         }
         if (spawnCrate) {
-            Block crateBlock = placeMoonBigAsteroidCrate(world, centerX, centerY, centerZ);
-            if (crateBlock != null) {
-                broadcast(Component.text(
-                        "Asteroid crate spawned at "
-                                + crateBlock.getX() + ", "
-                                + crateBlock.getY() + ", "
-                                + crateBlock.getZ(),
-                        NamedTextColor.GOLD));
-            }
-        } else {
-            broadcast(Component.text(
-                    "Asteroid crate not spawned: roll=" + String.format(Locale.US, "%.4f", crateRoll)
-                            + " chance=" + String.format(Locale.US, "%.4f", crateChance),
-                    NamedTextColor.GRAY));
+            placeMoonBigAsteroidCrate(world, centerX, centerY, centerZ);
         }
     }
 
@@ -921,29 +906,73 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         BlockState state = crateBlock.getState();
         if (state instanceof Barrel barrel) {
             barrel.setCustomName("Asteroid Crate");
-            fillMoonBigAsteroidCrate(barrel);
-            barrel.update();
+            List<ItemStack> loot = createMoonBigAsteroidCrateLoot();
+            setMoonBigAsteroidCrateLoot(
+                    new BlockPoint(crateBlock.getX(), crateBlock.getY(), crateBlock.getZ()),
+                    loot);
+            barrel.getInventory().clear();
+            barrel.update(true, false);
         }
         return crateBlock;
     }
 
-    protected void fillMoonBigAsteroidCrate(Barrel barrel) {
-        if (barrel == null) {
-            return;
-        }
-        Inventory inventory = barrel.getInventory();
-        inventory.clear();
+    protected List<ItemStack> createMoonBigAsteroidCrateLoot() {
+        List<ItemStack> loot = new ArrayList<>();
         AsteroidLootEntry normal = pickRandomNormalAsteroidLoot();
         if (normal != null) {
             int amount = normal.rollAmount();
             if (amount > 0) {
-                inventory.addItem(new ItemStack(normal.material(), amount));
+                loot.add(new ItemStack(normal.material(), amount));
             }
         }
         ShopItemDefinition rotating = pickRandomRotatingAsteroidLoot();
         if (rotating != null) {
-            inventory.addItem(rotating.createPurchaseItem(null));
+            ItemStack rotatingItem = rotating.createPurchaseItem(null);
+            if (rotatingItem != null && rotatingItem.getType() != Material.AIR && rotatingItem.getAmount() > 0) {
+                loot.add(rotatingItem);
+            }
         }
+        return loot;
+    }
+
+    protected void setMoonBigAsteroidCrateLoot(BlockPoint point, List<ItemStack> loot) {
+        if (point == null) {
+            return;
+        }
+        if (loot == null || loot.isEmpty()) {
+            moonBigAsteroidCrateLoot.remove(point);
+            return;
+        }
+        List<ItemStack> stored = new ArrayList<>();
+        for (ItemStack item : loot) {
+            if (item == null || item.getType() == Material.AIR || item.getAmount() <= 0) {
+                continue;
+            }
+            stored.add(item.clone());
+        }
+        if (stored.isEmpty()) {
+            moonBigAsteroidCrateLoot.remove(point);
+            return;
+        }
+        moonBigAsteroidCrateLoot.put(point, stored);
+    }
+
+    protected List<ItemStack> claimMoonBigAsteroidCrateLoot(BlockPoint point) {
+        if (point == null) {
+            return List.of();
+        }
+        List<ItemStack> stored = moonBigAsteroidCrateLoot.remove(point);
+        if (stored == null || stored.isEmpty()) {
+            return List.of();
+        }
+        List<ItemStack> claimed = new ArrayList<>(stored.size());
+        for (ItemStack item : stored) {
+            if (item == null || item.getType() == Material.AIR || item.getAmount() <= 0) {
+                continue;
+            }
+            claimed.add(item.clone());
+        }
+        return claimed;
     }
 
     protected double lerp(double start, double end, double t) {
@@ -1926,6 +1955,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         eliminationOrder.clear();
         placedBlocks.clear();
         placedBlockItems.clear();
+        moonBigAsteroidCrateLoot.clear();
         temporaryMapLobbyIslandBlocks.clear();
         forcedChunks.clear();
         bedStates.clear();

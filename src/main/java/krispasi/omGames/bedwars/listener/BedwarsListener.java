@@ -39,6 +39,7 @@ import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
+import org.bukkit.block.Barrel;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Container;
 import org.bukkit.block.data.BlockData;
@@ -365,6 +366,10 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             }
             String worldName = player.getWorld().getName();
             if (!bedwarsManager.isBedwarsWorld(worldName)) {
+                return;
+            }
+            if (event.getInventory().getHolder() instanceof Barrel barrel
+                    && "Asteroid Crate".equals(barrel.getCustomName())) {
                 return;
             }
             event.setCancelled(true);
@@ -1363,6 +1368,19 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
             if (!session.isPlacedBlock(point)) {
                 event.setCancelled(true);
                 player.sendMessage(Component.text("You can only break blocks placed in this game.", NamedTextColor.RED));
+                return;
+            }
+            if (block.getState() instanceof Barrel barrel) {
+                List<ItemStack> storedLoot = session.claimMoonBigAsteroidCrateLoot(point);
+                for (ItemStack item : storedLoot) {
+                    if (item == null || item.getType() == Material.AIR || item.getAmount() <= 0) {
+                        continue;
+                    }
+                    block.getWorld().dropItemNaturally(block.getLocation(), item.clone());
+                }
+                session.removePlacedBlock(point);
+                block.setType(Material.AIR, false);
+                event.setCancelled(true);
                 return;
             }
             ItemStack drop = session.removePlacedBlockItem(point);

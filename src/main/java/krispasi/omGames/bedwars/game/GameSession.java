@@ -813,6 +813,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
     public void removePlacedBlock(BlockPoint point) {
         placedBlocks.remove(point);
         placedBlockItems.remove(point);
+        moonBigAsteroidCrateLoot.remove(point);
         if (proximityMineRuntime != null) {
             proximityMineRuntime.remove(point);
         }
@@ -820,10 +821,51 @@ public class GameSession extends GameSessionMatchFlowSupport {
 
     public ItemStack removePlacedBlockItem(BlockPoint point) {
         placedBlocks.remove(point);
+        moonBigAsteroidCrateLoot.remove(point);
         if (proximityMineRuntime != null) {
             proximityMineRuntime.remove(point);
         }
         return placedBlockItems.remove(point);
+    }
+
+    public void setMoonBigAsteroidCrateLoot(BlockPoint point, List<ItemStack> loot) {
+        if (point == null) {
+            return;
+        }
+        if (loot == null || loot.isEmpty()) {
+            moonBigAsteroidCrateLoot.remove(point);
+            return;
+        }
+        List<ItemStack> stored = new ArrayList<>();
+        for (ItemStack item : loot) {
+            if (item == null || item.getType() == Material.AIR || item.getAmount() <= 0) {
+                continue;
+            }
+            stored.add(item.clone());
+        }
+        if (stored.isEmpty()) {
+            moonBigAsteroidCrateLoot.remove(point);
+            return;
+        }
+        moonBigAsteroidCrateLoot.put(point, stored);
+    }
+
+    public List<ItemStack> claimMoonBigAsteroidCrateLoot(BlockPoint point) {
+        if (point == null) {
+            return List.of();
+        }
+        List<ItemStack> stored = moonBigAsteroidCrateLoot.remove(point);
+        if (stored == null || stored.isEmpty()) {
+            return List.of();
+        }
+        List<ItemStack> claimed = new ArrayList<>(stored.size());
+        for (ItemStack item : stored) {
+            if (item == null || item.getType() == Material.AIR || item.getAmount() <= 0) {
+                continue;
+            }
+            claimed.add(item.clone());
+        }
+        return claimed;
     }
 
     public boolean isPendingRespawn(UUID playerId) {

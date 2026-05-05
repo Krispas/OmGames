@@ -189,6 +189,7 @@ abstract class GameSessionEffectSupport {
     protected final Map<BlockPoint, TeamColor> bedBlocks = new HashMap<>();
     protected final Set<BlockPoint> placedBlocks = new HashSet<>();
     protected final Map<BlockPoint, ItemStack> placedBlockItems = new HashMap<>();
+    protected final Map<BlockPoint, List<ItemStack>> moonBigAsteroidCrateLoot = new HashMap<>();
     protected final Map<BlockPoint, BlockState> temporaryMapLobbyIslandBlocks = new HashMap<>();
     protected final Set<Long> forcedChunks = new HashSet<>();
     protected final Set<UUID> frozenPlayers = new HashSet<>();
