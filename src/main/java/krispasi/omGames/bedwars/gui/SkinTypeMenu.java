@@ -14,9 +14,9 @@ import krispasi.omGames.shared.Skin;
 import krispasi.omGames.shared.SkinEquipment;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
@@ -24,6 +24,7 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.components.EquippableComponent;
 
 public class SkinTypeMenu implements InventoryHolder {
     private static final int SIZE = 27;
@@ -117,36 +118,92 @@ public class SkinTypeMenu implements InventoryHolder {
     private ItemStack buildTypeIcon(SKIN_TYPE type, List<BedwarsSkinOption> options) {
         ItemStack icon = new ItemStack(resolveTypeIcon(type));
         ItemMeta meta = icon.getItemMeta();
-        meta.displayName(Component.text(formatTypeName(type), NamedTextColor.YELLOW));
+        meta.displayName(Component.text(formatTypeName(type), NamedTextColor.DARK_PURPLE));
         List<Component> lore = new ArrayList<>();
         BedwarsSkinSelection selection = bedwarsManager.getSkinSelection(viewerId, type);
-        String selectedName = resolveSelectedName(selection, options);
-        if (selectedName != null) {
-            lore.add(Component.text("Selected: " + selectedName, NamedTextColor.GREEN));
+        BedwarsSkinOption selectedOption = resolveSelectedOption(selection, options);
+        Component selectedComponent = resolveSelectedComponent(selection, options);
+        if (selectedComponent != null) {
+            lore.add(Component.text("Selected: ", NamedTextColor.GREEN).append(selectedComponent));
         } else {
             lore.add(Component.text("Selected: Default", NamedTextColor.GRAY));
         }
-        lore.add(Component.text("Click to view skins", NamedTextColor.DARK_GRAY));
+        lore.add(Component.text("Click to view skins", NamedTextColor.DARK_PURPLE));
         meta.lore(lore);
+        if (selectedOption != null) {
+            applySelectedSkinModel(icon, meta, selectedOption);
+        }
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         icon.setItemMeta(meta);
         return icon;
     }
 
-    private String resolveSelectedName(BedwarsSkinSelection selection, List<BedwarsSkinOption> options) {
+    private Component resolveSelectedComponent(BedwarsSkinSelection selection, List<BedwarsSkinOption> options) {
         if (selection == null || selection.modelId() == null || selection.modelId().isBlank()) {
             return null;
         }
         if (options == null) {
             return null;
         }
+        String selectedModelId = normalizeModelId(selection.modelId());
         for (BedwarsSkinOption option : options) {
-            if (selection.modelId().equalsIgnoreCase(option.modelId())) {
-                String plain = PlainTextComponentSerializer.plainText().serialize(option.skin().name());
-                return plain != null && !plain.isBlank() ? plain : option.modelId();
+            if (selectedModelId.equalsIgnoreCase(normalizeModelId(option.modelId()))) {
+                return option.skin().name();
             }
         }
-        return selection.modelId();
+        return null;
+    }
+
+    private String normalizeModelId(String modelId) {
+        if (modelId == null || modelId.isBlank()) {
+            return "";
+        }
+        String trimmed = modelId.trim();
+        return trimmed.contains(":") ? trimmed : "om:" + trimmed;
+    }
+
+    private BedwarsSkinOption resolveSelectedOption(BedwarsSkinSelection selection, List<BedwarsSkinOption> options) {
+        if (selection == null || selection.modelId() == null || selection.modelId().isBlank()
+                || options == null || options.isEmpty()) {
+            return null;
+        }
+        String selectedModelId = normalizeModelId(selection.modelId());
+        for (BedwarsSkinOption option : options) {
+            if (selectedModelId.equalsIgnoreCase(normalizeModelId(option.modelId()))) {
+                return option;
+            }
+        }
+        return null;
+    }
+
+    private void applySelectedSkinModel(ItemStack item, ItemMeta meta, BedwarsSkinOption option) {
+        NamespacedKey modelKey = NamespacedKey.fromString(normalizeModelId(option.modelId()));
+        if (modelKey != null) {
+            meta.setItemModel(modelKey);
+        }
+        if (!option.hasEquipmentModel()) {
+            return;
+        }
+        EquippableComponent equippable = resolveEquippableComponent(item, meta);
+        if (equippable == null) {
+            return;
+        }
+        NamespacedKey equipKey = NamespacedKey.fromString(normalizeModelId(option.equipmentModelId()));
+        if (equipKey != null) {
+            equippable.setModel(equipKey);
+            meta.setEquippable(equippable);
+        }
+    }
+
+    private EquippableComponent resolveEquippableComponent(ItemStack item, ItemMeta meta) {
+        if (meta != null) {
+            EquippableComponent equippable = meta.getEquippable();
+            if (equippable != null) {
+                return equippable;
+            }
+        }
+        ItemMeta defaults = item != null ? Bukkit.getItemFactory().getItemMeta(item.getType()) : null;
+        return defaults != null ? defaults.getEquippable() : null;
     }
 
     private Map<SKIN_TYPE, List<BedwarsSkinOption>> buildSkinMap(Map<String, Skin> source) {

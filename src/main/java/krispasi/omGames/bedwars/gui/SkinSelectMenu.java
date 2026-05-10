@@ -151,7 +151,7 @@ public class SkinSelectMenu implements InventoryHolder {
     private ItemStack buildBackButton() {
         ItemStack item = new ItemStack(Material.ARROW);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Back", NamedTextColor.YELLOW));
+        meta.displayName(Component.text("Back", NamedTextColor.DARK_PURPLE));
         item.setItemMeta(meta);
         return item;
     }

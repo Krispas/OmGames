@@ -432,6 +432,12 @@ public class BedwarsManager {
         }
         removeLobbyMenuVillager();
         Location spawn = lobby.clone();
+        if (actor != null && actor.getWorld().equals(lobby.getWorld())) {
+            Location actorLocation = actor.getLocation();
+            spawn.setX(Math.floor(actorLocation.getX()) + 0.5);
+            spawn.setY(actorLocation.getY());
+            spawn.setZ(Math.floor(actorLocation.getZ()) + 0.5);
+        }
         spawn.setYaw(yaw);
         spawn.setPitch(0.0f);
         Villager villager = spawn.getWorld().spawn(spawn, Villager.class, created -> {
@@ -454,9 +460,39 @@ public class BedwarsManager {
         return true;
     }
 
+    public boolean removeNearestLobbyMenuVillager(Player actor, double radius) {
+        if (actor == null || actor.getWorld() == null || radius <= 0.0) {
+            return false;
+        }
+        Villager nearest = null;
+        double bestDistanceSquared = radius * radius;
+        for (Villager villager : actor.getWorld().getEntitiesByClass(Villager.class)) {
+            if (!isLobbyMenuVillager(villager)) {
+                continue;
+            }
+            double distanceSquared = villager.getLocation().distanceSquared(actor.getLocation());
+            if (distanceSquared <= bestDistanceSquared) {
+                nearest = villager;
+                bestDistanceSquared = distanceSquared;
+            }
+        }
+        if (nearest == null) {
+            return false;
+        }
+        if (lobbyMenuVillagerId != null && lobbyMenuVillagerId.equals(nearest.getUniqueId())) {
+            lobbyMenuVillagerId = null;
+        }
+        nearest.remove();
+        return true;
+    }
+
     public void startSession(Player initiator, GameSession session) {
         if (session.getAssignedCount() == 0 && !session.isTeamPickEnabled()) {
             initiator.sendMessage(Component.text("Assign at least one player to a team or enable Team Pick.", NamedTextColor.RED));
+            return;
+        }
+        if (!session.isTestMode() && session.getAssignedCount() < 2 && !session.isTeamPickEnabled()) {
+            initiator.sendMessage(Component.text("Normal games require at least 2 assigned players.", NamedTextColor.RED));
             return;
         }
 
@@ -479,6 +515,10 @@ public class BedwarsManager {
     public void startLobby(Player initiator, GameSession session, int lobbySeconds) {
         if (session.getAssignedCount() == 0 && !session.isTeamPickEnabled()) {
             initiator.sendMessage(Component.text("Assign at least one player to a team or enable Team Pick.", NamedTextColor.RED));
+            return;
+        }
+        if (!session.isTestMode() && session.getAssignedCount() < 2 && !session.isTeamPickEnabled()) {
+            initiator.sendMessage(Component.text("Normal games require at least 2 assigned players.", NamedTextColor.RED));
             return;
         }
 

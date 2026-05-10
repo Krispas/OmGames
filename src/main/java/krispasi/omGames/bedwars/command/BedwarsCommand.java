@@ -340,7 +340,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             }
         }
 
-        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test_time_capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw lobby spawnMenuVillager <rotation> | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <player> <rotating_item> <amount> | /bw time_capsule view <user> [time_id] | /bw quick_buy | /bw skins | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("Usage: /bw start | /bw test start | /bw test_time_capsule view <user> [time_id] | /bw stop | /bw tp <arena>|lobby | /bw lobby parkour <start|checkpoint [x]|end> | /bw lobby spawnMenuVillager <rotation> | /bw lobby removeMenuVillager | /bw game out [player] | /bw game join <team|spectate> [player] | /bw game spectate [player] | /bw game revive <team> | /bw karma <user> | /bw karma add <permanent|temporary> <user> | /bw karma cause | /bw give <player> <rotating_item> <amount> | /bw time_capsule view <user> [time_id] | /bw quick_buy | /bw skins | /bw stats [user] | /bw stats modify <user> <stat|all> <+|-|set|+1|-1> [amount] | /bw reload | /bw setup new <arena> | /bw setup <arena> [key] | /bw creator add <user> | /bw creator remove <user>", NamedTextColor.YELLOW));
         return true;
     }
 
@@ -475,7 +475,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("lobby")) {
             String input = args[1].toLowerCase(Locale.ROOT);
-            return Stream.of("parkour", "spawnMenuVillager")
+            return Stream.of("parkour", "spawnMenuVillager", "removeMenuVillager")
                     .filter(option -> option.startsWith(input))
                     .toList();
         }
@@ -1393,6 +1393,14 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleLobbyCommand(CommandSender sender, Player player, String[] args) {
+        if (args.length >= 2 && args[1].equalsIgnoreCase("removeMenuVillager")) {
+            if (bedwarsManager.removeNearestLobbyMenuVillager(player, 10.0)) {
+                sender.sendMessage(Component.text("Removed nearest BedWars menu villager (within 10 blocks).", NamedTextColor.GREEN));
+            } else {
+                sender.sendMessage(Component.text("No BedWars menu villager found within 10 blocks.", NamedTextColor.RED));
+            }
+            return true;
+        }
         if (args.length >= 2 && args[1].equalsIgnoreCase("spawnMenuVillager")) {
             if (args.length < 3) {
                 sender.sendMessage(Component.text("Usage: /bw lobby spawnMenuVillager <rotation>", NamedTextColor.YELLOW));
@@ -1412,7 +1420,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (args.length < 2 || !args[1].equalsIgnoreCase("parkour")) {
-            sender.sendMessage(Component.text("Usage: /bw lobby parkour <start|checkpoint [x]|end> | /bw lobby spawnMenuVillager <rotation>", NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Usage: /bw lobby parkour <start|checkpoint [x]|end> | /bw lobby spawnMenuVillager <rotation> | /bw lobby removeMenuVillager", NamedTextColor.YELLOW));
             return true;
         }
         if (args.length < 3) {

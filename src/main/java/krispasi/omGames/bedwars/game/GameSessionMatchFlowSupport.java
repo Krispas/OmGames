@@ -811,15 +811,17 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         if (world == null || location == null) {
             return;
         }
-        int tailSteps = Math.max(3, radius * 3);
-        double stepDistance = 0.35;
+        int tailSteps = Math.max(8, radius * 10);
+        double stepDistance = 0.45;
+        double tubeRadius = Math.max(0.35, radius * 0.45);
         for (int step = 0; step <= tailSteps; step++) {
             double progress = step / (double) tailSteps;
             double yOffset = step * stepDistance;
             Location tail = location.clone().add(0.0, yOffset, 0.0);
-            int flameCount = Math.max(1, (int) Math.round((1.0 - progress) * (radius + 2)));
-            int smokeCount = Math.max(1, (int) Math.round((1.0 - progress) * (radius + 1)));
-            double spread = Math.max(0.12, (1.0 - progress) * (radius * 0.22));
+            double density = 1.0 - (progress * 0.25);
+            int flameCount = Math.max(3, (int) Math.round(density * ((radius * 2) + 3)));
+            int smokeCount = Math.max(2, (int) Math.round(density * ((radius * 2) + 2)));
+            double spread = tubeRadius;
             world.spawnParticle(Particle.FLAME, tail, flameCount, spread, 0.06, spread, 0.01);
             world.spawnParticle(Particle.SMOKE, tail, smokeCount, spread, 0.06, spread, 0.008);
         }
