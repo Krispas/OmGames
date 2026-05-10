@@ -1800,6 +1800,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         if (spinjitzuRuntime != null) {
             spinjitzuRuntime.reset();
         }
+        if (wardenFamilyRuntime != null) {
+            wardenFamilyRuntime.clear();
+        }
         clearAbyssalRifts();
         clearEditors();
         releaseForcedChunks();
@@ -1927,7 +1930,8 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
                     || entity.getScoreboardTags().contains(ABYSSAL_RIFT_TAG)
                     || entity.getScoreboardTags().contains(ABYSSAL_RIFT_DISPLAY_TAG)
                     || entity.getScoreboardTags().contains(ABYSSAL_RIFT_NAME_TAG)
-                    || entity.getScoreboardTags().contains(MOON_BIG_ASTEROID_TAG)) {
+                    || entity.getScoreboardTags().contains(MOON_BIG_ASTEROID_TAG)
+                    || (wardenFamilyRuntime != null && entity.getScoreboardTags().contains(wardenFamilyRuntime.scoreboardTag()))) {
                 entity.remove();
             }
         }
@@ -2000,6 +2004,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         }
         if (moonBigAsteroidRuntime != null) {
             moonBigAsteroidRuntime.reset();
+        }
+        if (wardenFamilyRuntime != null) {
+            wardenFamilyRuntime.clear();
         }
         if (karmaRuntime != null) {
             karmaRuntime.reset();

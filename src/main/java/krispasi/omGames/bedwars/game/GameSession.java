@@ -121,6 +121,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
         this.timeCapsuleRuntime = new GameSessionTimeCapsuleRuntime(this, bedwarsManager.getTimeCapsuleService());
         this.karmaRuntime = new GameSessionKarmaRuntime(this, bedwarsManager.getKarmaService());
         this.raptureRuntime = new GameSessionRaptureRuntime(this, assignments, tasks);
+        this.wardenFamilyRuntime = new GameSessionWardenFamilyRuntime(this, tasks);
     }
 
     public static Title.Times sharedTitleTimes() {
@@ -1124,7 +1125,9 @@ public class GameSession extends GameSessionMatchFlowSupport {
             return false;
         }
         TeamUpgradeState state = getUpgradeState(team);
-        int currentTier = state.getTier(type);
+        int currentTier = type == TeamUpgradeType.WARDEN_FAMILY
+                ? getSharedUpgradeTier(type)
+                : state.getTier(type);
         ShopCost shopCost = getEffectiveUpgradeCost(type, currentTier);
         if (shopCost == null || !shopCost.isValid()) {
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
@@ -1135,13 +1138,20 @@ public class GameSession extends GameSessionMatchFlowSupport {
             return false;
         }
         int nextTier = currentTier + 1;
-        state.setTier(type, nextTier);
+        if (type == TeamUpgradeType.WARDEN_FAMILY) {
+            setSharedUpgradeTier(type, nextTier);
+        } else {
+            state.setTier(type, nextTier);
+        }
         removeResources(player, shopCost);
         if (type == TeamUpgradeType.FORGE && generatorManager != null) {
             generatorManager.setBaseForgeTier(team, nextTier);
         }
         if (type == TeamUpgradeType.BROKEN_MIRROR && karmaRuntime != null) {
             karmaRuntime.applyBrokenMirrorLevel(team);
+        }
+        if (type == TeamUpgradeType.WARDEN_FAMILY && wardenFamilyRuntime != null) {
+            wardenFamilyRuntime.applySharedTier(nextTier);
         }
         applyTeamUpgradeEffects(team);
         announceTeamUpgrade(team, player, type, nextTier);
@@ -1268,10 +1278,63 @@ public class GameSession extends GameSessionMatchFlowSupport {
     }
 
     public int getUpgradeTier(TeamColor team, TeamUpgradeType type) {
+        if (type == TeamUpgradeType.WARDEN_FAMILY) {
+            return getSharedUpgradeTier(type);
+        }
         if (team == null) {
             return 0;
         }
         return getUpgradeState(team).getTier(type);
+    }
+
+    public int getSharedUpgradeTier(TeamUpgradeType type) {
+        if (type == null) {
+            return 0;
+        }
+        int tier = 0;
+        for (TeamColor team : teamsInMatch) {
+            tier = Math.max(tier, getUpgradeState(team).getTier(type));
+        }
+        return tier;
+    }
+
+    public void setSharedUpgradeTier(TeamUpgradeType type, int tier) {
+        if (type == null) {
+            return;
+        }
+        int clamped = Math.max(0, Math.min(type.maxTier(), tier));
+        for (TeamColor team : teamsInMatch) {
+            getUpgradeState(team).setTier(type, clamped);
+        }
+        if (type == TeamUpgradeType.WARDEN_FAMILY && wardenFamilyRuntime != null) {
+            wardenFamilyRuntime.applySharedTier(clamped);
+        }
+    }
+
+    public boolean isWardenFamilyEntity(Entity entity) {
+        return wardenFamilyRuntime != null && wardenFamilyRuntime.isWardenFamilyEntity(entity);
+    }
+
+    public boolean isWardenFamilyDowngradeOnDeathEntity(Entity entity) {
+        return wardenFamilyRuntime != null && wardenFamilyRuntime.isDowngradeOnDeathEntity(entity);
+    }
+
+    public void handleWardenFamilyDeath(Entity entity) {
+        if (wardenFamilyRuntime != null) {
+            wardenFamilyRuntime.handleDeath(entity);
+        }
+    }
+
+    public void handleWardenFamilyDamage(EntityDamageEvent event) {
+        if (wardenFamilyRuntime != null) {
+            wardenFamilyRuntime.handleDamage(event);
+        }
+    }
+
+    public void handleWardenFamilyTarget(org.bukkit.event.entity.EntityTargetLivingEntityEvent event) {
+        if (wardenFamilyRuntime != null) {
+            wardenFamilyRuntime.handleTarget(event);
+        }
     }
 
     public int getTrapCost(TeamColor team, TrapType trap) {

@@ -275,6 +275,7 @@ abstract class GameSessionEffectSupport {
     protected GameSessionTimeCapsuleRuntime timeCapsuleRuntime;
     protected GameSessionKarmaRuntime karmaRuntime;
     protected GameSessionRaptureRuntime raptureRuntime;
+    protected GameSessionWardenFamilyRuntime wardenFamilyRuntime;
 
 
     protected GameSessionEffectSupport(BedwarsManager bedwarsManager, Arena arena) {

@@ -1419,6 +1419,9 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 if (!session.isInArenaWorld(event.getEntity().getWorld())) {
                     return;
                 }
+                if (session.isWardenFamilyEntity(event.getEntity())) {
+                    return;
+                }
                 if (session.isAbyssalRiftEntity(event.getEntity())) {
                     Player attacker = resolveAttacker(event);
                     if (session.damageAbyssalRift(event.getEntity(), attacker, resolveAbyssalRiftDamage(event))) {
@@ -1615,6 +1618,10 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 if (!session.isInArenaWorld(event.getEntity().getWorld())) {
                     return;
                 }
+                if (session.isWardenFamilyEntity(event.getEntity())) {
+                    session.handleWardenFamilyDamage(event);
+                    return;
+                }
                 if (session.isAbyssalRiftEntity(event.getEntity())) {
                     if (session.damageAbyssalRift(event.getEntity(), null, resolveAbyssalRiftDamage(event))) {
                         event.setCancelled(true);
@@ -1721,6 +1728,11 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
     public void onEntityTarget(EntityTargetLivingEntityEvent event) {
         safeHandle("onEntityTarget", () -> {
             if (!isSummon(event.getEntity())) {
+                GameSession session = bedwarsManager.getActiveSession();
+                if (session == null || !session.isWardenFamilyEntity(event.getEntity())) {
+                    return;
+                }
+                session.handleWardenFamilyTarget(event);
                 return;
             }
             GameSession session = bedwarsManager.getActiveSession();
@@ -1728,6 +1740,7 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 event.setCancelled(true);
                 return;
             }
+            session.handleWardenFamilyTarget(event);
             if (!(event.getTarget() instanceof Player target)) {
                 event.setCancelled(true);
                 return;
@@ -1812,6 +1825,13 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
     @EventHandler(ignoreCancelled = true)
     public void onEntityDeath(EntityDeathEvent event) {
         safeHandle("onEntityDeath", () -> {
+            GameSession session = bedwarsManager.getActiveSession();
+            if (session != null && session.isWardenFamilyEntity(event.getEntity())) {
+                event.getDrops().clear();
+                event.setDroppedExp(0);
+                session.handleWardenFamilyDeath(event.getEntity());
+                return;
+            }
             if (!isSummon(event.getEntity())) {
                 return;
             }

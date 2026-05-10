@@ -42,6 +42,7 @@ shop:
         scale_down_upgrade: 30
         illusion_trap: 31
         broken_mirror_upgrade: 32
+        warden_family_upgrade: 33
   items:
     utility:
       fireball:
@@ -435,3 +436,15 @@ shop:
           - "to all enemy players."
         behavior: UPGRADE
         upgrade: BROKEN_MIRROR
+      warden_family_upgrade:
+        material: SCULK_SHRIEKER
+        amount: 1
+        cost:
+          material: DIAMOND
+          amount: 2
+        display-name: "Warden Family"
+        lore:
+          - "Shared across all teams."
+          - "Spawns middle Wardens by level."
+        behavior: UPGRADE
+        upgrade: WARDEN_FAMILY

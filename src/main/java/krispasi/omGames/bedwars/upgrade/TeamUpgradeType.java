@@ -26,6 +26,8 @@ public enum TeamUpgradeType {
             List.of("Shrink your team to 90% and 80% size.")),
     BROKEN_MIRROR("Broken Mirror", Material.TINTED_GLASS, new int[]{1, 4, 16, 32},
             List.of("Each level adds 1 temporary karma", "to all enemy players.")),
+    WARDEN_FAMILY("Warden Family", Material.SCULK_SHRIEKER, new int[]{2, 2, 2},
+            List.of("Shared among all teams.", "Each level adds a middle Warden.")),
     FORGE("Forge", Material.FURNACE, new int[]{2, 4, 6, 8},
             List.of("Upgrade your base generator.")),
     HEAL_POOL("Heal Pool", Material.BEACON, new int[]{1},
@@ -75,7 +77,17 @@ public enum TeamUpgradeType {
             case FORGE -> forgeName(tier);
             case SHARPNESS -> displayName;
             case HEAL_POOL -> displayName;
+            case WARDEN_FAMILY -> wardenFamilyName(tier);
             default -> displayName + " " + toRoman(tier);
+        };
+    }
+
+    private String wardenFamilyName(int tier) {
+        return switch (tier) {
+            case 1 -> "Gary the Warden";
+            case 2 -> "Gary's Wife";
+            case 3 -> "Gary Jr.";
+            default -> displayName;
         };
     }
 

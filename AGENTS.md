@@ -535,7 +535,16 @@ Rotating item notes:
 - `broken_mirror`
   - rotating team upgrade with `4` levels
   - each purchased level adds `1` temporary karma to every current enemy participant
-- the three pylon entries (`abyssal_rift`, `abyssal_rift_corruption`, `abyssal_rift_regeneration`) count as one rotating-item selection in auto/manual rotation; when that selection is active, all three shop entries should be available together
+- `warden_family`
+  - rotating shared upgrade with `3` levels
+  - level 1 spawns `Gary the Warden` (500 HP) at middle
+  - level 2 adds `Gary's Wife` (200 HP), level 3 adds `Gary Jr.` (100 HP)
+  - each level costs `2` diamonds
+  - wife/junior deaths downgrade the shared level by `1`
+  - if one falls to death, it digs away then re-emerges at middle with the same health
+  - wardens use a circular `30`-block territory around each diamond/emerald generator
+  - if target leaves territory, the target is cleared and the warden digs away/re-emerges at middle
+  - if middle support is air, create a temporary stone platform and clear it when the session ends
 - when `time_capsule` is active for a match, any available saved reward capsules from that queue should be granted to participants at match start before play begins
 - if `shop.categories.rotating_upgrades` has no upgrade entries, rotating-upgrade selection falls back to upgrade entries found under `shop.categories.rotating`
 - if `shop.categories.rotating_upgrades` does have entries, it is the authoritative upgrade/trap pool and runtime should not also consult legacy upgrade entries under `shop.categories.rotating`
