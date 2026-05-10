@@ -12,6 +12,7 @@ import krispasi.omGames.bedwars.generator.*;
 import krispasi.omGames.bedwars.gui.*;
 import krispasi.omGames.bedwars.item.*;
 import krispasi.omGames.bedwars.model.*;
+import krispasi.omGames.bedwars.rotation.BedwarsRotationHistoryService;
 import krispasi.omGames.bedwars.shop.*;
 import krispasi.omGames.bedwars.upgrade.*;
 import krispasi.omGames.shared.SKIN_TYPE;
@@ -598,9 +599,62 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
             }
             return;
         }
-        rotatingItemIds.addAll(pickRandom(itemCandidates, 2));
-        rotatingUpgradeIds.addAll(pickRandom(upgradeCandidates, 1));
+        if (testMode) {
+            rotatingItemIds.addAll(pickRandom(itemCandidates, 2));
+            rotatingUpgradeIds.addAll(pickRandom(upgradeCandidates, 1));
+        } else {
+            BedwarsRotationHistoryService historyService = bedwarsManager.getRotationHistoryService();
+            if (historyService != null) {
+                historyService.ensureCandidates(itemCandidates, upgradeCandidates);
+            }
+            List<String> pickedItems = pickByHistory(itemCandidates, 2, true);
+            List<String> pickedUpgrades = pickByHistory(upgradeCandidates, 1, false);
+            rotatingItemIds.addAll(pickedItems);
+            rotatingUpgradeIds.addAll(pickedUpgrades);
+            if (historyService != null) {
+                historyService.recordItemPicks(pickedItems);
+                historyService.recordUpgradePicks(pickedUpgrades);
+            }
+        }
         normalizeAutoRotatingSelection(itemCandidates, upgradeCandidates);
+    }
+
+    protected List<String> pickByHistory(List<String> candidates, int count, boolean itemPool) {
+        if (candidates == null || candidates.isEmpty()) {
+            return List.of();
+        }
+        int target = Math.max(1, Math.min(count, candidates.size()));
+        BedwarsRotationHistoryService historyService = bedwarsManager.getRotationHistoryService();
+        if (historyService == null) {
+            return pickRandom(candidates, count);
+        }
+        List<String> remaining = new ArrayList<>(new LinkedHashSet<>(candidates));
+        List<String> picked = new ArrayList<>();
+        while (picked.size() < target && !remaining.isEmpty()) {
+            int min = Integer.MAX_VALUE;
+            for (String candidate : remaining) {
+                int value = itemPool
+                        ? historyService.getItemPickCount(candidate)
+                        : historyService.getUpgradePickCount(candidate);
+                if (value < min) {
+                    min = value;
+                }
+            }
+            List<String> minPool = new ArrayList<>();
+            for (String candidate : remaining) {
+                int value = itemPool
+                        ? historyService.getItemPickCount(candidate)
+                        : historyService.getUpgradePickCount(candidate);
+                if (value == min) {
+                    minPool.add(candidate);
+                }
+            }
+            Collections.shuffle(minPool);
+            String selected = minPool.get(0);
+            picked.add(selected);
+            remaining.remove(selected);
+        }
+        return picked;
     }
 
     protected krispasi.omGames.bedwars.shop.ShopCategory resolveRotatingUpgradeCategory(ShopConfig config) {

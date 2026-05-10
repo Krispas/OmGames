@@ -42,6 +42,7 @@ public final class OmGames extends JavaPlugin {
         bedwarsManager.loadArenas();
         bedwarsManager.loadCustomItems();
         bedwarsManager.loadShopConfig();
+        bedwarsManager.loadRotationHistory();
         bedwarsManager.loadQuickBuy();
         bedwarsManager.loadStats();
         bedwarsManager.loadTimeCapsules();

@@ -15,6 +15,7 @@ import krispasi.omGames.bedwars.item.CustomItemConfigLoader;
 import krispasi.omGames.bedwars.karma.BedwarsKarmaService;
 import krispasi.omGames.bedwars.lobby.BedwarsLobbyParkour;
 import krispasi.omGames.bedwars.lobby.BedwarsParkourLeaderboard;
+import krispasi.omGames.bedwars.rotation.BedwarsRotationHistoryService;
 import krispasi.omGames.bedwars.shop.QuickBuyService;
 import krispasi.omGames.bedwars.stats.BedwarsLobbyLeaderboard;
 import krispasi.omGames.bedwars.stats.BedwarsStatsService;
@@ -78,6 +79,7 @@ public class BedwarsManager {
     private final BedwarsStatsService statsService;
     private final TimeCapsuleService timeCapsuleService;
     private final BedwarsKarmaService karmaService;
+    private final BedwarsRotationHistoryService rotationHistoryService;
     private final BedwarsLobbyLeaderboard lobbyLeaderboard;
     private final BedwarsLobbyParkour lobbyParkour;
     private final BedwarsParkourLeaderboard parkourLeaderboard;
@@ -102,6 +104,7 @@ public class BedwarsManager {
         this.statsService = new BedwarsStatsService(plugin);
         this.timeCapsuleService = new TimeCapsuleService(plugin);
         this.karmaService = new BedwarsKarmaService(plugin);
+        this.rotationHistoryService = new BedwarsRotationHistoryService(plugin);
         this.lobbyLeaderboard = new BedwarsLobbyLeaderboard(plugin, statsService);
         this.lobbyParkour = new BedwarsLobbyParkour(this);
         this.parkourLeaderboard = new BedwarsParkourLeaderboard(plugin, lobbyParkour);
@@ -266,6 +269,10 @@ public class BedwarsManager {
         return karmaEventConfig;
     }
 
+    public void loadRotationHistory() {
+        rotationHistoryService.load(getBedwarsDataFolder());
+    }
+
     public BedwarsMoonBigConfig getMoonBigConfig() {
         return moonBigConfig;
     }
@@ -288,6 +295,10 @@ public class BedwarsManager {
 
     public BedwarsLobbyParkour getLobbyParkour() {
         return lobbyParkour;
+    }
+
+    public BedwarsRotationHistoryService getRotationHistoryService() {
+        return rotationHistoryService;
     }
 
     public BedwarsSkinSelection getSkinSelection(UUID playerId, SKIN_TYPE type) {
@@ -595,6 +606,7 @@ public class BedwarsManager {
         statsService.shutdown();
         timeCapsuleService.shutdown();
         karmaService.shutdown();
+        rotationHistoryService.shutdown();
         saveSkins();
         skinSelections.clear();
         clearDroppedItems();

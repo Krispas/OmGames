@@ -118,11 +118,13 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
    - `shop.yml`
    - `rotating-items.yml`
    - `custom-items.yml`
+   - `rotating-history.yml` (created on demand after first normal auto-rotation roll)
 2. Construct `BedwarsManager`.
 3. Load:
    - arenas
    - custom items
    - shop config
+   - rotating history
    - rotating config merge
    - quick-buy DB
    - stats DB
@@ -281,8 +283,13 @@ Files:
 - `shop.yml`
 - `rotating-items.yml`
 - `custom-items.yml`
+- `rotating-history.yml`
 - `../Skins/bedwars.yml`
 - `../OmGames.db`
+
+`rotating-history.yml`:
+- stores persistent pick counters for normal-match auto-rotation balancing
+- test matches ignore this history and do not increment it
 
 ### 2.7 SQLite
 

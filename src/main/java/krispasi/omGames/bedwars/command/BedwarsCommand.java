@@ -304,6 +304,7 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             bedwarsManager.loadArenas();
             bedwarsManager.loadCustomItems();
             bedwarsManager.loadShopConfig();
+            bedwarsManager.loadRotationHistory();
             bedwarsManager.loadQuickBuy();
             sender.sendMessage(Component.text("BedWars configs reloaded.", NamedTextColor.GREEN));
             if (bedwarsManager.getActiveSession() != null && bedwarsManager.getActiveSession().isActive()) {
