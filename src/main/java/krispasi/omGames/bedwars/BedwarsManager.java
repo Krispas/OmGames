@@ -91,7 +91,9 @@ public class BedwarsManager {
     private BlockPoint sharedLobbySpawn = DEFAULT_LOBBY_SPAWN;
     private String lobbyAmbientWorldName;
     private BukkitTask lobbyAmbientChimeTask;
+    private BukkitTask lobbyMenuVillagerRestoreTask;
     private UUID lobbyMenuVillagerId;
+    private String lobbyMenuVillagerSerializedLocation;
     private ShopConfig shopConfig = ShopConfig.empty();
     private CustomItemConfig customItemConfig = CustomItemConfig.empty();
     private BedwarsMatchEventConfig matchEventConfig = BedwarsMatchEventConfig.defaults();
@@ -221,6 +223,7 @@ public class BedwarsManager {
         lobbyLeaderboard.start();
         parkourLeaderboard.start();
         startLobbyAmbientChimeLoop();
+        ensureLobbyMenuVillagerRestored();
     }
 
     public Collection<Arena> getArenas() {
@@ -594,6 +597,7 @@ public class BedwarsManager {
 
     public void shutdown() {
         stopLobbyAmbientChimeLoop();
+        cancelLobbyMenuVillagerRestoreTask();
         if (activeSession != null) {
             activeSession.stop();
             activeSession = null;
@@ -966,6 +970,7 @@ public class BedwarsManager {
     }
 
     private void configureLobbyMenuVillager(File configFile) {
+        lobbyMenuVillagerSerializedLocation = null;
         if (configFile == null || !configFile.exists()) {
             return;
         }
@@ -974,9 +979,44 @@ public class BedwarsManager {
         if (serialized == null) {
             return;
         }
+        lobbyMenuVillagerSerializedLocation = serialized;
+        ensureLobbyMenuVillagerRestored();
+    }
+
+    private void ensureLobbyMenuVillagerRestored() {
+        String serialized = trimToNull(lobbyMenuVillagerSerializedLocation);
+        if (serialized == null) {
+            return;
+        }
+        if (trySpawnConfiguredLobbyMenuVillager(serialized)) {
+            lobbyMenuVillagerSerializedLocation = null;
+            cancelLobbyMenuVillagerRestoreTask();
+            return;
+        }
+        if (lobbyMenuVillagerRestoreTask != null) {
+            return;
+        }
+        lobbyMenuVillagerRestoreTask = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+            try {
+                String pending = trimToNull(lobbyMenuVillagerSerializedLocation);
+                if (pending == null) {
+                    cancelLobbyMenuVillagerRestoreTask();
+                    return;
+                }
+                if (trySpawnConfiguredLobbyMenuVillager(pending)) {
+                    lobbyMenuVillagerSerializedLocation = null;
+                    cancelLobbyMenuVillagerRestoreTask();
+                }
+            } catch (Exception ex) {
+                plugin.getLogger().warning("Failed to restore lobby menu villager: " + ex.getMessage());
+            }
+        }, 40L, 40L);
+    }
+
+    private boolean trySpawnConfiguredLobbyMenuVillager(String serialized) {
         Location location = parseLobbyMenuVillagerLocation(serialized);
         if (location == null || location.getWorld() == null) {
-            return;
+            return false;
         }
         removeLobbyMenuVillager();
         Villager villager = location.getWorld().spawn(location, Villager.class, created -> {
@@ -992,6 +1032,14 @@ public class BedwarsManager {
             created.setPersistent(true);
         });
         lobbyMenuVillagerId = villager.getUniqueId();
+        return true;
+    }
+
+    private void cancelLobbyMenuVillagerRestoreTask() {
+        if (lobbyMenuVillagerRestoreTask != null) {
+            lobbyMenuVillagerRestoreTask.cancel();
+            lobbyMenuVillagerRestoreTask = null;
+        }
     }
 
     private Location parseLobbyMenuVillagerLocation(String raw) {

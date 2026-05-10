@@ -503,7 +503,9 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
                 || cause == EntityDamageEvent.DamageCause.FIRE_TICK
                 || cause == EntityDamageEvent.DamageCause.LAVA
                 || cause == EntityDamageEvent.DamageCause.HOT_FLOOR
-                || cause == EntityDamageEvent.DamageCause.CAMPFIRE;
+                || cause == EntityDamageEvent.DamageCause.CAMPFIRE
+                || cause == EntityDamageEvent.DamageCause.POISON
+                || cause == EntityDamageEvent.DamageCause.MAGIC;
     }
 
     protected void applySummonStats(LivingEntity entity, CustomItemDefinition custom) {

@@ -414,6 +414,8 @@ Root keys:
 
 Supported event ids:
 - `speedrun`
+- `speedrun-any`
+- `the-rapture`
 - `benevolent-upgrades`
 - `long-arms`
 - `moon-big`
@@ -431,6 +433,18 @@ Supported event ids:
 - bridge egg should not launch a projectile; using it should instead pillar the user upward `30` blocks over time while building a vertical team-wool column under them
 - fireball should seat its thrower on the launched projectile and manual dismount attempts should be blocked while that fireball exists
 - the April Fools rotating-item override should auto-include both `bedrock` and `riding_fireball` when those rotating candidates exist
+
+`speedrun-any` runtime note:
+- all arena phase timers run `5x` faster (tier upgrades, bed destruction, sudden death, and game end)
+- sudden-death world-border shrink duration also runs `5x` faster
+
+Global world-border pacing note:
+- tune sudden-death world-border pacing through arena `event-times` config (`sudden-death` and `game-end`) rather than code-side multipliers
+
+`the-rapture` runtime note:
+- schedules four hidden outcomes (one from each pair: `famine/meltdown`, `pestilence/pollution`, `war/conquest`, `death/eternity`) between match start and bed destruction with at least `60s` spacing
+- each outcome plays a warning `10s` before trigger (`The anger of god is coming!`) with a wither ambient cue
+- if item rewards target a respawning participant, drop those rewards at that player's base generator location
 
 `moon-big` runtime note:
 - use the gravity attribute for the low-gravity effect

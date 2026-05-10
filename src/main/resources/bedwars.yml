@@ -20,6 +20,10 @@ match-events:
   events:
     speedrun:
       weight: 3
+    speedrun-any:
+      weight: 3
+    the-rapture:
+      weight: 2
     benevolent-upgrades:
       weight: 3
     long-arms:
@@ -147,7 +151,7 @@ arenas:
       tier-3: 660
       bed-destruction: 1260
       sudden-death: 1560
-      game-end: 2120
+      game-end: 1840
     world: bedwars
     center: 952 68 1488
     center-radius: 51
@@ -367,7 +371,7 @@ arenas:
       tier-3: 660
       bed-destruction: 1260
       sudden-death: 1560
-      game-end: 2120
+      game-end: 1840
   Vigilante:
     world: bedwars
     center: -3244 73 108
@@ -517,7 +521,7 @@ arenas:
       tier-3: 660
       bed-destruction: 1260
       sudden-death: 1560
-      game-end: 2120
+      game-end: 1840
   Mirage:
     world: bedwars
     center: 945 61 -976
@@ -667,7 +671,7 @@ arenas:
     tier-3: 660
     bed-destruction: 1260
     sudden-death: 1560
-    game-end: 2120
+    game-end: 1840
   Keep:
     world: bedwars
     center: -999 46 1000
@@ -817,7 +821,7 @@ arenas:
       tier-3: 660
       bed-destruction: 1260
       sudden-death: 1560
-      game-end: 2120
+      game-end: 1840
   Rooftop:
     world: bedwars
     center: 2540 83 36
@@ -967,4 +971,4 @@ arenas:
       tier-3: 660
       bed-destruction: 1260
       sudden-death: 1560
-      game-end: 2120
+      game-end: 1840

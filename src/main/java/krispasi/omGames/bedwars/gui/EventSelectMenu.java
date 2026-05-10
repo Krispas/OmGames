@@ -23,16 +23,23 @@ import org.bukkit.inventory.meta.ItemMeta;
  * Inventory UI for selecting the prestart match-event mode before the game starts.
  */
 public class EventSelectMenu implements InventoryHolder {
-    private static final int INVENTORY_SIZE = 27;
-    private static final int[] EVENT_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19};
-    private static final int FORCE_RANDOM_SLOT = 21;
-    private static final int AUTO_SLOT = 22;
-    private static final int BACK_SLOT = 26;
+    private static final int INVENTORY_SIZE = 54;
+    private static final int[] EVENT_SLOTS = {
+            10, 11, 12, 13, 14, 15, 16,
+            19, 20, 21, 22, 23, 24, 25,
+            28, 29, 30, 31, 32, 33, 34
+    };
+    private static final int PREV_SLOT = 45;
+    private static final int FORCE_RANDOM_SLOT = 46;
+    private static final int AUTO_SLOT = 47;
+    private static final int BACK_SLOT = 49;
+    private static final int NEXT_SLOT = 53;
 
     private final GameSession session;
     private final UUID viewerId;
     private final Inventory inventory;
     private final Map<Integer, BedwarsMatchEventType> eventSlots = new HashMap<>();
+    private int page;
 
     public EventSelectMenu(GameSession session, Player viewer) {
         this.session = session;
@@ -70,6 +77,21 @@ public class EventSelectMenu implements InventoryHolder {
             new TeamAssignMenu(session.getBedwarsManager(), session).open(player);
             return;
         }
+        if (slot == PREV_SLOT) {
+            if (page > 0) {
+                page--;
+                build();
+            }
+            return;
+        }
+        if (slot == NEXT_SLOT) {
+            int lastPage = Math.max(0, (int) Math.ceil(BedwarsMatchEventType.values().length / (double) EVENT_SLOTS.length) - 1);
+            if (page < lastPage) {
+                page++;
+                build();
+            }
+            return;
+        }
         if (slot == FORCE_RANDOM_SLOT) {
             BedwarsMatchEventConfig config = session.getBedwarsManager().getMatchEventConfig();
             if (config == null || !config.hasEligibleEvents()) {
@@ -100,15 +122,35 @@ public class EventSelectMenu implements InventoryHolder {
         BedwarsMatchEventType forced = session.getForcedMatchEvent();
         boolean forcedRandom = session.isForcedRandomMatchEvent();
         BedwarsMatchEventType[] events = BedwarsMatchEventType.values();
-        for (int i = 0; i < events.length && i < EVENT_SLOTS.length; i++) {
-            BedwarsMatchEventType type = events[i];
+        int totalPages = Math.max(1, (int) Math.ceil(events.length / (double) EVENT_SLOTS.length));
+        if (page >= totalPages) {
+            page = totalPages - 1;
+        }
+        int startIndex = page * EVENT_SLOTS.length;
+        for (int i = 0; i < EVENT_SLOTS.length; i++) {
+            int eventIndex = startIndex + i;
+            if (eventIndex >= events.length) {
+                break;
+            }
+            BedwarsMatchEventType type = events[eventIndex];
             int slot = EVENT_SLOTS[i];
             inventory.setItem(slot, buildEventItem(type, config, forced == type));
             eventSlots.put(slot, type);
         }
+        inventory.setItem(PREV_SLOT, buildPageItem(Material.ARROW, "Previous", page > 0));
+        inventory.setItem(NEXT_SLOT, buildPageItem(Material.ARROW, "Next", page < totalPages - 1));
         inventory.setItem(FORCE_RANDOM_SLOT, buildForceRandomItem(config, forcedRandom));
         inventory.setItem(AUTO_SLOT, buildAutoItem(config, forced == null && !forcedRandom));
         inventory.setItem(BACK_SLOT, buildBackItem());
+    }
+
+    private ItemStack buildPageItem(Material material, String label, boolean enabled) {
+        ItemStack item = new ItemStack(enabled ? material : Material.GRAY_STAINED_GLASS_PANE);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(Component.text(label, enabled ? NamedTextColor.YELLOW : NamedTextColor.DARK_GRAY));
+        meta.lore(List.of(Component.text(enabled ? "Change page" : "No more pages", NamedTextColor.GRAY)));
+        item.setItemMeta(meta);
+        return item;
     }
 
     private ItemStack buildEventItem(BedwarsMatchEventType type, BedwarsMatchEventConfig config, boolean selected) {
@@ -173,6 +215,8 @@ public class EventSelectMenu implements InventoryHolder {
     private Material iconFor(BedwarsMatchEventType type) {
         return switch (type) {
             case SPEEDRUN -> Material.SUGAR;
+            case SPEEDRUN_ANY -> Material.CLOCK;
+            case THE_RAPTURE -> Material.WITHER_ROSE;
             case BENEVOLENT_UPGRADES -> Material.ENCHANTED_BOOK;
             case LONG_ARMS -> Material.STICK;
             case MOON_BIG -> Material.RABBIT_FOOT;

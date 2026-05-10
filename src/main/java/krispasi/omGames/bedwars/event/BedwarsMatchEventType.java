@@ -9,6 +9,8 @@ import java.util.Locale;
  */
 public enum BedwarsMatchEventType {
     SPEEDRUN("speedrun", "Speedrun!", "Everyone is faster.", 3),
+    SPEEDRUN_ANY("speedrun-any", "Speedrun Any%", "All game phases are 5x faster.", 3),
+    THE_RAPTURE("the-rapture", "The Rapture", "Judgment events will strike before bed destruction.", 2),
     BENEVOLENT_UPGRADES("benevolent-upgrades", "Benevolent Upgrades", "Teams begin with maxed upgrades.", 3),
     LONG_ARMS("long-arms", "Long Arms!", "Your block reach is extended.", 3),
     MOON_BIG("moon-big", "MOON BIG!!!", "Jump like the moon owns you.", 3),

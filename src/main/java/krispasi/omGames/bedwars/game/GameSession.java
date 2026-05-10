@@ -120,6 +120,7 @@ public class GameSession extends GameSessionMatchFlowSupport {
                 tasks);
         this.timeCapsuleRuntime = new GameSessionTimeCapsuleRuntime(this, bedwarsManager.getTimeCapsuleService());
         this.karmaRuntime = new GameSessionKarmaRuntime(this, bedwarsManager.getKarmaService());
+        this.raptureRuntime = new GameSessionRaptureRuntime(this, assignments, tasks);
     }
 
     public static Title.Times sharedTitleTimes() {

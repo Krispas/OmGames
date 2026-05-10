@@ -274,6 +274,7 @@ abstract class GameSessionEffectSupport {
     protected GameSessionMoonBigAsteroidRuntime moonBigAsteroidRuntime;
     protected GameSessionTimeCapsuleRuntime timeCapsuleRuntime;
     protected GameSessionKarmaRuntime karmaRuntime;
+    protected GameSessionRaptureRuntime raptureRuntime;
 
 
     protected GameSessionEffectSupport(BedwarsManager bedwarsManager, Arena arena) {
@@ -1107,6 +1108,11 @@ abstract class GameSessionEffectSupport {
                     falloutRuntime.applyTo(player);
                 }
             }
+            case THE_RAPTURE -> {
+                if (raptureRuntime != null) {
+                    raptureRuntime.applyTo(player);
+                }
+            }
             default -> {
             }
         }
@@ -1307,6 +1313,8 @@ abstract class GameSessionEffectSupport {
         player.removePotionEffect(PotionEffectType.SLOWNESS);
         player.removePotionEffect(PotionEffectType.MINING_FATIGUE);
         player.removePotionEffect(PotionEffectType.SLOW_FALLING);
+        player.removePotionEffect(PotionEffectType.WEAKNESS);
+        player.removePotionEffect(PotionEffectType.POISON);
         PotionEffectType resistance = resolvePotionEffectType("RESISTANCE", "DAMAGE_RESISTANCE");
         if (resistance != null) {
             player.removePotionEffect(resistance);

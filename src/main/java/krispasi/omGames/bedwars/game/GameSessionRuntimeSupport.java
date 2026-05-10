@@ -49,6 +49,7 @@ import org.bukkit.util.Vector;
  */
 
 abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
+    protected static final int SPEEDRUN_ANY_POST_BORDER_GAME_END_BUFFER_SECONDS = 5 * 60;
 
     protected GameSessionRuntimeSupport(BedwarsManager bedwarsManager, Arena arena) {
         super(bedwarsManager, arena);
@@ -2235,21 +2236,42 @@ abstract class GameSessionRuntimeSupport extends GameSessionEffectSupport {
                 : 0L;
         krispasi.omGames.bedwars.model.EventSettings events = arena.getEventSettings();
         if (!tier2Triggered) {
-            return new EventInfo("Generators II", remainingSeconds(events.getTier2Delay(), elapsedSeconds));
+            return new EventInfo("Generators II",
+                    remainingSeconds(resolveMatchPhaseDelaySeconds(events.getTier2Delay()), elapsedSeconds));
         }
         if (!tier3Triggered) {
-            return new EventInfo("Generators III", remainingSeconds(events.getTier3Delay(), elapsedSeconds));
+            return new EventInfo("Generators III",
+                    remainingSeconds(resolveMatchPhaseDelaySeconds(events.getTier3Delay()), elapsedSeconds));
         }
         if (!bedDestructionTriggered) {
-            return new EventInfo("Beds Destroyed", remainingSeconds(events.getBedDestructionDelay(), elapsedSeconds));
+            return new EventInfo("Beds Destroyed",
+                    remainingSeconds(resolveMatchPhaseDelaySeconds(events.getBedDestructionDelay()), elapsedSeconds));
         }
         if (!suddenDeathActive) {
-            return new EventInfo("Sudden Death", remainingSeconds(events.getSuddenDeathDelay(), elapsedSeconds));
+            return new EventInfo("Sudden Death",
+                    remainingSeconds(resolveMatchPhaseDelaySeconds(events.getSuddenDeathDelay()), elapsedSeconds));
         }
         if (!gameEndTriggered) {
-            return new EventInfo("Game End", remainingSeconds(events.getGameEndDelay(), elapsedSeconds));
+            return new EventInfo("Game End",
+                    remainingSeconds(resolveGameEndDelaySeconds(events.getGameEndDelay()), elapsedSeconds));
         }
         return new EventInfo("Game End", 0);
+    }
+
+    protected int resolveMatchPhaseDelaySeconds(int baseDelaySeconds) {
+        int safe = Math.max(0, baseDelaySeconds);
+        if (activeMatchEvent != BedwarsMatchEventType.SPEEDRUN_ANY) {
+            return safe;
+        }
+        return Math.max(1, (int) Math.ceil(safe / 5.0d));
+    }
+
+    protected int resolveGameEndDelaySeconds(int baseGameEndDelaySeconds) {
+        int resolved = resolveMatchPhaseDelaySeconds(baseGameEndDelaySeconds);
+        if (activeMatchEvent == BedwarsMatchEventType.SPEEDRUN_ANY) {
+            return resolved + SPEEDRUN_ANY_POST_BORDER_GAME_END_BUFFER_SECONDS;
+        }
+        return resolved;
     }
 
     protected int remainingSeconds(int targetSeconds, long elapsedSeconds) {

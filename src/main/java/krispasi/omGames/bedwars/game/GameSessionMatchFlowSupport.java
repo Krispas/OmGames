@@ -542,11 +542,11 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
     protected void scheduleGameEvents() {
         krispasi.omGames.bedwars.model.EventSettings events = arena.getEventSettings();
         scheduleLongMatchPartyExp(LONG_MATCH_PARTY_EXP_SECONDS);
-        scheduleTierUpgrade(2, events.getTier2Delay());
-        scheduleTierUpgrade(3, events.getTier3Delay());
-        scheduleBedDestruction(events.getBedDestructionDelay());
-        scheduleSuddenDeath(events.getSuddenDeathDelay());
-        scheduleGameEnd(events.getGameEndDelay());
+        scheduleTierUpgrade(2, resolveMatchPhaseDelaySeconds(events.getTier2Delay()));
+        scheduleTierUpgrade(3, resolveMatchPhaseDelaySeconds(events.getTier3Delay()));
+        scheduleBedDestruction(resolveMatchPhaseDelaySeconds(events.getBedDestructionDelay()));
+        scheduleSuddenDeath(resolveMatchPhaseDelaySeconds(events.getSuddenDeathDelay()));
+        scheduleGameEnd(resolveGameEndDelaySeconds(events.getGameEndDelay()));
     }
 
     protected void rollMatchEvent() {
@@ -730,6 +730,12 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         if (activeMatchEvent == BedwarsMatchEventType.FALLOUT) {
             if (falloutRuntime != null) {
                 falloutRuntime.start();
+            }
+            return;
+        }
+        if (activeMatchEvent == BedwarsMatchEventType.THE_RAPTURE) {
+            if (raptureRuntime != null) {
+                raptureRuntime.start();
             }
             return;
         }
@@ -1227,7 +1233,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             return;
         }
         EventSettings events = arena.getEventSettings();
-        int remainingSeconds = Math.max(1, events.getGameEndDelay() - events.getSuddenDeathDelay());
+        int remainingSeconds = Math.max(1,
+                resolveMatchPhaseDelaySeconds(events.getGameEndDelay())
+                        - resolveMatchPhaseDelaySeconds(events.getSuddenDeathDelay()));
         WorldBorder border = world.getWorldBorder();
         double targetSize = SUDDEN_DEATH_BORDER_TARGET_SIZE;
         border.setCenter(center.x() + 0.5, center.z() + 0.5);
@@ -1983,6 +1991,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         }
         if (falloutRuntime != null) {
             falloutRuntime.reset();
+        }
+        if (raptureRuntime != null) {
+            raptureRuntime.reset();
         }
         if (spinjitzuRuntime != null) {
             spinjitzuRuntime.reset();
