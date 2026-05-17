@@ -85,7 +85,7 @@ final class GameSessionCustomItemRuntime {
     private static final int SHOCK_CELL_MAX_CHARGE = 100;
     private static final int SHOCK_CELL_MIN_FIRE_CHARGE = 10;
     private static final int SHOCK_CELL_WAVE_CHARGE_THRESHOLD = 50;
-    private static final int SHOCK_CELL_CHARGE_PER_CLICK = 10;
+    private static final int SHOCK_CELL_CHARGE_PER_CLICK = 1;
     private static final double SHOCK_CELL_WAVE_SAMPLE_STEP = 1.0;
     private static final double SHOCK_CELL_BOLT_SAMPLE_STEP = 0.5;
     private static final double SHOCK_CELL_ENTITY_HIT_RADIUS = 0.9;
@@ -1711,15 +1711,15 @@ final class GameSessionCustomItemRuntime {
             return;
         }
         int maxDurability = item.getType().getMaxDurability();
-        if (maxDurability <= 0) {
+        if (maxDurability <= 1) {
             return;
         }
-        int durabilityLeft = (int) Math.round((normalizedCharge / 100.0) * maxDurability);
-        int damage = Math.max(0, Math.min(maxDurability, maxDurability - durabilityLeft));
+        int durabilitySpan = maxDurability - 1;
+        int durabilityLeft = (int) Math.round((normalizedCharge / 100.0) * durabilitySpan);
+        int damage = Math.max(0, Math.min(durabilitySpan, durabilitySpan - durabilityLeft));
         damageable.setDamage(damage);
-        damageable.setUnbreakable(true);
         damageable.setItemModel(SHOCK_CELL_ITEM_MODEL);
-        damageable.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ATTRIBUTES);
+        damageable.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         CustomItemData.apply(damageable, custom.getId());
         item.setItemMeta(damageable);
     }

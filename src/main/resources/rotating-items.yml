@@ -387,7 +387,7 @@ shop:
           - "nearby enemies on contact."
         custom-item: spinjitzu
       shock_cell:
-        material: CARROT_ON_A_STICK
+        material: SHEARS
         amount: 1
         cost:
           material: EMERALD

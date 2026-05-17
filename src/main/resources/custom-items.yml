@@ -166,4 +166,4 @@ custom-items:
     save-chance-percent: 50
   shock_cell:
     type: SHOCK_CELL
-    material: CARROT_ON_A_STICK
+    material: SHEARS
