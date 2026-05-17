@@ -420,6 +420,7 @@ Supported event ids:
 - `long-arms`
 - `moon-big`
 - `blood-moon`
+- `sumo`
 - `fallout`
 - `chaos`
 - `in-this-economy`
@@ -459,6 +460,10 @@ Global world-border pacing note:
 - once per second, pick one shared attribute from the Fallout pool and change it up or down for every active participant by its configured step amount
 - Fallout uses one shared match-scoped value per attribute, so all participants always have the same current values and reconnecting players must receive those current values on rejoin
 - Fallout should reset its tracked attributes to their normal defaults on death-to-spectator transitions, quit, world/session exit, and match stop
+
+`sumo` runtime note:
+- all active participants should have `Resistance V`
+- all active participants should have their knockback-resistance attribute set to `5x` their default value
 
 `in-this-economy` runtime note:
 - `fireball`, `bed_bug`, and `dream_defender` stay purchasable at `4x` their normal price

@@ -15,6 +15,7 @@ public enum BedwarsMatchEventType {
     LONG_ARMS("long-arms", "Long Arms!", "Put those long noodles to use!", 3),
     MOON_BIG("moon-big", "MOON BIG!!!", "Grian? Is the moon big???!!!", 3),
     BLOOD_MOON("blood-moon", "Blood Moon!", "Embrace your inner demon.", 2),
+    SUMO("sumo", "SUMO!", "No damage. Only knockback.", 2),
     FALLOUT("fallout", "Fallout!", "Radiation is healthy!", 2),
     CHAOS("chaos", "Chaos!", "soahC ecarbmE", 2),
     IN_THIS_ECONOMY("in-this-economy", "In this economy?!", "Even ingame now?!", 3),

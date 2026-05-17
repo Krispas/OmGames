@@ -32,6 +32,8 @@ match-events:
       weight: 3
     blood-moon:
       weight: 2
+    sumo:
+      weight: 2
     fallout:
       weight: 2
     chaos:

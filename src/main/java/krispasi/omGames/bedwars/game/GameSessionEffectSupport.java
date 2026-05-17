@@ -1104,6 +1104,20 @@ abstract class GameSessionEffectSupport {
                 }
                 clampPlayerHealthToMax(player);
             }
+            case SUMO -> {
+                PotionEffectType resistance = resolvePotionEffectType("RESISTANCE", "DAMAGE_RESISTANCE");
+                if (resistance != null) {
+                    player.addPotionEffect(new PotionEffect(resistance,
+                            Integer.MAX_VALUE,
+                            4,
+                            true,
+                            false,
+                            true));
+                }
+                setAttributeToDefaultMultiplier(player, 5.0,
+                        "KNOCKBACK_RESISTANCE",
+                        "GENERIC_KNOCKBACK_RESISTANCE");
+            }
             case FALLOUT -> {
                 if (falloutRuntime != null) {
                     falloutRuntime.applyTo(player);
@@ -1325,6 +1339,7 @@ abstract class GameSessionEffectSupport {
         resetAttributeToDefault(player, "BLOCK_INTERACTION_RANGE", "PLAYER_BLOCK_INTERACTION_RANGE");
         resetAttributeToDefault(player, "JUMP_STRENGTH", "GENERIC_JUMP_STRENGTH");
         setAttributeToValue(player, DEFAULT_PLAYER_GRAVITY, "GRAVITY", "GENERIC_GRAVITY");
+        resetAttributeToDefault(player, "KNOCKBACK_RESISTANCE", "GENERIC_KNOCKBACK_RESISTANCE");
         resetAttributeToDefault(player, "MAX_HEALTH", "GENERIC_MAX_HEALTH");
         applyScale(player, DEFAULT_PLAYER_SCALE);
         clampPlayerHealthToMax(player);
