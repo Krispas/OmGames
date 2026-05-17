@@ -1,24 +1,20 @@
 package krispasi.omGames.bedwars.game;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
 import krispasi.omGames.bedwars.generator.GeneratorInfo;
 import krispasi.omGames.bedwars.generator.GeneratorType;
-import krispasi.omGames.bedwars.model.BlockPoint;
 import krispasi.omGames.bedwars.upgrade.TeamUpgradeType;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockState;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -44,7 +40,6 @@ final class GameSessionWardenFamilyRuntime {
     private final GameSession session;
     private final List<BukkitTask> sessionTasks;
     private final Set<UUID> relocatingWardens = new HashSet<>();
-    private final Map<BlockPoint, BlockState> temporaryMiddlePlatformBlocks = new HashMap<>();
 
     private UUID garyId;
     private UUID wifeId;
@@ -62,7 +57,7 @@ final class GameSessionWardenFamilyRuntime {
             clear();
             return;
         }
-        Location spawn = resolveMiddleSpawn(true);
+        Location spawn = resolveRandomEmeraldSpawn();
         if (spawn == null || spawn.getWorld() == null) {
             return;
         }
@@ -86,7 +81,6 @@ final class GameSessionWardenFamilyRuntime {
         removeByTier(2);
         removeByTier(1);
         relocatingWardens.clear();
-        clearTemporaryMiddlePlatform();
     }
 
     boolean isWardenFamilyEntity(Entity entity) {
@@ -173,7 +167,7 @@ final class GameSessionWardenFamilyRuntime {
             clear();
             return;
         }
-        Location spawn = resolveMiddleSpawn(true);
+        Location spawn = resolveRandomEmeraldSpawn();
         if (spawn == null) {
             return;
         }
@@ -282,7 +276,7 @@ final class GameSessionWardenFamilyRuntime {
                 warden.remove();
             }
             setByTier(tier, null);
-            Location spawn = resolveMiddleSpawn(true);
+            Location spawn = resolveRandomEmeraldSpawn();
             if (spawn != null) {
                 spawnWithEmerge(tier, spawn, maxHealth, resolveName(tier), health);
             }
@@ -401,49 +395,25 @@ final class GameSessionWardenFamilyRuntime {
         };
     }
 
-    private Location resolveMiddleSpawn(boolean allowPlatform) {
-        BlockPoint center = session.getArena().getCenter();
+    private Location resolveRandomEmeraldSpawn() {
+        List<GeneratorInfo> generators = session.getArena().getGenerators();
         World world = session.getArena().getWorld();
-        if (center == null || world == null) {
+        if (world == null || generators == null || generators.isEmpty()) {
             return null;
         }
-        if (allowPlatform) {
-            ensureMiddlePlatformIfNeeded(world, center);
+        List<GeneratorInfo> emeralds = generators.stream()
+                .filter(generator -> generator != null
+                        && generator.type() == GeneratorType.EMERALD
+                        && generator.location() != null)
+                .toList();
+        if (emeralds.isEmpty()) {
+            return null;
         }
-        return new Location(world, center.x() + 0.5, center.y() + 1.0, center.z() + 0.5);
-    }
-
-    private void ensureMiddlePlatformIfNeeded(World world, BlockPoint center) {
-        if (world == null || center == null) {
-            return;
-        }
-        Block support = world.getBlockAt(center.x(), center.y(), center.z());
-        if (!support.isEmpty()) {
-            return;
-        }
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                Block block = world.getBlockAt(center.x() + dx, center.y(), center.z() + dz);
-                if (!block.isEmpty()) {
-                    continue;
-                }
-                BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
-                temporaryMiddlePlatformBlocks.putIfAbsent(point, block.getState());
-                block.setType(Material.STONE, false);
-            }
-        }
-    }
-
-    private void clearTemporaryMiddlePlatform() {
-        if (temporaryMiddlePlatformBlocks.isEmpty()) {
-            return;
-        }
-        for (BlockState state : temporaryMiddlePlatformBlocks.values()) {
-            if (state != null) {
-                state.update(true, false);
-            }
-        }
-        temporaryMiddlePlatformBlocks.clear();
+        GeneratorInfo selected = emeralds.get(ThreadLocalRandom.current().nextInt(emeralds.size()));
+        return new Location(world,
+                selected.location().x() + 0.5,
+                selected.location().y() + 1.0,
+                selected.location().z() + 0.5);
     }
 
     private boolean isInsideTerritory(Location location) {
