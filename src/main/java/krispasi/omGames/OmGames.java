@@ -27,6 +27,12 @@ public final class OmGames extends JavaPlugin {
             "rotating-items.yml",
             "custom-items.yml"
     };
+    private static final String[] BEDWARS_VERSION_REFRESH_FILES = {
+            "shop.yml",
+            "rotating-items.yml",
+            "custom-items.yml"
+    };
+    private static final String BEDWARS_VERSION_MARKER_FILE = ".config-sync-version";
     private static OmGames instance;
     private BedwarsManager bedwarsManager;
     private BedwarsSetupManager setupManager;
@@ -108,6 +114,60 @@ public final class OmGames extends JavaPlugin {
     private void synchronizeBedwarsConfigs() {
         for (String configName : BEDWARS_CONFIG_FILES) {
             ensureBedwarsConfig(configName);
+        }
+        String pluginVersion = getDescription().getVersion();
+        String storedVersion = readBedwarsConfigSyncVersion();
+        if (pluginVersion.equalsIgnoreCase(storedVersion)) {
+            return;
+        }
+        getLogger().info("Detected plugin version change for BedWars config sync (" + storedVersion + " -> "
+                + pluginVersion + "). Refreshing shop/rotating/custom item defaults.");
+        for (String configName : BEDWARS_VERSION_REFRESH_FILES) {
+            copyBedwarsConfig(configName);
+        }
+        writeBedwarsConfigSyncVersion(pluginVersion);
+    }
+
+    private void copyBedwarsConfig(String name) {
+        java.io.File dataFolder = getDataFolder();
+        java.io.File bedwarsFolder = new java.io.File(dataFolder, "Bedwars");
+        if (!bedwarsFolder.exists()) {
+            bedwarsFolder.mkdirs();
+        }
+        java.io.File target = new java.io.File(bedwarsFolder, name);
+        try (java.io.InputStream input = getResource(name)) {
+            if (input == null) {
+                return;
+            }
+            java.nio.file.Files.copy(input, target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (java.io.IOException ex) {
+            getLogger().warning("Failed to refresh Bedwars config " + name + ": " + ex.getMessage());
+        }
+    }
+
+    private String readBedwarsConfigSyncVersion() {
+        java.io.File markerFile = new java.io.File(new java.io.File(getDataFolder(), "Bedwars"), BEDWARS_VERSION_MARKER_FILE);
+        if (!markerFile.exists()) {
+            return null;
+        }
+        try {
+            return java.nio.file.Files.readString(markerFile.toPath()).trim();
+        } catch (java.io.IOException ex) {
+            getLogger().warning("Failed to read Bedwars config sync marker: " + ex.getMessage());
+            return null;
+        }
+    }
+
+    private void writeBedwarsConfigSyncVersion(String version) {
+        java.io.File bedwarsFolder = new java.io.File(getDataFolder(), "Bedwars");
+        if (!bedwarsFolder.exists()) {
+            bedwarsFolder.mkdirs();
+        }
+        java.io.File markerFile = new java.io.File(bedwarsFolder, BEDWARS_VERSION_MARKER_FILE);
+        try {
+            java.nio.file.Files.writeString(markerFile.toPath(), version == null ? "" : version);
+        } catch (java.io.IOException ex) {
+            getLogger().warning("Failed to write Bedwars config sync marker: " + ex.getMessage());
         }
     }
 

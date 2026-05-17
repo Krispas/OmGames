@@ -118,6 +118,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
    - `shop.yml`
    - `rotating-items.yml`
    - `custom-items.yml`
+   - `.config-sync-version` (created on demand for BedWars version-based sync tracking)
    - `rotating-history.yml` (created on demand after first normal auto-rotation roll)
 2. Construct `BedwarsManager`.
 3. Load:
@@ -135,6 +136,11 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 5. Construct `BedwarsSetupManager`.
 6. Register `/bw`.
 7. Register `BedwarsListener`.
+
+BedWars config sync behavior on plugin version change:
+- only `shop.yml`, `rotating-items.yml`, and `custom-items.yml` are regenerated from bundled defaults
+- `bedwars.yml` is preserved
+- sync version state is tracked in `plugins/OmGames/Bedwars/.config-sync-version`
 
 #### 2.2.2 onDisable
 
