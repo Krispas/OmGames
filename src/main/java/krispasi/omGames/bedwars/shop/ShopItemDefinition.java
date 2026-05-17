@@ -31,6 +31,8 @@ import org.bukkit.potion.PotionEffect;
  * @see krispasi.omGames.bedwars.shop.ShopCost
  */
 public class ShopItemDefinition {
+    private static final String SHOCK_CELL_ITEM_ID = "shock_cell";
+    private static final NamespacedKey SHOCK_CELL_ITEM_MODEL = new NamespacedKey("om", "coiled_energy");
     private final String id;
     private final Material material;
     private final int amount;
@@ -221,6 +223,9 @@ public class ShopItemDefinition {
         }
         if (!lines.isEmpty()) {
             meta.lore(lines);
+        }
+        if (SHOCK_CELL_ITEM_ID.equalsIgnoreCase(id)) {
+            meta.setItemModel(SHOCK_CELL_ITEM_MODEL);
         }
         if (!includeCost && knockbackBonus > 0.0) {
             meta.addAttributeModifier(Attribute.ATTACK_KNOCKBACK,

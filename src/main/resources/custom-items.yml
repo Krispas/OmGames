@@ -164,3 +164,6 @@ custom-items:
     type: TIME_CAPSULE
     material: ENDER_CHEST
     save-chance-percent: 50
+  shock_cell:
+    type: SHOCK_CELL
+    material: CARROT_ON_A_STICK

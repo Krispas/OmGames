@@ -40,6 +40,7 @@ import org.bukkit.entity.TNTPrimed;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
@@ -81,6 +82,14 @@ final class GameSessionCustomItemRuntime {
     private static final long LOCKPICK_CHEST_DELAY_TICKS = 10L * 20L;
     private static final long LOCKPICK_ENDER_CHEST_DELAY_TICKS = 20L * 20L;
     private static final long LOCKPICK_ACCESS_DURATION_MILLIS = 60_000L;
+    private static final int SHOCK_CELL_MAX_CHARGE = 100;
+    private static final int SHOCK_CELL_MIN_FIRE_CHARGE = 10;
+    private static final int SHOCK_CELL_WAVE_CHARGE_THRESHOLD = 50;
+    private static final int SHOCK_CELL_CHARGE_PER_CLICK = 10;
+    private static final double SHOCK_CELL_WAVE_SAMPLE_STEP = 1.0;
+    private static final double SHOCK_CELL_BOLT_SAMPLE_STEP = 0.5;
+    private static final double SHOCK_CELL_ENTITY_HIT_RADIUS = 0.9;
+    private static final NamespacedKey SHOCK_CELL_ITEM_MODEL = new NamespacedKey("om", "coiled_energy");
     private static final double LOCKPICK_DISPLAY_Y_OFFSET = 1.2;
     private static final String LOCKPICK_DISPLAY_TAG = "bw_lockpick_display";
     private static final String ABYSSAL_RIFT_REGENERATION_ITEM_ID = "abyssal_rift_regeneration";
@@ -852,6 +861,44 @@ final class GameSessionCustomItemRuntime {
         sessionTasks.add(task);
         activeSteelShells.put(playerId, new SteelShellState(shellPoints, task, previousResistance));
         player.getWorld().playSound(player.getLocation(), Sound.BLOCK_NETHERITE_BLOCK_PLACE, 1.0f, 0.9f);
+        return true;
+    }
+
+    boolean activateShockCell(Player player, ItemStack item, CustomItemDefinition custom, boolean firing) {
+        if (player == null
+                || item == null
+                || custom == null
+                || !session.isRunning()
+                || !session.isParticipant(player.getUniqueId())
+                || !session.isInArenaWorld(player.getWorld())) {
+            return false;
+        }
+        int charge = getShockCellCharge(item);
+        if (!firing) {
+            int next = Math.min(SHOCK_CELL_MAX_CHARGE, charge + SHOCK_CELL_CHARGE_PER_CLICK);
+            setShockCellCharge(item, custom, next);
+            player.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 0.9f + (next / 200.0f));
+            player.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,
+                    player.getEyeLocation().add(player.getLocation().getDirection().normalize().multiply(0.5)),
+                    8,
+                    0.2,
+                    0.2,
+                    0.2,
+                    0.02);
+            return true;
+        }
+        if (charge < SHOCK_CELL_MIN_FIRE_CHARGE) {
+            player.sendMessage(Component.text("Shock Cell needs at least 10 charge.", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
+            return false;
+        }
+        boolean fired = charge >= SHOCK_CELL_WAVE_CHARGE_THRESHOLD
+                ? fireShockCellWave(player, charge)
+                : fireShockCellBolt(player, charge);
+        if (!fired) {
+            return false;
+        }
+        setShockCellCharge(item, custom, 0);
         return true;
     }
 
@@ -1635,6 +1682,172 @@ final class GameSessionCustomItemRuntime {
         Vector closest = path.origin().toVector().add(path.direction().clone().multiply(along));
         double effectiveRadius = path.radius() + 0.4;
         return targetLocation.toVector().distanceSquared(closest) <= effectiveRadius * effectiveRadius;
+    }
+
+    private int getShockCellCharge(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return 0;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (!(meta instanceof Damageable damageable)) {
+            return 0;
+        }
+        int maxDurability = item.getType().getMaxDurability();
+        if (maxDurability <= 0) {
+            return 0;
+        }
+        int damage = Math.max(0, Math.min(maxDurability, damageable.getDamage()));
+        int durabilityLeft = maxDurability - damage;
+        return Math.max(0, Math.min(SHOCK_CELL_MAX_CHARGE, (int) Math.round((durabilityLeft * 100.0) / maxDurability)));
+    }
+
+    private void setShockCellCharge(ItemStack item, CustomItemDefinition custom, int charge) {
+        if (item == null || custom == null || !item.hasItemMeta()) {
+            return;
+        }
+        int normalizedCharge = Math.max(0, Math.min(SHOCK_CELL_MAX_CHARGE, charge));
+        ItemMeta meta = item.getItemMeta();
+        if (!(meta instanceof Damageable damageable)) {
+            return;
+        }
+        int maxDurability = item.getType().getMaxDurability();
+        if (maxDurability <= 0) {
+            return;
+        }
+        int durabilityLeft = (int) Math.round((normalizedCharge / 100.0) * maxDurability);
+        int damage = Math.max(0, Math.min(maxDurability, maxDurability - durabilityLeft));
+        damageable.setDamage(damage);
+        damageable.setUnbreakable(true);
+        damageable.setItemModel(SHOCK_CELL_ITEM_MODEL);
+        damageable.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ATTRIBUTES);
+        CustomItemData.apply(damageable, custom.getId());
+        item.setItemMeta(damageable);
+    }
+
+    private boolean fireShockCellBolt(Player owner, int charge) {
+        Vector direction = owner.getEyeLocation().getDirection();
+        if (direction.lengthSquared() < 0.0001) {
+            return false;
+        }
+        direction.normalize();
+        Location origin = owner.getEyeLocation().add(direction.clone().multiply(0.6));
+        double maxRange = Math.max(1.0, charge);
+        TeamColor ownerTeam = session.getTeam(owner.getUniqueId());
+        Player hitTarget = null;
+        Location hitLocation = null;
+        double traversed = 0.0;
+        while (traversed <= maxRange) {
+            Location point = origin.clone().add(direction.clone().multiply(traversed));
+            if (!isInsideRailgunSample(point)) {
+                break;
+            }
+            point.getWorld().spawnParticle(Particle.ELECTRIC_SPARK, point, 2, 0.02, 0.02, 0.02, 0.0);
+            point.getWorld().spawnParticle(Particle.END_ROD, point, 1, 0.0, 0.0, 0.0, 0.0);
+            if (point.getBlock().getType().isSolid()) {
+                hitLocation = point;
+                break;
+            }
+            Player target = findShockCellTargetAt(owner, ownerTeam, point, SHOCK_CELL_ENTITY_HIT_RADIUS);
+            if (target != null) {
+                hitTarget = target;
+                hitLocation = target.getLocation().add(0.0, target.getHeight() * 0.5, 0.0);
+                break;
+            }
+            traversed += SHOCK_CELL_BOLT_SAMPLE_STEP;
+        }
+        owner.playSound(owner.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_IMPACT, 1.0f, 1.45f);
+        owner.getWorld().playSound(origin, Sound.BLOCK_BEACON_DEACTIVATE, 0.9f, 1.35f);
+        if (hitTarget != null) {
+            double damage = 10.0 + charge * 0.2;
+            session.recordCombat(owner.getUniqueId(), hitTarget.getUniqueId());
+            hitTarget.setNoDamageTicks(0);
+            hitTarget.damage(Math.max(1.0, damage), owner);
+            session.recordDamage(hitTarget.getUniqueId());
+            if (hitLocation != null) {
+                hitLocation.getWorld().spawnParticle(Particle.FLAME, hitLocation, 20, 0.25, 0.25, 0.25, 0.02);
+            }
+        }
+        return true;
+    }
+
+    private boolean fireShockCellWave(Player owner, int charge) {
+        Location center = owner.getLocation().add(0.0, 1.0, 0.0);
+        if (!isInsideRailgunSample(center)) {
+            return false;
+        }
+        double radius = Math.max(1.0, charge / 3.0);
+        double damage = 10.0 + charge * 0.2;
+        TeamColor ownerTeam = session.getTeam(owner.getUniqueId());
+        UUID ownerId = owner.getUniqueId();
+        for (UUID playerId : assignments.keySet()) {
+            if (playerId == null || playerId.equals(ownerId)) {
+                continue;
+            }
+            Player target = Bukkit.getPlayer(playerId);
+            if (!isValidRailgunTarget(target, ownerTeam)) {
+                continue;
+            }
+            Location targetLocation = target.getLocation().add(0.0, target.getHeight() * 0.5, 0.0);
+            if (targetLocation.getWorld() != center.getWorld()
+                    || targetLocation.distanceSquared(center) > radius * radius) {
+                continue;
+            }
+            session.recordCombat(ownerId, playerId);
+            target.setNoDamageTicks(0);
+            target.damage(Math.max(1.0, damage), owner);
+            session.recordDamage(playerId);
+        }
+        int integerRadius = (int) Math.ceil(radius);
+        for (int x = -integerRadius; x <= integerRadius; x++) {
+            for (int y = -integerRadius; y <= integerRadius; y++) {
+                for (int z = -integerRadius; z <= integerRadius; z++) {
+                    Location sample = center.clone().add(x, y, z);
+                    if (sample.distanceSquared(center) > radius * radius || !isInsideRailgunSample(sample)) {
+                        continue;
+                    }
+                    Block block = sample.getBlock();
+                    if (block.getType() == Material.AIR) {
+                        continue;
+                    }
+                    BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
+                    if (!session.isPlacedBlock(point)) {
+                        continue;
+                    }
+                    session.removePlacedBlock(point);
+                    block.setType(Material.AIR, false);
+                }
+            }
+        }
+        World world = center.getWorld();
+        for (double d = 0.0; d <= radius; d += SHOCK_CELL_WAVE_SAMPLE_STEP) {
+            world.spawnParticle(Particle.FLAME, center, 20, d * 0.5, d * 0.35, d * 0.5, 0.02);
+            world.spawnParticle(Particle.ELECTRIC_SPARK, center, 14, d * 0.5, d * 0.35, d * 0.5, 0.01);
+        }
+        world.playSound(center, Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.9f, 1.2f);
+        world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 0.8f, 1.35f);
+        return true;
+    }
+
+    private Player findShockCellTargetAt(Player owner, TeamColor ownerTeam, Location point, double radius) {
+        if (owner == null || point == null || point.getWorld() == null) {
+            return null;
+        }
+        UUID ownerId = owner.getUniqueId();
+        for (UUID playerId : assignments.keySet()) {
+            if (playerId == null || playerId.equals(ownerId)) {
+                continue;
+            }
+            Player target = Bukkit.getPlayer(playerId);
+            if (!isValidRailgunTarget(target, ownerTeam)) {
+                continue;
+            }
+            Location targetLocation = target.getLocation().add(0.0, target.getHeight() * 0.5, 0.0);
+            if (targetLocation.getWorld() == point.getWorld()
+                    && targetLocation.distanceSquared(point) <= radius * radius) {
+                return target;
+            }
+        }
+        return null;
     }
 
     private void clearAllRailgunBlasts() {

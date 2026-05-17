@@ -32,6 +32,7 @@ shop:
         woodoo_doll: 38
         riding_fireball: 39
         spinjitzu: 40
+        shock_cell: 41
     rotating_upgrades:
       title: "Rotating Upgrades"
       icon: ANVIL
@@ -385,6 +386,19 @@ shop:
           - "Hover, climb, and burn"
           - "nearby enemies on contact."
         custom-item: spinjitzu
+      shock_cell:
+        material: CARROT_ON_A_STICK
+        amount: 1
+        cost:
+          material: EMERALD
+          amount: 4
+        display-name: "Shock Cell"
+        lore:
+          - "Right-click to charge."
+          - "Shift right-click to fire."
+          - "10-49: line shock bolt."
+          - "50+: radial shockwave."
+        custom-item: shock_cell
       thorns_upgrade:
         material: CACTUS
         amount: 1

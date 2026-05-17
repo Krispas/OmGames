@@ -1598,6 +1598,10 @@ public class GameSession extends GameSessionMatchFlowSupport {
         return timeCapsuleRuntime != null && timeCapsuleRuntime.activate(player, item, custom);
     }
 
+    public boolean activateShockCell(Player player, ItemStack item, CustomItemDefinition custom, boolean firing) {
+        return customItemRuntime.activateShockCell(player, item, custom, firing);
+    }
+
     public boolean handleWoodooDollHit(Player attacker, Player victim) {
         return karmaRuntime != null && karmaRuntime.handleWoodooDollHit(attacker, victim);
     }

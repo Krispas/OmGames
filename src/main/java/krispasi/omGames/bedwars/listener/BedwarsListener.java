@@ -663,6 +663,10 @@ public class BedwarsListener extends BedwarsListenerRuntimeSupport implements Li
                 case TIME_CAPSULE -> {
                     yield session.activateTimeCapsule(player, item, custom);
                 }
+                case SHOCK_CELL -> {
+                    consume = false;
+                    yield session.activateShockCell(player, item, custom, player.isSneaking());
+                }
                 case WOODOO_DOLL -> {
                     yield false;
                 }

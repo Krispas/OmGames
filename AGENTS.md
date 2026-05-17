@@ -613,6 +613,7 @@ Supported `type` values:
 - `SPINJITZU`
 - `TOWER_CHEST`
 - `STEEL_SHELL`
+- `SHOCK_CELL`
 
 Behavior notes:
 - `FLAMETHROWER`
@@ -713,6 +714,12 @@ Behavior notes:
   - purchased as a held item using a `NETHERITE_BLOCK` icon
   - right-click activation builds a temporary bedrock prison around the user for 10 seconds if every shell block fits in air inside the map
   - while active it applies `Resistance V` and then restores any previous resistance effect when the shell expires
+- `SHOCK_CELL`
+  - rotating held item with model `om:coiled_energy`
+  - right-click charges the held item by `10`, up to `100`, and uses the durability bar to display charge
+  - shift + right-click fires and resets charge to `0`
+  - charge `10-49` fires a straight shock bolt with range equal to charge and damage `10 + charge * 0.2`
+  - charge `50+` fires a spherical shockwave with radius `charge / 3`, same damage formula, and only breaks tracked BedWars placed blocks
 
 ### 2.9 Match Event Workflow
 

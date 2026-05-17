@@ -31,7 +31,8 @@ public enum CustomItemType {
     WOODOO_DOLL(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     LOCKPICK(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
     UNSTABLE_TELEPORTATION_DEVICE(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 30),
-    TIME_CAPSULE(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0);
+    TIME_CAPSULE(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0),
+    SHOCK_CELL(0.0, 0.0f, false, 0, 1, 0.0, 0.0, 0, -1.0, -1.0, -1.0, 0, 0);
 
     private final double defaultVelocity;
     private final float defaultYield;
