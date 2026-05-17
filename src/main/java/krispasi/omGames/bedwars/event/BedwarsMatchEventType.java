@@ -10,18 +10,18 @@ import java.util.Locale;
 public enum BedwarsMatchEventType {
     SPEEDRUN("speedrun", "Speedrun!", "Everyone can be a speedrunner!!!", 3),
     SPEEDRUN_ANY("speedrun-any", "Speedrun Any%", "GET TO THE FINISH LINE!!!", 3),
-    THE_RAPTURE("the-rapture", "The Rapture", "Anger of god is coming!", 2),
+    THE_RAPTURE("the-rapture", "The Rapture", "Anger of god is coming!", 3),
     BENEVOLENT_UPGRADES("benevolent-upgrades", "Benevolent Upgrades", "Better than a pizza party!", 3),
     LONG_ARMS("long-arms", "Long Arms!", "Put those long noodles to use!", 3),
     MOON_BIG("moon-big", "MOON BIG!!!", "Grian? Is the moon big???!!!", 3),
-    BLOOD_MOON("blood-moon", "Blood Moon!", "Embrace your inner demon.", 2),
-    SUMO("sumo", "SUMO!", "No damage. Only knockback.", 2),
-    FALLOUT("fallout", "Fallout!", "Radiation is healthy!", 2),
-    CHAOS("chaos", "Chaos!", "soahC ecarbmE", 2),
+    BLOOD_MOON("blood-moon", "Blood Moon!", "Embrace your inner demon.", 3),
+    SUMO("sumo", "SUMO!", "No damage. Only knockback.", 3),
+    FALLOUT("fallout", "Fallout!", "Radiation is healthy!", 3),
+    CHAOS("chaos", "Chaos!", "soahC ecarbmE", 3),
     IN_THIS_ECONOMY("in-this-economy", "In this economy?!", "Even ingame now?!", 3),
-    APRIL_FOOLS("april-fools", "April Fools!", "Something is very wrong.", 1);
+    APRIL_FOOLS("april-fools", "April Fools!", "Something is very wrong.", 2);
 
-    private static final int APRIL_FOOLS_APRIL_WEIGHT = 7;
+    private static final int APRIL_FOOLS_APRIL_WEIGHT = 15;
 
     private final String key;
     private final String displayName;
