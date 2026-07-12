@@ -9,6 +9,9 @@ commands:
   egghunt:
     description: Egg Hunt event commands
     usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt start_test | /egghunt stop | /egghunt clear <near/all/scoreboard>
+  chess:
+    description: Chess game commands
+    usage: /chess board build <x> <y> <z> | /chess board remove <timestamp|*> | /chess board blocks <b1> <b2> <b3> | /chess match <white|black|start|settings|test|print_log> | /chess resign | /chess draw | /chess undo | /chess redo | /chess checkmate
 permissions:
   omgames.bw.start:
     description: Allows opening the BedWars setup GUI
@@ -21,4 +24,7 @@ permissions:
     default: op
   omgames.egghunt.manage:
     description: Allows managing the Egg Hunt event via /egghunt
+    default: op
+  omgames.chess.manage:
+    description: Allows managing Chess boards and matches via /chess
     default: op

@@ -5,7 +5,7 @@ import java.util.UUID;
 public final class ChessPiece {
     private final UUID pieceId;
     private final ChessSide side;
-    private final ChessPieceType type;
+    private ChessPieceType type;
     private ChessSquare square;
     private UUID displayId;
     private UUID interactionId;
@@ -30,6 +30,10 @@ public final class ChessPiece {
 
     public ChessPieceType type() {
         return type;
+    }
+
+    public void setType(ChessPieceType type) {
+        this.type = type;
     }
 
     public ChessSquare square() {

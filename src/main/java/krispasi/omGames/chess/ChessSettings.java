@@ -5,6 +5,7 @@ public final class ChessSettings {
     private boolean visualizeMovementCheck = false;
     private boolean doEndgameChecks = true;
     private boolean allowUndo = false;
+    private boolean showAnnotation = false;
 
     public boolean doMovementCheck() {
         return doMovementCheck;
@@ -38,12 +39,21 @@ public final class ChessSettings {
         this.allowUndo = allowUndo;
     }
 
+    public boolean showAnnotation() {
+        return showAnnotation;
+    }
+
+    public void setShowAnnotation(boolean showAnnotation) {
+        this.showAnnotation = showAnnotation;
+    }
+
     public ChessSettings copy() {
         ChessSettings copy = new ChessSettings();
         copy.doMovementCheck = doMovementCheck;
         copy.visualizeMovementCheck = visualizeMovementCheck;
         copy.doEndgameChecks = doEndgameChecks;
         copy.allowUndo = allowUndo;
+        copy.showAnnotation = showAnnotation;
         return copy;
     }
 }

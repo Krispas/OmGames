@@ -4,6 +4,9 @@ import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.command.BedwarsCommand;
 import krispasi.omGames.bedwars.listener.BedwarsListener;
 import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
+import krispasi.omGames.chess.ChessCommand;
+import krispasi.omGames.chess.ChessListener;
+import krispasi.omGames.chess.ChessManager;
 import krispasi.omGames.egghunt.EggHuntCommand;
 import krispasi.omGames.egghunt.EggHuntListener;
 import krispasi.omGames.egghunt.EggHuntManager;
@@ -37,6 +40,7 @@ public final class OmGames extends JavaPlugin {
     private BedwarsManager bedwarsManager;
     private BedwarsSetupManager setupManager;
     private EggHuntManager eggHuntManager;
+    private ChessManager chessManager;
 
     @Override
     public void onEnable() {
@@ -58,6 +62,8 @@ public final class OmGames extends JavaPlugin {
         setupManager = new BedwarsSetupManager(this, bedwarsManager);
         eggHuntManager = new EggHuntManager(this);
         eggHuntManager.load();
+        chessManager = new ChessManager(this);
+        chessManager.load();
 
         PluginCommand command = getCommand("bw");
         if (command != null) {
@@ -71,9 +77,16 @@ public final class OmGames extends JavaPlugin {
             eggHuntCommand.setExecutor(executor);
             eggHuntCommand.setTabCompleter(executor);
         }
+        PluginCommand chessCommand = getCommand("chess");
+        if (chessCommand != null) {
+            ChessCommand executor = new ChessCommand(chessManager);
+            chessCommand.setExecutor(executor);
+            chessCommand.setTabCompleter(executor);
+        }
 
         getServer().getPluginManager().registerEvents(new BedwarsListener(bedwarsManager), this);
         getServer().getPluginManager().registerEvents(new EggHuntListener(eggHuntManager), this);
+        getServer().getPluginManager().registerEvents(new ChessListener(chessManager), this);
 /*      setupBedwars();
         setupBedwars1();
         setupBedwars2();
@@ -85,6 +98,9 @@ public final class OmGames extends JavaPlugin {
     public void onDisable() {
         if (eggHuntManager != null) {
             eggHuntManager.shutdown();
+        }
+        if (chessManager != null) {
+            chessManager.shutdown();
         }
         if (bedwarsManager != null) {
             bedwarsManager.shutdown();

@@ -7,12 +7,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import krispasi.omGames.storage.OmGamesDatabaseFiles;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ChessDatabaseService {
@@ -32,6 +33,7 @@ public final class ChessDatabaseService {
               do_movement_check INTEGER NOT NULL,
               visualize_movement_check INTEGER NOT NULL,
               do_endgame_checks INTEGER NOT NULL,
+              show_annotation INTEGER NOT NULL DEFAULT 0,
               settings_logged INTEGER NOT NULL DEFAULT 0,
               finished_at TEXT,
               result TEXT,
@@ -71,10 +73,28 @@ public final class ChessDatabaseService {
               redos INTEGER NOT NULL DEFAULT 0
             )
             """;
+    private static final String BOARDS_SQL = """
+            CREATE TABLE IF NOT EXISTS chess_boards (
+              board_timestamp TEXT PRIMARY KEY,
+              world_name TEXT NOT NULL,
+              origin_x INTEGER NOT NULL,
+              origin_y INTEGER NOT NULL,
+              origin_z INTEGER NOT NULL
+            )
+            """;
 
     private final File databaseFile;
     private final Logger logger;
     private Connection connection;
+
+    public record PlayerRef(UUID uuid, String name) {
+    }
+
+    public record BoardRef(String timestamp, String worldName, int originX, int originY, int originZ) {
+    }
+
+    public record RecentMatchLog(String header, List<String> settings, List<String> events, String result) {
+    }
 
     public ChessDatabaseService(JavaPlugin plugin) {
         this.databaseFile = OmGamesDatabaseFiles.getMainDatabaseFile(plugin.getDataFolder());
@@ -88,7 +108,9 @@ public final class ChessDatabaseService {
                 statement.execute(MATCHES_SQL);
                 statement.execute(EVENTS_SQL);
                 statement.execute(STATS_SQL);
+                statement.execute(BOARDS_SQL);
             }
+            ensureMatchColumn("show_annotation", "INTEGER NOT NULL DEFAULT 0");
         } catch (SQLException ex) {
             logger.log(Level.SEVERE, "Failed to load Chess database tables.", ex);
         }
@@ -107,8 +129,8 @@ public final class ChessDatabaseService {
     }
 
     public long startMatch(ChessManager.BoardContext board,
-                           Collection<Player> whitePlayers,
-                           Collection<Player> blackPlayers,
+                           Collection<PlayerRef> whitePlayers,
+                           Collection<PlayerRef> blackPlayers,
                            ChessSettings settings,
                            boolean testMode,
                            String startedAt) {
@@ -130,8 +152,9 @@ public final class ChessDatabaseService {
                   do_movement_check,
                   visualize_movement_check,
                   do_endgame_checks,
+                  show_annotation,
                   settings_logged
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
                 """;
         try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             statement.setString(1, startedAt);
@@ -147,6 +170,7 @@ public final class ChessDatabaseService {
             statement.setInt(11, settings.doMovementCheck() ? 1 : 0);
             statement.setInt(12, settings.visualizeMovementCheck() ? 1 : 0);
             statement.setInt(13, settings.doEndgameChecks() ? 1 : 0);
+            statement.setInt(14, settings.showAnnotation() ? 1 : 0);
             statement.executeUpdate();
             try (ResultSet keys = statement.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -169,6 +193,7 @@ public final class ChessDatabaseService {
                     do_movement_check = ?,
                     visualize_movement_check = ?,
                     do_endgame_checks = ?,
+                    show_annotation = ?,
                     settings_logged = 1
                 WHERE match_id = ?
                 """;
@@ -177,10 +202,155 @@ public final class ChessDatabaseService {
             statement.setInt(2, settings.doMovementCheck() ? 1 : 0);
             statement.setInt(3, settings.visualizeMovementCheck() ? 1 : 0);
             statement.setInt(4, settings.doEndgameChecks() ? 1 : 0);
-            statement.setLong(5, matchId);
+            statement.setInt(5, settings.showAnnotation() ? 1 : 0);
+            statement.setLong(6, matchId);
             statement.executeUpdate();
         } catch (SQLException ex) {
             logger.log(Level.WARNING, "Failed to mark Chess settings logged.", ex);
+        }
+    }
+
+    public void saveBoard(ChessManager.BoardContext board) {
+        if (connection == null || board == null) {
+            return;
+        }
+        String sql = """
+                INSERT OR REPLACE INTO chess_boards (
+                  board_timestamp,
+                  world_name,
+                  origin_x,
+                  origin_y,
+                  origin_z
+                ) VALUES (?, ?, ?, ?, ?)
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, board.timestamp());
+            statement.setString(2, board.worldName());
+            statement.setInt(3, board.originX());
+            statement.setInt(4, board.originY());
+            statement.setInt(5, board.originZ());
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to save Chess board metadata.", ex);
+        }
+    }
+
+    public List<BoardRef> getBoards() {
+        List<BoardRef> boards = new ArrayList<>();
+        if (connection == null) {
+            return boards;
+        }
+        String sql = "SELECT board_timestamp, world_name, origin_x, origin_y, origin_z FROM chess_boards ORDER BY board_timestamp";
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                boards.add(new BoardRef(
+                        resultSet.getString("board_timestamp"),
+                        resultSet.getString("world_name"),
+                        resultSet.getInt("origin_x"),
+                        resultSet.getInt("origin_y"),
+                        resultSet.getInt("origin_z")
+                ));
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to list Chess boards.", ex);
+        }
+        return boards;
+    }
+
+    public BoardRef getBoard(String timestamp) {
+        if (connection == null || timestamp == null || timestamp.isBlank()) {
+            return null;
+        }
+        String sql = "SELECT board_timestamp, world_name, origin_x, origin_y, origin_z FROM chess_boards WHERE board_timestamp = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, timestamp);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return new BoardRef(
+                            resultSet.getString("board_timestamp"),
+                            resultSet.getString("world_name"),
+                            resultSet.getInt("origin_x"),
+                            resultSet.getInt("origin_y"),
+                            resultSet.getInt("origin_z")
+                    );
+                }
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load Chess board " + timestamp + ".", ex);
+        }
+        return null;
+    }
+
+    public void deleteBoard(String timestamp) {
+        if (connection == null || timestamp == null || timestamp.isBlank()) {
+            return;
+        }
+        try (PreparedStatement statement = connection.prepareStatement("DELETE FROM chess_boards WHERE board_timestamp = ?")) {
+            statement.setString(1, timestamp);
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to delete Chess board metadata.", ex);
+        }
+    }
+
+    public void deleteAllBoards() {
+        if (connection == null) {
+            return;
+        }
+        try (PreparedStatement statement = connection.prepareStatement("DELETE FROM chess_boards")) {
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to delete all Chess board metadata.", ex);
+        }
+    }
+
+    public RecentMatchLog getMostRecentMatchLog() {
+        if (connection == null) {
+            return null;
+        }
+        String matchSql = """
+                SELECT match_id,
+                       started_at,
+                       white_players,
+                       black_players,
+                       allow_undo,
+                       do_movement_check,
+                       visualize_movement_check,
+                       do_endgame_checks,
+                       show_annotation,
+                       result,
+                       winner
+                FROM chess_matches
+                ORDER BY match_id DESC
+                LIMIT 1
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(matchSql);
+             ResultSet match = statement.executeQuery()) {
+            if (!match.next()) {
+                return null;
+            }
+            long matchId = match.getLong("match_id");
+            String header = match.getString("started_at")
+                    + " white= " + match.getString("white_players")
+                    + " black= " + match.getString("black_players");
+            List<String> settings = List.of(
+                    "allow_undo = " + asBooleanText(match.getInt("allow_undo")),
+                    "do_movement_check = " + asBooleanText(match.getInt("do_movement_check")),
+                    "do_endgame_checks = " + asBooleanText(match.getInt("do_endgame_checks")),
+                    "visualize_movement_check = " + asBooleanText(match.getInt("visualize_movement_check")),
+                    "show_annotation = " + asBooleanText(match.getInt("show_annotation"))
+            );
+            List<String> events = getMatchEventLines(matchId);
+            String result = match.getString("result");
+            String winner = match.getString("winner");
+            if (result != null && winner != null && !winner.isBlank()) {
+                result += " (" + winner + ")";
+            }
+            return new RecentMatchLog(header, settings, events, result);
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to read recent Chess match log.", ex);
+            return null;
         }
     }
 
@@ -241,8 +411,8 @@ public final class ChessDatabaseService {
     }
 
     public void finishMatch(long matchId,
-                            Collection<Player> whitePlayers,
-                            Collection<Player> blackPlayers,
+                            Collection<PlayerRef> whitePlayers,
+                            Collection<PlayerRef> blackPlayers,
                             ChessSide winner,
                             String result,
                             String finishedAt,
@@ -268,7 +438,22 @@ public final class ChessDatabaseService {
         updateStats(blackPlayers, false, winner == ChessSide.BLACK, winner == ChessSide.WHITE, winner == null, blackResigned, undoCount, redoCount);
     }
 
-    private void updateStats(Collection<Player> players,
+    public void abortMatch(long matchId, String result, String finishedAt) {
+        if (connection == null || matchId <= 0L) {
+            return;
+        }
+        String sql = "UPDATE chess_matches SET finished_at = ?, result = ? WHERE match_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, finishedAt);
+            statement.setString(2, result);
+            statement.setLong(3, matchId);
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to abort Chess match.", ex);
+        }
+    }
+
+    private void updateStats(Collection<PlayerRef> players,
                              boolean whiteSide,
                              boolean won,
                              boolean lost,
@@ -279,11 +464,11 @@ public final class ChessDatabaseService {
         if (players == null) {
             return;
         }
-        for (Player player : players) {
+        for (PlayerRef player : players) {
             if (player == null) {
                 continue;
             }
-            upsertStats(player.getUniqueId(), whiteSide, won, lost, draw, resigned, undoCount, redoCount);
+            upsertStats(player.uuid(), whiteSide, won, lost, draw, resigned, undoCount, redoCount);
         }
     }
 
@@ -351,20 +536,74 @@ public final class ChessDatabaseService {
         return detail.toString();
     }
 
-    private String joinPlayers(Collection<Player> players) {
+    private String joinPlayers(Collection<PlayerRef> players) {
         StringBuilder builder = new StringBuilder();
         boolean first = true;
-        for (Player player : players) {
+        for (PlayerRef player : players) {
             if (player == null) {
                 continue;
             }
             if (!first) {
                 builder.append(" , ");
             }
-            builder.append(player.getName());
+            builder.append(player.name());
             first = false;
         }
         return builder.toString();
+    }
+
+    private List<String> getMatchEventLines(long matchId) throws SQLException {
+        List<String> events = new ArrayList<>();
+        String sql = """
+                SELECT event_time, player_name, detail
+                FROM chess_match_events
+                WHERE match_id = ?
+                ORDER BY event_id
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, matchId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    String time = resultSet.getString("event_time");
+                    String player = resultSet.getString("player_name");
+                    String detail = resultSet.getString("detail");
+                    StringBuilder line = new StringBuilder(time == null ? "" : time);
+                    if (player != null && !player.isBlank()) {
+                        line.append(" ").append(player);
+                    }
+                    if (detail != null && !detail.isBlank()) {
+                        line.append(" ").append(detail);
+                    }
+                    events.add(line.toString().trim());
+                }
+            }
+        }
+        return events;
+    }
+
+    private String asBooleanText(int value) {
+        return value == 0 ? "false" : "true";
+    }
+
+    private void ensureMatchColumn(String columnName, String definition) throws SQLException {
+        if (hasColumn("chess_matches", columnName)) {
+            return;
+        }
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE chess_matches ADD COLUMN " + columnName + " " + definition);
+        }
+    }
+
+    private boolean hasColumn(String tableName, String columnName) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("PRAGMA table_info(" + tableName + ")");
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                if (columnName.equalsIgnoreCase(resultSet.getString("name"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void openConnection() throws SQLException {

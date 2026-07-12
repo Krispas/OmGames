@@ -930,3 +930,63 @@ Files:
 `egghunt.yml` keys:
 - `timer-seconds`
 - `points`
+
+## 4) Chess
+
+### 4.1 Top-Level Layout
+
+- `src/main/java/krispasi/omGames/chess/*`
+  - Chess game implementation.
+  - Owns `/chess`, the active board, item displays, interaction boxes, move validation, undo/redo state, and SQLite match/stat logging.
+  - Keep Chess logic inside this package; do not push Chess rules into BedWars or Egg Hunt classes.
+
+### 4.2 Command Surface
+
+Operator subcommands:
+- `/chess board build <x> <y> <z>`
+- `/chess board blocks <b1> <b2> <b3>`
+- `/chess board blocks reset`
+- `/chess board reset`
+- `/chess board remove <timestamp|*>`
+- `/chess match white <player> [player] [player]`
+- `/chess match black <player> [player] [player]`
+- `/chess match start`
+- `/chess match test`
+- `/chess match print_log`
+- `/chess match settings do_movement_check <true|false>`
+- `/chess match settings visualize_movement_check <true|false>`
+- `/chess match settings do_endgame_checks <true|false>`
+- `/chess match settings allow_undo <true|false>`
+- `/chess match settings show_annotation <true|false>`
+
+Team/player subcommands:
+- `/chess resign`
+- `/chess draw`
+- `/chess undo`
+- `/chess redo`
+- `/chess checkmate`
+
+### 4.3 Runtime Data Layout
+
+Chess uses:
+- item displays for visible pieces
+- interaction entities for piece hitboxes and board-square click targets
+- `plugins/OmGames/OmGames.db`
+
+SQLite tables:
+- `chess_matches`
+- `chess_match_events`
+- `chess_player_stats`
+- `chess_boards`
+
+### 4.4 Runtime Notes
+
+- The board is built in `minecraft:bedwars_lobby`.
+- The configured board corner is treated as the white A1 side; files run A-H across positive X and ranks run 1-8 toward negative Z.
+- Board tiles are 2x2 blocks, with light squares using palette block `b1`, dark squares using `b2`, and movement highlights using `b3`.
+- Defaults are `minecraft:smooth_quartz`, `minecraft:coal_block`, and `minecraft:smooth_basalt`.
+- A1 is white's left rook square and H8 is black's left rook square.
+- Piece item displays use `minecraft:iron_nugget` with `ItemMeta#setItemModel()`.
+- Normal models are `om:<piece>` for white and `om:black_<piece>` for black; selected models are `om:selected_<piece>`.
+- Each active board owns 64 square interaction boxes, 32 piece interaction boxes, and 32 item displays.
+- Chess board entities are persistent and can be removed with `/chess board remove <timestamp|*>`.
