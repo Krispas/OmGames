@@ -997,3 +997,26 @@ SQLite tables:
 - Chess interaction entities use persistent data and scoreboard tags for identity; do not rely on visible custom names.
 - Active non-test matches are saved in `chess_active_match_state` so they can continue after restart until a win, draw, resign, cancel, board reset, or board removal.
 - During an active match, online team players in the board world are put in Adventure mode with flight enabled and 16-block block/entity interaction reach; this must be restored when they leave the board world or the match ends.
+
+## 5) Bank
+
+### 5.1 Top-Level Layout
+
+- `src/main/java/krispasi/omGames/bank/*`
+  - Bank project implementation.
+  - Keep Bank logic inside this package; do not push Bank rules into BedWars, Egg Hunt, or Chess classes.
+  - Only use `OmGames` for plugin lifecycle wiring, command registration, and listener registration.
+
+### 5.2 Runtime Data Layout
+
+Bank runtime files live in:
+- `plugins/OmGames/Bank/`
+
+Bank may use shared plugin storage only when the schema is explicitly defined:
+- `plugins/OmGames/OmGames.db`
+
+### 5.3 Ownership Rules
+
+- Bank should own its own commands, listeners, services, config loading, and persistence helpers.
+- Use lowercase Java package names, even though the runtime folder is `Bank`.
+- Keep Bank changes isolated from existing BedWars, Egg Hunt, and Chess behavior unless integration is explicitly requested.
