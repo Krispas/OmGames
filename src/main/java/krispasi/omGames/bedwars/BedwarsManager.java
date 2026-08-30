@@ -25,11 +25,14 @@ import krispasi.omGames.bedwars.shop.ShopConfigLoader;
 import krispasi.omGames.shared.SKIN_TYPE;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.entity.Firework;
@@ -38,6 +41,7 @@ import org.bukkit.FireworkEffect;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.meta.FireworkMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.plugin.java.JavaPlugin;
 import krispasi.omGames.bedwars.gui.LobbyMenuVillagerMenu;
@@ -74,7 +78,10 @@ public class BedwarsManager {
     private static final float LOBBY_CHIME_VOLUME = 5.0f;
     private static final float LOBBY_CHIME_PITCH = 1.8f;
     private static final String LOBBY_MENU_VILLAGER_TAG = "bw_lobby_menu_villager";
+    private static final String LOBBY_MENU_VILLAGER_NAME = "BedWars Menu";
+    private static final double LOBBY_MENU_VILLAGER_MATCH_RADIUS_SQUARED = 4.0;
     private final JavaPlugin plugin;
+    private final NamespacedKey lobbyMenuVillagerKey;
     private final QuickBuyService quickBuyService;
     private final BedwarsStatsService statsService;
     private final TimeCapsuleService timeCapsuleService;
@@ -102,6 +109,7 @@ public class BedwarsManager {
 
     public BedwarsManager(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.lobbyMenuVillagerKey = new NamespacedKey(plugin, LOBBY_MENU_VILLAGER_TAG);
         this.quickBuyService = new QuickBuyService(plugin);
         this.statsService = new BedwarsStatsService(plugin);
         this.timeCapsuleService = new TimeCapsuleService(plugin);
@@ -436,7 +444,12 @@ public class BedwarsManager {
         if (lobbyMenuVillagerId != null && lobbyMenuVillagerId.equals(villager.getUniqueId())) {
             return true;
         }
-        return villager.getScoreboardTags().contains(LOBBY_MENU_VILLAGER_TAG);
+        if (hasLobbyMenuVillagerMarker(villager)) {
+            return true;
+        }
+        Location configuredLocation = parseLobbyMenuVillagerLocation(lobbyMenuVillagerSerializedLocation);
+        return hasLobbyMenuVillagerName(villager)
+                && isAtConfiguredLobbyMenuVillagerLocation(villager, configuredLocation);
     }
 
     public boolean spawnLobbyMenuVillager(Player actor, float yaw) {
@@ -455,16 +468,7 @@ public class BedwarsManager {
         spawn.setYaw(yaw);
         spawn.setPitch(0.0f);
         Villager villager = spawn.getWorld().spawn(spawn, Villager.class, created -> {
-            created.addScoreboardTag(LOBBY_MENU_VILLAGER_TAG);
-            created.customName(Component.text("BedWars Menu", NamedTextColor.DARK_PURPLE));
-            created.setCustomNameVisible(true);
-            created.setAI(false);
-            created.setInvulnerable(true);
-            created.setCollidable(false);
-            created.setGravity(false);
-            created.setSilent(true);
-            created.setRemoveWhenFarAway(false);
-            created.setPersistent(true);
+            configureLobbyMenuVillagerEntity(created, null);
         });
         lobbyMenuVillagerId = villager.getUniqueId();
         saveLobbyMenuVillagerLocation(spawn);
@@ -989,7 +993,6 @@ public class BedwarsManager {
             return;
         }
         if (trySpawnConfiguredLobbyMenuVillager(serialized)) {
-            lobbyMenuVillagerSerializedLocation = null;
             cancelLobbyMenuVillagerRestoreTask();
             return;
         }
@@ -1004,7 +1007,6 @@ public class BedwarsManager {
                     return;
                 }
                 if (trySpawnConfiguredLobbyMenuVillager(pending)) {
-                    lobbyMenuVillagerSerializedLocation = null;
                     cancelLobbyMenuVillagerRestoreTask();
                 }
             } catch (Exception ex) {
@@ -1018,18 +1020,17 @@ public class BedwarsManager {
         if (location == null || location.getWorld() == null) {
             return false;
         }
-        removeLobbyMenuVillager();
+        location.getChunk().load();
+        Villager existing = findConfiguredLobbyMenuVillager(location);
+        if (existing != null) {
+            configureLobbyMenuVillagerEntity(existing, location);
+            lobbyMenuVillagerId = existing.getUniqueId();
+            removeDuplicateLobbyMenuVillagers(location, lobbyMenuVillagerId);
+            return true;
+        }
+        removeDuplicateLobbyMenuVillagers(location, null);
         Villager villager = location.getWorld().spawn(location, Villager.class, created -> {
-            created.addScoreboardTag(LOBBY_MENU_VILLAGER_TAG);
-            created.customName(Component.text("BedWars Menu", NamedTextColor.DARK_PURPLE));
-            created.setCustomNameVisible(true);
-            created.setAI(false);
-            created.setInvulnerable(true);
-            created.setCollidable(false);
-            created.setGravity(false);
-            created.setSilent(true);
-            created.setRemoveWhenFarAway(false);
-            created.setPersistent(true);
+            configureLobbyMenuVillagerEntity(created, null);
         });
         lobbyMenuVillagerId = villager.getUniqueId();
         return true;
@@ -1071,18 +1072,24 @@ public class BedwarsManager {
         }
         File configFile = getBedwarsConfigFile("bedwars.yml");
         YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
-        config.set("lobby.menu-villager", String.format(Locale.ROOT, "%.3f %.3f %.3f %.2f",
-                location.getX(), location.getY(), location.getZ(), location.getYaw()));
+        String serialized = String.format(Locale.ROOT, "%.3f %.3f %.3f %.2f",
+                location.getX(), location.getY(), location.getZ(), location.getYaw());
+        config.set("lobby.menu-villager", serialized);
         try {
             config.save(configFile);
+            lobbyMenuVillagerSerializedLocation = serialized;
         } catch (Exception ex) {
             plugin.getLogger().warning("Failed to save lobby menu villager location: " + ex.getMessage());
         }
     }
 
     private void removeLobbyMenuVillager() {
+        Location configuredLocation = parseLobbyMenuVillagerLocation(lobbyMenuVillagerSerializedLocation);
+        if (configuredLocation != null && configuredLocation.getWorld() != null) {
+            configuredLocation.getChunk().load();
+        }
         if (lobbyMenuVillagerId != null) {
-            org.bukkit.entity.Entity entity = Bukkit.getEntity(lobbyMenuVillagerId);
+            Entity entity = Bukkit.getEntity(lobbyMenuVillagerId);
             if (entity != null) {
                 entity.remove();
             }
@@ -1090,11 +1097,79 @@ public class BedwarsManager {
         }
         for (World world : Bukkit.getWorlds()) {
             for (Villager villager : world.getEntitiesByClass(Villager.class)) {
-                if (villager.getScoreboardTags().contains(LOBBY_MENU_VILLAGER_TAG)) {
+                if (hasLobbyMenuVillagerMarker(villager)
+                        || (hasLobbyMenuVillagerName(villager)
+                        && isAtConfiguredLobbyMenuVillagerLocation(villager, configuredLocation))) {
                     villager.remove();
                 }
             }
         }
+    }
+
+    private void configureLobbyMenuVillagerEntity(Villager villager, Location location) {
+        villager.addScoreboardTag(LOBBY_MENU_VILLAGER_TAG);
+        villager.getPersistentDataContainer().set(lobbyMenuVillagerKey, PersistentDataType.BYTE, (byte) 1);
+        villager.customName(Component.text(LOBBY_MENU_VILLAGER_NAME, NamedTextColor.DARK_PURPLE));
+        villager.setCustomNameVisible(true);
+        villager.setAI(false);
+        villager.setInvulnerable(true);
+        villager.setCollidable(false);
+        villager.setGravity(false);
+        villager.setSilent(true);
+        villager.setRemoveWhenFarAway(false);
+        villager.setPersistent(true);
+        if (location != null && villager.getWorld().equals(location.getWorld())) {
+            villager.teleport(location);
+        }
+    }
+
+    private Villager findConfiguredLobbyMenuVillager(Location configuredLocation) {
+        if (configuredLocation == null || configuredLocation.getWorld() == null) {
+            return null;
+        }
+        for (Villager villager : configuredLocation.getWorld().getEntitiesByClass(Villager.class)) {
+            if (!isAtConfiguredLobbyMenuVillagerLocation(villager, configuredLocation)) {
+                continue;
+            }
+            if (hasLobbyMenuVillagerMarker(villager) || hasLobbyMenuVillagerName(villager)) {
+                return villager;
+            }
+        }
+        return null;
+    }
+
+    private void removeDuplicateLobbyMenuVillagers(Location configuredLocation, UUID keepId) {
+        for (World world : Bukkit.getWorlds()) {
+            for (Villager villager : world.getEntitiesByClass(Villager.class)) {
+                if (keepId != null && keepId.equals(villager.getUniqueId())) {
+                    continue;
+                }
+                if (hasLobbyMenuVillagerMarker(villager)
+                        || (hasLobbyMenuVillagerName(villager)
+                        && isAtConfiguredLobbyMenuVillagerLocation(villager, configuredLocation))) {
+                    villager.remove();
+                }
+            }
+        }
+    }
+
+    private boolean hasLobbyMenuVillagerMarker(Villager villager) {
+        return villager.getScoreboardTags().contains(LOBBY_MENU_VILLAGER_TAG)
+                || villager.getPersistentDataContainer().has(lobbyMenuVillagerKey, PersistentDataType.BYTE);
+    }
+
+    private boolean hasLobbyMenuVillagerName(Villager villager) {
+        Component name = villager.customName();
+        return name != null && LOBBY_MENU_VILLAGER_NAME.equals(PlainTextComponentSerializer.plainText().serialize(name));
+    }
+
+    private boolean isAtConfiguredLobbyMenuVillagerLocation(Villager villager, Location configuredLocation) {
+        if (configuredLocation == null || configuredLocation.getWorld() == null) {
+            return false;
+        }
+        Location location = villager.getLocation();
+        return configuredLocation.getWorld().equals(location.getWorld())
+                && location.distanceSquared(configuredLocation) <= LOBBY_MENU_VILLAGER_MATCH_RADIUS_SQUARED;
     }
 
     private void startLobbyAmbientChimeLoop() {
