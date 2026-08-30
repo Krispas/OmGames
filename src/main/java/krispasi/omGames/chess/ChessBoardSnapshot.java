@@ -28,7 +28,9 @@ public record ChessBoardSnapshot(
                     piece.interactionId(),
                     piece.moved(),
                     piece.captured(),
-                    piece.selected()
+                    piece.selected(),
+                    piece.promotionConsumed(),
+                    piece.captureOrder()
             ));
         }
         return new ChessBoardSnapshot(
@@ -54,7 +56,9 @@ public record ChessBoardSnapshot(
             UUID interactionId,
             boolean moved,
             boolean captured,
-            boolean selected
+            boolean selected,
+            boolean promotionConsumed,
+            int captureOrder
     ) {
     }
 }

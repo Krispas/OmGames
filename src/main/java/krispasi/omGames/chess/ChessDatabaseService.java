@@ -82,6 +82,38 @@ public final class ChessDatabaseService {
               origin_z INTEGER NOT NULL
             )
             """;
+    private static final String ACTIVE_MATCH_STATE_SQL = """
+            CREATE TABLE IF NOT EXISTS chess_active_match_state (
+              match_id INTEGER PRIMARY KEY,
+              started_at TEXT NOT NULL,
+              board_timestamp TEXT NOT NULL,
+              world_name TEXT NOT NULL,
+              origin_x INTEGER NOT NULL,
+              origin_y INTEGER NOT NULL,
+              origin_z INTEGER NOT NULL,
+              white_players TEXT NOT NULL,
+              black_players TEXT NOT NULL,
+              allow_undo INTEGER NOT NULL,
+              do_movement_check INTEGER NOT NULL,
+              visualize_movement_check INTEGER NOT NULL,
+              do_endgame_checks INTEGER NOT NULL,
+              show_annotation INTEGER NOT NULL,
+              turn TEXT NOT NULL,
+              move_count INTEGER NOT NULL,
+              undo_count INTEGER NOT NULL,
+              redo_count INTEGER NOT NULL,
+              en_passant_square TEXT,
+              en_passant_pawn_id TEXT,
+              white_king_moved INTEGER NOT NULL,
+              black_king_moved INTEGER NOT NULL,
+              white_kingside_rook_moved INTEGER NOT NULL,
+              white_queenside_rook_moved INTEGER NOT NULL,
+              black_kingside_rook_moved INTEGER NOT NULL,
+              black_queenside_rook_moved INTEGER NOT NULL,
+              pieces TEXT NOT NULL,
+              pending_promotion TEXT
+            )
+            """;
 
     private final File databaseFile;
     private final Logger logger;
@@ -94,6 +126,43 @@ public final class ChessDatabaseService {
     }
 
     public record RecentMatchLog(String header, List<String> settings, List<String> events, String result) {
+    }
+
+    public record ActiveMatchState(
+            long matchId,
+            String startedAt,
+            ChessManager.BoardContext board,
+            List<PlayerRef> whitePlayers,
+            List<PlayerRef> blackPlayers,
+            ChessSettings settings,
+            ChessSide turn,
+            int moveCount,
+            int undoCount,
+            int redoCount,
+            ChessSquare enPassantSquare,
+            UUID enPassantPawnId,
+            boolean whiteKingMoved,
+            boolean blackKingMoved,
+            boolean whiteKingsideRookMoved,
+            boolean whiteQueensideRookMoved,
+            boolean blackKingsideRookMoved,
+            boolean blackQueensideRookMoved,
+            List<StoredPiece> pieces,
+            String pendingPromotion
+    ) {
+    }
+
+    public record StoredPiece(
+            UUID pieceId,
+            ChessSide side,
+            ChessPieceType type,
+            ChessSquare square,
+            boolean moved,
+            boolean captured,
+            boolean selected,
+            boolean promotionConsumed,
+            int captureOrder
+    ) {
     }
 
     public ChessDatabaseService(JavaPlugin plugin) {
@@ -109,6 +178,7 @@ public final class ChessDatabaseService {
                 statement.execute(EVENTS_SQL);
                 statement.execute(STATS_SQL);
                 statement.execute(BOARDS_SQL);
+                statement.execute(ACTIVE_MATCH_STATE_SQL);
             }
             ensureMatchColumn("show_annotation", "INTEGER NOT NULL DEFAULT 0");
         } catch (SQLException ex) {
@@ -207,6 +277,148 @@ public final class ChessDatabaseService {
             statement.executeUpdate();
         } catch (SQLException ex) {
             logger.log(Level.WARNING, "Failed to mark Chess settings logged.", ex);
+        }
+    }
+
+    public void saveActiveMatchState(ActiveMatchState state) {
+        if (connection == null || state == null || state.matchId() <= 0L || state.board() == null) {
+            return;
+        }
+        String sql = """
+                INSERT OR REPLACE INTO chess_active_match_state (
+                  match_id,
+                  started_at,
+                  board_timestamp,
+                  world_name,
+                  origin_x,
+                  origin_y,
+                  origin_z,
+                  white_players,
+                  black_players,
+                  allow_undo,
+                  do_movement_check,
+                  visualize_movement_check,
+                  do_endgame_checks,
+                  show_annotation,
+                  turn,
+                  move_count,
+                  undo_count,
+                  redo_count,
+                  en_passant_square,
+                  en_passant_pawn_id,
+                  white_king_moved,
+                  black_king_moved,
+                  white_kingside_rook_moved,
+                  white_queenside_rook_moved,
+                  black_kingside_rook_moved,
+                  black_queenside_rook_moved,
+                  pieces,
+                  pending_promotion
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            ChessManager.BoardContext board = state.board();
+            statement.setLong(1, state.matchId());
+            statement.setString(2, state.startedAt());
+            statement.setString(3, board.timestamp());
+            statement.setString(4, board.worldName());
+            statement.setInt(5, board.originX());
+            statement.setInt(6, board.originY());
+            statement.setInt(7, board.originZ());
+            statement.setString(8, serializePlayers(state.whitePlayers()));
+            statement.setString(9, serializePlayers(state.blackPlayers()));
+            statement.setInt(10, state.settings().allowUndo() ? 1 : 0);
+            statement.setInt(11, state.settings().doMovementCheck() ? 1 : 0);
+            statement.setInt(12, state.settings().visualizeMovementCheck() ? 1 : 0);
+            statement.setInt(13, state.settings().doEndgameChecks() ? 1 : 0);
+            statement.setInt(14, state.settings().showAnnotation() ? 1 : 0);
+            statement.setString(15, state.turn().key());
+            statement.setInt(16, state.moveCount());
+            statement.setInt(17, state.undoCount());
+            statement.setInt(18, state.redoCount());
+            statement.setString(19, state.enPassantSquare() == null ? null : state.enPassantSquare().notation());
+            statement.setString(20, state.enPassantPawnId() == null ? null : state.enPassantPawnId().toString());
+            statement.setInt(21, state.whiteKingMoved() ? 1 : 0);
+            statement.setInt(22, state.blackKingMoved() ? 1 : 0);
+            statement.setInt(23, state.whiteKingsideRookMoved() ? 1 : 0);
+            statement.setInt(24, state.whiteQueensideRookMoved() ? 1 : 0);
+            statement.setInt(25, state.blackKingsideRookMoved() ? 1 : 0);
+            statement.setInt(26, state.blackQueensideRookMoved() ? 1 : 0);
+            statement.setString(27, serializePieces(state.pieces()));
+            statement.setString(28, state.pendingPromotion());
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to save active Chess match state.", ex);
+        }
+    }
+
+    public ActiveMatchState loadActiveMatchState() {
+        if (connection == null) {
+            return null;
+        }
+        String sql = """
+                SELECT s.*
+                FROM chess_active_match_state s
+                LEFT JOIN chess_matches m ON m.match_id = s.match_id
+                WHERE m.finished_at IS NULL OR m.match_id IS NULL
+                ORDER BY s.match_id DESC
+                LIMIT 1
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            if (!resultSet.next()) {
+                return null;
+            }
+            ChessSettings settings = new ChessSettings();
+            settings.setAllowUndo(resultSet.getInt("allow_undo") != 0);
+            settings.setDoMovementCheck(resultSet.getInt("do_movement_check") != 0);
+            settings.setVisualizeMovementCheck(resultSet.getInt("visualize_movement_check") != 0);
+            settings.setDoEndgameChecks(resultSet.getInt("do_endgame_checks") != 0);
+            settings.setShowAnnotation(resultSet.getInt("show_annotation") != 0);
+            String enPassantPawnText = resultSet.getString("en_passant_pawn_id");
+            return new ActiveMatchState(
+                    resultSet.getLong("match_id"),
+                    resultSet.getString("started_at"),
+                    new ChessManager.BoardContext(
+                            resultSet.getString("board_timestamp"),
+                            resultSet.getString("world_name"),
+                            resultSet.getInt("origin_x"),
+                            resultSet.getInt("origin_y"),
+                            resultSet.getInt("origin_z")
+                    ),
+                    parsePlayers(resultSet.getString("white_players")),
+                    parsePlayers(resultSet.getString("black_players")),
+                    settings,
+                    ChessSide.fromKey(resultSet.getString("turn")),
+                    resultSet.getInt("move_count"),
+                    resultSet.getInt("undo_count"),
+                    resultSet.getInt("redo_count"),
+                    ChessSquare.fromNotation(resultSet.getString("en_passant_square")),
+                    enPassantPawnText == null || enPassantPawnText.isBlank() ? null : UUID.fromString(enPassantPawnText),
+                    resultSet.getInt("white_king_moved") != 0,
+                    resultSet.getInt("black_king_moved") != 0,
+                    resultSet.getInt("white_kingside_rook_moved") != 0,
+                    resultSet.getInt("white_queenside_rook_moved") != 0,
+                    resultSet.getInt("black_kingside_rook_moved") != 0,
+                    resultSet.getInt("black_queenside_rook_moved") != 0,
+                    parsePieces(resultSet.getString("pieces")),
+                    resultSet.getString("pending_promotion")
+            );
+        } catch (SQLException | IllegalArgumentException ex) {
+            logger.log(Level.WARNING, "Failed to load active Chess match state.", ex);
+            return null;
+        }
+    }
+
+    public void deleteActiveMatchState(long matchId) {
+        if (connection == null || matchId <= 0L) {
+            return;
+        }
+        try (PreparedStatement statement = connection.prepareStatement("DELETE FROM chess_active_match_state WHERE match_id = ?")) {
+            statement.setLong(1, matchId);
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to delete active Chess match state.", ex);
         }
     }
 
@@ -453,6 +665,26 @@ public final class ChessDatabaseService {
         }
     }
 
+    public int cancelUnfinishedMatches(String timestamp, String finishedAt) {
+        if (connection == null || timestamp == null || timestamp.isBlank()) {
+            return 0;
+        }
+        String sql = timestamp.equals("*")
+                ? "UPDATE chess_matches SET finished_at = ?, result = ?, winner = NULL WHERE finished_at IS NULL"
+                : "UPDATE chess_matches SET finished_at = ?, result = ?, winner = NULL WHERE finished_at IS NULL AND started_at = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, finishedAt);
+            statement.setString(2, "Cancelled");
+            if (!timestamp.equals("*")) {
+                statement.setString(3, timestamp);
+            }
+            return statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to cancel Chess match.", ex);
+            return 0;
+        }
+    }
+
     private void updateStats(Collection<PlayerRef> players,
                              boolean whiteSide,
                              boolean won,
@@ -519,6 +751,127 @@ public final class ChessDatabaseService {
         } catch (SQLException ex) {
             logger.log(Level.WARNING, "Failed to update Chess player stats for " + playerId, ex);
         }
+    }
+
+    private String serializePlayers(Collection<PlayerRef> players) {
+        if (players == null || players.isEmpty()) {
+            return "";
+        }
+        List<String> parts = new ArrayList<>();
+        for (PlayerRef player : players) {
+            if (player != null && player.uuid() != null) {
+                parts.add(player.uuid() + "," + nullToEmpty(player.name()));
+            }
+        }
+        return String.join("|", parts);
+    }
+
+    private List<PlayerRef> parsePlayers(String text) {
+        List<PlayerRef> players = new ArrayList<>();
+        if (text == null || text.isBlank()) {
+            return players;
+        }
+        for (String entry : text.split("\\|")) {
+            if (entry.isBlank()) {
+                continue;
+            }
+            String[] parts = entry.split(",", 2);
+            if (parts.length == 0 || parts[0].isBlank()) {
+                continue;
+            }
+            players.add(new PlayerRef(UUID.fromString(parts[0]), parts.length > 1 ? parts[1] : ""));
+        }
+        return players;
+    }
+
+    private String serializePieces(Collection<StoredPiece> pieces) {
+        if (pieces == null || pieces.isEmpty()) {
+            return "";
+        }
+        List<String> parts = new ArrayList<>();
+        for (StoredPiece piece : pieces) {
+            if (piece == null || piece.pieceId() == null || piece.side() == null || piece.type() == null || piece.square() == null) {
+                continue;
+            }
+            parts.add(String.join(",",
+                    piece.pieceId().toString(),
+                    piece.side().key(),
+                    piece.type().key(),
+                    piece.square().notation(),
+                    booleanDigit(piece.moved()),
+                    booleanDigit(piece.captured()),
+                    booleanDigit(piece.selected()),
+                    booleanDigit(piece.promotionConsumed()),
+                    Integer.toString(piece.captureOrder())
+            ));
+        }
+        return String.join("|", parts);
+    }
+
+    private List<StoredPiece> parsePieces(String text) {
+        List<StoredPiece> pieces = new ArrayList<>();
+        if (text == null || text.isBlank()) {
+            return pieces;
+        }
+        for (String entry : text.split("\\|")) {
+            if (entry.isBlank()) {
+                continue;
+            }
+            String[] parts = entry.split(",", -1);
+            if (parts.length < 8) {
+                continue;
+            }
+            ChessSide side = ChessSide.fromKey(parts[1]);
+            ChessPieceType type = parsePieceType(parts[2]);
+            ChessSquare square = ChessSquare.fromNotation(parts[3]);
+            if (side == null || type == null || square == null) {
+                continue;
+            }
+            pieces.add(new StoredPiece(
+                    UUID.fromString(parts[0]),
+                    side,
+                    type,
+                    square,
+                    parseBooleanDigit(parts[4]),
+                    parseBooleanDigit(parts[5]),
+                    parseBooleanDigit(parts[6]),
+                    parseBooleanDigit(parts[7]),
+                    parts.length > 8 ? parseInt(parts[8], -1) : -1
+            ));
+        }
+        return pieces;
+    }
+
+    private int parseInt(String value, int fallback) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private ChessPieceType parsePieceType(String key) {
+        if (key == null) {
+            return null;
+        }
+        for (ChessPieceType type : ChessPieceType.values()) {
+            if (type.key().equalsIgnoreCase(key.trim())) {
+                return type;
+            }
+        }
+        return null;
+    }
+
+    private String booleanDigit(boolean value) {
+        return value ? "1" : "0";
+    }
+
+    private boolean parseBooleanDigit(String value) {
+        return "1".equals(value) || "true".equalsIgnoreCase(value);
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private String buildDetail(ChessMoveRecord record) {

@@ -70,6 +70,20 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                 }
                 result = chessManager.redo(player, sender.isOp());
             }
+            case "rewind" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("Only players can rewind chess moves.", NamedTextColor.RED));
+                    return true;
+                }
+                result = chessManager.rewind(player);
+            }
+            case "forward" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("Only players can forward chess moves.", NamedTextColor.RED));
+                    return true;
+                }
+                result = chessManager.forward(player);
+            }
             case "checkmate" -> {
                 if (!(sender instanceof Player player)) {
                     sender.sendMessage(Component.text("Only players can run a chess checkmate check.", NamedTextColor.RED));
@@ -127,6 +141,9 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && args[1].equalsIgnoreCase("print_log")) {
             return chessManager.printRecentLog(sender);
         }
+        if (args.length == 3 && args[1].equalsIgnoreCase("cancel")) {
+            return chessManager.cancelMatch(args[2]);
+        }
         if (args.length >= 2 && (args[1].equalsIgnoreCase("white") || args[1].equalsIgnoreCase("black"))) {
             if (args.length < 3 || args.length > 5) {
                 return ChessManager.Result.fail("Usage: /chess match " + args[1].toLowerCase(Locale.ROOT)
@@ -162,7 +179,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
             }
             return chessManager.setSetting(args[2], value);
         }
-        return ChessManager.Result.fail("Usage: /chess match <white|black> <players...> | /chess match start | /chess match test | /chess match print_log | /chess match settings <setting> <true|false>");
+        return ChessManager.Result.fail("Usage: /chess match <white|black> <players...> | /chess match start | /chess match test | /chess match print_log | /chess match cancel <timestamp|*> | /chess match settings <setting> <true|false>");
     }
 
     private boolean requireOp(CommandSender sender) {
@@ -193,7 +210,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(args[0], "board", "match", "resign", "draw", "undo", "redo", "checkmate");
+            return filter(args[0], "board", "match", "resign", "draw", "undo", "redo", "rewind", "forward", "checkmate");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("board")) {
             return filter(args[1], "build", "blocks", "reset", "remove");
@@ -211,7 +228,10 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("match")) {
-            return filter(args[1], "white", "black", "start", "settings", "test", "print_log");
+            return filter(args[1], "white", "black", "start", "settings", "test", "print_log", "cancel");
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("match") && args[1].equalsIgnoreCase("cancel")) {
+            return filter(args[2], "*");
         }
         if (args.length >= 3 && args.length <= 5 && args[0].equalsIgnoreCase("match")
                 && (args[1].equalsIgnoreCase("white") || args[1].equalsIgnoreCase("black"))) {
@@ -239,7 +259,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
 
     private Component usage() {
         return Component.text(
-                "Usage: /chess board build <x> <y> <z> | /chess board remove <timestamp|*> | /chess match <white|black|start|settings|test|print_log> | /chess resign | /chess draw | /chess undo | /chess redo | /chess checkmate",
+                "Usage: /chess board build <x> <y> <z> | /chess board remove <timestamp|*> | /chess match <white|black|start|settings|test|print_log|cancel> | /chess resign | /chess draw | /chess undo | /chess redo | /chess rewind | /chess forward | /chess checkmate",
                 NamedTextColor.YELLOW
         );
     }

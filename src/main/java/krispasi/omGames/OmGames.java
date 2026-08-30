@@ -86,7 +86,7 @@ public final class OmGames extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new BedwarsListener(bedwarsManager), this);
         getServer().getPluginManager().registerEvents(new EggHuntListener(eggHuntManager), this);
-        getServer().getPluginManager().registerEvents(new ChessListener(chessManager), this);
+        getServer().getPluginManager().registerEvents(new ChessListener(chessManager, this), this);
 /*      setupBedwars();
         setupBedwars1();
         setupBedwars2();

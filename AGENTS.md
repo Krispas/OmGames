@@ -953,6 +953,7 @@ Operator subcommands:
 - `/chess match start`
 - `/chess match test`
 - `/chess match print_log`
+- `/chess match cancel <timestamp|*>`
 - `/chess match settings do_movement_check <true|false>`
 - `/chess match settings visualize_movement_check <true|false>`
 - `/chess match settings do_endgame_checks <true|false>`
@@ -964,6 +965,8 @@ Team/player subcommands:
 - `/chess draw`
 - `/chess undo`
 - `/chess redo`
+- `/chess rewind`
+- `/chess forward`
 - `/chess checkmate`
 
 ### 4.3 Runtime Data Layout
@@ -978,6 +981,7 @@ SQLite tables:
 - `chess_match_events`
 - `chess_player_stats`
 - `chess_boards`
+- `chess_active_match_state`
 
 ### 4.4 Runtime Notes
 
@@ -990,3 +994,6 @@ SQLite tables:
 - Normal models are `om:<piece>` for white and `om:black_<piece>` for black; selected models are `om:selected_<piece>`.
 - Each active board owns 64 square interaction boxes, 32 piece interaction boxes, and 32 item displays.
 - Chess board entities are persistent and can be removed with `/chess board remove <timestamp|*>`.
+- Chess interaction entities use persistent data and scoreboard tags for identity; do not rely on visible custom names.
+- Active non-test matches are saved in `chess_active_match_state` so they can continue after restart until a win, draw, resign, cancel, board reset, or board removal.
+- During an active match, online team players in the board world are put in Adventure mode with flight enabled and 16-block block/entity interaction reach; this must be restored when they leave the board world or the match ends.

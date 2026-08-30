@@ -6,17 +6,22 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ChessListener implements Listener {
     private final ChessManager chessManager;
+    private final JavaPlugin plugin;
 
-    public ChessListener(ChessManager chessManager) {
+    public ChessListener(ChessManager chessManager, JavaPlugin plugin) {
         this.chessManager = chessManager;
+        this.plugin = plugin;
     }
 
     @EventHandler
@@ -58,5 +63,21 @@ public final class ChessListener implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         chessManager.handleQuit(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
+        chessManager.handleWorldChange(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onAsyncPlayerChat(AsyncPlayerChatEvent event) {
+        if (!chessManager.hasPendingPromotion(event.getPlayer())) {
+            return;
+        }
+        event.setCancelled(true);
+        String message = event.getMessage();
+        Player player = event.getPlayer();
+        plugin.getServer().getScheduler().runTask(plugin, () -> chessManager.handlePromotionChat(player, message));
     }
 }

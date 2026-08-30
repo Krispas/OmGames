@@ -12,6 +12,8 @@ public final class ChessPiece {
     private boolean moved;
     private boolean captured;
     private boolean selected;
+    private boolean promotionConsumed;
+    private int captureOrder = -1;
 
     public ChessPiece(UUID pieceId, ChessSide side, ChessPieceType type, ChessSquare square) {
         this.pieceId = pieceId;
@@ -82,6 +84,22 @@ public final class ChessPiece {
 
     public void setSelected(boolean selected) {
         this.selected = selected;
+    }
+
+    public boolean promotionConsumed() {
+        return promotionConsumed;
+    }
+
+    public void setPromotionConsumed(boolean promotionConsumed) {
+        this.promotionConsumed = promotionConsumed;
+    }
+
+    public int captureOrder() {
+        return captureOrder;
+    }
+
+    public void setCaptureOrder(int captureOrder) {
+        this.captureOrder = captureOrder;
     }
 
     public String logName() {
