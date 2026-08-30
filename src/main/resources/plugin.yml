@@ -15,6 +15,9 @@ commands:
   bank:
     description: Fortuna betting commands
     usage: /bank fortuna
+  omgames:
+    description: OmGames utility commands
+    usage: /omgames gif
 permissions:
   omgames.bw.start:
     description: Allows opening the BedWars setup GUI
@@ -33,4 +36,7 @@ permissions:
     default: op
   omgames.fortuna.manage:
     description: Allows managing Fortuna matches via /bank fortuna
+    default: op
+  omgames.random.gif:
+    description: Allows managing Random GIF map displays via /omgames gif
     default: op

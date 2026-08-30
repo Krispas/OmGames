@@ -171,41 +171,46 @@ public final class FortunaMapDisplay {
     }
 
     private void drawHeader(Graphics2D g) {
+        Rectangle header = new Rectangle(16, 12, DISPLAY_WIDTH - 32, 44);
         g.setColor(PANEL_DARK);
-        g.fillRoundRect(14, 12, DISPLAY_WIDTH - 28, 42, 10, 10);
+        g.fillRoundRect(header.x, header.y, header.width, header.height, 8, 8);
         g.setColor(GREEN);
         g.setStroke(new BasicStroke(2.0f));
-        g.drawLine(24, 54, DISPLAY_WIDTH - 24, 54);
+        g.drawLine(header.x + 10, header.y + header.height - 1,
+                header.x + header.width - 10, header.y + header.height - 1);
 
-        g.setFont(new Font("SansSerif", Font.BOLD, 30));
+        g.setFont(new Font("SansSerif", Font.BOLD, 28));
         g.setColor(WHITE);
         g.drawString("FORTUNA", 28, 43);
-        g.setFont(new Font("SansSerif", Font.BOLD, 12));
-        g.setColor(GOLD);
-        g.drawString("BANK", 180, 42);
 
-        g.setFont(new Font("SansSerif", Font.BOLD, 12));
-        g.setColor(MUTED);
-        g.drawString("Sazkova kancelar", DISPLAY_WIDTH - 143, 38);
+        g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 36));
+        g.fillRoundRect(178, 26, 44, 18, 7, 7);
+        g.setColor(GOLD);
+        g.setStroke(new BasicStroke(1.1f));
+        g.drawRoundRect(178, 26, 44, 18, 7, 7);
+        drawCentered(g, "BANK", new Font("SansSerif", Font.BOLD, 11), 178, 26, 44, 18, GOLD);
     }
 
     private void drawCleanState(Graphics2D g) {
-        Rectangle body = new Rectangle(34, 72, DISPLAY_WIDTH - 68, 118);
+        Rectangle body = new Rectangle(26, 78, DISPLAY_WIDTH - 52, 118);
         g.setColor(PANEL);
-        g.fillRoundRect(body.x, body.y, body.width, body.height, 12, 12);
-        drawCentered(g, "Board clean", new Font("SansSerif", Font.BOLD, 28), body.x, body.y + 20,
-                body.width, 40, WHITE);
-        drawCentered(g, "No active or upcoming match", new Font("SansSerif", Font.BOLD, 17), body.x, body.y + 62,
-                body.width, 26, MUTED);
-        drawCentered(g, "Use /bank fortuna", new Font("SansSerif", Font.BOLD, 15), body.x, body.y + 88,
-                body.width, 30, GOLD);
+        g.fillRoundRect(body.x, body.y, body.width, body.height, 10, 10);
+        g.setColor(new Color(255, 255, 255, 30));
+        g.setStroke(new BasicStroke(1.2f));
+        g.drawRoundRect(body.x, body.y, body.width, body.height, 10, 10);
+
+        drawCentered(g, "NO ACTIVE MATCH", new Font("SansSerif", Font.BOLD, 27),
+                body.x + 16, body.y + 25, body.width - 32, 34, WHITE);
+        drawCentered(g, "Board is clean", new Font("SansSerif", Font.BOLD, 16),
+                body.x + 16, body.y + 61, body.width - 32, 24, MUTED);
+        drawCentered(g, "Next match coming soon", new Font("SansSerif", Font.BOLD, 15),
+                body.x + 16, body.y + 86, body.width - 32, 24, GOLD);
     }
 
     private void drawMatch(Graphics2D g, FortunaMatch match) {
         drawStatusBadge(g, match);
         drawOddsCards(g, match);
         drawScheduleStrip(g, match);
-        drawOddsChart(g, match);
     }
 
     private void drawStatusBadge(Graphics2D g, FortunaMatch match) {
@@ -215,127 +220,72 @@ public final class FortunaMapDisplay {
             case UPCOMING -> DRAW;
         };
         g.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 45));
-        g.fillRoundRect(250, 22, 92, 23, 9, 9);
+        Rectangle badge = new Rectangle(DISPLAY_WIDTH - 111, 24, 88, 20);
+        g.fillRoundRect(badge.x, badge.y, badge.width, badge.height, 7, 7);
         g.setColor(color);
         g.setStroke(new BasicStroke(1.5f));
-        g.drawRoundRect(250, 22, 92, 23, 9, 9);
+        g.drawRoundRect(badge.x, badge.y, badge.width, badge.height, 7, 7);
         drawCentered(g, match.getStatus().displayName().toUpperCase(Locale.ROOT),
-                new Font("SansSerif", Font.BOLD, 12), 250, 22, 92, 23, color);
+                new Font("SansSerif", Font.BOLD, 11), badge.x + 4, badge.y, badge.width - 8, badge.height, color);
     }
 
     private void drawOddsCards(Graphics2D g, FortunaMatch match) {
-        Rectangle main = new Rectangle(20, 69, DISPLAY_WIDTH - 40, 88);
+        Rectangle main = new Rectangle(18, 68, DISPLAY_WIDTH - 36, 102);
         g.setColor(PANEL);
-        g.fillRoundRect(main.x, main.y, main.width, main.height, 12, 12);
+        g.fillRoundRect(main.x, main.y, main.width, main.height, 10, 10);
         g.setColor(new Color(255, 255, 255, 30));
-        g.drawRoundRect(main.x, main.y, main.width, main.height, 12, 12);
+        g.setStroke(new BasicStroke(1.0f));
+        g.drawRoundRect(main.x, main.y, main.width, main.height, 10, 10);
 
-        drawOddsCard(g, new Rectangle(34, 83, 94, 58), "Vyhra", match.getHomeName(), match.getHomeOdds(), GREEN);
-        drawOddsCard(g, new Rectangle(145, 83, 94, 58), "Remiza", "X", match.getDrawOdds(), DRAW);
-        drawOddsCard(g, new Rectangle(256, 83, 94, 58), "Prohra", match.getAwayName(), match.getAwayOdds(), RED);
+        drawOddsCard(g, new Rectangle(31, 82, 98, 72), "Vyhra", match.getHomeName(), match.getHomeOdds(), GREEN);
+        drawOddsCard(g, new Rectangle(143, 82, 98, 72), "Remiza", "X", match.getDrawOdds(), DRAW);
+        drawOddsCard(g, new Rectangle(255, 82, 98, 72), "Prohra", match.getAwayName(), match.getAwayOdds(), RED);
     }
 
     private void drawOddsCard(Graphics2D g, Rectangle rect, String title, String name, double odds, Color accent) {
         g.setColor(new Color(0, 0, 0, 120));
-        g.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 10, 10);
+        g.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 9, 9);
         g.setColor(accent);
         g.setStroke(new BasicStroke(2.0f));
-        g.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 10, 10);
+        g.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 9, 9);
         drawCentered(g, title.toUpperCase(Locale.ROOT), new Font("SansSerif", Font.BOLD, 11),
-                rect.x + 4, rect.y + 5, rect.width - 8, 16, accent);
-        drawCentered(g, name, new Font("SansSerif", Font.BOLD, 13),
-                rect.x + 6, rect.y + 22, rect.width - 12, 17, WHITE);
-        drawCentered(g, formatOdds(odds), new Font("SansSerif", Font.BOLD, 22),
-                rect.x + 6, rect.y + 36, rect.width - 12, 22, WHITE);
+                rect.x + 6, rect.y + 7, rect.width - 12, 14, accent);
+        drawCentered(g, name, new Font("SansSerif", Font.BOLD, 14),
+                rect.x + 7, rect.y + 26, rect.width - 14, 16, WHITE);
+        drawCentered(g, formatOdds(odds), new Font("SansSerif", Font.BOLD, 24),
+                rect.x + 7, rect.y + 43, rect.width - 14, 22, WHITE);
     }
 
     private void drawScheduleStrip(Graphics2D g, FortunaMatch match) {
-        Rectangle strip = new Rectangle(20, 165, DISPLAY_WIDTH - 40, 31);
+        Rectangle strip = new Rectangle(18, 178, DISPLAY_WIDTH - 36, 56);
         g.setColor(PANEL_DARK);
-        g.fillRoundRect(strip.x, strip.y, strip.width, strip.height, 9, 9);
-
-        drawCentered(g, "DATE", new Font("SansSerif", Font.BOLD, 9), 34, 168, 72, 11, MUTED);
-        drawCentered(g, DATE_FORMAT.format(match.getScheduledAt()), new Font("SansSerif", Font.BOLD, 15),
-                34, 178, 72, 18, WHITE);
-
-        drawCentered(g, "NEXT GAME", new Font("SansSerif", Font.BOLD, 9), 120, 168, 144, 11, MUTED);
-        drawCentered(g, match.label(), new Font("SansSerif", Font.BOLD, 14), 110, 181, 164, 15, WHITE);
-
-        drawCentered(g, "TIME", new Font("SansSerif", Font.BOLD, 9), 278, 168, 72, 11, MUTED);
-        drawCentered(g, TIME_FORMAT.format(match.getScheduledAt()), new Font("SansSerif", Font.BOLD, 15),
-                278, 178, 72, 18, WHITE);
-
-        if (match.getStatus() == FortunaMatchStatus.FINISHED) {
-            drawCentered(g, "Result: " + match.resultLabel(), new Font("SansSerif", Font.BOLD, 11),
-                    120, 153, 144, 14, GOLD);
-        }
-    }
-
-    private void drawOddsChart(Graphics2D g, FortunaMatch match) {
-        Rectangle chart = new Rectangle(20, 205, DISPLAY_WIDTH - 40, 38);
-        g.setColor(new Color(0, 0, 0, 150));
-        g.fillRoundRect(chart.x, chart.y, chart.width, chart.height, 8, 8);
+        g.fillRoundRect(strip.x, strip.y, strip.width, strip.height, 10, 10);
         g.setColor(new Color(255, 255, 255, 25));
         g.setStroke(new BasicStroke(1.0f));
-        for (int i = 1; i <= 2; i++) {
-            int y = chart.y + i * chart.height / 3;
-            g.drawLine(chart.x + 8, y, chart.x + chart.width - 8, y);
-        }
+        g.drawRoundRect(strip.x, strip.y, strip.width, strip.height, 10, 10);
 
-        List<FortunaOddsPoint> points = new ArrayList<>(match.getOddsHistory());
-        if (points.isEmpty()) {
-            points.add(new FortunaOddsPoint(match.getCreatedAt(), match.getHomeOdds(), match.getDrawOdds(), match.getAwayOdds()));
-        }
-        if (points.size() == 1) {
-            FortunaOddsPoint point = points.getFirst();
-            points.add(new FortunaOddsPoint(point.changedAt().plusMinutes(1), point.homeOdds(), point.drawOdds(), point.awayOdds()));
-        }
+        drawCentered(g, "DATE", new Font("SansSerif", Font.BOLD, 9), 30, 185, 66, 11, MUTED);
+        drawCentered(g, DATE_FORMAT.format(match.getScheduledAt()), new Font("SansSerif", Font.BOLD, 15),
+                30, 198, 66, 19, WHITE);
 
-        double min = Double.MAX_VALUE;
-        double max = -Double.MAX_VALUE;
-        for (FortunaOddsPoint point : points) {
-            min = Math.min(min, Math.min(point.homeOdds(), Math.min(point.drawOdds(), point.awayOdds())));
-            max = Math.max(max, Math.max(point.homeOdds(), Math.max(point.drawOdds(), point.awayOdds())));
-        }
-        if (Math.abs(max - min) < 0.0001) {
-            max = min + 1.0;
-        }
-        double padding = (max - min) * 0.12;
-        min -= padding;
-        max += padding;
+        String centerTitle = match.getStatus() == FortunaMatchStatus.ACTIVE ? "LIVE GAME" : "NEXT GAME";
+        drawCentered(g, centerTitle, new Font("SansSerif", Font.BOLD, 9), 108, 185, 168, 11, MUTED);
+        drawCentered(g, match.label(), new Font("SansSerif", Font.BOLD, 16), 100, 199, 184, 20, WHITE);
 
-        Rectangle plot = new Rectangle(chart.x + 10, chart.y + 6, chart.width - 20, chart.height - 12);
-        drawChartLine(g, points.stream().map(FortunaOddsPoint::homeOdds).toList(), plot, min, max, GREEN);
-        drawChartLine(g, points.stream().map(FortunaOddsPoint::drawOdds).toList(), plot, min, max, DRAW);
-        drawChartLine(g, points.stream().map(FortunaOddsPoint::awayOdds).toList(), plot, min, max, RED);
+        drawCentered(g, "TIME", new Font("SansSerif", Font.BOLD, 9), 288, 185, 66, 11, MUTED);
+        drawCentered(g, TIME_FORMAT.format(match.getScheduledAt()), new Font("SansSerif", Font.BOLD, 15),
+                288, 198, 66, 19, WHITE);
 
-        g.setFont(new Font("SansSerif", Font.BOLD, 8));
-        g.setColor(GREEN);
-        g.drawString("1", chart.x + 13, chart.y + 10);
-        g.setColor(DRAW);
-        g.drawString("X", chart.x + 27, chart.y + 10);
-        g.setColor(RED);
-        g.drawString("2", chart.x + 41, chart.y + 10);
-    }
-
-    private void drawChartLine(Graphics2D g, List<Double> values, Rectangle plot, double min, double max, Color color) {
-        if (values == null || values.size() < 2) {
-            return;
+        if (match.getStatus() == FortunaMatchStatus.FINISHED) {
+            drawCentered(g, "RESULT: " + match.resultLabel(), new Font("SansSerif", Font.BOLD, 13),
+                    strip.x + 16, 219, strip.width - 32, 14, GOLD);
+        } else if (match.getStatus() == FortunaMatchStatus.ACTIVE) {
+            drawCentered(g, "LIVE MARKET", new Font("SansSerif", Font.BOLD, 12),
+                    strip.x + 16, 220, strip.width - 32, 13, GOLD);
+        } else {
+            drawCentered(g, "MARKET OPEN", new Font("SansSerif", Font.BOLD, 12),
+                    strip.x + 16, 220, strip.width - 32, 13, GOLD);
         }
-        Path2D path = new Path2D.Double();
-        for (int i = 0; i < values.size(); i++) {
-            double x = plot.x + i * (plot.width / (double) (values.size() - 1));
-            double normalized = (values.get(i) - min) / (max - min);
-            double y = plot.y + plot.height - normalized * plot.height;
-            if (i == 0) {
-                path.moveTo(x, y);
-            } else {
-                path.lineTo(x, y);
-            }
-        }
-        g.setColor(color);
-        g.setStroke(new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        g.draw(path);
     }
 
     private void drawCentered(Graphics2D g,

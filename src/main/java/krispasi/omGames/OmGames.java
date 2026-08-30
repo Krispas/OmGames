@@ -1,4 +1,4 @@
-﻿package krispasi.omGames;
+package krispasi.omGames;
 
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.command.BedwarsCommand;
@@ -13,6 +13,9 @@ import krispasi.omGames.chess.ChessManager;
 import krispasi.omGames.egghunt.EggHuntCommand;
 import krispasi.omGames.egghunt.EggHuntListener;
 import krispasi.omGames.egghunt.EggHuntManager;
+import krispasi.omGames.random.RandomCommand;
+import krispasi.omGames.random.RandomGifManager;
+import krispasi.omGames.random.RandomListener;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -44,6 +47,7 @@ public final class OmGames extends JavaPlugin {
     private EggHuntManager eggHuntManager;
     private ChessManager chessManager;
     private FortunaManager fortunaManager;
+    private RandomGifManager randomGifManager;
 
     @Override
     public void onEnable() {
@@ -69,6 +73,8 @@ public final class OmGames extends JavaPlugin {
         chessManager.load();
         fortunaManager = new FortunaManager(this);
         fortunaManager.load();
+        randomGifManager = new RandomGifManager(this);
+        randomGifManager.load();
 
         PluginCommand command = getCommand("bw");
         if (command != null) {
@@ -94,11 +100,18 @@ public final class OmGames extends JavaPlugin {
             bankCommand.setExecutor(executor);
             bankCommand.setTabCompleter(executor);
         }
+        PluginCommand omGamesCommand = getCommand("omgames");
+        if (omGamesCommand != null) {
+            RandomCommand executor = new RandomCommand(randomGifManager);
+            omGamesCommand.setExecutor(executor);
+            omGamesCommand.setTabCompleter(executor);
+        }
 
         getServer().getPluginManager().registerEvents(new BedwarsListener(bedwarsManager), this);
         getServer().getPluginManager().registerEvents(new EggHuntListener(eggHuntManager), this);
         getServer().getPluginManager().registerEvents(new ChessListener(chessManager, this), this);
         getServer().getPluginManager().registerEvents(new FortunaListener(fortunaManager, this), this);
+        getServer().getPluginManager().registerEvents(new RandomListener(randomGifManager, this), this);
 /*      setupBedwars();
         setupBedwars1();
         setupBedwars2();
@@ -116,6 +129,9 @@ public final class OmGames extends JavaPlugin {
         }
         if (fortunaManager != null) {
             fortunaManager.shutdown();
+        }
+        if (randomGifManager != null) {
+            randomGifManager.shutdown();
         }
         if (bedwarsManager != null) {
             bedwarsManager.shutdown();

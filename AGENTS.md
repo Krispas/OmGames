@@ -1050,3 +1050,39 @@ Permissions declared in `plugin.yml`:
 - The map display renders the selected active match first; if none is active, it renders the next upcoming match; if none is upcoming, it renders a clean board state.
 - The Clean Board GUI action only clears the current display render; it does not delete saved matches.
 - Match deletion is available from the match detail GUI and should remain a deliberate action, not an accidental one-click removal.
+
+## 6) Random
+
+### 6.1 Top-Level Layout
+
+- `src/main/java/krispasi/omGames/random/*`
+  - Miscellaneous OmGames utility features that do not belong to BedWars, Egg Hunt, Chess, or Bank.
+  - Keep Random features isolated from game-mode ownership unless integration is explicitly requested.
+
+### 6.2 GIF Map Player
+
+- Runtime owner: `RandomGifManager`
+- Command owner: `RandomCommand`
+- Listener owner: `RandomListener`
+
+Command surface:
+- `/omgames gif`
+  - OP/default-permission GUI for managing GIF-to-map links.
+  - Opens the GIF manager menu.
+
+Permissions declared in `plugin.yml`:
+- `omgames.random.gif`
+
+Runtime data layout:
+- `plugins/OmGames/Random/gifs/`
+  - Server folder where `.gif` files are dropped manually.
+- `plugins/OmGames/Random/gifs.yml`
+  - Stores persisted GIF filename to map-id links.
+
+Behavior notes:
+- The GUI flow is: create new GIF -> choose a `.gif` file from `plugins/OmGames/Random/gifs/` -> choose a map board size -> enter the first target map id in chat.
+- Supported board sizes are selected in the GUI and range up to `4x4`.
+- Multi-map GIF boards use consecutive map ids from the entered first map id, laid out left-to-right and top-to-bottom.
+- GIF animation only advances when at least one linked `FILLED_MAP` from that GIF board is placed in an item frame and at least one player is within `20` blocks of that item frame.
+- When no player is near a placed linked map, the GIF runtime resets the renderer state to frame `0` and does not send animation updates.
+- Existing map ids must already exist on the server before linking; the GIF manager does not create new vanilla maps.
