@@ -1299,7 +1299,7 @@ abstract class BedwarsListenerRuntimeSupport extends BedwarsListenerCustomSuppor
         player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 45 * 20, 1), true);
         player.addPotionEffect(new PotionEffect(PotionEffectType.ABSORPTION, 5 * 20, 1), true);
         player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 40 * 20, 0), true);
-        player.playEffect(EntityEffect.TOTEM_RESURRECT);
+        player.playEffect(EntityEffect.PROTECTED_FROM_DEATH);
         player.getWorld().playSound(player.getLocation(), Sound.ITEM_TOTEM_USE, 1.0f, 1.0f);
     }
 

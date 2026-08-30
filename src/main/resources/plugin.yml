@@ -1,7 +1,7 @@
 name: OmGames
 version: ${project.version}
 main: krispasi.omGames.OmGames
-api-version: '26.1.2'
+api-version: '26.2'
 commands:
   bw:
     description: BedWars commands

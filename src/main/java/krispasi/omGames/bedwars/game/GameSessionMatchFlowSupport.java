@@ -772,9 +772,9 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             previousWorldTime = world.getTime();
         }
         if (previousDaylightCycle == null) {
-            previousDaylightCycle = world.getGameRuleValue(GameRule.DO_DAYLIGHT_CYCLE);
+            previousDaylightCycle = world.getGameRuleValue(GameRules.ADVANCE_TIME);
         }
-        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+        world.setGameRule(GameRules.ADVANCE_TIME, false);
         world.setTime(18000L);
     }
 
@@ -1050,7 +1050,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
             return;
         }
         if (previousDaylightCycle != null) {
-            world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, previousDaylightCycle);
+            world.setGameRule(GameRules.ADVANCE_TIME, previousDaylightCycle);
         }
         if (previousWorldTime != null) {
             world.setTime(previousWorldTime);
@@ -1239,7 +1239,7 @@ abstract class GameSessionMatchFlowSupport extends GameSessionRuntimeSupport {
         WorldBorder border = world.getWorldBorder();
         double targetSize = SUDDEN_DEATH_BORDER_TARGET_SIZE;
         border.setCenter(center.x() + 0.5, center.z() + 0.5);
-        border.setSize(Math.max(targetSize, 1.0), remainingSeconds);
+        border.changeSize(Math.max(targetSize, 1.0), Math.min(Integer.MAX_VALUE, remainingSeconds * 20L));
         border.setDamageBuffer(WORLD_BORDER_DAMAGE_BUFFER);
         border.setDamageAmount(WORLD_BORDER_DAMAGE_AMOUNT);
         border.setWarningDistance(WORLD_BORDER_WARNING_DISTANCE);
