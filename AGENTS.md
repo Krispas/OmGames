@@ -1,4 +1,4 @@
-# AGENTS.md
+﻿# AGENTS.md
 
 ## 1) Repo Rules
 
@@ -1002,21 +1002,51 @@ SQLite tables:
 
 ### 5.1 Top-Level Layout
 
-- `src/main/java/krispasi/omGames/bank/*`
-  - Bank project implementation.
-  - Keep Bank logic inside this package; do not push Bank rules into BedWars, Egg Hunt, or Chess classes.
+- `src/main/java/krispasi/omGames/bank/fortuna/*`
+  - Fortuna betting implementation under the Bank root command area.
+  - Keep Fortuna logic inside this package; do not push Fortuna rules into BedWars, Egg Hunt, or Chess classes.
   - Only use `OmGames` for plugin lifecycle wiring, command registration, and listener registration.
 
 ### 5.2 Runtime Data Layout
 
-Bank runtime files live in:
-- `plugins/OmGames/Bank/`
+Fortuna runtime files live in:
+- `plugins/OmGames/Bank/Fortuna/`
 
 Bank may use shared plugin storage only when the schema is explicitly defined:
 - `plugins/OmGames/OmGames.db`
 
-### 5.3 Ownership Rules
+Files:
+- `fortuna.yml`
 
-- Bank should own its own commands, listeners, services, config loading, and persistence helpers.
+`fortuna.yml` keys:
+- `map-display.width`
+- `map-display.height`
+- `map-display.map-ids`
+- `next-match-id`
+- `matches`
+
+### 5.3 Command Surface
+
+Implemented in `FortunaCommand`.
+
+Operator subcommands:
+- `/bank fortuna`
+
+Permissions declared in `plugin.yml`:
+- `omgames.fortuna.manage`
+
+### 5.4 Ownership Rules
+
+- Fortuna should own its own commands, listeners, services, config loading, and persistence helpers.
 - Use lowercase Java package names, even though the runtime folder is `Bank`.
-- Keep Bank changes isolated from existing BedWars, Egg Hunt, and Chess behavior unless integration is explicitly requested.
+- Keep Fortuna changes isolated from existing BedWars, Egg Hunt, and Chess behavior unless integration is explicitly requested.
+
+### 5.5 Fortuna Display Notes
+
+- Fortuna display uses a fixed 3x2 map board.
+- Default map ids are `1459`, `1460`, `1461`, `1462`, `1463`, and `1464`.
+- `/bank fortuna` opens the operator GUI for creating matches, changing live odds, activating matches, ending active matches as home win, draw, or away win, cleaning the display board, and deleting saved matches.
+- Text entry for match names, dates, times, and odds is collected through chat prompts started from the GUI.
+- The map display renders the selected active match first; if none is active, it renders the next upcoming match; if none is upcoming, it renders a clean board state.
+- The Clean Board GUI action only clears the current display render; it does not delete saved matches.
+- Match deletion is available from the match detail GUI and should remain a deliberate action, not an accidental one-click removal.

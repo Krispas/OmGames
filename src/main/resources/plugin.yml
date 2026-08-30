@@ -1,4 +1,4 @@
-name: OmGames
+﻿name: OmGames
 version: ${project.version}
 main: krispasi.omGames.OmGames
 api-version: '26.2'
@@ -12,6 +12,9 @@ commands:
   chess:
     description: Chess game commands
     usage: /chess board build <x> <y> <z> | /chess board remove <timestamp|*> | /chess board blocks <b1> <b2> <b3> | /chess match <white|black|start|settings|test|print_log> | /chess resign | /chess draw | /chess undo | /chess redo | /chess checkmate
+  bank:
+    description: Fortuna betting commands
+    usage: /bank fortuna
 permissions:
   omgames.bw.start:
     description: Allows opening the BedWars setup GUI
@@ -27,4 +30,7 @@ permissions:
     default: op
   omgames.chess.manage:
     description: Allows managing Chess boards and matches via /chess
+    default: op
+  omgames.fortuna.manage:
+    description: Allows managing Fortuna matches via /bank fortuna
     default: op

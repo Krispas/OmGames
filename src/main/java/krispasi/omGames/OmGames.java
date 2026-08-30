@@ -1,16 +1,18 @@
-package krispasi.omGames;
+﻿package krispasi.omGames;
 
 import krispasi.omGames.bedwars.BedwarsManager;
 import krispasi.omGames.bedwars.command.BedwarsCommand;
 import krispasi.omGames.bedwars.listener.BedwarsListener;
 import krispasi.omGames.bedwars.setup.BedwarsSetupManager;
+import krispasi.omGames.bank.fortuna.FortunaCommand;
+import krispasi.omGames.bank.fortuna.FortunaListener;
+import krispasi.omGames.bank.fortuna.FortunaManager;
 import krispasi.omGames.chess.ChessCommand;
 import krispasi.omGames.chess.ChessListener;
 import krispasi.omGames.chess.ChessManager;
 import krispasi.omGames.egghunt.EggHuntCommand;
 import krispasi.omGames.egghunt.EggHuntListener;
 import krispasi.omGames.egghunt.EggHuntManager;
-import org.bukkit.*;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -41,6 +43,7 @@ public final class OmGames extends JavaPlugin {
     private BedwarsSetupManager setupManager;
     private EggHuntManager eggHuntManager;
     private ChessManager chessManager;
+    private FortunaManager fortunaManager;
 
     @Override
     public void onEnable() {
@@ -64,6 +67,8 @@ public final class OmGames extends JavaPlugin {
         eggHuntManager.load();
         chessManager = new ChessManager(this);
         chessManager.load();
+        fortunaManager = new FortunaManager(this);
+        fortunaManager.load();
 
         PluginCommand command = getCommand("bw");
         if (command != null) {
@@ -83,10 +88,17 @@ public final class OmGames extends JavaPlugin {
             chessCommand.setExecutor(executor);
             chessCommand.setTabCompleter(executor);
         }
+        PluginCommand bankCommand = getCommand("bank");
+        if (bankCommand != null) {
+            FortunaCommand executor = new FortunaCommand(fortunaManager);
+            bankCommand.setExecutor(executor);
+            bankCommand.setTabCompleter(executor);
+        }
 
         getServer().getPluginManager().registerEvents(new BedwarsListener(bedwarsManager), this);
         getServer().getPluginManager().registerEvents(new EggHuntListener(eggHuntManager), this);
         getServer().getPluginManager().registerEvents(new ChessListener(chessManager, this), this);
+        getServer().getPluginManager().registerEvents(new FortunaListener(fortunaManager, this), this);
 /*      setupBedwars();
         setupBedwars1();
         setupBedwars2();
@@ -101,6 +113,9 @@ public final class OmGames extends JavaPlugin {
         }
         if (chessManager != null) {
             chessManager.shutdown();
+        }
+        if (fortunaManager != null) {
+            fortunaManager.shutdown();
         }
         if (bedwarsManager != null) {
             bedwarsManager.shutdown();
