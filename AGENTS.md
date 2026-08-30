@@ -1047,8 +1047,8 @@ Permissions declared in `plugin.yml`:
 - Default map ids are `1459`, `1460`, `1461`, `1462`, `1463`, and `1464`.
 - `/bank fortuna` opens the operator GUI for creating matches, changing live odds, activating matches, ending active matches as home win, draw, or away win, cleaning the display board, and deleting saved matches.
 - Text entry for match names, dates, times, and odds is collected through chat prompts started from the GUI.
-- The map display renders the selected active match first; if none is active, it renders the next upcoming match; if none is upcoming, it renders a clean board state.
-- The Clean Board GUI action only clears the current display render; it does not delete saved matches.
+- The map display renders an active match first; when an active match is finished, that finished match remains pinned as the result strip while the main display area shows the next upcoming match when one exists, or the finished match itself when it does not.
+- The Clean Board GUI action clears the current display render and unpins any finished result; it does not delete saved matches.
 - Match deletion is available from the match detail GUI and should remain a deliberate action, not an accidental one-click removal.
 
 ## 6) Random

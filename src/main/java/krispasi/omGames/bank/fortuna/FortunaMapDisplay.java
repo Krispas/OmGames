@@ -184,11 +184,11 @@ public final class FortunaMapDisplay {
         g.drawString("FORTUNA", 28, 43);
 
         g.setColor(new Color(GOLD.getRed(), GOLD.getGreen(), GOLD.getBlue(), 36));
-        g.fillRoundRect(178, 26, 44, 18, 7, 7);
+        g.fillRoundRect(195, 26, 44, 18, 7, 7);
         g.setColor(GOLD);
         g.setStroke(new BasicStroke(1.1f));
-        g.drawRoundRect(178, 26, 44, 18, 7, 7);
-        drawCentered(g, "BANK", new Font("SansSerif", Font.BOLD, 11), 178, 26, 44, 18, GOLD);
+        g.drawRoundRect(195, 26, 44, 18, 7, 7);
+        drawCentered(g, "BANK", new Font("SansSerif", Font.BOLD, 11), 195, 26, 44, 18, GOLD);
     }
 
     private void drawCleanState(Graphics2D g) {
@@ -201,7 +201,7 @@ public final class FortunaMapDisplay {
 
         drawCentered(g, "NO ACTIVE MATCH", new Font("SansSerif", Font.BOLD, 27),
                 body.x + 16, body.y + 25, body.width - 32, 34, WHITE);
-        drawCentered(g, "Board is clean", new Font("SansSerif", Font.BOLD, 16),
+        drawCentered(g, "No upcoming game", new Font("SansSerif", Font.BOLD, 16),
                 body.x + 16, body.y + 61, body.width - 32, 24, MUTED);
         drawCentered(g, "Next match coming soon", new Font("SansSerif", Font.BOLD, 15),
                 body.x + 16, body.y + 86, body.width - 32, 24, GOLD);
@@ -209,8 +209,23 @@ public final class FortunaMapDisplay {
 
     private void drawMatch(Graphics2D g, FortunaMatch match) {
         drawStatusBadge(g, match);
+        if (match.getStatus() == FortunaMatchStatus.ACTIVE) {
+            drawLiveMatchPanel(g, match);
+            drawFutureMatchStrip(g, manager.getNextUpcomingMatch().orElse(null));
+            return;
+        }
+        if (match.getStatus() == FortunaMatchStatus.FINISHED) {
+            java.util.Optional<FortunaMatch> nextMatch = manager.getNextUpcomingMatch();
+            if (nextMatch.isPresent()) {
+                drawUpcomingMatchPanel(g, nextMatch.get());
+            } else {
+                drawOddsCards(g, match);
+            }
+            drawResultStrip(g, match);
+            return;
+        }
         drawOddsCards(g, match);
-        drawScheduleStrip(g, match);
+        drawScheduleStrip(g, match, "NEXT GAME");
     }
 
     private void drawStatusBadge(Graphics2D g, FortunaMatch match) {
@@ -237,9 +252,12 @@ public final class FortunaMapDisplay {
         g.setStroke(new BasicStroke(1.0f));
         g.drawRoundRect(main.x, main.y, main.width, main.height, 10, 10);
 
-        drawOddsCard(g, new Rectangle(31, 82, 98, 72), "Vyhra", match.getHomeName(), match.getHomeOdds(), GREEN);
-        drawOddsCard(g, new Rectangle(143, 82, 98, 72), "Remiza", "X", match.getDrawOdds(), DRAW);
-        drawOddsCard(g, new Rectangle(255, 82, 98, 72), "Prohra", match.getAwayName(), match.getAwayOdds(), RED);
+        drawOddsCard(g, new Rectangle(31, 82, 98, 72),
+                resultTitle(match, FortunaOutcome.HOME), match.getHomeName(), match.getHomeOdds(), GREEN);
+        drawOddsCard(g, new Rectangle(143, 82, 98, 72),
+                resultTitle(match, FortunaOutcome.DRAW), "X", match.getDrawOdds(), DRAW);
+        drawOddsCard(g, new Rectangle(255, 82, 98, 72),
+                resultTitle(match, FortunaOutcome.AWAY), match.getAwayName(), match.getAwayOdds(), RED);
     }
 
     private void drawOddsCard(Graphics2D g, Rectangle rect, String title, String name, double odds, Color accent) {
@@ -248,15 +266,111 @@ public final class FortunaMapDisplay {
         g.setColor(accent);
         g.setStroke(new BasicStroke(2.0f));
         g.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 9, 9);
-        drawCentered(g, title.toUpperCase(Locale.ROOT), new Font("SansSerif", Font.BOLD, 11),
-                rect.x + 6, rect.y + 7, rect.width - 12, 14, accent);
-        drawCentered(g, name, new Font("SansSerif", Font.BOLD, 14),
-                rect.x + 7, rect.y + 26, rect.width - 14, 16, WHITE);
+        int nameY = rect.y + 18;
+        if (title != null && !title.isBlank()) {
+            drawCentered(g, title.toUpperCase(Locale.ROOT), new Font("SansSerif", Font.BOLD, 11),
+                    rect.x + 6, rect.y + 7, rect.width - 12, 14, resultTitleColor(title));
+            nameY = rect.y + 26;
+        }
+        drawCentered(g, name, new Font("SansSerif", Font.BOLD, 15),
+                rect.x + 7, nameY, rect.width - 14, 17, WHITE);
         drawCentered(g, formatOdds(odds), new Font("SansSerif", Font.BOLD, 24),
                 rect.x + 7, rect.y + 43, rect.width - 14, 22, WHITE);
     }
 
-    private void drawScheduleStrip(Graphics2D g, FortunaMatch match) {
+    private void drawLiveMatchPanel(Graphics2D g, FortunaMatch match) {
+        drawMatchHeaderPanel(g, match, "LIVE MATCH", GREEN);
+    }
+
+    private void drawUpcomingMatchPanel(Graphics2D g, FortunaMatch match) {
+        drawMatchHeaderPanel(g, match, "NEXT MATCH", DRAW);
+    }
+
+    private void drawMatchHeaderPanel(Graphics2D g, FortunaMatch match, String title, Color titleColor) {
+        Rectangle main = new Rectangle(18, 68, DISPLAY_WIDTH - 36, 102);
+        g.setColor(PANEL);
+        g.fillRoundRect(main.x, main.y, main.width, main.height, 10, 10);
+        g.setColor(new Color(255, 255, 255, 30));
+        g.setStroke(new BasicStroke(1.0f));
+        g.drawRoundRect(main.x, main.y, main.width, main.height, 10, 10);
+
+        drawCentered(g, title, new Font("SansSerif", Font.BOLD, 13),
+                main.x + 16, main.y + 10, main.width - 32, 17, titleColor);
+        drawCentered(g, match.getHomeName(), new Font("SansSerif", Font.BOLD, 24),
+                main.x + 18, main.y + 34, 126, 30, WHITE);
+        drawCentered(g, "VS", new Font("SansSerif", Font.BOLD, 18),
+                main.x + 160, main.y + 39, 26, 20, MUTED);
+        drawCentered(g, match.getAwayName(), new Font("SansSerif", Font.BOLD, 24),
+                main.x + main.width - 144, main.y + 34, 126, 30, WHITE);
+
+        drawCentered(g, "1 " + formatOdds(match.getHomeOdds()), new Font("SansSerif", Font.BOLD, 16),
+                main.x + 18, main.y + 73, 126, 20, GREEN);
+        drawCentered(g, "X " + formatOdds(match.getDrawOdds()), new Font("SansSerif", Font.BOLD, 16),
+                main.x + 154, main.y + 73, 76, 20, DRAW);
+        drawCentered(g, "2 " + formatOdds(match.getAwayOdds()), new Font("SansSerif", Font.BOLD, 16),
+                main.x + main.width - 144, main.y + 73, 126, 20, RED);
+    }
+
+    private String resultTitle(FortunaMatch match, FortunaOutcome outcome) {
+        if (match.getStatus() != FortunaMatchStatus.FINISHED || match.getResult() == null) {
+            return "";
+        }
+        if (match.getResult() == FortunaOutcome.DRAW) {
+            return outcome == FortunaOutcome.DRAW ? "Remiza" : "";
+        }
+        if (match.getResult() == outcome) {
+            return "Vyhra";
+        }
+        return outcome == FortunaOutcome.DRAW ? "" : "Prohra";
+    }
+
+    private Color resultTitleColor(String title) {
+        return switch (title.toLowerCase(Locale.ROOT)) {
+            case "vyhra" -> GREEN;
+            case "prohra" -> RED;
+            case "remiza" -> DRAW;
+            default -> MUTED;
+        };
+    }
+
+    private void drawFutureMatchStrip(Graphics2D g, FortunaMatch match) {
+        if (match == null) {
+            drawEmptyFutureStrip(g);
+            return;
+        }
+        drawScheduleStrip(g, match, "FUTURE MATCH");
+    }
+
+    private void drawResultStrip(Graphics2D g, FortunaMatch match) {
+        Rectangle strip = new Rectangle(18, 178, DISPLAY_WIDTH - 36, 56);
+        g.setColor(PANEL_DARK);
+        g.fillRoundRect(strip.x, strip.y, strip.width, strip.height, 10, 10);
+        g.setColor(new Color(255, 255, 255, 25));
+        g.setStroke(new BasicStroke(1.0f));
+        g.drawRoundRect(strip.x, strip.y, strip.width, strip.height, 10, 10);
+
+        drawCentered(g, "RESULT", new Font("SansSerif", Font.BOLD, 9),
+                strip.x + 16, 186, strip.width - 32, 11, MUTED);
+        drawCentered(g, match.resultLabel(), new Font("SansSerif", Font.BOLD, 18),
+                strip.x + 16, 201, strip.width - 32, 22, WHITE);
+        drawCentered(g, "Winning odds " + formatOdds(winningOdds(match)), new Font("SansSerif", Font.BOLD, 12),
+                strip.x + 16, 221, strip.width - 32, 12, GOLD);
+    }
+
+    private void drawEmptyFutureStrip(Graphics2D g) {
+        Rectangle strip = new Rectangle(18, 178, DISPLAY_WIDTH - 36, 56);
+        g.setColor(PANEL_DARK);
+        g.fillRoundRect(strip.x, strip.y, strip.width, strip.height, 10, 10);
+        g.setColor(new Color(255, 255, 255, 25));
+        g.setStroke(new BasicStroke(1.0f));
+        g.drawRoundRect(strip.x, strip.y, strip.width, strip.height, 10, 10);
+        drawCentered(g, "FUTURE MATCH", new Font("SansSerif", Font.BOLD, 9),
+                strip.x + 16, 187, strip.width - 32, 11, MUTED);
+        drawCentered(g, "No upcoming game", new Font("SansSerif", Font.BOLD, 18),
+                strip.x + 16, 203, strip.width - 32, 22, WHITE);
+    }
+
+    private void drawScheduleStrip(Graphics2D g, FortunaMatch match, String centerTitle) {
         Rectangle strip = new Rectangle(18, 178, DISPLAY_WIDTH - 36, 56);
         g.setColor(PANEL_DARK);
         g.fillRoundRect(strip.x, strip.y, strip.width, strip.height, 10, 10);
@@ -268,7 +382,6 @@ public final class FortunaMapDisplay {
         drawCentered(g, DATE_FORMAT.format(match.getScheduledAt()), new Font("SansSerif", Font.BOLD, 15),
                 30, 198, 66, 19, WHITE);
 
-        String centerTitle = match.getStatus() == FortunaMatchStatus.ACTIVE ? "LIVE GAME" : "NEXT GAME";
         drawCentered(g, centerTitle, new Font("SansSerif", Font.BOLD, 9), 108, 185, 168, 11, MUTED);
         drawCentered(g, match.label(), new Font("SansSerif", Font.BOLD, 16), 100, 199, 184, 20, WHITE);
 
@@ -283,9 +396,26 @@ public final class FortunaMapDisplay {
             drawCentered(g, "LIVE MARKET", new Font("SansSerif", Font.BOLD, 12),
                     strip.x + 16, 220, strip.width - 32, 13, GOLD);
         } else {
-            drawCentered(g, "MARKET OPEN", new Font("SansSerif", Font.BOLD, 12),
-                    strip.x + 16, 220, strip.width - 32, 13, GOLD);
+            drawCentered(g, "1 " + formatOdds(match.getHomeOdds()), new Font("SansSerif", Font.BOLD, 11),
+                    47, 220, 72, 13, GREEN);
+            drawCentered(g, "X " + formatOdds(match.getDrawOdds()), new Font("SansSerif", Font.BOLD, 11),
+                    156, 220, 72, 13, DRAW);
+            drawCentered(g, "2 " + formatOdds(match.getAwayOdds()), new Font("SansSerif", Font.BOLD, 11),
+                    265, 220, 72, 13, RED);
         }
+    }
+
+    private double winningOdds(FortunaMatch match) {
+        if (match.getResult() == FortunaOutcome.HOME) {
+            return match.getHomeOdds();
+        }
+        if (match.getResult() == FortunaOutcome.DRAW) {
+            return match.getDrawOdds();
+        }
+        if (match.getResult() == FortunaOutcome.AWAY) {
+            return match.getAwayOdds();
+        }
+        return 0.0;
     }
 
     private void drawCentered(Graphics2D g,

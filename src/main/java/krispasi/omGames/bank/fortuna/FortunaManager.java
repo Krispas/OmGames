@@ -48,6 +48,7 @@ public final class FortunaManager {
     private final List<FortunaMatch> matches = new ArrayList<>();
     private final Map<UUID, FortunaPromptSession> prompts = new LinkedHashMap<>();
     private int nextMatchId = 1;
+    private Integer pinnedFinishedDisplayMatchId;
 
     public FortunaManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -125,13 +126,40 @@ public final class FortunaManager {
     }
 
     public FortunaMatch getDisplayMatch() {
+        return getActiveDisplayMatch()
+                .or(this::getPinnedFinishedDisplayMatch)
+                .or(this::getNextUpcomingMatch)
+                .orElse(null);
+    }
+
+    public java.util.Optional<FortunaMatch> getActiveDisplayMatch() {
         return matches.stream()
                 .filter(match -> match.getStatus() == FortunaMatchStatus.ACTIVE)
-                .max(Comparator.comparing(match -> fallbackTime(match.getStartedAt(), match.getScheduledAt())))
-                .or(() -> matches.stream()
-                        .filter(match -> match.getStatus() == FortunaMatchStatus.UPCOMING)
-                        .min(Comparator.comparing(FortunaMatch::getScheduledAt)))
-                .orElse(null);
+                .max(Comparator.comparing(match -> fallbackTime(match.getStartedAt(), match.getScheduledAt())));
+    }
+
+    public java.util.Optional<FortunaMatch> getNextUpcomingMatch() {
+        return matches.stream()
+                .filter(match -> match.getStatus() == FortunaMatchStatus.UPCOMING)
+                .min(Comparator.comparing(FortunaMatch::getScheduledAt));
+    }
+
+    public java.util.Optional<FortunaMatch> getLatestFinishedMatch() {
+        return matches.stream()
+                .filter(match -> match.getStatus() == FortunaMatchStatus.FINISHED)
+                .max(Comparator.comparing(match -> fallbackTime(match.getFinishedAt(), match.getScheduledAt())));
+    }
+
+    private java.util.Optional<FortunaMatch> getPinnedFinishedDisplayMatch() {
+        if (pinnedFinishedDisplayMatchId == null) {
+            return java.util.Optional.empty();
+        }
+        FortunaMatch match = getMatch(pinnedFinishedDisplayMatchId);
+        if (match == null || match.getStatus() != FortunaMatchStatus.FINISHED) {
+            pinnedFinishedDisplayMatchId = null;
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(match);
     }
 
     public void beginNewMatchPrompt(Player player) {
@@ -207,6 +235,7 @@ public final class FortunaManager {
         match.setStartedAt(LocalDateTime.now());
         match.setResult(null);
         match.setFinishedAt(null);
+        pinnedFinishedDisplayMatchId = null;
         save();
         refreshDisplay();
         return Result.ok("Match #" + match.getId() + " moved to active games.");
@@ -226,6 +255,7 @@ public final class FortunaManager {
         match.setStatus(FortunaMatchStatus.FINISHED);
         match.setResult(outcome);
         match.setFinishedAt(LocalDateTime.now());
+        pinnedFinishedDisplayMatchId = match.getId();
         save();
         refreshDisplay();
         return Result.ok("Match #" + match.getId() + " ended. Result: " + match.resultLabel() + ".");
@@ -237,6 +267,9 @@ public final class FortunaManager {
             return Result.fail("Match not found.");
         }
         matches.remove(match);
+        if (Integer.valueOf(matchId).equals(pinnedFinishedDisplayMatchId)) {
+            pinnedFinishedDisplayMatchId = null;
+        }
         prompts.entrySet().removeIf(entry -> entry.getValue().mode() == FortunaPromptSession.Mode.ODDS_UPDATE
                 && entry.getValue().matchId() == matchId);
         save();
@@ -278,6 +311,7 @@ public final class FortunaManager {
     }
 
     public Result cleanDisplay() {
+        pinnedFinishedDisplayMatchId = null;
         mapDisplay.cleanBoard();
         return Result.ok("Fortuna display board cleaned.");
     }
@@ -387,6 +421,7 @@ public final class FortunaManager {
         );
         match.addOddsPoint(new FortunaOddsPoint(now, session.homeOdds(), session.drawOdds(), awayOdds));
         matches.add(match);
+        pinnedFinishedDisplayMatchId = null;
         prompts.remove(player.getUniqueId());
         save();
         refreshDisplay();
