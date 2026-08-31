@@ -1,24 +1,89 @@
+id: untold_depths
 name: "Untold Depths"
-length: "50"
 difficulty: "Medium"
-description: "Lorem ipsum"
-
-This is a dummy file.
-Upper stuff is just visual for main menu.
-
-Floors should be defined in a list like
-
-type: "howling_mines"
-difficulty: 30
-items: 12
-breakables: 40
-rooms: 12
-
-There should be a weapon/armor list
-
-item: "Super sword of awesomness"
-unlock: "Armory level 3"
-
-again this is just a dummy description, figure out the structure of the file yourself.
-
-This is the first scenario and it should have 50 floors. Camp each 5 floors and a combat room on the last floor.
+description:
+  - "A long descent through the first halls beneath Om Nom Lands."
+  - "Camps appear every fifth floor. The final floor is a combat arena."
+players:
+  min: 1
+  max: 6
+allowed-items:
+  scrap:
+    - wood
+    - iron
+    - diamond
+    - redstone
+  gear:
+    - rusty_sword
+    - miner_pick
+    - short_bow
+    - padded_armor
+  buildings:
+    - cooking_pot
+    - weapon_bench
+    - armory
+    - grindstone
+    - storage_locker_small
+    - storage_locker_medium
+    - storage_locker_large
+    - mycelia_farm
+    - elevator_drill
+    - scanner
+    - bounty_board
+    - sculk_purifier_small
+    - sculk_purifier_medium
+    - sculk_purifier_large
+floors:
+  - number: 1
+    kind: start
+    level-type: howling_corridors
+    difficulty: 5
+    layout: special/start_floor.txt
+  - number: 2-4
+    kind: exploration
+    level-type: howling_corridors
+    difficulty: 10
+    rooms: 8
+    items: 8
+    breakables: 24
+  - number: 5
+    kind: camp
+    level-type: howling_corridors
+    difficulty: 10
+    build-spots:
+      small: 3
+      medium: 2
+      large: 1
+  - number: 6-9
+    kind: exploration
+    level-type: howling_corridors
+    difficulty: 18
+    rooms: 10
+    items: 10
+    breakables: 32
+  - number: 10
+    kind: camp
+    level-type: frozen_halls
+    difficulty: 18
+    build-spots:
+      small: 4
+      medium: 2
+      large: 1
+  - number: 11-49
+    kind: exploration
+    level-type: deep_crypt
+    difficulty: "20 + floor"
+    rooms: 12
+    items: 12
+    breakables: 40
+    camp-every: 5
+  - number: 50
+    kind: combat
+    level-type: howling_corridors
+    difficulty: 80
+    layout: special/final_floor_1.txt
+    enemy-pool:
+      - zombie
+      - skeleton
+      - husk
+      - stray

@@ -1099,3 +1099,62 @@ Behavior notes:
 - GIF animation only advances when at least one linked `FILLED_MAP` from that GIF board is placed in an item frame and at least one player is within `20` blocks of that item frame.
 - When no player is near a placed linked map, the GIF runtime resets the renderer state to frame `0` and does not send animation updates.
 - Existing map ids must already exist on the server before linking; the GIF manager does not create new vanilla maps.
+
+## 7) Halls of Carnage
+
+### 7.1 Top-Level Layout
+
+- `src/main/java/krispasi/omGames/hallsofcarnage/*`
+  - Initial Halls of Carnage implementation.
+  - Owns `/hoc`, Halls config/resource loading, lobby/menu-villager handling, scenario discovery, and Halls shame persistence.
+  - Keep Halls logic isolated from BedWars, Egg Hunt, Chess, Bank, and Random classes.
+
+### 7.2 Command Surface
+
+Public subcommands:
+- `/hoc menu`
+- `/hoc scenarios`
+- `/hoc sessions`
+- `/hoc top`
+- `/hoc shame [player]`
+- `/hoc tp`
+
+Operator subcommands:
+- `/hoc start <scenario> [player...]`
+- `/hoc stop <session_id|*>`
+- `/hoc shame set <player> <amount>`
+- `/hoc shame add <player> <amount>`
+- `/hoc lobby setspawn`
+- `/hoc lobby spawnMenuVillager [rotation]`
+- `/hoc reload`
+
+Permission declared in `plugin.yml`:
+- `omgames.hoc.manage`
+
+### 7.3 Runtime Data Layout
+
+Halls runtime files live in:
+- `plugins/OmGames/HallsOfCarnage/`
+- `plugins/OmGames/OmGames.db`
+
+Files:
+- `halls-of-carnage.yml`
+- `scenarios/*.txt|*.yml|*.yaml`
+- `level/**`
+- `level_type/**`
+- `modifiers/**`
+
+SQLite tables:
+- `hoc_shame`
+- `hoc_completed_scenarios`
+
+### 7.4 Runtime Notes
+
+- Halls uses the `om:halls_of_carnage` dimension configured by OmVeins, but must not call `OmVeinsAPI` during startup.
+- The human-built lobby is centered near `0 70 0`; automated session/dungeon placement must stay at least 1000 blocks away.
+- Players in the Halls world are kept in Adventure mode, with full hunger and natural regeneration disabled.
+- Shame leaderboards are ascending because lower shame is better.
+- `/hoc start <scenario> [player...]` allocates a session origin, builds the first start floor/elevator shell, teleports players into it, and tracks changed blocks for cleanup.
+- `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
+- If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
+- Current Halls implementation is still early; randomized dungeon generation, real floor progression, elevator transitions, ghost state, item physics, scrap storage, camps, traps, sculk, and monsters are pending.

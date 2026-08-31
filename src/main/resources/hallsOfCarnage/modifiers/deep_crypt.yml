@@ -1,0 +1,7 @@
+modifiers:
+  poison_darts:
+    type: bad
+    display-name: "Poison Darts"
+    weight: 6
+    effects:
+      trap: poison_darts

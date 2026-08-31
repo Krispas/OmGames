@@ -1,0 +1,27 @@
+lobby:
+  world: "om:halls_of_carnage"
+  spawn:
+    x: 0.5
+    y: 70.0
+    z: 0.5
+    yaw: 0.0
+    pitch: 0.0
+  menu-villager:
+    enabled: false
+    x: 0.5
+    y: 70.0
+    z: 0.5
+    yaw: 0.0
+    pitch: 0.0
+
+sessions:
+  first-origin:
+    x: 2000
+    y: 70
+    z: 0
+  spacing: 1000
+  max-players: 6
+  disconnect-grace-seconds: 300
+
+leaderboard:
+  limit: 10
