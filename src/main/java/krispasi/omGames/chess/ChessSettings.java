@@ -6,6 +6,7 @@ public final class ChessSettings {
     private boolean doEndgameChecks = true;
     private boolean allowUndo = false;
     private boolean showAnnotation = false;
+    private FigureStyle figureStyle = FigureStyle.DEFAULT;
 
     public boolean doMovementCheck() {
         return doMovementCheck;
@@ -47,6 +48,14 @@ public final class ChessSettings {
         this.showAnnotation = showAnnotation;
     }
 
+    public FigureStyle figureStyle() {
+        return figureStyle;
+    }
+
+    public void setFigureStyle(FigureStyle figureStyle) {
+        this.figureStyle = figureStyle == null ? FigureStyle.DEFAULT : figureStyle;
+    }
+
     public ChessSettings copy() {
         ChessSettings copy = new ChessSettings();
         copy.doMovementCheck = doMovementCheck;
@@ -54,6 +63,12 @@ public final class ChessSettings {
         copy.doEndgameChecks = doEndgameChecks;
         copy.allowUndo = allowUndo;
         copy.showAnnotation = showAnnotation;
+        copy.figureStyle = figureStyle;
         return copy;
+    }
+
+    public enum FigureStyle {
+        DEFAULT,
+        FLAT
     }
 }
