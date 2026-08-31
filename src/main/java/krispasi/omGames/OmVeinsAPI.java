@@ -1,10 +1,14 @@
 package krispasi.omGames;
 
 import krispasi.omGames.shared.Skin;
+import org.apache.commons.lang3.tuple.MutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.logging.Level;
 
@@ -54,12 +58,26 @@ public class OmVeinsAPI {
     private static Function<Player, Map<String, Skin>> getPlayerSkinsFunction;
 
     /**
+     * Function responsible for gathering items from OmVeins ItemDatabase using their String id.
+     * Will throw exception if the item doesn't exist.
+     */
+    private static Function<String, ItemStack> getItemFunction;
+
+    /**
+     * Tries to add a new item under a specific id into the OmVeins ItemDatabase. Return true if added, false if not.
+     * Item is not added if the id is already occupied.
+     */
+    private static BiFunction<String, ItemStack, Boolean> addItemFunction;
+
+    /**
      * Checks whether all required consumers are set.
      * If so, marks the API as initialized and logs the state.
      */
     private static void checkIfDone() {
         if (addPartyExpConsumer == null) return;
         if (getPlayerSkinsFunction == null) return;
+        if (addItemFunction == null) return;
+        if (getItemFunction == null) return;
 
         initialized = true;
         OmGames.getInstance().getLogger().info("OmVeins API: Fully initialized!");
@@ -87,6 +105,22 @@ public class OmVeinsAPI {
     public static void setAddPartyExpConsumer(BiConsumer<Player, Integer> consumer) {
         addPartyExpConsumer = consumer;
         OmGames.getInstance().getLogger().info("OmVeins API: AddPartyExp consumer set!");
+        checkIfDone();
+    }
+
+    /**
+     * Registers the consumer responsible for adding party experience.
+     *
+     * <p>This method should be called by the OmVeins plugin during its
+     * initialization phase.</p>
+     *
+     * @param get the {@link Function} that handles getting item from ItemDatabase
+     * @param add the {@link BiFunction} that handles adding item to ItemDatabase
+     */
+    public static void setItemDatabaseFunctions(Function<String, ItemStack> get, BiFunction<String, ItemStack, Boolean> add) {
+        getItemFunction = get;
+        addItemFunction = add;
+        OmGames.getInstance().getLogger().info("OmVeins API: ItemDatabase functions set!");
         checkIfDone();
     }
 
@@ -161,5 +195,33 @@ public class OmVeinsAPI {
         throw new IllegalStateException(
                 "Attempting to use OmVeins API while it is not initialized!"
         );
+    }
+
+    /**
+     * Returns an item from the OmVeins ItemDatabase using its String id.
+     *
+     * @param id String id of the item to retrieve
+     * @return the {@link ItemStack} associated with the given id
+     *
+     * @throws IllegalArgumentException if no item exists with the given id
+     * @throws IllegalStateException if the API has not been initialized
+     */
+    public static ItemStack getItem(String id){
+        return getItemFunction.apply(id);
+    }
+
+    /**
+     * Attempts to add a new item to the OmVeins ItemDatabase under the specified id.
+     *
+     * <p>The item will not be added if the given id is already occupied.</p>
+     *
+     * @param id id under which the item should be registered
+     * @param item item to add to the ItemDatabase
+     * @return {@code true} if the item was added, {@code false} if the id is already occupied
+     *
+     * @throws IllegalStateException if the API has not been initialized
+     */
+    public static boolean addItem(String id, ItemStack item){
+        return addItemFunction.apply(id, item);
     }
 }
