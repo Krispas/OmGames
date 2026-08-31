@@ -6,21 +6,21 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.GameMode;
-import org.bukkit.GameRule;
-import org.bukkit.Location;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class HallsOfCarnageManager {
@@ -50,8 +50,12 @@ public final class HallsOfCarnageManager {
     private final JavaPlugin plugin;
     private final org.bukkit.NamespacedKey menuVillagerKey;
     private final HallsShameService shameService;
+    private final Map<Integer, HallsSession> activeSessions = new HashMap<>();
+    private final Map<UUID, Integer> playerSessions = new HashMap<>();
+    private final Map<Integer, BukkitTask> disconnectGraceTasks = new HashMap<>();
     private HallsConfig config;
     private List<HallsScenario> scenarios = List.of();
+    private int nextSessionId = 1;
 
     public HallsOfCarnageManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -70,6 +74,7 @@ public final class HallsOfCarnageManager {
     }
 
     public void shutdown() {
+        stopAllSessions(false);
         shameService.shutdown();
     }
 
@@ -84,6 +89,12 @@ public final class HallsOfCarnageManager {
 
     public List<HallsScenario> getScenarios() {
         return scenarios;
+    }
+
+    public List<HallsSession> getActiveSessions() {
+        return activeSessions.values().stream()
+                .sorted(java.util.Comparator.comparingInt(HallsSession::id))
+                .toList();
     }
 
     public HallsScenario getScenario(String id) {
@@ -205,11 +216,94 @@ public final class HallsOfCarnageManager {
             return Result.fail("Scenario " + scenario.name() + " requires " + scenario.minPlayers()
                     + "-" + scenario.maxPlayers() + " players.");
         }
-        for (Player player : players) {
-            teleportToLobby(player);
+        if (players.size() > config.maxPlayers()) {
+            return Result.fail("Halls sessions support at most " + config.maxPlayers() + " players.");
         }
-        return Result.ok("Prepared Halls scenario " + scenario.name() + " for " + players.size()
-                + " player" + (players.size() == 1 ? "" : "s") + ". Dungeon generation is not implemented yet.");
+        for (Player player : players) {
+            if (playerSessions.containsKey(player.getUniqueId())) {
+                return Result.fail(player.getName() + " is already in Halls session "
+                        + playerSessions.get(player.getUniqueId()) + ".");
+            }
+        }
+        World world = config.resolveLobbyWorld();
+        if (world == null) {
+            return Result.fail("Halls world is not loaded.");
+        }
+        int sessionId = nextSessionId++;
+        int slot = firstFreeSessionSlot();
+        HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot), getDataFolder(), players);
+        try {
+            session.start();
+        } catch (IOException ex) {
+            session.stop(null);
+            return Result.fail("Failed to build Halls start floor: " + ex.getMessage());
+        }
+        activeSessions.put(sessionId, session);
+        for (Player player : players) {
+            playerSessions.put(player.getUniqueId(), sessionId);
+        }
+        return Result.ok("Started Halls session " + sessionId + " for " + scenario.name() + " with "
+                + players.size() + " player" + (players.size() == 1 ? "" : "s") + ".");
+    }
+
+    public Result stopSession(String rawSessionId) {
+        if (rawSessionId == null || rawSessionId.isBlank()) {
+            return Result.fail("Usage: /hoc stop <session_id|*>");
+        }
+        if (rawSessionId.equals("*")) {
+            int stopped = activeSessions.size();
+            stopAllSessions(true);
+            return Result.ok("Stopped " + stopped + " Halls session" + (stopped == 1 ? "" : "s") + ".");
+        }
+        int sessionId;
+        try {
+            sessionId = Integer.parseInt(rawSessionId);
+        } catch (NumberFormatException ex) {
+            return Result.fail("Session id must be a whole number or *.");
+        }
+        HallsSession session = activeSessions.get(sessionId);
+        if (session == null) {
+            return Result.fail("No active Halls session has id " + sessionId + ".");
+        }
+        stopSession(sessionId, true);
+        return Result.ok("Stopped Halls session " + sessionId + ".");
+    }
+
+    public void handlePlayerQuit(Player player) {
+        if (player == null) {
+            return;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        if (sessionId == null || disconnectGraceTasks.containsKey(sessionId)) {
+            return;
+        }
+        HallsSession session = activeSessions.get(sessionId);
+        if (session == null) {
+            return;
+        }
+        long delayTicks = Math.max(1L, config.disconnectGraceSeconds()) * 20L;
+        BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            disconnectGraceTasks.remove(sessionId);
+            HallsSession current = activeSessions.get(sessionId);
+            if (current != null && current.participants().stream().noneMatch(id -> Bukkit.getPlayer(id) != null)) {
+                stopSession(sessionId, true);
+            }
+        }, delayTicks);
+        disconnectGraceTasks.put(sessionId, task);
+    }
+
+    public void handlePlayerJoin(Player player) {
+        if (player == null) {
+            return;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        if (sessionId != null) {
+            BukkitTask task = disconnectGraceTasks.remove(sessionId);
+            if (task != null) {
+                task.cancel();
+            }
+        }
+        prepareLobbyPlayer(player);
     }
 
     private void ensureDefaultFiles() {
@@ -246,10 +340,49 @@ public final class HallsOfCarnageManager {
         if (world == null) {
             return;
         }
-        world.setGameRule(GameRule.NATURAL_REGENERATION, false);
+        world.setGameRule(GameRules.NATURAL_HEALTH_REGENERATION, true);
         for (Player player : world.getPlayers()) {
             prepareLobbyPlayer(player);
         }
+    }
+
+    private int firstFreeSessionSlot() {
+        int slot = 0;
+        while (true) {
+            HallsConfig.BlockPoint candidate = config.sessionOrigin(slot);
+            boolean used = activeSessions.values().stream().anyMatch(session -> session.origin().equals(candidate));
+            if (!used) {
+                return slot;
+            }
+            slot++;
+        }
+    }
+
+    private void stopSession(int sessionId, boolean teleportPlayers) {
+        HallsSession session = activeSessions.remove(sessionId);
+        if (session == null) {
+            return;
+        }
+        BukkitTask task = disconnectGraceTasks.remove(sessionId);
+        if (task != null) {
+            task.cancel();
+        }
+        Location fallback = teleportPlayers ? getLobbySpawn() : null;
+        session.stop(fallback);
+        for (UUID playerId : session.participants()) {
+            playerSessions.remove(playerId);
+        }
+    }
+
+    private void stopAllSessions(boolean teleportPlayers) {
+        for (Integer sessionId : new ArrayList<>(activeSessions.keySet())) {
+            stopSession(sessionId, teleportPlayers);
+        }
+        for (BukkitTask task : disconnectGraceTasks.values()) {
+            task.cancel();
+        }
+        disconnectGraceTasks.clear();
+        playerSessions.clear();
     }
 
     private void spawnConfiguredMenuVillager() {

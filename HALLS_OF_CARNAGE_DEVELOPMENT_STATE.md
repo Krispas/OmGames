@@ -10,6 +10,10 @@ Last updated: 2026-08-31
 - Scenario files are loaded from `plugins/OmGames/HallsOfCarnage/scenarios/`, seeded from `src/main/resources/hallsOfCarnage/scenarios/`.
 - Shared SQLite database `plugins/OmGames/OmGames.db` is used for Halls shame/history tables.
 - Bukkit command root is `/hoc`.
+- `/hoc start <scenario> [player...]` now creates a lightweight active session, builds a temporary start floor/elevator area at an allocated session origin, teleports participants there, and keeps block snapshots for cleanup.
+- `/hoc sessions` lists active session ids, scenarios, participant counts, and origins.
+- `/hoc stop <session_id|*>` stops sessions and restores changed blocks.
+- If all participants in a session are offline for the configured grace period, the session is cleaned up automatically.
 
 ## Current Scope
 
@@ -20,12 +24,13 @@ This is the first implementation slice. It focuses on:
 - scenario discovery,
 - basic player handling in `om:halls_of_carnage`,
 - shame leaderboard persistence,
-- resource schemas that future dungeon/session systems can build on.
+- resource schemas that future dungeon/session systems can build on,
+- minimal temporary session runtime and start-floor generation.
 
 ## Not Yet Implemented
 
 - Dungeon generation.
-- Multi-session floor runtime.
+- Full multi-floor session runtime.
 - Elevator transition logic.
 - Ghost death state.
 - Physics-driven item drops.

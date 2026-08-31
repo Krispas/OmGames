@@ -20,7 +20,7 @@ commands:
     usage: /omgames gif
   hoc:
     description: Halls of Carnage commands
-    usage: /hoc menu | /hoc scenarios | /hoc top | /hoc shame [player] | /hoc tp | /hoc start <scenario> [player...] | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload
+    usage: /hoc menu | /hoc scenarios | /hoc sessions | /hoc top | /hoc shame [player] | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload
 permissions:
   omgames.bw.start:
     description: Allows opening the BedWars setup GUI

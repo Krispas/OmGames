@@ -1114,12 +1114,14 @@ Behavior notes:
 Public subcommands:
 - `/hoc menu`
 - `/hoc scenarios`
+- `/hoc sessions`
 - `/hoc top`
 - `/hoc shame [player]`
 - `/hoc tp`
 
 Operator subcommands:
 - `/hoc start <scenario> [player...]`
+- `/hoc stop <session_id|*>`
 - `/hoc shame set <player> <amount>`
 - `/hoc shame add <player> <amount>`
 - `/hoc lobby setspawn`
@@ -1152,4 +1154,7 @@ SQLite tables:
 - The human-built lobby is centered near `0 70 0`; automated session/dungeon placement must stay at least 1000 blocks away.
 - Players in the Halls world are kept in Adventure mode, with full hunger and natural regeneration disabled.
 - Shame leaderboards are ascending because lower shame is better.
-- Current Halls implementation is a foundation only; dungeon generation, multi-session runtime, elevator transitions, ghost state, item physics, scrap storage, camps, traps, sculk, and monsters are still pending.
+- `/hoc start <scenario> [player...]` allocates a session origin, builds the first start floor/elevator shell, teleports players into it, and tracks changed blocks for cleanup.
+- `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
+- If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
+- Current Halls implementation is still early; randomized dungeon generation, real floor progression, elevator transitions, ghost state, item physics, scrap storage, camps, traps, sculk, and monsters are pending.

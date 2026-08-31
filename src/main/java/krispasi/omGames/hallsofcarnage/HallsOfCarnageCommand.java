@@ -45,6 +45,10 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                 sendScenarios(sender);
                 return true;
             }
+            case "sessions" -> {
+                sendSessions(sender);
+                return true;
+            }
             case "top" -> {
                 sendLeaderboard(sender);
                 return true;
@@ -65,6 +69,16 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                     return true;
                 }
                 result = handleStart(sender, args);
+            }
+            case "stop" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                if (args.length != 2) {
+                    result = HallsOfCarnageManager.Result.fail("Usage: /hoc stop <session_id|*>");
+                } else {
+                    result = manager.stopSession(args[1]);
+                }
             }
             case "reload" -> {
                 if (!requireOp(sender)) {
@@ -188,6 +202,21 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
         }
     }
 
+    private void sendSessions(CommandSender sender) {
+        List<HallsSession> sessions = manager.getActiveSessions();
+        if (sessions.isEmpty()) {
+            sender.sendMessage(Component.text("No Halls sessions are active.", NamedTextColor.GRAY));
+            return;
+        }
+        sender.sendMessage(Component.text("Active Halls sessions:", NamedTextColor.GOLD));
+        for (HallsSession session : sessions) {
+            HallsConfig.BlockPoint origin = session.origin();
+            sender.sendMessage(Component.text("- " + session.id() + ": " + session.scenario().name()
+                    + " (" + session.participants().size() + " players, origin "
+                    + origin.x() + " " + origin.y() + " " + origin.z() + ")", NamedTextColor.YELLOW));
+        }
+    }
+
     private boolean requireOp(CommandSender sender) {
         if (sender.isOp() || sender.hasPermission(MANAGE_PERMISSION)) {
             return true;
@@ -205,13 +234,13 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
     }
 
     private Component usage() {
-        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload", NamedTextColor.YELLOW);
+        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc sessions | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload", NamedTextColor.YELLOW);
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(args[0], "menu", "scenarios", "top", "shame", "tp", "start", "lobby", "reload");
+            return filter(args[0], "menu", "scenarios", "sessions", "top", "shame", "tp", "start", "stop", "lobby", "reload");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("start")) {
             return filter(args[1], manager.getScenarios().stream().map(HallsScenario::id).toArray(String[]::new));
@@ -224,6 +253,12 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("lobby")) {
             return filter(args[1], "setspawn", "spawnMenuVillager");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("stop")) {
+            List<String> options = new ArrayList<>();
+            options.add("*");
+            options.addAll(manager.getActiveSessions().stream().map(session -> Integer.toString(session.id())).toList());
+            return filter(args[1], options.toArray(String[]::new));
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("shame")) {
             return filter(args[1], "set", "add");
