@@ -6,6 +6,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -13,6 +14,7 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 
@@ -36,6 +38,13 @@ public final class HallsOfCarnageListener implements Listener {
     @EventHandler
     public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
         manager.prepareLobbyPlayer(event.getPlayer());
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerMove(PlayerMoveEvent event) {
+        if (manager.isHallsWorld(event.getPlayer().getWorld())) {
+            manager.pushOutOfSessionProps(event.getPlayer());
+        }
     }
 
     @EventHandler
@@ -66,7 +75,18 @@ public final class HallsOfCarnageListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent event) {
         Entity entity = event.getEntity();
-        if (manager.isMenuVillager(entity)) {
+        if (manager.isMenuVillager(entity)
+                || (manager.isSessionEntity(entity) && !(event instanceof EntityDamageByEntityEvent))) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
+        if (!(event.getDamager() instanceof Player player)) {
+            return;
+        }
+        if (manager.handleSessionEntityAttack(player, event.getEntity())) {
             event.setCancelled(true);
         }
     }
@@ -74,6 +94,9 @@ public final class HallsOfCarnageListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
         if (!manager.isMenuVillager(event.getRightClicked())) {
+            if (manager.isSessionEntity(event.getRightClicked())) {
+                event.setCancelled(true);
+            }
             return;
         }
         event.setCancelled(true);

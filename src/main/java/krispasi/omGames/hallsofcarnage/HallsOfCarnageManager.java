@@ -161,6 +161,28 @@ public final class HallsOfCarnageManager {
                 && entity.getPersistentDataContainer().has(menuVillagerKey, PersistentDataType.BYTE);
     }
 
+    public boolean isSessionEntity(Entity entity) {
+        return entity != null && activeSessions.values().stream().anyMatch(session -> session.isSessionEntity(entity));
+    }
+
+    public boolean handleSessionEntityAttack(Player player, Entity entity) {
+        if (entity == null) {
+            return false;
+        }
+        for (HallsSession session : activeSessions.values()) {
+            if (session.handleBreakableAttack(player, entity)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void pushOutOfSessionProps(Player player) {
+        for (HallsSession session : activeSessions.values()) {
+            session.pushOutOfSessionProps(player);
+        }
+    }
+
     public boolean isHallsWorld(World world) {
         World lobbyWorld = config == null ? null : config.resolveLobbyWorld();
         return world != null && lobbyWorld != null && world.equals(lobbyWorld);

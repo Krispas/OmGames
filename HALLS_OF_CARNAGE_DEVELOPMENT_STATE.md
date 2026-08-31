@@ -12,11 +12,16 @@ Last updated: 2026-08-31
 - Bukkit command root is `/hoc`.
 - `/hoc start <scenario> [player...]` now creates a lightweight active session, builds a temporary start floor/elevator area at an allocated session origin, teleports participants there, and keeps block snapshots for cleanup.
 - The temporary elevator shell now uses a 7x7 outer footprint around a true 5x5 interior, matching the GDD. The front connector starts outside the copper-bar door wall.
+- The temporary elevator shell has mirrored wall materials, and the chest/button/hopper fixtures are backed by solid machine-wall blocks.
 - `/hoc sessions` lists active session ids, scenarios, participant counts, and origins.
 - `/hoc stop <session_id|*>` stops sessions and restores changed blocks.
 - If all participants in a session are offline for the configured grace period, the session is cleaned up automatically.
 - Halls world natural regeneration is disabled by gamerule and players are kept at full hunger/saturation for sprinting.
 - Smithing tables in the Halls world are blocked from opening their GUI, so generated elevator ceilings are inert.
+- The start-floor barrel is now a session-owned breakable entity prop using a `BlockDisplay` visual plus `Interaction` hitbox. Player attacks damage it, breaking it removes both entities and drops a placeholder building blueprint.
+- Session-owned breakable prop entities and their placeholder drops are removed during `/hoc stop` cleanup.
+- Breakable props have initial lightweight movement pushback so players cannot freely stand inside them.
+- Active sessions send a placeholder action-bar HUD once per second showing floor, elapsed time, scrap counters, and sculk.
 
 ## Current Scope
 
@@ -40,7 +45,7 @@ This is the first implementation slice. It focuses on:
 - Scrap storage and camp building runtime.
 - Combat/exploration/camp floor gameplay.
 - Sculk, traps, modifiers, monster flood systems.
-- Entity-driven breakable props and physics-driven unpicked item entities with collision/pushback.
+- Config-driven breakable prop definitions, real loot tables, and physics-driven unpicked item entities.
 
 ## Resume Notes
 
@@ -54,3 +59,5 @@ This is the first implementation slice. It focuses on:
 
 - Addressed the reviewer note that the elevator generated too small. Existing server-side copied resources do not need migration; `/hoc start` uses the Java generator change immediately.
 - Moved the breakable-object clarification into the GDD. Future item/breakable work should build entity props and physics item drops rather than placing ordinary loot blocks.
+- Added the first entity-driven breakable prop path for the start-floor barrel. This is intentionally still a placeholder: it always drops a normal `Building Blueprint` paper item until Halls item definitions, loot tables, and physics item drops are implemented.
+- Fixed the temporary elevator wall symmetry/backing issue and added a first action-bar HUD for in-game runtime feedback.

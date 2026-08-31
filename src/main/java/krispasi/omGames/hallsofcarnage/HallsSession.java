@@ -3,8 +3,10 @@ package krispasi.omGames.hallsofcarnage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
@@ -13,13 +15,23 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
+import org.bukkit.entity.BlockDisplay;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Interaction;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
 public final class HallsSession {
     private static final int CLEAR_RADIUS = 24;
@@ -36,6 +48,10 @@ public final class HallsSession {
     private final File dataFolder;
     private final Set<UUID> participants;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
+    private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
+    private final Set<UUID> droppedSessionItems = new HashSet<>();
+    private BukkitTask hudTask;
+    private long startedAtMillis;
     private boolean running;
 
     public HallsSession(JavaPlugin plugin,
@@ -77,12 +93,66 @@ public final class HallsSession {
         return Set.copyOf(participants);
     }
 
+    public boolean isSessionEntity(Entity entity) {
+        return entity != null && breakableProps.containsKey(entity.getUniqueId());
+    }
+
+    public boolean handleBreakableAttack(Player player, Entity entity) {
+        BreakableProp prop = entity == null ? null : breakableProps.get(entity.getUniqueId());
+        if (prop == null) {
+            return false;
+        }
+        prop.damage();
+        Location location = entity.getLocation();
+        world.playSound(location, Sound.BLOCK_BARREL_CLOSE, 0.7f, 1.25f);
+        world.spawnParticle(Particle.BLOCK, location.clone().add(0.0, 0.75, 0.0), 12, 0.25, 0.25, 0.25,
+                Material.BARREL.createBlockData());
+        if (prop.health() <= 0) {
+            breakBreakableProp(prop);
+            if (player != null) {
+                player.sendMessage(Component.text("You broke open a dusty barrel.", NamedTextColor.GRAY));
+            }
+        }
+        return true;
+    }
+
+    public void pushOutOfSessionProps(Player player) {
+        if (player == null || !player.getWorld().equals(world)) {
+            return;
+        }
+        Location playerLocation = player.getLocation();
+        for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
+            Entity interaction = Bukkit.getEntity(prop.interactionId());
+            if (interaction == null) {
+                continue;
+            }
+            Location center = interaction.getLocation();
+            double vertical = playerLocation.getY() - center.getY();
+            if (vertical < -0.25 || vertical > 1.35) {
+                continue;
+            }
+            double dx = playerLocation.getX() - center.getX();
+            double dz = playerLocation.getZ() - center.getZ();
+            double distanceSquared = dx * dx + dz * dz;
+            if (distanceSquared <= 0.0001 || distanceSquared > 0.64) {
+                continue;
+            }
+            double distance = Math.sqrt(distanceSquared);
+            Vector velocity = player.getVelocity();
+            velocity.setX((dx / distance) * 0.28);
+            velocity.setZ((dz / distance) * 0.28);
+            player.setVelocity(velocity);
+        }
+    }
+
     public void start() throws IOException {
         if (running) {
             return;
         }
         buildStartArea();
         running = true;
+        startedAtMillis = System.currentTimeMillis();
+        startHudTask();
         Location spawn = new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5, 180.0f, 0.0f);
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
@@ -109,6 +179,8 @@ public final class HallsSession {
             }
         }
         restoreBlocks();
+        removeSessionEntities();
+        stopHudTask();
         running = false;
     }
 
@@ -150,19 +222,23 @@ public final class HallsSession {
         }
         for (int y = 0; y <= 3; y++) {
             for (int x = -ELEVATOR_OUTER_RADIUS; x <= ELEVATOR_OUTER_RADIUS; x++) {
-                Material backMaterial = Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : x == -2 ? side : back;
-                Material frontMaterial = Math.abs(x) <= 1 ? door : Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : side;
+                Material backMaterial = Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : Math.abs(x) == 2 ? side : back;
+                Material frontMaterial = Math.abs(x) <= 1 ? door : Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : Math.abs(x) == 2 ? side : back;
                 setBlock(origin.x() + x, origin.y() + y, origin.z() - ELEVATOR_OUTER_RADIUS, backMaterial);
                 setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, frontMaterial);
             }
             for (int z = -ELEVATOR_INNER_RADIUS; z <= ELEVATOR_INNER_RADIUS; z++) {
-                setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + y, origin.z() + z, z == 0 ? machine : side);
-                setBlock(origin.x() + ELEVATOR_OUTER_RADIUS, origin.y() + y, origin.z() + z, back);
+                Material sideWall = Math.abs(z) == ELEVATOR_INNER_RADIUS ? side : back;
+                setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + y, origin.z() + z, sideWall);
+                setBlock(origin.x() + ELEVATOR_OUTER_RADIUS, origin.y() + y, origin.z() + z, sideWall);
             }
         }
-        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y(), origin.z(), Material.CHEST);
-        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 1, origin.z(), Material.STONE_BUTTON, BlockFace.EAST);
-        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 2, origin.z(), Material.HOPPER);
+        setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y(), origin.z(), Material.CHEST);
+        setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y() + 1, origin.z(), Material.STONE_BUTTON, BlockFace.EAST);
+        setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y() + 2, origin.z(), Material.HOPPER);
+        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y(), origin.z(), machine);
+        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 1, origin.z(), machine);
+        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 2, origin.z(), machine);
     }
 
     private void buildLayoutRoom(HallsLayout layout, int startX, int y, int startZ) {
@@ -188,7 +264,7 @@ public final class HallsSession {
                 }
             }
         }
-        setBlock(startX + 1, y, startZ + 1, Material.BARREL);
+        spawnBreakableBarrel(startX + 1, y, startZ + 1);
     }
 
     private void buildConnector(int x, int y, int startZ, int endZ) {
@@ -207,6 +283,44 @@ public final class HallsSession {
         }
     }
 
+    private void startHudTask() {
+        stopHudTask();
+        hudTask = Bukkit.getScheduler().runTaskTimer(plugin, this::sendHud, 0L, 20L);
+    }
+
+    private void stopHudTask() {
+        if (hudTask != null) {
+            hudTask.cancel();
+            hudTask = null;
+        }
+    }
+
+    private void sendHud() {
+        if (!running) {
+            return;
+        }
+        Component message = Component.text("Floor 1", NamedTextColor.DARK_RED)
+                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                .append(Component.text(formatElapsedSeconds(), NamedTextColor.GRAY))
+                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                .append(Component.text("Scrap W0 I0 D0 R0", NamedTextColor.GOLD))
+                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                .append(Component.text("Sculk 0", NamedTextColor.AQUA));
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.sendActionBar(message);
+            }
+        }
+    }
+
+    private String formatElapsedSeconds() {
+        long elapsedSeconds = Math.max(0L, (System.currentTimeMillis() - startedAtMillis) / 1000L);
+        long minutes = elapsedSeconds / 60L;
+        long seconds = elapsedSeconds % 60L;
+        return String.format("%02d:%02d", minutes, seconds);
+    }
+
     private void restoreBlocks() {
         for (int i = snapshots.size() - 1; i >= 0; i--) {
             BlockSnapshot snapshot = snapshots.get(i);
@@ -214,6 +328,79 @@ public final class HallsSession {
             block.setBlockData(snapshot.blockData(), false);
         }
         snapshots.clear();
+    }
+
+    private void spawnBreakableBarrel(int x, int y, int z) {
+        Location displayLocation = new Location(world, x, y, z);
+        BlockDisplay display = world.spawn(displayLocation, BlockDisplay.class, entity -> {
+            entity.setBlock(Material.BARREL.createBlockData());
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_breakable");
+        });
+        Location hitboxLocation = new Location(world, x + 0.5, y, z + 0.5);
+        Interaction interaction = world.spawn(hitboxLocation, Interaction.class, entity -> {
+            entity.setInteractionWidth(1.0f);
+            entity.setInteractionHeight(1.0f);
+            entity.setResponsive(true);
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_breakable");
+        });
+        BreakableProp prop = new BreakableProp(interaction.getUniqueId(), display.getUniqueId(), 3);
+        breakableProps.put(interaction.getUniqueId(), prop);
+        breakableProps.put(display.getUniqueId(), prop);
+    }
+
+    private void breakBreakableProp(BreakableProp prop) {
+        Location dropLocation = null;
+        Entity interaction = Bukkit.getEntity(prop.interactionId());
+        if (interaction != null) {
+            dropLocation = interaction.getLocation().clone().add(0.0, 0.25, 0.0);
+        }
+        removeBreakableProp(prop);
+        if (dropLocation != null) {
+            world.playSound(dropLocation, Sound.BLOCK_WOOD_BREAK, 0.8f, 1.0f);
+            Item drop = world.dropItemNaturally(dropLocation, blueprintPlaceholder());
+            drop.setPersistent(false);
+            drop.addScoreboardTag("omgames_hoc_session_drop");
+            droppedSessionItems.add(drop.getUniqueId());
+        }
+    }
+
+    private void removeSessionEntities() {
+        for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
+            removeBreakableProp(prop);
+        }
+        breakableProps.clear();
+        for (UUID entityId : Set.copyOf(droppedSessionItems)) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity != null) {
+                entity.remove();
+            }
+        }
+        droppedSessionItems.clear();
+    }
+
+    private void removeBreakableProp(BreakableProp prop) {
+        breakableProps.remove(prop.interactionId());
+        breakableProps.remove(prop.displayId());
+        Entity interaction = Bukkit.getEntity(prop.interactionId());
+        if (interaction != null) {
+            interaction.remove();
+        }
+        Entity display = Bukkit.getEntity(prop.displayId());
+        if (display != null) {
+            display.remove();
+        }
+    }
+
+    private ItemStack blueprintPlaceholder() {
+        ItemStack item = new ItemStack(Material.PAPER);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("Building Blueprint", NamedTextColor.AQUA));
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     private void setBlock(int x, int y, int z, Material material) {
@@ -241,5 +428,33 @@ public final class HallsSession {
     }
 
     private record BlockSnapshot(int x, int y, int z, BlockData blockData) {
+    }
+
+    private static final class BreakableProp {
+        private final UUID interactionId;
+        private final UUID displayId;
+        private int health;
+
+        private BreakableProp(UUID interactionId, UUID displayId, int health) {
+            this.interactionId = interactionId;
+            this.displayId = displayId;
+            this.health = health;
+        }
+
+        private UUID interactionId() {
+            return interactionId;
+        }
+
+        private UUID displayId() {
+            return displayId;
+        }
+
+        private int health() {
+            return health;
+        }
+
+        private void damage() {
+            health--;
+        }
     }
 }
