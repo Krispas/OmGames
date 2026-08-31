@@ -3,10 +3,12 @@ package krispasi.omGames.hallsofcarnage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
@@ -38,7 +40,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
 public final class HallsSession {
-    private static final int CLEAR_RADIUS = 24;
+    private static final int CLEAR_RADIUS = 40;
     private static final int CLEAR_HEIGHT = 9;
     private static final int ROOM_HEIGHT = 5;
     private static final int ELEVATOR_INNER_RADIUS = 2;
@@ -243,6 +245,7 @@ public final class HallsSession {
             return;
         }
         buildStartArea();
+        openElevatorDoors();
         running = true;
         startedAtMillis = System.currentTimeMillis();
         startHudTask();
@@ -290,8 +293,9 @@ public final class HallsSession {
         buildElevator();
         HallsLayout layout = HallsLayoutLoader.load(new File(dataFolder, "level/special/start_floor.txt"));
         int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
-        buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ, true);
+        buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ, Set.of(BlockFace.NORTH));
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1);
+        spawnBreakableProp(origin.x() - layout.width() / 2 + 1, origin.y(), roomStartZ + 1, Material.BARREL, 3, PropReward.BLUEPRINT);
         closeElevatorDoors();
     }
 
@@ -329,11 +333,7 @@ public final class HallsSession {
         buildElevator();
         restoreElevatorChestContents();
         currentFloor = floor;
-        HallsLayout layout = loadExplorationLayout();
-        int startX = origin.x() - layout.width() / 2;
-        int startZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
-        buildLayoutRoom(layout, startX, origin.y(), startZ, false);
-        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, startZ - 1);
+        buildExplorationRooms(floor);
         closeElevatorDoors();
         teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
     }
@@ -349,21 +349,65 @@ public final class HallsSession {
         }
     }
 
-    private HallsLayout loadExplorationLayout() {
-        File file = new File(dataFolder, "level/howling_corridors/exploration_1.txt");
-        try {
-            return HallsLayoutLoader.load(file);
-        } catch (IOException ex) {
-            plugin.getLogger().warning("Failed to load Halls exploration template " + file + ": " + ex.getMessage());
-            return new HallsLayout(List.of(
-                    "XXXXXXXXXXXXX",
-                    "XBWOXOOOIOOOX",
-                    "XOOOOOOOOOOOX",
-                    "XOROOXOOOWOOX",
-                    "XOOOOOOOOBIOX",
-                    "XXXXXXXXXXXXX"
-            ), 13, 6);
+    private void buildExplorationRooms(int floor) {
+        List<HallsLayout> layouts = loadExplorationLayouts();
+        Random random = new Random((((long) id) << 32) ^ floor);
+        RoomPlacement main = placeRoomAtStart(layouts.get(0), origin.x(), origin.z() + ELEVATOR_OUTER_RADIUS + 6,
+                Set.of(BlockFace.NORTH, BlockFace.EAST, BlockFace.WEST, BlockFace.SOUTH));
+        RoomPlacement east = placeRoomAtCenter(layouts.get(1 % layouts.size()), origin.x() + 15, main.centerZ(),
+                Set.of(BlockFace.WEST));
+        RoomPlacement west = placeRoomAtCenter(layouts.get(2 % layouts.size()), origin.x() - 15, main.centerZ(),
+                Set.of(BlockFace.EAST));
+        RoomPlacement deeper = placeRoomAtStart(layouts.get(Math.min(2, layouts.size() - 1)), origin.x(), main.southExitZ() + 7,
+                Set.of(BlockFace.NORTH));
+
+        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, main.startZ() - 1);
+        buildHorizontalConnector(origin.y(), main.eastExitX(), east.westExitX(), main.centerZ());
+        buildHorizontalConnector(origin.y(), west.eastExitX(), main.westExitX(), main.centerZ());
+        buildVerticalConnector(origin.x(), origin.y(), main.southExitZ(), deeper.northExitZ());
+
+        placeRoomContents(main, random, floor, 0);
+        placeRoomContents(east, random, floor, 1);
+        placeRoomContents(west, random, floor, 2);
+        placeRoomContents(deeper, random, floor, 3);
+    }
+
+    private RoomPlacement placeRoomAtStart(HallsLayout layout, int centerX, int startZ, Set<BlockFace> openings) {
+        int startX = centerX - layout.width() / 2;
+        buildLayoutRoom(layout, startX, origin.y(), startZ, openings);
+        return new RoomPlacement(layout, startX, startZ);
+    }
+
+    private RoomPlacement placeRoomAtCenter(HallsLayout layout, int centerX, int centerZ, Set<BlockFace> openings) {
+        return placeRoomAtStart(layout, centerX, centerZ - layout.depth() / 2, openings);
+    }
+
+    private List<HallsLayout> loadExplorationLayouts() {
+        File folder = new File(dataFolder, "level/howling_corridors");
+        File[] files = folder.listFiles((dir, name) -> name.startsWith("exploration_") && name.endsWith(".txt"));
+        if (files == null || files.length == 0) {
+            return List.of(fallbackExplorationLayout());
         }
+        List<HallsLayout> layouts = new ArrayList<>();
+        for (File file : java.util.Arrays.stream(files).sorted(Comparator.comparing(File::getName)).toList()) {
+            try {
+                layouts.add(HallsLayoutLoader.load(file));
+            } catch (IOException ex) {
+                plugin.getLogger().warning("Failed to load Halls exploration template " + file + ": " + ex.getMessage());
+            }
+        }
+        return layouts.isEmpty() ? List.of(fallbackExplorationLayout()) : layouts;
+    }
+
+    private HallsLayout fallbackExplorationLayout() {
+        return new HallsLayout(List.of(
+                "OOOOOOOOO",
+                "OOOXOOOOO",
+                "OOOXOOXOO",
+                "OOOOOOXOO",
+                "OXOOOOOOO",
+                "OOOOOOOOO"
+        ), 9, 6);
     }
 
     private void clearBuildVolume() {
@@ -415,19 +459,20 @@ public final class HallsSession {
         setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 2, origin.z(), machine);
     }
 
-    private void buildLayoutRoom(HallsLayout layout, int startX, int y, int startZ, boolean startRoom) {
+    private void buildLayoutRoom(HallsLayout layout, int startX, int y, int startZ, Set<BlockFace> openings) {
         Material floor = Material.PACKED_MUD;
         Material ceiling = Material.TUFF_BRICKS;
         Material wall = Material.DEEPSLATE_BRICKS;
         for (int z = -1; z <= layout.depth(); z++) {
             for (int x = -1; x <= layout.width(); x++) {
                 boolean border = x < 0 || z < 0 || x >= layout.width() || z >= layout.depth();
+                boolean opening = border && isRoomOpening(layout, x, z, openings);
                 char cell = border ? 'X' : layout.at(x, z);
                 int blockX = startX + x;
                 int blockZ = startZ + z;
                 setBlock(blockX, y - 1, blockZ, floor);
                 setBlock(blockX, y + ROOM_HEIGHT, blockZ, ceiling);
-                if (border || cell == 'X') {
+                if (!opening && (border || cell == 'X')) {
                     for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
                         setBlock(blockX, y + dy, blockZ, wall);
                     }
@@ -435,45 +480,61 @@ public final class HallsSession {
                     for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
                         setBlock(blockX, y + dy, blockZ, Material.AIR);
                     }
-                    applyLayoutMarker(cell, blockX, y, blockZ);
                 }
             }
-        }
-        if (startRoom) {
-            spawnBreakableProp(startX + 1, y, startZ + 1, Material.BARREL, 3, PropReward.BLUEPRINT);
         }
     }
 
-    private void buildRectRoom(int startX, int y, int startZ, int width, int depth) {
-        Material floor = Material.PACKED_MUD;
-        Material ceiling = Material.TUFF_BRICKS;
-        Material wall = Material.DEEPSLATE_BRICKS;
-        for (int z = -1; z <= depth; z++) {
-            for (int x = -1; x <= width; x++) {
-                boolean border = x < 0 || z < 0 || x >= width || z >= depth;
-                int blockX = startX + x;
-                int blockZ = startZ + z;
-                setBlock(blockX, y - 1, blockZ, floor);
-                setBlock(blockX, y + ROOM_HEIGHT, blockZ, ceiling);
-                for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
-                    setBlock(blockX, y + dy, blockZ, border ? wall : Material.AIR);
-                }
-            }
+    private boolean isRoomOpening(HallsLayout layout, int x, int z, Set<BlockFace> openings) {
+        int centerX = layout.width() / 2;
+        int centerZ = layout.depth() / 2;
+        if (z == -1 && x == centerX) {
+            return openings.contains(BlockFace.NORTH);
         }
+        if (z == layout.depth() && x == centerX) {
+            return openings.contains(BlockFace.SOUTH);
+        }
+        if (x == -1 && z == centerZ) {
+            return openings.contains(BlockFace.WEST);
+        }
+        if (x == layout.width() && z == centerZ) {
+            return openings.contains(BlockFace.EAST);
+        }
+        return false;
     }
 
     private void buildConnector(int x, int y, int startZ, int endZ) {
+        for (int z = Math.min(startZ, endZ); z <= Math.max(startZ, endZ); z++) {
+            int halfWidth = z == origin.z() + ELEVATOR_OUTER_RADIUS + 1 ? 1 : 0;
+            buildCorridorCell(x, y, z, halfWidth, true);
+        }
+    }
+
+    private void buildVerticalConnector(int x, int y, int startZ, int endZ) {
+        for (int z = Math.min(startZ, endZ); z <= Math.max(startZ, endZ); z++) {
+            buildCorridorCell(x, y, z, 0, true);
+        }
+    }
+
+    private void buildHorizontalConnector(int y, int startX, int endX, int z) {
+        for (int x = Math.min(startX, endX); x <= Math.max(startX, endX); x++) {
+            buildCorridorCell(x, y, z, 0, false);
+        }
+    }
+
+    private void buildCorridorCell(int x, int y, int z, int halfWidth, boolean northSouth) {
         Material floor = Material.PACKED_MUD;
         Material wall = Material.DEEPSLATE_BRICKS;
-        for (int z = Math.min(startZ, endZ); z <= Math.max(startZ, endZ); z++) {
-            for (int dx = -1; dx <= 1; dx++) {
-                setBlock(x + dx, y - 1, z, floor);
-                setBlock(x + dx, y + 3, z, wall);
-            }
+        int pathMin = -halfWidth;
+        int pathMax = halfWidth;
+        for (int offset = pathMin - 1; offset <= pathMax + 1; offset++) {
+            int blockX = northSouth ? x + offset : x;
+            int blockZ = northSouth ? z : z + offset;
+            setBlock(blockX, y - 1, blockZ, floor);
+            setBlock(blockX, y + 3, blockZ, wall);
             for (int dy = 0; dy < 3; dy++) {
-                setBlock(x, y + dy, z, Material.AIR);
-                setBlock(x - 1, y + dy, z, wall);
-                setBlock(x + 1, y + dy, z, wall);
+                boolean path = offset >= pathMin && offset <= pathMax;
+                setBlock(blockX, y + dy, blockZ, path ? Material.AIR : wall);
             }
         }
     }
@@ -497,17 +558,49 @@ public final class HallsSession {
         }
     }
 
-    private void applyLayoutMarker(char marker, int x, int y, int z) {
-        switch (marker) {
-            case 'B' -> spawnBreakableProp(x, y, z, Material.BARREL, 3, PropReward.BLUEPRINT);
-            case 'W' -> spawnBreakableProp(x, y, z, Material.OAK_LOG, 2, PropReward.WOOD_SCRAP);
-            case 'I' -> spawnBreakableProp(x, y, z, Material.IRON_ORE, 3, PropReward.IRON_SCRAP);
-            case 'D' -> spawnBreakableProp(x, y, z, Material.DEEPSLATE_DIAMOND_ORE, 4, PropReward.DIAMOND_SCRAP);
-            case 'R' -> spawnBreakableProp(x, y, z, Material.REDSTONE_ORE, 3, PropReward.REDSTONE_SCRAP);
-            case 'L' -> setBlock(x, y + ROOM_HEIGHT - 1, z, Material.SEA_LANTERN);
-            default -> {
+    private void placeRoomContents(RoomPlacement room, Random random, int floor, int roomIndex) {
+        List<Cell> cells = openInteriorCells(room);
+        if (cells.isEmpty()) {
+            return;
+        }
+        Cell light = cells.get(Math.floorMod(roomIndex * 3 + floor, cells.size()));
+        setBlock(room.startX() + light.x(), origin.y() + ROOM_HEIGHT - 1, room.startZ() + light.z(), Material.SEA_LANTERN);
+        int props = Math.min(cells.size(), 2 + (roomIndex == 0 ? 1 : 0));
+        for (int i = 0; i < props; i++) {
+            Cell cell = cells.get(random.nextInt(cells.size()));
+            spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
+                    propMaterial(i, roomIndex), propHealth(i), propReward(floor, roomIndex, i));
+        }
+    }
+
+    private List<Cell> openInteriorCells(RoomPlacement room) {
+        List<Cell> cells = new ArrayList<>();
+        for (int z = 1; z < room.layout().depth() - 1; z++) {
+            for (int x = 1; x < room.layout().width() - 1; x++) {
+                if (room.layout().at(x, z) == 'O' && !isNearRoomExit(room, x, z)) {
+                    cells.add(new Cell(x, z));
+                }
             }
         }
+        return cells;
+    }
+
+    private boolean isNearRoomExit(RoomPlacement room, int x, int z) {
+        return x == room.layout().width() / 2 || z == room.layout().depth() / 2;
+    }
+
+    private Material propMaterial(int index, int roomIndex) {
+        Material[] materials = {Material.BARREL, Material.OAK_LOG, Material.IRON_ORE, Material.REDSTONE_ORE, Material.DEEPSLATE_DIAMOND_ORE};
+        return materials[Math.floorMod(index + roomIndex, materials.length)];
+    }
+
+    private int propHealth(int index) {
+        return 2 + Math.floorMod(index, 3);
+    }
+
+    private PropReward propReward(int floor, int roomIndex, int index) {
+        PropReward[] rewards = {PropReward.WOOD_SCRAP, PropReward.IRON_SCRAP, PropReward.REDSTONE_SCRAP, PropReward.DIAMOND_SCRAP};
+        return rewards[Math.floorMod(floor + roomIndex + index, rewards.length)];
     }
 
     private void startHudTask() {
@@ -857,6 +950,35 @@ public final class HallsSession {
     }
 
     private record BlockSnapshot(int x, int y, int z, BlockData blockData) {
+    }
+
+    private record RoomPlacement(HallsLayout layout, int startX, int startZ) {
+        private int centerX() {
+            return startX + layout.width() / 2;
+        }
+
+        private int centerZ() {
+            return startZ + layout.depth() / 2;
+        }
+
+        private int northExitZ() {
+            return startZ - 1;
+        }
+
+        private int southExitZ() {
+            return startZ + layout.depth();
+        }
+
+        private int westExitX() {
+            return startX - 1;
+        }
+
+        private int eastExitX() {
+            return startX + layout.width();
+        }
+    }
+
+    private record Cell(int x, int z) {
     }
 
     private static final class BreakableProp {
