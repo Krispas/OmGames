@@ -165,6 +165,14 @@ public final class HallsOfCarnageManager {
         return entity != null && activeSessions.values().stream().anyMatch(session -> session.isSessionEntity(entity));
     }
 
+    public boolean isActiveSessionParticipant(Player player) {
+        if (player == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        return sessionId != null && activeSessions.containsKey(sessionId);
+    }
+
     public boolean handleSessionEntityAttack(Player player, Entity entity) {
         if (entity == null) {
             return false;

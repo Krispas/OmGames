@@ -9,6 +9,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -17,6 +18,9 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.inventory.PlayerInventory;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 
 public final class HallsOfCarnageListener implements Listener {
     private final HallsOfCarnageManager manager;
@@ -115,9 +119,48 @@ public final class HallsOfCarnageListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!HallsMainMenu.isMenu(event.getInventory())) {
+        if (HallsMainMenu.isMenu(event.getInventory())) {
+            event.setCancelled(true);
             return;
         }
-        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player player)
+                || !manager.isActiveSessionParticipant(player)
+                || !manager.isHallsWorld(player.getWorld())) {
+            return;
+        }
+        if (event.isShiftClick()) {
+            event.setCancelled(true);
+            sendInventoryLimitActionBar(player);
+            return;
+        }
+        if (event.getClickedInventory() instanceof PlayerInventory && isBlockedPlayerInventorySlot(event.getSlot())) {
+            event.setCancelled(true);
+            sendInventoryLimitActionBar(player);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)
+                || !manager.isActiveSessionParticipant(player)
+                || !manager.isHallsWorld(player.getWorld())) {
+            return;
+        }
+        int topSize = event.getView().getTopInventory().getSize();
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot >= topSize && isBlockedPlayerInventorySlot(event.getView().convertSlot(rawSlot))) {
+                event.setCancelled(true);
+                sendInventoryLimitActionBar(player);
+                return;
+            }
+        }
+    }
+
+    private void sendInventoryLimitActionBar(Player player) {
+        player.sendActionBar(Component.text("Use hotbar slots only in Halls.", NamedTextColor.RED));
+    }
+
+    private boolean isBlockedPlayerInventorySlot(int slot) {
+        return slot >= 9 && slot <= 35;
     }
 }

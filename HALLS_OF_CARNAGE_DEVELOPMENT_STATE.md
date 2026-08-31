@@ -22,6 +22,7 @@ Last updated: 2026-08-31
 - Session-owned breakable prop entities and their placeholder drops are removed during `/hoc stop` cleanup.
 - Breakable props have initial lightweight movement pushback so players cannot freely stand inside them.
 - Active sessions send a placeholder action-bar HUD once per second showing floor, elapsed time, scrap counters, and sculk.
+- Active session participants are limited to the hotbar plus armor/offhand inventory shape. Player inventory storage slots `9-35`, drag placement into those slots, and shift-click transfers are blocked during sessions.
 
 ## Current Scope
 
@@ -46,6 +47,7 @@ This is the first implementation slice. It focuses on:
 - Combat/exploration/camp floor gameplay.
 - Sculk, traps, modifiers, monster flood systems.
 - Config-driven breakable prop definitions, real loot tables, and physics-driven unpicked item entities.
+- Dedicated elevator transfer chest inventory and item persistence rules.
 
 ## Resume Notes
 
@@ -61,3 +63,7 @@ This is the first implementation slice. It focuses on:
 - Moved the breakable-object clarification into the GDD. Future item/breakable work should build entity props and physics item drops rather than placing ordinary loot blocks.
 - Added the first entity-driven breakable prop path for the start-floor barrel. This is intentionally still a placeholder: it always drops a normal `Building Blueprint` paper item until Halls item definitions, loot tables, and physics item drops are implemented.
 - Fixed the temporary elevator wall symmetry/backing issue and added a first action-bar HUD for in-game runtime feedback.
+- Added first-pass active-session inventory enforcement for the GDD hotbar-only inventory rule. This currently blocks storage-row access rather than deleting or migrating existing inventory contents.
+
+## Reviewer note (Delete entries once done, but keep the header)
+- Fill rest of the inventory with barrier items, so player cant pickup more than can carry. Don't spend the whole development slice on this.
