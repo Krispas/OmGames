@@ -44,3 +44,8 @@ This is the first implementation slice. It focuses on:
 - Do not use `OmVeinsAPI` during startup.
 - Do not place lobby blocks near `0 70 0`; the lobby is human-built.
 - Session build origins should stay at least 1000 blocks away from the lobby; current default first origin is `2000 70 0`.
+
+
+## Notes from human reviewer (you are free to remove these once completed)
+- I tried running the game. Elevator generates completely wrong. By 5x5 I meant inside, not the whole structure.
+- I know you aren't there yet, but I should better specify the breakables, edit the GDD with this. Breakables should not be blocks, but entities simillar to unpicked items. And unpicked items should interact by not falling through. There should also be some kind of hitbox which pushes player away if they try to go through them.
