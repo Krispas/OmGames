@@ -97,6 +97,14 @@ public final class HallsSession {
         return origin;
     }
 
+    public int currentFloor() {
+        return currentFloor;
+    }
+
+    public boolean isTransitioning() {
+        return transitioning;
+    }
+
     public boolean isParticipant(UUID playerId) {
         return participants.contains(playerId);
     }
@@ -137,15 +145,40 @@ public final class HallsSession {
                 || block.getZ() != origin.z()) {
             return false;
         }
-        if (currentFloor == 1 && !transitioning) {
+        if (transitioning) {
+            player.sendMessage(Component.text("The elevator is already moving.", NamedTextColor.YELLOW));
+        } else if (currentFloor < scenario.floorCount()) {
             transitioning = true;
             openElevatorDoors();
             world.playSound(block.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
             player.sendMessage(Component.text("The elevator doors grind open.", NamedTextColor.DARK_RED));
-            startElevatorTransition();
+            startElevatorTransition(currentFloor + 1);
         } else {
-            player.sendMessage(Component.text("Further floors are not implemented yet.", NamedTextColor.YELLOW));
+            player.sendMessage(Component.text("No deeper placeholder floor is available.", NamedTextColor.YELLOW));
         }
+        return true;
+    }
+
+    public boolean forceBuildFloor(int floor) {
+        if (!running || transitioning || floor < 1 || floor > scenario.floorCount()) {
+            return false;
+        }
+        if (floor == 1) {
+            captureElevatorChestContents();
+            removeSessionEntities();
+            try {
+                buildStartArea();
+            } catch (IOException ex) {
+                plugin.getLogger().warning("Failed to force rebuild Halls start floor for session " + id + ": " + ex.getMessage());
+                return false;
+            }
+            restoreElevatorChestContents();
+            openElevatorDoors();
+            teleportParticipantsToElevator("Floor 1", "Reset to the start floor.");
+            return true;
+        }
+        buildExplorationFloor(floor);
+        openElevatorDoors();
         return true;
     }
 
@@ -252,15 +285,17 @@ public final class HallsSession {
     }
 
     private void buildStartArea() throws IOException {
+        currentFloor = 1;
         clearBuildVolume();
         buildElevator();
         HallsLayout layout = HallsLayoutLoader.load(new File(dataFolder, "level/special/start_floor.txt"));
         int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
         buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ, true);
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1);
+        closeElevatorDoors();
     }
 
-    private void startElevatorTransition() {
+    private void startElevatorTransition(int destinationFloor) {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!running) {
                 return;
@@ -279,7 +314,7 @@ public final class HallsSession {
             if (!running) {
                 return;
             }
-            buildExplorationFloor();
+            buildExplorationFloor(destinationFloor);
             openElevatorDoors();
             transitioning = false;
             world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
@@ -287,24 +322,29 @@ public final class HallsSession {
         }, 200L);
     }
 
-    private void buildExplorationFloor() {
+    private void buildExplorationFloor(int floor) {
         captureElevatorChestContents();
         removeSessionEntities();
         clearBuildVolume();
         buildElevator();
         restoreElevatorChestContents();
-        currentFloor = 2;
+        currentFloor = floor;
         HallsLayout layout = loadExplorationLayout();
         int startX = origin.x() - layout.width() / 2;
         int startZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
         buildLayoutRoom(layout, startX, origin.y(), startZ, false);
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, startZ - 1);
+        closeElevatorDoors();
+        teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
+    }
+
+    private void teleportParticipantsToElevator(String title, String subtitle) {
         Location spawn = new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5, 180.0f, 0.0f);
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
                 player.teleport(spawn);
-                player.sendTitle("Floor 2", "Gather what you can.", 10, 45, 15);
+                player.sendTitle(title, subtitle, 10, 45, 15);
             }
         }
     }
@@ -442,6 +482,7 @@ public final class HallsSession {
         for (int y = 0; y <= 3; y++) {
             for (int x = -1; x <= 1; x++) {
                 setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, Material.AIR);
+                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS + 1, Material.AIR);
             }
         }
     }
@@ -451,6 +492,7 @@ public final class HallsSession {
         for (int y = 0; y <= 3; y++) {
             for (int x = -1; x <= 1; x++) {
                 setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, door, BlockFace.EAST);
+                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS + 1, Material.BLACK_CONCRETE);
             }
         }
     }

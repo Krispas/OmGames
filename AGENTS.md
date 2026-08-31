@@ -1122,6 +1122,7 @@ Public subcommands:
 Operator subcommands:
 - `/hoc start <scenario> [player...]`
 - `/hoc stop <session_id|*>`
+- `/hoc floor <session_id> <floor>`
 - `/hoc shame set <player> <amount>`
 - `/hoc shame add <player> <amount>`
 - `/hoc lobby setspawn`
@@ -1156,5 +1157,6 @@ SQLite tables:
 - Shame leaderboards are ascending because lower shame is better.
 - `/hoc start <scenario> [player...]` allocates a session origin, builds the first start floor/elevator shell, teleports players into it, and tracks changed blocks for cleanup.
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
+- `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
 - Current Halls implementation is still early; randomized dungeon generation, real floor progression, elevator transitions, ghost state, item physics, scrap storage, camps, traps, sculk, and monsters are pending.

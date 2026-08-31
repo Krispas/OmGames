@@ -322,6 +322,31 @@ public final class HallsOfCarnageManager {
         return Result.ok("Stopped Halls session " + sessionId + ".");
     }
 
+    public Result forceSessionFloor(String rawSessionId, String rawFloor) {
+        int sessionId;
+        int floor;
+        try {
+            sessionId = Integer.parseInt(rawSessionId);
+            floor = Integer.parseInt(rawFloor);
+        } catch (NumberFormatException ex) {
+            return Result.fail("Usage: /hoc floor <session_id> <floor>");
+        }
+        HallsSession session = activeSessions.get(sessionId);
+        if (session == null) {
+            return Result.fail("No active Halls session has id " + sessionId + ".");
+        }
+        if (session.isTransitioning()) {
+            return Result.fail("Halls session " + sessionId + " is already transitioning.");
+        }
+        if (floor < 1 || floor > session.scenario().floorCount()) {
+            return Result.fail("Floor must be between 1 and " + session.scenario().floorCount() + ".");
+        }
+        if (!session.forceBuildFloor(floor)) {
+            return Result.fail("Could not rebuild Halls session " + sessionId + ".");
+        }
+        return Result.ok("Rebuilt Halls session " + sessionId + " at floor " + floor + ".");
+    }
+
     public void handlePlayerQuit(Player player) {
         if (player == null) {
             return;

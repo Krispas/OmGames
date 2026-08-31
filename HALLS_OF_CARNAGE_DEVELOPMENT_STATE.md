@@ -34,6 +34,9 @@ Last updated: 2026-08-31
 - Floor 2 now loads from bundled/data-folder template `level/howling_corridors/exploration_1.txt` instead of only a hardcoded rectangle.
 - Exploration templates currently support marker characters: `X` wall, `O` open, `B` blueprint barrel, `W/I/D/R` scrap breakable props, and `L` sea-lantern lighting.
 - Elevator transitions now run through a 10-second elevator-only phase: doors open on button press, close while descending, the destination floor rebuilds, then doors reopen on arrival.
+- Closed elevator doors now also place a black-concrete backing block on the corridor side of the door and remove it when the doors open.
+- `/hoc floor <session_id> <floor>` is available as an OP-only development shortcut. It rebuilds an active placeholder floor, preserves the elevator transfer chest, teleports participants back into the elevator, and bypasses the 10-second transition delay for faster iteration.
+- `/hoc sessions` now includes the current floor for each active session.
 
 ## Current Scope
 
@@ -80,7 +83,10 @@ This is the first implementation slice. It focuses on:
 - Added the first real floor progression hook: pressing the elevator button on floor 1 rebuilds the temporary play area as floor 2 with breakable scrap props and HUD counter updates.
 - Addressed the latest in-game review pass by clearing session inventories on exit, allowing valid chest shift-click transfers, preserving elevator chest contents through floor rebuilds, opening the elevator doors before transition, applying block data to generated elevator fixtures, and moving coin gain to elevator scrap deposit.
 - Added the first resource-template-backed exploration room with marker-driven props/lights, and changed the elevator button flow into a 10-second transition phase that reopens doors after the destination floor loads.
+- Added the elevator closed-door backing requested in review and an OP-only `/hoc floor <session_id> <floor>` shortcut so generation/content slices can be tested without restarting sessions.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 - Okay, I would rather that the lights, prop places and so on were not defined in the room definitions for bigger map procgen possibilities and place them during the generation as described in the design doc.
-- If you havent added it, put block concrete on the other side of the elevator door when the doors are closed.
+- When the concrete vanishes, it opens up the coridor walls, fix that, maybe make the corridor wider for that one block or something. Or extend the elevator by a block to have "exterior"
+- Rooms should not have outer walls defined in the files and instead walls should automatically generate around each room if corridor is attached there. For example the current room has blocked entrance.
+- Fix the above issues in the next slice and add more room teplates, also add support for multi-room generation with the basic corridors as described in the design doc.
