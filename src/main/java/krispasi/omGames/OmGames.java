@@ -13,6 +13,9 @@ import krispasi.omGames.chess.ChessManager;
 import krispasi.omGames.egghunt.EggHuntCommand;
 import krispasi.omGames.egghunt.EggHuntListener;
 import krispasi.omGames.egghunt.EggHuntManager;
+import krispasi.omGames.hallsofcarnage.HallsOfCarnageCommand;
+import krispasi.omGames.hallsofcarnage.HallsOfCarnageListener;
+import krispasi.omGames.hallsofcarnage.HallsOfCarnageManager;
 import krispasi.omGames.random.RandomCommand;
 import krispasi.omGames.random.RandomGifManager;
 import krispasi.omGames.random.RandomListener;
@@ -48,6 +51,7 @@ public final class OmGames extends JavaPlugin {
     private ChessManager chessManager;
     private FortunaManager fortunaManager;
     private RandomGifManager randomGifManager;
+    private HallsOfCarnageManager hallsOfCarnageManager;
 
     @Override
     public void onEnable() {
@@ -75,6 +79,8 @@ public final class OmGames extends JavaPlugin {
         fortunaManager.load();
         randomGifManager = new RandomGifManager(this);
         randomGifManager.load();
+        hallsOfCarnageManager = new HallsOfCarnageManager(this);
+        hallsOfCarnageManager.load();
 
         PluginCommand command = getCommand("bw");
         if (command != null) {
@@ -106,12 +112,19 @@ public final class OmGames extends JavaPlugin {
             omGamesCommand.setExecutor(executor);
             omGamesCommand.setTabCompleter(executor);
         }
+        PluginCommand hallsCommand = getCommand("hoc");
+        if (hallsCommand != null) {
+            HallsOfCarnageCommand executor = new HallsOfCarnageCommand(hallsOfCarnageManager);
+            hallsCommand.setExecutor(executor);
+            hallsCommand.setTabCompleter(executor);
+        }
 
         getServer().getPluginManager().registerEvents(new BedwarsListener(bedwarsManager), this);
         getServer().getPluginManager().registerEvents(new EggHuntListener(eggHuntManager), this);
         getServer().getPluginManager().registerEvents(new ChessListener(chessManager, this), this);
         getServer().getPluginManager().registerEvents(new FortunaListener(fortunaManager, this), this);
         getServer().getPluginManager().registerEvents(new RandomListener(randomGifManager, this), this);
+        getServer().getPluginManager().registerEvents(new HallsOfCarnageListener(hallsOfCarnageManager), this);
 /*      setupBedwars();
         setupBedwars1();
         setupBedwars2();
@@ -132,6 +145,9 @@ public final class OmGames extends JavaPlugin {
         }
         if (randomGifManager != null) {
             randomGifManager.shutdown();
+        }
+        if (hallsOfCarnageManager != null) {
+            hallsOfCarnageManager.shutdown();
         }
         if (bedwarsManager != null) {
             bedwarsManager.shutdown();
