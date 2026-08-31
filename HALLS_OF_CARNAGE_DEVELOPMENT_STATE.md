@@ -26,6 +26,11 @@ Last updated: 2026-08-31
 - Empty player inventory storage slots `9-35` are filled with marked barrier placeholders while in an active session, preventing normal pickup overflow beyond the hotbar. Existing items in those slots are left untouched but remain inaccessible until session exit.
 - The elevator button on the temporary elevator now moves floor 1 sessions to a first placeholder floor 2 exploration room.
 - Floor 2 generates a larger test exploration room with several breakable props that award placeholder scrap/coins and update the HUD counters.
+- Session start clears player inventory before applying the hotbar-only shape, and normal session stop returns players to the Halls lobby with an empty inventory.
+- Shift-clicking is allowed for top-container transfers and hotbar-origin transfers while storage-row shift-clicks remain blocked.
+- The elevator doors now open briefly before the floor 2 rebuild, and generated chest/hopper/button/bar blocks apply explicit block data for facing/connectivity.
+- Elevator chest contents are captured before floor rebuilds and restored into the rebuilt elevator chest, preventing chest contents from dropping during floor transitions.
+- Scrap breakables now drop scrap items only. Stored scrap counters and coins increase when players deposit those scrap items into the elevator hopper.
 
 ## Current Scope
 
@@ -51,6 +56,8 @@ This is the first implementation slice. It focuses on:
 - Sculk, traps, modifiers, monster flood systems.
 - Config-driven breakable prop definitions, real loot tables, and physics-driven unpicked item entities.
 - Dedicated elevator transfer chest inventory and item persistence rules.
+- Template-driven exploration room selection from `resources/hallsOfCarnage/level/<level_type>/`.
+- Level-type lighting/material palettes.
 
 ## Resume Notes
 
@@ -68,12 +75,9 @@ This is the first implementation slice. It focuses on:
 - Fixed the temporary elevator wall symmetry/backing issue and added a first action-bar HUD for in-game runtime feedback.
 - Added first-pass active-session inventory enforcement for the GDD hotbar-only inventory rule. Storage-row access is blocked, and empty storage slots are filled with marked barriers during the session.
 - Added the first real floor progression hook: pressing the elevator button on floor 1 rebuilds the temporary play area as floor 2 with breakable scrap props and HUD counter updates.
+- Addressed the latest in-game review pass by clearing session inventories on exit, allowing valid chest shift-click transfers, preserving elevator chest contents through floor rebuilds, opening the elevator doors before transition, applying block data to generated elevator fixtures, and moving coin gain to elevator scrap deposit.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- After session ends, empty player inventory as players should have nothing while in the lobby. If a game is saved in the camp (not implemented yet, I know), the player inventories should save too. Again, don't dedicate whole slice to this.
-- Shift clicking stuff to transfer into chests doesnt work as its claiming to use the invalid slots.
-- Make elevator door actually open. Also elevator is fully missing blockdata, the bars dont connect and the chest is facing north instead of east. The hopper should probably also face towards the wall.
-- I put the blueprint into the chest on floor one, it dropped out of the chest when I transfered floor to 2.
 - I am guessing its a testing enviroment, but dont forget the real rooms should be taking templates from resources.
-- Coins should not be acquired on resource pick, but when its deposited in the elevator.
 - The game is quite dark, there should be some lights around the place, it should be probably implmented later, once the level types are being worked on.
+- The elevator doors are closed on level one, when going to level 2 they open, but as soon as the level loads, they close again. You should do this together with the elevator transition scene described in the design doc.

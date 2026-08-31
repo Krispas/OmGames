@@ -198,6 +198,15 @@ public final class HallsOfCarnageManager {
         return session != null && session.handleElevatorButton(player, block);
     }
 
+    public boolean handleScrapDeposit(Player player, org.bukkit.block.Block block) {
+        if (player == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleScrapDeposit(player, block);
+    }
+
     public void pushOutOfSessionProps(Player player) {
         for (HallsSession session : activeSessions.values()) {
             session.pushOutOfSessionProps(player);

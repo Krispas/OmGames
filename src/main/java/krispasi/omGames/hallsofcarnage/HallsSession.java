@@ -20,14 +20,17 @@ import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.Container;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
+import org.bukkit.block.data.MultipleFacing;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -59,6 +62,8 @@ public final class HallsSession {
     private int diamondScrap;
     private int redstoneScrap;
     private int coins;
+    private ItemStack[] elevatorChestContents = new ItemStack[27];
+    private boolean transitioning;
     private boolean running;
 
     public HallsSession(JavaPlugin plugin,
@@ -132,12 +137,43 @@ public final class HallsSession {
                 || block.getZ() != origin.z()) {
             return false;
         }
-        if (currentFloor == 1) {
-            buildExplorationFloor();
-            player.sendMessage(Component.text("The elevator grinds deeper into the halls.", NamedTextColor.DARK_RED));
+        if (currentFloor == 1 && !transitioning) {
+            transitioning = true;
+            openElevatorDoors();
+            world.playSound(block.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
+            player.sendMessage(Component.text("The elevator doors grind open.", NamedTextColor.DARK_RED));
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!running) {
+                    return;
+                }
+                buildExplorationFloor();
+                transitioning = false;
+                world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                        Sound.BLOCK_IRON_DOOR_CLOSE, 0.9f, 0.8f);
+            }, 25L);
         } else {
             player.sendMessage(Component.text("Further floors are not implemented yet.", NamedTextColor.YELLOW));
         }
+        return true;
+    }
+
+    public boolean handleScrapDeposit(Player player, Block block) {
+        if (!running || player == null || block == null || !player.getWorld().equals(world)) {
+            return false;
+        }
+        if (block.getX() != origin.x() - ELEVATOR_INNER_RADIUS
+                || block.getY() != origin.y() + 2
+                || block.getZ() != origin.z()) {
+            return false;
+        }
+        int deposited = depositScrap(player.getInventory());
+        if (deposited <= 0) {
+            player.sendActionBar(Component.text("No scrap to deposit.", NamedTextColor.GRAY));
+            return true;
+        }
+        coins += deposited;
+        world.playSound(block.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8f, 0.7f);
+        player.sendActionBar(Component.text("Deposited " + deposited + " scrap.", NamedTextColor.GOLD));
         return true;
     }
 
@@ -196,6 +232,7 @@ public final class HallsSession {
             player.setFoodLevel(20);
             player.setSaturation(20.0f);
             player.setRespawnLocation(spawn, true);
+            player.getInventory().clear();
             applyInventoryLimit(player);
             player.sendMessage(Component.text("Entering " + scenario.name() + " floor 1.", NamedTextColor.DARK_RED));
         }
@@ -209,9 +246,11 @@ public final class HallsSession {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && fallback != null && player.getWorld().equals(world)) {
                 restoreInventoryLimit(player);
+                player.getInventory().clear();
                 player.teleport(fallback);
             } else if (player != null) {
                 restoreInventoryLimit(player);
+                player.getInventory().clear();
             }
         }
         restoreBlocks();
@@ -230,9 +269,11 @@ public final class HallsSession {
     }
 
     private void buildExplorationFloor() {
+        captureElevatorChestContents();
         removeSessionEntities();
         clearBuildVolume();
         buildElevator();
+        restoreElevatorChestContents();
         currentFloor = 2;
         int startX = origin.x() - 6;
         int startZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
@@ -286,7 +327,8 @@ public final class HallsSession {
                 Material backMaterial = Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : Math.abs(x) == 2 ? side : back;
                 Material frontMaterial = Math.abs(x) <= 1 ? door : Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : Math.abs(x) == 2 ? side : back;
                 setBlock(origin.x() + x, origin.y() + y, origin.z() - ELEVATOR_OUTER_RADIUS, backMaterial);
-                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, frontMaterial);
+                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, frontMaterial,
+                        frontMaterial == door ? BlockFace.EAST : null);
             }
             for (int z = -ELEVATOR_INNER_RADIUS; z <= ELEVATOR_INNER_RADIUS; z++) {
                 Material sideWall = Math.abs(z) == ELEVATOR_INNER_RADIUS ? side : back;
@@ -294,9 +336,9 @@ public final class HallsSession {
                 setBlock(origin.x() + ELEVATOR_OUTER_RADIUS, origin.y() + y, origin.z() + z, sideWall);
             }
         }
-        setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y(), origin.z(), Material.CHEST);
+        setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y(), origin.z(), Material.CHEST, BlockFace.EAST);
         setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y() + 1, origin.z(), Material.STONE_BUTTON, BlockFace.EAST);
-        setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y() + 2, origin.z(), Material.HOPPER);
+        setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y() + 2, origin.z(), Material.HOPPER, BlockFace.WEST);
         setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y(), origin.z(), machine);
         setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 1, origin.z(), machine);
         setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 2, origin.z(), machine);
@@ -362,6 +404,14 @@ public final class HallsSession {
         }
     }
 
+    private void openElevatorDoors() {
+        for (int y = 0; y <= 3; y++) {
+            for (int x = -1; x <= 1; x++) {
+                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, Material.AIR);
+            }
+        }
+    }
+
     private void startHudTask() {
         stopHudTask();
         hudTask = Bukkit.getScheduler().runTaskTimer(plugin, this::sendHud, 0L, 20L);
@@ -407,9 +457,39 @@ public final class HallsSession {
         for (int i = snapshots.size() - 1; i >= 0; i--) {
             BlockSnapshot snapshot = snapshots.get(i);
             Block block = world.getBlockAt(snapshot.x(), snapshot.y(), snapshot.z());
+            if (block.getState(false) instanceof Container container) {
+                container.getInventory().clear();
+            }
             block.setBlockData(snapshot.blockData(), false);
         }
         snapshots.clear();
+    }
+
+    private void captureElevatorChestContents() {
+        Container container = elevatorChestContainer();
+        if (container == null) {
+            elevatorChestContents = new ItemStack[27];
+            return;
+        }
+        ItemStack[] contents = container.getInventory().getContents();
+        elevatorChestContents = new ItemStack[Math.max(27, contents.length)];
+        for (int i = 0; i < contents.length; i++) {
+            elevatorChestContents[i] = contents[i] == null ? null : contents[i].clone();
+        }
+        container.getInventory().clear();
+    }
+
+    private void restoreElevatorChestContents() {
+        Container container = elevatorChestContainer();
+        if (container == null) {
+            return;
+        }
+        container.getInventory().setContents(elevatorChestContents);
+    }
+
+    private Container elevatorChestContainer() {
+        Block block = world.getBlockAt(origin.x() - ELEVATOR_INNER_RADIUS, origin.y(), origin.z());
+        return block.getState(false) instanceof Container container ? container : null;
     }
 
     private void spawnBreakableProp(int x, int y, int z, Material material, int health, PropReward reward) {
@@ -449,26 +529,52 @@ public final class HallsSession {
         switch (reward) {
             case BLUEPRINT -> dropSessionItem(dropLocation, blueprintPlaceholder());
             case WOOD_SCRAP -> {
-                woodScrap++;
-                coins++;
-                dropSessionItem(dropLocation, namedItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD));
+                dropSessionItem(dropLocation, scrapItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD, reward));
             }
             case IRON_SCRAP -> {
-                ironScrap++;
-                coins++;
-                dropSessionItem(dropLocation, namedItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY));
+                dropSessionItem(dropLocation, scrapItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY, reward));
             }
             case DIAMOND_SCRAP -> {
-                diamondScrap++;
-                coins++;
-                dropSessionItem(dropLocation, namedItem(Material.DIAMOND, "Diamond Scrap", NamedTextColor.AQUA));
+                dropSessionItem(dropLocation, scrapItem(Material.DIAMOND, "Diamond Scrap", NamedTextColor.AQUA, reward));
             }
             case REDSTONE_SCRAP -> {
-                redstoneScrap++;
-                coins++;
-                dropSessionItem(dropLocation, namedItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED));
+                dropSessionItem(dropLocation, scrapItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED, reward));
             }
         }
+    }
+
+    private int depositScrap(PlayerInventory inventory) {
+        int deposited = 0;
+        for (int slot = 0; slot <= 8; slot++) {
+            deposited += depositScrapStack(inventory.getItem(slot));
+            if (isScrapItem(inventory.getItem(slot))) {
+                inventory.setItem(slot, null);
+            }
+        }
+        ItemStack offhand = inventory.getItemInOffHand();
+        deposited += depositScrapStack(offhand);
+        if (isScrapItem(offhand)) {
+            inventory.setItemInOffHand(null);
+        }
+        return deposited;
+    }
+
+    private int depositScrapStack(ItemStack item) {
+        PropReward scrapType = scrapType(item);
+        if (scrapType == null) {
+            return 0;
+        }
+        int amount = Math.max(1, item.getAmount());
+        switch (scrapType) {
+            case WOOD_SCRAP -> woodScrap += amount;
+            case IRON_SCRAP -> ironScrap += amount;
+            case DIAMOND_SCRAP -> diamondScrap += amount;
+            case REDSTONE_SCRAP -> redstoneScrap += amount;
+            default -> {
+                return 0;
+            }
+        }
+        return amount;
     }
 
     private void dropSessionItem(Location location, ItemStack stack) {
@@ -517,6 +623,41 @@ public final class HallsSession {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private ItemStack scrapItem(Material material, String name, NamedTextColor color, PropReward reward) {
+        ItemStack item = namedItem(material, name, color);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.getPersistentDataContainer().set(
+                    new org.bukkit.NamespacedKey(plugin, "hoc_scrap_type"),
+                    PersistentDataType.STRING,
+                    reward.name()
+            );
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private PropReward scrapType(ItemStack item) {
+        if (!isScrapItem(item)) {
+            return null;
+        }
+        String value = item.getItemMeta().getPersistentDataContainer()
+                .get(new org.bukkit.NamespacedKey(plugin, "hoc_scrap_type"), PersistentDataType.STRING);
+        try {
+            return PropReward.valueOf(value);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private boolean isScrapItem(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return false;
+        }
+        return item.getItemMeta().getPersistentDataContainer()
+                .has(new org.bukkit.NamespacedKey(plugin, "hoc_scrap_type"), PersistentDataType.STRING);
     }
 
     private void applyInventoryLimit(Player player) {
@@ -582,10 +723,28 @@ public final class HallsSession {
     private void setBlock(int x, int y, int z, Material material, BlockFace facing) {
         Block block = world.getBlockAt(x, y, z);
         snapshots.add(new BlockSnapshot(x, y, z, block.getBlockData().clone()));
+        if (block.getState(false) instanceof Container container) {
+            container.getInventory().clear();
+        }
         block.setType(material, false);
         if (facing != null && block.getBlockData() instanceof Directional directional) {
             directional.setFacing(facing);
             block.setBlockData(directional, false);
+        }
+        if (facing != null && block.getBlockData() instanceof MultipleFacing multipleFacing) {
+            if (multipleFacing.getAllowedFaces().contains(facing)) {
+                multipleFacing.setFace(facing, true);
+            }
+            if (multipleFacing.getAllowedFaces().contains(facing.getOppositeFace())) {
+                multipleFacing.setFace(facing.getOppositeFace(), true);
+            }
+            if (multipleFacing.getAllowedFaces().contains(BlockFace.UP)) {
+                multipleFacing.setFace(BlockFace.UP, true);
+            }
+            if (multipleFacing.getAllowedFaces().contains(BlockFace.DOWN)) {
+                multipleFacing.setFace(BlockFace.DOWN, true);
+            }
+            block.setBlockData(multipleFacing, false);
         }
     }
 

@@ -134,6 +134,12 @@ public final class HallsOfCarnageListener implements Listener {
                 && event.getClickedBlock().getType() == Material.STONE_BUTTON
                 && manager.handleElevatorButton(event.getPlayer(), event.getClickedBlock())) {
             event.setCancelled(true);
+            return;
+        }
+        if (event.getAction() == Action.RIGHT_CLICK_BLOCK
+                && event.getClickedBlock().getType() == Material.HOPPER
+                && manager.handleScrapDeposit(event.getPlayer(), event.getClickedBlock())) {
+            event.setCancelled(true);
         }
     }
 
@@ -153,8 +159,10 @@ public final class HallsOfCarnageListener implements Listener {
             return;
         }
         if (event.isShiftClick()) {
-            event.setCancelled(true);
-            sendInventoryLimitActionBar(player);
+            if (!isAllowedShiftClick(event)) {
+                event.setCancelled(true);
+                sendInventoryLimitActionBar(player);
+            }
             return;
         }
         if (event.getClickedInventory() instanceof PlayerInventory && isBlockedPlayerInventorySlot(event.getSlot())) {
@@ -193,5 +201,15 @@ public final class HallsOfCarnageListener implements Listener {
 
     private boolean isBlockedPlayerInventorySlot(int slot) {
         return slot >= 9 && slot <= 35;
+    }
+
+    private boolean isAllowedShiftClick(InventoryClickEvent event) {
+        if (event.getCurrentItem() == null || event.getCurrentItem().getType().isAir()) {
+            return true;
+        }
+        if (event.getClickedInventory() instanceof PlayerInventory) {
+            return event.getSlot() >= 0 && event.getSlot() <= 8;
+        }
+        return true;
     }
 }
