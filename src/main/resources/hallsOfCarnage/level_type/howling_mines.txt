@@ -1,0 +1,2 @@
+Should contain stuff like what blocks are ont he walls, what are on corners. If there is a block pallete instead of a normal block.
+Monsters, and so on refer to the main doc

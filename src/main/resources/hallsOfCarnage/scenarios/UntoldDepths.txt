@@ -1,0 +1,24 @@
+name: "Untold Depths"
+length: "50"
+difficulty: "Medium"
+description: "Lorem ipsum"
+
+This is a dummy file.
+Upper stuff is just visual for main menu.
+
+Floors should be defined in a list like
+
+type: "howling_mines"
+difficulty: 30
+items: 12
+breakables: 40
+rooms: 12
+
+There should be a weapon/armor list
+
+item: "Super sword of awesomness"
+unlock: "Armory level 3"
+
+again this is just a dummy description, figure out the structure of the file yourself.
+
+This is the first scenario and it should have 50 floors. Camp each 5 floors and a combat room on the last floor.
