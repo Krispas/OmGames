@@ -18,7 +18,7 @@ public final class ChessRules {
     private ChessRules() {
     }
 
-    public static List<ChessSquare> getCandidateMoves(ChessManager manager, ChessPiece piece, boolean legalOnly) {
+    public static List<ChessSquare> getCandidateMoves(ChessMatchRuntime manager, ChessPiece piece, boolean legalOnly) {
         if (manager == null || piece == null || piece.captured() || piece.square() == null) {
             return List.of();
         }
@@ -42,18 +42,18 @@ public final class ChessRules {
         return legalMoves;
     }
 
-    public static boolean isValidMove(ChessManager manager, ChessPiece piece, ChessSquare target, boolean legalOnly) {
+    public static boolean isValidMove(ChessMatchRuntime manager, ChessPiece piece, ChessSquare target, boolean legalOnly) {
         return target != null && getCandidateMoves(manager, piece, legalOnly).contains(target);
     }
 
-    public static boolean isKingInCheck(ChessManager manager, ChessSide side) {
+    public static boolean isKingInCheck(ChessMatchRuntime manager, ChessSide side) {
         if (manager == null || side == null) {
             return false;
         }
         return BoardState.from(manager).isKingInCheck(side);
     }
 
-    public static boolean hasAnyLegalMove(ChessManager manager, ChessSide side) {
+    public static boolean hasAnyLegalMove(ChessMatchRuntime manager, ChessSide side) {
         if (manager == null || side == null) {
             return false;
         }
@@ -73,7 +73,7 @@ public final class ChessRules {
         return false;
     }
 
-    public static boolean isDeadPosition(ChessManager manager) {
+    public static boolean isDeadPosition(ChessMatchRuntime manager) {
         Collection<ChessPiece> pieces = manager.getActivePieces();
         List<ChessPiece> whitePieces = pieces.stream().filter(piece -> piece.side() == ChessSide.WHITE).toList();
         List<ChessPiece> blackPieces = pieces.stream().filter(piece -> piece.side() == ChessSide.BLACK).toList();
@@ -93,7 +93,7 @@ public final class ChessRules {
         return false;
     }
 
-    public static Set<ChessSquare> getAttackedSquares(ChessManager manager, ChessSide side) {
+    public static Set<ChessSquare> getAttackedSquares(ChessMatchRuntime manager, ChessSide side) {
         Set<ChessSquare> attacked = new LinkedHashSet<>();
         if (manager == null || side == null) {
             return attacked;
@@ -107,7 +107,7 @@ public final class ChessRules {
         return attacked;
     }
 
-    public static boolean isSquareAttacked(ChessManager manager, ChessSquare target, ChessSide bySide) {
+    public static boolean isSquareAttacked(ChessMatchRuntime manager, ChessSquare target, ChessSide bySide) {
         if (manager == null || target == null || bySide == null) {
             return false;
         }
@@ -313,7 +313,7 @@ public final class ChessRules {
             this.enPassantPawnId = enPassantPawnId;
         }
 
-        static BoardState from(ChessManager manager) {
+        static BoardState from(ChessMatchRuntime manager) {
             Map<UUID, PieceState> pieces = new LinkedHashMap<>();
             Map<ChessSquare, UUID> squares = new LinkedHashMap<>();
             for (ChessPiece piece : manager.getPieces().values()) {

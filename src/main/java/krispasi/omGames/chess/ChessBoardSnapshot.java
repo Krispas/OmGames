@@ -17,7 +17,7 @@ public record ChessBoardSnapshot(
         boolean blackKingsideRookMoved,
         boolean blackQueensideRookMoved
 ) {
-    public static ChessBoardSnapshot capture(ChessManager manager) {
+    public static ChessBoardSnapshot capture(ChessMatchRuntime manager) {
         Map<UUID, PieceState> pieceStates = new LinkedHashMap<>();
         for (ChessPiece piece : manager.getPieces().values()) {
             pieceStates.put(piece.pieceId(), new PieceState(

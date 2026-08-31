@@ -937,7 +937,9 @@ Files:
 
 - `src/main/java/krispasi/omGames/chess/*`
   - Chess game implementation.
-  - Owns `/chess`, the active board, item displays, interaction boxes, move validation, undo/redo state, and SQLite match/stat logging.
+  - Owns `/chess`, saved boards, active match runtimes, item displays, interaction boxes, move validation, undo/redo state, timers, and SQLite match/stat logging.
+  - `ChessManager` is the command/event coordinator.
+  - `ChessMatchRuntime` owns one active match on one board timestamp.
   - Keep Chess logic inside this package; do not push Chess rules into BedWars or Egg Hunt classes.
 
 ### 4.2 Command Surface
@@ -950,15 +952,20 @@ Operator subcommands:
 - `/chess board remove <timestamp|*>`
 - `/chess match white <player> [player] [player]`
 - `/chess match black <player> [player] [player]`
-- `/chess match start`
+- `/chess match start [board_timestamp]`
 - `/chess match test`
-- `/chess match print_log`
 - `/chess match cancel <timestamp|*>`
 - `/chess match settings do_movement_check <true|false>`
 - `/chess match settings visualize_movement_check <true|false>`
 - `/chess match settings do_endgame_checks <true|false>`
 - `/chess match settings allow_undo <true|false>`
 - `/chess match settings show_annotation <true|false>`
+- `/chess match settings figure_style <default|flat>`
+- `/chess log print [timestamp|*]`
+- `/chess log delete <timestamp|*>`
+- `/chess log search <player> [player...]`
+- `/chess timer off`
+- `/chess timer time <duration> [check <duration>]`
 
 Team/player subcommands:
 - `/chess resign`
@@ -992,11 +999,17 @@ SQLite tables:
 - A1 is white's left rook square and H8 is black's left rook square.
 - Piece item displays use `minecraft:iron_nugget` with `ItemMeta#setItemModel()`.
 - Normal models are `om:<piece>` for white and `om:black_<piece>` for black; selected models are `om:selected_<piece>`.
-- Each active board owns 64 square interaction boxes, 32 piece interaction boxes, and 32 item displays.
+- Multiple boards and active matches may exist at the same time; each active match is identified by its match timestamp and runs on one board timestamp.
+- `/chess match start` without a board timestamp uses the most recent saved board.
+- A player may be assigned to any side in any number of concurrent matches; clicked board entities route moves to the match for that entity timestamp.
+- Each active match board owns 64 square interaction boxes, 32 piece interaction boxes, and 32 item displays.
 - Chess board entities are persistent and can be removed with `/chess board remove <timestamp|*>`.
 - Chess interaction entities use persistent data and scoreboard tags for identity; do not rely on visible custom names.
 - Active non-test matches are saved in `chess_active_match_state` so they can continue after restart until a win, draw, resign, cancel, board reset, or board removal.
 - During an active match, online team players in the board world are put in Adventure mode with flight enabled and 16-block block/entity interaction reach; this must be restored when they leave the board world or the match ends.
+- Flat figure style uses `om:<side>_<piece>_icon` item models on `minecraft:iron_nugget`; default style keeps the existing standing figure models.
+- Pawn promotion uses a forced small inventory selection for bishop, horse, queen, or rook, not captured-piece selection.
+- Chess timer durations accept decimal values with optional `s`, `m`, `h`, or `d` units; unqualified match time defaults to minutes and unqualified check bonus defaults to seconds.
 
 ## 5) Bank
 

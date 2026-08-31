@@ -131,7 +131,7 @@ public final class ChessDatabaseService {
     public record ActiveMatchState(
             long matchId,
             String startedAt,
-            ChessManager.BoardContext board,
+            ChessMatchRuntime.BoardContext board,
             List<PlayerRef> whitePlayers,
             List<PlayerRef> blackPlayers,
             ChessSettings settings,
@@ -198,7 +198,7 @@ public final class ChessDatabaseService {
         connection = null;
     }
 
-    public long startMatch(ChessManager.BoardContext board,
+    public long startMatch(ChessMatchRuntime.BoardContext board,
                            Collection<PlayerRef> whitePlayers,
                            Collection<PlayerRef> blackPlayers,
                            ChessSettings settings,
@@ -317,7 +317,7 @@ public final class ChessDatabaseService {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            ChessManager.BoardContext board = state.board();
+            ChessMatchRuntime.BoardContext board = state.board();
             statement.setLong(1, state.matchId());
             statement.setString(2, state.startedAt());
             statement.setString(3, board.timestamp());
@@ -353,61 +353,65 @@ public final class ChessDatabaseService {
     }
 
     public ActiveMatchState loadActiveMatchState() {
+        List<ActiveMatchState> states = loadActiveMatchStates();
+        return states.isEmpty() ? null : states.getLast();
+    }
+
+    public List<ActiveMatchState> loadActiveMatchStates() {
+        List<ActiveMatchState> states = new ArrayList<>();
         if (connection == null) {
-            return null;
+            return states;
         }
         String sql = """
                 SELECT s.*
                 FROM chess_active_match_state s
                 LEFT JOIN chess_matches m ON m.match_id = s.match_id
                 WHERE m.finished_at IS NULL OR m.match_id IS NULL
-                ORDER BY s.match_id DESC
-                LIMIT 1
+                ORDER BY s.match_id
                 """;
         try (PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet resultSet = statement.executeQuery()) {
-            if (!resultSet.next()) {
-                return null;
+            while (resultSet.next()) {
+                ChessSettings settings = new ChessSettings();
+                settings.setAllowUndo(resultSet.getInt("allow_undo") != 0);
+                settings.setDoMovementCheck(resultSet.getInt("do_movement_check") != 0);
+                settings.setVisualizeMovementCheck(resultSet.getInt("visualize_movement_check") != 0);
+                settings.setDoEndgameChecks(resultSet.getInt("do_endgame_checks") != 0);
+                settings.setShowAnnotation(resultSet.getInt("show_annotation") != 0);
+                String enPassantPawnText = resultSet.getString("en_passant_pawn_id");
+                states.add(new ActiveMatchState(
+                        resultSet.getLong("match_id"),
+                        resultSet.getString("started_at"),
+                        new ChessMatchRuntime.BoardContext(
+                                resultSet.getString("board_timestamp"),
+                                resultSet.getString("world_name"),
+                                resultSet.getInt("origin_x"),
+                                resultSet.getInt("origin_y"),
+                                resultSet.getInt("origin_z")
+                        ),
+                        parsePlayers(resultSet.getString("white_players")),
+                        parsePlayers(resultSet.getString("black_players")),
+                        settings,
+                        ChessSide.fromKey(resultSet.getString("turn")),
+                        resultSet.getInt("move_count"),
+                        resultSet.getInt("undo_count"),
+                        resultSet.getInt("redo_count"),
+                        ChessSquare.fromNotation(resultSet.getString("en_passant_square")),
+                        enPassantPawnText == null || enPassantPawnText.isBlank() ? null : UUID.fromString(enPassantPawnText),
+                        resultSet.getInt("white_king_moved") != 0,
+                        resultSet.getInt("black_king_moved") != 0,
+                        resultSet.getInt("white_kingside_rook_moved") != 0,
+                        resultSet.getInt("white_queenside_rook_moved") != 0,
+                        resultSet.getInt("black_kingside_rook_moved") != 0,
+                        resultSet.getInt("black_queenside_rook_moved") != 0,
+                        parsePieces(resultSet.getString("pieces")),
+                        resultSet.getString("pending_promotion")
+                ));
             }
-            ChessSettings settings = new ChessSettings();
-            settings.setAllowUndo(resultSet.getInt("allow_undo") != 0);
-            settings.setDoMovementCheck(resultSet.getInt("do_movement_check") != 0);
-            settings.setVisualizeMovementCheck(resultSet.getInt("visualize_movement_check") != 0);
-            settings.setDoEndgameChecks(resultSet.getInt("do_endgame_checks") != 0);
-            settings.setShowAnnotation(resultSet.getInt("show_annotation") != 0);
-            String enPassantPawnText = resultSet.getString("en_passant_pawn_id");
-            return new ActiveMatchState(
-                    resultSet.getLong("match_id"),
-                    resultSet.getString("started_at"),
-                    new ChessManager.BoardContext(
-                            resultSet.getString("board_timestamp"),
-                            resultSet.getString("world_name"),
-                            resultSet.getInt("origin_x"),
-                            resultSet.getInt("origin_y"),
-                            resultSet.getInt("origin_z")
-                    ),
-                    parsePlayers(resultSet.getString("white_players")),
-                    parsePlayers(resultSet.getString("black_players")),
-                    settings,
-                    ChessSide.fromKey(resultSet.getString("turn")),
-                    resultSet.getInt("move_count"),
-                    resultSet.getInt("undo_count"),
-                    resultSet.getInt("redo_count"),
-                    ChessSquare.fromNotation(resultSet.getString("en_passant_square")),
-                    enPassantPawnText == null || enPassantPawnText.isBlank() ? null : UUID.fromString(enPassantPawnText),
-                    resultSet.getInt("white_king_moved") != 0,
-                    resultSet.getInt("black_king_moved") != 0,
-                    resultSet.getInt("white_kingside_rook_moved") != 0,
-                    resultSet.getInt("white_queenside_rook_moved") != 0,
-                    resultSet.getInt("black_kingside_rook_moved") != 0,
-                    resultSet.getInt("black_queenside_rook_moved") != 0,
-                    parsePieces(resultSet.getString("pieces")),
-                    resultSet.getString("pending_promotion")
-            );
         } catch (SQLException | IllegalArgumentException ex) {
             logger.log(Level.WARNING, "Failed to load active Chess match state.", ex);
-            return null;
         }
+        return states;
     }
 
     public void deleteActiveMatchState(long matchId) {
@@ -422,7 +426,7 @@ public final class ChessDatabaseService {
         }
     }
 
-    public void saveBoard(ChessManager.BoardContext board) {
+    public void saveBoard(ChessMatchRuntime.BoardContext board) {
         if (connection == null || board == null) {
             return;
         }
@@ -468,6 +472,29 @@ public final class ChessDatabaseService {
             logger.log(Level.WARNING, "Failed to list Chess boards.", ex);
         }
         return boards;
+    }
+
+    public BoardRef getMostRecentBoard() {
+        if (connection == null) {
+            return null;
+        }
+        String sql = "SELECT board_timestamp, world_name, origin_x, origin_y, origin_z FROM chess_boards ORDER BY board_timestamp DESC LIMIT 1";
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            if (!resultSet.next()) {
+                return null;
+            }
+            return new BoardRef(
+                    resultSet.getString("board_timestamp"),
+                    resultSet.getString("world_name"),
+                    resultSet.getInt("origin_x"),
+                    resultSet.getInt("origin_y"),
+                    resultSet.getInt("origin_z")
+            );
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load most recent Chess board.", ex);
+            return null;
+        }
     }
 
     public BoardRef getBoard(String timestamp) {
@@ -564,6 +591,132 @@ public final class ChessDatabaseService {
             logger.log(Level.WARNING, "Failed to read recent Chess match log.", ex);
             return null;
         }
+    }
+
+    public RecentMatchLog getMatchLog(String timestamp) {
+        if (connection == null || timestamp == null || timestamp.isBlank()) {
+            return null;
+        }
+        String matchSql = """
+                SELECT match_id,
+                       started_at,
+                       white_players,
+                       black_players,
+                       allow_undo,
+                       do_movement_check,
+                       visualize_movement_check,
+                       do_endgame_checks,
+                       show_annotation,
+                       result,
+                       winner
+                FROM chess_matches
+                WHERE started_at = ?
+                ORDER BY match_id DESC
+                LIMIT 1
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(matchSql)) {
+            statement.setString(1, timestamp);
+            try (ResultSet match = statement.executeQuery()) {
+                if (!match.next()) {
+                    return null;
+                }
+                long matchId = match.getLong("match_id");
+                String header = match.getString("started_at")
+                        + " white= " + match.getString("white_players")
+                        + " black= " + match.getString("black_players");
+                List<String> settings = List.of(
+                        "allow_undo = " + asBooleanText(match.getInt("allow_undo")),
+                        "do_movement_check = " + asBooleanText(match.getInt("do_movement_check")),
+                        "do_endgame_checks = " + asBooleanText(match.getInt("do_endgame_checks")),
+                        "visualize_movement_check = " + asBooleanText(match.getInt("visualize_movement_check")),
+                        "show_annotation = " + asBooleanText(match.getInt("show_annotation"))
+                );
+                List<String> events = getMatchEventLines(matchId);
+                String result = match.getString("result");
+                String winner = match.getString("winner");
+                if (result != null && winner != null && !winner.isBlank()) {
+                    result += " (" + winner + ")";
+                }
+                return new RecentMatchLog(header, settings, events, result);
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to read Chess match log " + timestamp + ".", ex);
+            return null;
+        }
+    }
+
+    public List<String> getMatchLogTimestamps() {
+        List<String> timestamps = new ArrayList<>();
+        if (connection == null) {
+            return timestamps;
+        }
+        String sql = "SELECT started_at FROM chess_matches ORDER BY started_at";
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                timestamps.add(resultSet.getString("started_at"));
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to list Chess match logs.", ex);
+        }
+        return timestamps;
+    }
+
+    public int deleteMatchLogs(String timestamp) {
+        if (connection == null || timestamp == null || timestamp.isBlank()) {
+            return 0;
+        }
+        String selectSql = timestamp.equals("*")
+                ? "SELECT match_id FROM chess_matches"
+                : "SELECT match_id FROM chess_matches WHERE started_at = ?";
+        List<Long> ids = new ArrayList<>();
+        try (PreparedStatement select = connection.prepareStatement(selectSql)) {
+            if (!timestamp.equals("*")) {
+                select.setString(1, timestamp);
+            }
+            try (ResultSet resultSet = select.executeQuery()) {
+                while (resultSet.next()) {
+                    ids.add(resultSet.getLong("match_id"));
+                }
+            }
+            for (long id : ids) {
+                deleteMatch(id);
+            }
+            return ids.size();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to delete Chess match logs.", ex);
+            return 0;
+        }
+    }
+
+    public List<String> searchMatchLogsByPlayers(List<String> playerNames) {
+        List<String> timestamps = new ArrayList<>();
+        if (connection == null || playerNames == null || playerNames.isEmpty()) {
+            return timestamps;
+        }
+        String sql = "SELECT started_at, white_players, black_players FROM chess_matches ORDER BY started_at";
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                String players = (resultSet.getString("white_players") + " , " + resultSet.getString("black_players")).toLowerCase();
+                boolean matched = true;
+                for (String playerName : playerNames) {
+                    if (playerName == null || playerName.isBlank()) {
+                        continue;
+                    }
+                    if (!players.contains(playerName.toLowerCase())) {
+                        matched = false;
+                        break;
+                    }
+                }
+                if (matched) {
+                    timestamps.add(resultSet.getString("started_at"));
+                }
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to search Chess match logs.", ex);
+        }
+        return timestamps;
     }
 
     public void logMove(long matchId, ChessMoveRecord record) {

@@ -42,6 +42,18 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                 }
                 result = handleMatch(sender, args);
             }
+            case "log" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                result = handleLog(sender, args);
+            }
+            case "timer" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                result = handleTimer(args);
+            }
             case "resign" -> {
                 if (!(sender instanceof Player player)) {
                     sender.sendMessage(Component.text("Only players can resign from a chess match.", NamedTextColor.RED));
@@ -138,9 +150,6 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
     }
 
     private ChessManager.Result handleMatch(CommandSender sender, String[] args) {
-        if (args.length == 2 && args[1].equalsIgnoreCase("print_log")) {
-            return chessManager.printRecentLog(sender);
-        }
         if (args.length == 3 && args[1].equalsIgnoreCase("cancel")) {
             return chessManager.cancelMatch(args[2]);
         }
@@ -162,11 +171,17 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
             }
             return chessManager.setTeam(side, players);
         }
-        if (args.length == 2 && args[1].equalsIgnoreCase("start")) {
-            return chessManager.startMatch();
+        if ((args.length == 2 || args.length == 3) && args[1].equalsIgnoreCase("start")) {
+            return chessManager.startMatch(args.length == 3 ? args[2] : null);
         }
         if (args.length == 2 && args[1].equalsIgnoreCase("test")) {
             return chessManager.enableTestMode();
+        }
+        if (args.length == 5 && args[1].equalsIgnoreCase("settings") && args[2].equalsIgnoreCase("figure_style")) {
+            return chessManager.setFigureStyle(args[3].equalsIgnoreCase(";") ? args[4] : args[3]);
+        }
+        if (args.length == 4 && args[1].equalsIgnoreCase("settings") && args[2].equalsIgnoreCase("figure_style")) {
+            return chessManager.setFigureStyle(args[3]);
         }
         if (args.length == 4 && args[1].equalsIgnoreCase("settings")) {
             boolean value;
@@ -179,7 +194,81 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
             }
             return chessManager.setSetting(args[2], value);
         }
-        return ChessManager.Result.fail("Usage: /chess match <white|black> <players...> | /chess match start | /chess match test | /chess match print_log | /chess match cancel <timestamp|*> | /chess match settings <setting> <true|false>");
+        return ChessManager.Result.fail("Usage: /chess match <white|black> <players...> | /chess match start [board_timestamp] | /chess match test | /chess match cancel <timestamp|*> | /chess match settings <setting> <true|false> | /chess match settings figure_style <default|flat>");
+    }
+
+    private ChessManager.Result handleLog(CommandSender sender, String[] args) {
+        if (args.length >= 2 && args[1].equalsIgnoreCase("print")) {
+            if (args.length > 3) {
+                return ChessManager.Result.fail("Usage: /chess log print [timestamp|*]");
+            }
+            return chessManager.printLog(sender, args.length == 3 ? args[2] : "*");
+        }
+        if (args.length == 3 && args[1].equalsIgnoreCase("delete")) {
+            return chessManager.deleteLog(args[2]);
+        }
+        if (args.length >= 3 && args[1].equalsIgnoreCase("search")) {
+            List<String> players = new ArrayList<>();
+            for (int i = 2; i < args.length; i++) {
+                if (!args[i].equals("*")) {
+                    players.add(args[i]);
+                }
+            }
+            return chessManager.searchLogs(sender, players);
+        }
+        return ChessManager.Result.fail("Usage: /chess log print [timestamp|*] | /chess log delete <timestamp|*> | /chess log search <player> [player...]");
+    }
+
+    private ChessManager.Result handleTimer(String[] args) {
+        if (args.length == 1 || (args.length == 2 && args[1].equalsIgnoreCase("off"))) {
+            return chessManager.setTimer(ChessManager.ChessTimerConfig.off());
+        }
+        if (args.length >= 3 && args[1].equalsIgnoreCase("time")) {
+            Long initialMillis = parseDurationMillis(args[2], 60_000L);
+            if (initialMillis == null || initialMillis <= 0L) {
+                return ChessManager.Result.fail("Timer time must be a positive duration.");
+            }
+            long checkBonusMillis = 0L;
+            if (args.length == 5 && args[3].equalsIgnoreCase("check")) {
+                Long parsedBonus = parseDurationMillis(args[4], 1000L);
+                if (parsedBonus == null || parsedBonus < 0L) {
+                    return ChessManager.Result.fail("Timer check bonus must be a valid duration.");
+                }
+                checkBonusMillis = parsedBonus;
+            } else if (args.length != 3) {
+                return ChessManager.Result.fail("Usage: /chess timer off | /chess timer time <duration> [check <duration>]");
+            }
+            return chessManager.setTimer(new ChessManager.ChessTimerConfig(true, initialMillis, checkBonusMillis));
+        }
+        return ChessManager.Result.fail("Usage: /chess timer off | /chess timer time <duration> [check <duration>]");
+    }
+
+    private Long parseDurationMillis(String value, long defaultUnitMillis) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String text = value.trim().toLowerCase(Locale.ROOT);
+        long unit = defaultUnitMillis;
+        char last = text.charAt(text.length() - 1);
+        if (Character.isLetter(last)) {
+            unit = switch (last) {
+                case 's' -> 1000L;
+                case 'm' -> 60_000L;
+                case 'h' -> 3_600_000L;
+                case 'd' -> 86_400_000L;
+                default -> -1L;
+            };
+            text = text.substring(0, text.length() - 1);
+        }
+        if (unit <= 0L || text.isBlank()) {
+            return null;
+        }
+        try {
+            double amount = Double.parseDouble(text);
+            return Math.round(amount * unit);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private boolean requireOp(CommandSender sender) {
@@ -210,7 +299,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(args[0], "board", "match", "resign", "draw", "undo", "redo", "rewind", "forward", "checkmate");
+            return filter(args[0], "board", "match", "log", "timer", "resign", "draw", "undo", "redo", "rewind", "forward", "checkmate");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("board")) {
             return filter(args[1], "build", "blocks", "reset", "remove");
@@ -228,10 +317,16 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("match")) {
-            return filter(args[1], "white", "black", "start", "settings", "test", "print_log", "cancel");
+            return filter(args[1], "white", "black", "start", "settings", "test", "cancel");
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("match") && args[1].equalsIgnoreCase("start")) {
+            return filter(args[2], chessManager.getBoardTimestamps().toArray(String[]::new));
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("match") && args[1].equalsIgnoreCase("cancel")) {
-            return filter(args[2], "*");
+            List<String> options = new ArrayList<>();
+            options.add("*");
+            options.addAll(chessManager.getActiveMatchTimestamps());
+            return filter(args[2], options.toArray(String[]::new));
         }
         if (args.length >= 3 && args.length <= 5 && args[0].equalsIgnoreCase("match")
                 && (args[1].equalsIgnoreCase("white") || args[1].equalsIgnoreCase("black"))) {
@@ -242,10 +337,22 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                     .toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("match") && args[1].equalsIgnoreCase("settings")) {
-            return filter(args[2], "do_movement_check", "visualize_movement_check", "do_endgame_checks", "allow_undo", "show_annotation");
+            return filter(args[2], "do_movement_check", "visualize_movement_check", "do_endgame_checks", "allow_undo", "show_annotation", "figure_style");
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("match") && args[1].equalsIgnoreCase("settings") && args[2].equalsIgnoreCase("figure_style")) {
+            return filter(args[3], "default", "flat");
         }
         if (args.length == 4 && args[0].equalsIgnoreCase("match") && args[1].equalsIgnoreCase("settings")) {
             return filter(args[3], "true", "false");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("log")) {
+            return filter(args[1], "print", "delete", "search");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("timer")) {
+            return filter(args[1], "off", "time");
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("timer") && args[1].equalsIgnoreCase("time")) {
+            return filter(args[3], "check");
         }
         return List.of();
     }
@@ -259,7 +366,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
 
     private Component usage() {
         return Component.text(
-                "Usage: /chess board build <x> <y> <z> | /chess board remove <timestamp|*> | /chess match <white|black|start|settings|test|print_log|cancel> | /chess resign | /chess draw | /chess undo | /chess redo | /chess rewind | /chess forward | /chess checkmate",
+                "Usage: /chess board build <x> <y> <z> | /chess board remove <timestamp|*> | /chess match <white|black|start|settings|test|cancel> | /chess log <print|delete|search> | /chess timer <off|time> | /chess resign | /chess draw | /chess undo | /chess redo | /chess rewind | /chess forward | /chess checkmate",
                 NamedTextColor.YELLOW
         );
     }
