@@ -340,7 +340,7 @@ public final class HallsOfCarnageManager {
         if (world == null) {
             return;
         }
-        world.setGameRule(GameRules.NATURAL_HEALTH_REGENERATION, true);
+        world.setGameRule(GameRules.NATURAL_HEALTH_REGENERATION, false);
         for (Player player : world.getPlayers()) {
             prepareLobbyPlayer(player);
         }

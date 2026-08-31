@@ -1,5 +1,6 @@
 package krispasi.omGames.hallsofcarnage;
 
+import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -9,6 +10,7 @@ import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -76,6 +78,16 @@ public final class HallsOfCarnageListener implements Listener {
         }
         event.setCancelled(true);
         manager.openMainMenu(event.getPlayer());
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        if (!manager.isHallsWorld(event.getPlayer().getWorld())
+                || event.getClickedBlock() == null
+                || event.getClickedBlock().getType() != Material.SMITHING_TABLE) {
+            return;
+        }
+        event.setCancelled(true);
     }
 
     @EventHandler(ignoreCancelled = true)

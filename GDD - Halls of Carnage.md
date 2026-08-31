@@ -83,7 +83,7 @@ Natural bendy corridors generate between the rooms. They are 1-3 blocks wide per
 A maze is generated and the rooms are set into it, allowing entrance on the connection points.
 
 ### Elevator
-Elevator is 5x4x5 area with walls around it. Walls:
+Elevator is a 5x4x5 inside area with walls around it, making the total shell footprint 7x4x7. Walls:
 1233321
 2     3
 4     5
@@ -238,7 +238,7 @@ All items except scrap should be editable as files under resources. Also make it
 ### Scrap
 Game has 4 types of scrap: wood, iron, diamond and redstone. Adding scrap into the storage in elevator rewards 1 coin.
 ### Breakable objects
-Stuff like barels, chests, tables, chairs and so on can generate. They can be damaged and can drop items when broken.
+Stuff like barels, chests, tables, chairs and so on can generate. Breakables should be entity-driven props, not normal placed loot blocks. Use display entities for visuals plus interaction or hitbox entities for damage, collision, and player pushback so players cannot walk through them. When broken, they can drop the same physics-driven unpicked item entities used by normal floor loot.
 ### Food
 Food is meant for regenerating lost health, as natural regeneration is turned off (you must disable this yourself).
 Some food can apply status effects.

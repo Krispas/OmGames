@@ -22,9 +22,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class HallsSession {
-    private static final int CLEAR_RADIUS = 22;
+    private static final int CLEAR_RADIUS = 24;
     private static final int CLEAR_HEIGHT = 9;
     private static final int ROOM_HEIGHT = 5;
+    private static final int ELEVATOR_INNER_RADIUS = 2;
+    private static final int ELEVATOR_OUTER_RADIUS = 3;
 
     private final JavaPlugin plugin;
     private final int id;
@@ -114,8 +116,9 @@ public final class HallsSession {
         clearBuildVolume();
         buildElevator();
         HallsLayout layout = HallsLayoutLoader.load(new File(dataFolder, "level/special/start_floor.txt"));
-        buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), origin.z() + 7);
-        buildConnector(origin.x(), origin.y(), origin.z() + 3, origin.z() + 7);
+        int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
+        buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ);
+        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1);
     }
 
     private void clearBuildVolume() {
@@ -139,25 +142,27 @@ public final class HallsSession {
         Material floor = Material.PACKED_MUD;
         Material ceiling = Material.SMITHING_TABLE;
 
-        for (int x = -2; x <= 2; x++) {
-            for (int z = -2; z <= 2; z++) {
+        for (int x = -ELEVATOR_OUTER_RADIUS; x <= ELEVATOR_OUTER_RADIUS; x++) {
+            for (int z = -ELEVATOR_OUTER_RADIUS; z <= ELEVATOR_OUTER_RADIUS; z++) {
                 setBlock(origin.x() + x, origin.y() - 1, origin.z() + z, floor);
                 setBlock(origin.x() + x, origin.y() + 4, origin.z() + z, ceiling);
             }
         }
         for (int y = 0; y <= 3; y++) {
-            for (int x = -2; x <= 2; x++) {
-                setBlock(origin.x() + x, origin.y() + y, origin.z() - 2, Math.abs(x) == 2 ? corner : back);
-                setBlock(origin.x() + x, origin.y() + y, origin.z() + 2, door);
+            for (int x = -ELEVATOR_OUTER_RADIUS; x <= ELEVATOR_OUTER_RADIUS; x++) {
+                Material backMaterial = Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : x == -2 ? side : back;
+                Material frontMaterial = Math.abs(x) <= 1 ? door : Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : side;
+                setBlock(origin.x() + x, origin.y() + y, origin.z() - ELEVATOR_OUTER_RADIUS, backMaterial);
+                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, frontMaterial);
             }
-            for (int z = -1; z <= 1; z++) {
-                setBlock(origin.x() - 2, origin.y() + y, origin.z() + z, z == 0 ? machine : side);
-                setBlock(origin.x() + 2, origin.y() + y, origin.z() + z, back);
+            for (int z = -ELEVATOR_INNER_RADIUS; z <= ELEVATOR_INNER_RADIUS; z++) {
+                setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + y, origin.z() + z, z == 0 ? machine : side);
+                setBlock(origin.x() + ELEVATOR_OUTER_RADIUS, origin.y() + y, origin.z() + z, back);
             }
         }
-        setBlock(origin.x() - 2, origin.y(), origin.z(), Material.CHEST);
-        setBlock(origin.x() - 2, origin.y() + 1, origin.z(), Material.STONE_BUTTON, BlockFace.EAST);
-        setBlock(origin.x() - 2, origin.y() + 2, origin.z(), Material.HOPPER);
+        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y(), origin.z(), Material.CHEST);
+        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 1, origin.z(), Material.STONE_BUTTON, BlockFace.EAST);
+        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 2, origin.z(), Material.HOPPER);
     }
 
     private void buildLayoutRoom(HallsLayout layout, int startX, int y, int startZ) {
