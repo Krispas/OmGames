@@ -31,6 +31,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/scenarios/UntoldDepths.txt",
             "hallsOfCarnage/level/special/start_floor.txt",
             "hallsOfCarnage/level/special/final_floor_1.txt",
+            "hallsOfCarnage/level/howling_corridors/exploration_1.txt",
             "hallsOfCarnage/level_type/howling_corridors.txt",
             "hallsOfCarnage/modifiers/shared.yml",
             "hallsOfCarnage/modifiers/frozen_halls.yml",

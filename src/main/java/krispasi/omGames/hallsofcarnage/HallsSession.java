@@ -142,15 +142,7 @@ public final class HallsSession {
             openElevatorDoors();
             world.playSound(block.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
             player.sendMessage(Component.text("The elevator doors grind open.", NamedTextColor.DARK_RED));
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (!running) {
-                    return;
-                }
-                buildExplorationFloor();
-                transitioning = false;
-                world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
-                        Sound.BLOCK_IRON_DOOR_CLOSE, 0.9f, 0.8f);
-            }, 25L);
+            startElevatorTransition();
         } else {
             player.sendMessage(Component.text("Further floors are not implemented yet.", NamedTextColor.YELLOW));
         }
@@ -264,8 +256,35 @@ public final class HallsSession {
         buildElevator();
         HallsLayout layout = HallsLayoutLoader.load(new File(dataFolder, "level/special/start_floor.txt"));
         int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
-        buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ);
+        buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ, true);
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1);
+    }
+
+    private void startElevatorTransition() {
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!running) {
+                return;
+            }
+            closeElevatorDoors();
+            world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                    Sound.BLOCK_IRON_DOOR_CLOSE, 0.9f, 0.8f);
+            for (UUID playerId : participants) {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null && player.getWorld().equals(world)) {
+                    player.sendTitle("Descending", "The halls rearrange below.", 10, 60, 10);
+                }
+            }
+        }, 20L);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!running) {
+                return;
+            }
+            buildExplorationFloor();
+            openElevatorDoors();
+            transitioning = false;
+            world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                    Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.8f);
+        }, 200L);
     }
 
     private void buildExplorationFloor() {
@@ -275,16 +294,11 @@ public final class HallsSession {
         buildElevator();
         restoreElevatorChestContents();
         currentFloor = 2;
-        int startX = origin.x() - 6;
+        HallsLayout layout = loadExplorationLayout();
+        int startX = origin.x() - layout.width() / 2;
         int startZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
-        buildRectRoom(startX, origin.y(), startZ, 13, 11);
+        buildLayoutRoom(layout, startX, origin.y(), startZ, false);
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, startZ - 1);
-        spawnBreakableProp(startX + 2, origin.y(), startZ + 2, Material.BARREL, 3, PropReward.BLUEPRINT);
-        spawnBreakableProp(startX + 5, origin.y(), startZ + 3, Material.OAK_LOG, 2, PropReward.WOOD_SCRAP);
-        spawnBreakableProp(startX + 9, origin.y(), startZ + 3, Material.COPPER_ORE, 3, PropReward.IRON_SCRAP);
-        spawnBreakableProp(startX + 3, origin.y(), startZ + 7, Material.REDSTONE_ORE, 3, PropReward.REDSTONE_SCRAP);
-        spawnBreakableProp(startX + 7, origin.y(), startZ + 8, Material.BARREL, 2, PropReward.WOOD_SCRAP);
-        spawnBreakableProp(startX + 10, origin.y(), startZ + 7, Material.IRON_ORE, 3, PropReward.IRON_SCRAP);
         Location spawn = new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5, 180.0f, 0.0f);
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
@@ -292,6 +306,23 @@ public final class HallsSession {
                 player.teleport(spawn);
                 player.sendTitle("Floor 2", "Gather what you can.", 10, 45, 15);
             }
+        }
+    }
+
+    private HallsLayout loadExplorationLayout() {
+        File file = new File(dataFolder, "level/howling_corridors/exploration_1.txt");
+        try {
+            return HallsLayoutLoader.load(file);
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Failed to load Halls exploration template " + file + ": " + ex.getMessage());
+            return new HallsLayout(List.of(
+                    "XXXXXXXXXXXXX",
+                    "XBWOXOOOIOOOX",
+                    "XOOOOOOOOOOOX",
+                    "XOROOXOOOWOOX",
+                    "XOOOOOOOOBIOX",
+                    "XXXXXXXXXXXXX"
+            ), 13, 6);
         }
     }
 
@@ -344,7 +375,7 @@ public final class HallsSession {
         setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 2, origin.z(), machine);
     }
 
-    private void buildLayoutRoom(HallsLayout layout, int startX, int y, int startZ) {
+    private void buildLayoutRoom(HallsLayout layout, int startX, int y, int startZ, boolean startRoom) {
         Material floor = Material.PACKED_MUD;
         Material ceiling = Material.TUFF_BRICKS;
         Material wall = Material.DEEPSLATE_BRICKS;
@@ -364,10 +395,13 @@ public final class HallsSession {
                     for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
                         setBlock(blockX, y + dy, blockZ, Material.AIR);
                     }
+                    applyLayoutMarker(cell, blockX, y, blockZ);
                 }
             }
         }
-        spawnBreakableProp(startX + 1, y, startZ + 1, Material.BARREL, 3, PropReward.BLUEPRINT);
+        if (startRoom) {
+            spawnBreakableProp(startX + 1, y, startZ + 1, Material.BARREL, 3, PropReward.BLUEPRINT);
+        }
     }
 
     private void buildRectRoom(int startX, int y, int startZ, int width, int depth) {
@@ -408,6 +442,28 @@ public final class HallsSession {
         for (int y = 0; y <= 3; y++) {
             for (int x = -1; x <= 1; x++) {
                 setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, Material.AIR);
+            }
+        }
+    }
+
+    private void closeElevatorDoors() {
+        Material door = firstMaterial("WAXED_WEATHERED_COPPER_BARS", "WAXED_WEATHERED_COPPER_GRATE", "COPPER_BARS", "IRON_BARS");
+        for (int y = 0; y <= 3; y++) {
+            for (int x = -1; x <= 1; x++) {
+                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, door, BlockFace.EAST);
+            }
+        }
+    }
+
+    private void applyLayoutMarker(char marker, int x, int y, int z) {
+        switch (marker) {
+            case 'B' -> spawnBreakableProp(x, y, z, Material.BARREL, 3, PropReward.BLUEPRINT);
+            case 'W' -> spawnBreakableProp(x, y, z, Material.OAK_LOG, 2, PropReward.WOOD_SCRAP);
+            case 'I' -> spawnBreakableProp(x, y, z, Material.IRON_ORE, 3, PropReward.IRON_SCRAP);
+            case 'D' -> spawnBreakableProp(x, y, z, Material.DEEPSLATE_DIAMOND_ORE, 4, PropReward.DIAMOND_SCRAP);
+            case 'R' -> spawnBreakableProp(x, y, z, Material.REDSTONE_ORE, 3, PropReward.REDSTONE_SCRAP);
+            case 'L' -> setBlock(x, y + ROOM_HEIGHT - 1, z, Material.SEA_LANTERN);
+            default -> {
             }
         }
     }

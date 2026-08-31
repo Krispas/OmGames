@@ -31,6 +31,9 @@ Last updated: 2026-08-31
 - The elevator doors now open briefly before the floor 2 rebuild, and generated chest/hopper/button/bar blocks apply explicit block data for facing/connectivity.
 - Elevator chest contents are captured before floor rebuilds and restored into the rebuilt elevator chest, preventing chest contents from dropping during floor transitions.
 - Scrap breakables now drop scrap items only. Stored scrap counters and coins increase when players deposit those scrap items into the elevator hopper.
+- Floor 2 now loads from bundled/data-folder template `level/howling_corridors/exploration_1.txt` instead of only a hardcoded rectangle.
+- Exploration templates currently support marker characters: `X` wall, `O` open, `B` blueprint barrel, `W/I/D/R` scrap breakable props, and `L` sea-lantern lighting.
+- Elevator transitions now run through a 10-second elevator-only phase: doors open on button press, close while descending, the destination floor rebuilds, then doors reopen on arrival.
 
 ## Current Scope
 
@@ -56,8 +59,8 @@ This is the first implementation slice. It focuses on:
 - Sculk, traps, modifiers, monster flood systems.
 - Config-driven breakable prop definitions, real loot tables, and physics-driven unpicked item entities.
 - Dedicated elevator transfer chest inventory and item persistence rules.
-- Template-driven exploration room selection from `resources/hallsOfCarnage/level/<level_type>/`.
-- Level-type lighting/material palettes.
+- Randomized template-driven exploration room selection from `resources/hallsOfCarnage/level/<level_type>/`.
+- Level-type material palettes beyond the current placeholder Howling Corridors materials.
 
 ## Resume Notes
 
@@ -76,8 +79,8 @@ This is the first implementation slice. It focuses on:
 - Added first-pass active-session inventory enforcement for the GDD hotbar-only inventory rule. Storage-row access is blocked, and empty storage slots are filled with marked barriers during the session.
 - Added the first real floor progression hook: pressing the elevator button on floor 1 rebuilds the temporary play area as floor 2 with breakable scrap props and HUD counter updates.
 - Addressed the latest in-game review pass by clearing session inventories on exit, allowing valid chest shift-click transfers, preserving elevator chest contents through floor rebuilds, opening the elevator doors before transition, applying block data to generated elevator fixtures, and moving coin gain to elevator scrap deposit.
+- Added the first resource-template-backed exploration room with marker-driven props/lights, and changed the elevator button flow into a 10-second transition phase that reopens doors after the destination floor loads.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- I am guessing its a testing enviroment, but dont forget the real rooms should be taking templates from resources.
-- The game is quite dark, there should be some lights around the place, it should be probably implmented later, once the level types are being worked on.
-- The elevator doors are closed on level one, when going to level 2 they open, but as soon as the level loads, they close again. You should do this together with the elevator transition scene described in the design doc.
+- Okay, I would rather that the lights, prop places and so on were not defined in the room definitions for bigger map procgen possibilities and place them during the generation as described in the design doc.
+- If you havent added it, put block concrete on the other side of the elevator door when the doors are closed.
