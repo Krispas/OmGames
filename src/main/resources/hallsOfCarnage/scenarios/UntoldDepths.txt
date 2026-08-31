@@ -43,7 +43,7 @@ floors:
     kind: exploration
     level-type: howling_corridors
     difficulty: 10
-    rooms: 8
+    rooms: 16
     items: 8
     breakables: 24
   - number: 5
@@ -58,7 +58,7 @@ floors:
     kind: exploration
     level-type: howling_corridors
     difficulty: 18
-    rooms: 10
+    rooms: 20
     items: 10
     breakables: 32
   - number: 10
@@ -73,7 +73,7 @@ floors:
     kind: exploration
     level-type: deep_crypt
     difficulty: "20 + floor"
-    rooms: 12
+    rooms: 24
     items: 12
     breakables: 40
     camp-every: 5

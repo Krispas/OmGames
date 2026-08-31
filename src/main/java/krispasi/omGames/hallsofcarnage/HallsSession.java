@@ -153,7 +153,7 @@ public final class HallsSession {
             transitioning = true;
             openElevatorDoors();
             world.playSound(block.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
-            player.sendMessage(Component.text("The elevator doors grind open.", NamedTextColor.DARK_RED));
+            player.sendMessage(Component.text("The elevator begins its descent.", NamedTextColor.DARK_RED));
             startElevatorTransition(currentFloor + 1);
         } else {
             player.sendMessage(Component.text("No deeper placeholder floor is available.", NamedTextColor.YELLOW));
@@ -313,7 +313,7 @@ public final class HallsSession {
                     player.sendTitle("Descending", "The halls rearrange below.", 10, 60, 10);
                 }
             }
-        }, 20L);
+        }, 8L);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!running) {
                 return;
@@ -352,34 +352,91 @@ public final class HallsSession {
     private void buildExplorationRooms(int floor) {
         List<HallsLayout> layouts = loadExplorationLayouts();
         Random random = new Random((((long) id) << 32) ^ floor);
-        RoomPlacement main = placeRoomAtStart(layouts.get(0), origin.x(), origin.z() + ELEVATOR_OUTER_RADIUS + 6,
-                Set.of(BlockFace.NORTH, BlockFace.EAST, BlockFace.WEST, BlockFace.SOUTH));
-        RoomPlacement east = placeRoomAtCenter(layouts.get(1 % layouts.size()), origin.x() + 15, main.centerZ(),
-                Set.of(BlockFace.WEST));
-        RoomPlacement west = placeRoomAtCenter(layouts.get(2 % layouts.size()), origin.x() - 15, main.centerZ(),
-                Set.of(BlockFace.EAST));
-        RoomPlacement deeper = placeRoomAtStart(layouts.get(Math.min(2, layouts.size() - 1)), origin.x(), main.southExitZ() + 7,
-                Set.of(BlockFace.NORTH));
+        ExplorationPlan plan = generateNormalExplorationRooms(layouts, floor, random);
+        if (plan.rooms().isEmpty()) {
+            return;
+        }
 
-        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, main.startZ() - 1);
-        buildHorizontalConnector(origin.y(), main.eastExitX(), east.westExitX(), main.centerZ());
-        buildHorizontalConnector(origin.y(), west.eastExitX(), main.westExitX(), main.centerZ());
-        buildVerticalConnector(origin.x(), origin.y(), main.southExitZ(), deeper.northExitZ());
-
-        placeRoomContents(main, random, floor, 0);
-        placeRoomContents(east, random, floor, 1);
-        placeRoomContents(west, random, floor, 2);
-        placeRoomContents(deeper, random, floor, 3);
+        RoomNode first = plan.rooms().getFirst();
+        first.openings().add(BlockFace.NORTH);
+        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, first.placement().northExitZ());
+        for (RoomNode room : plan.rooms()) {
+            buildLayoutRoom(room.placement().layout(), room.placement().startX(), origin.y(), room.placement().startZ(), room.openings());
+        }
+        for (RoomConnection connection : plan.connections()) {
+            buildNormalConnector(connection.from(), connection.fromFace(), connection.to());
+        }
+        for (int i = 0; i < plan.rooms().size(); i++) {
+            placeRoomContents(plan.rooms().get(i).placement(), random, floor, i);
+        }
     }
 
-    private RoomPlacement placeRoomAtStart(HallsLayout layout, int centerX, int startZ, Set<BlockFace> openings) {
-        int startX = centerX - layout.width() / 2;
-        buildLayoutRoom(layout, startX, origin.y(), startZ, openings);
-        return new RoomPlacement(layout, startX, startZ);
+    private ExplorationPlan generateNormalExplorationRooms(List<HallsLayout> layouts, int floor, Random random) {
+        int targetRooms = Math.min(12, 6 + Math.min(4, floor));
+        List<RoomNode> rooms = new ArrayList<>();
+        List<RoomConnection> connections = new ArrayList<>();
+        HallsLayout firstLayout = layouts.get(random.nextInt(layouts.size()));
+        RoomPlacement first = new RoomPlacement(firstLayout, origin.x() - firstLayout.width() / 2,
+                origin.z() + ELEVATOR_OUTER_RADIUS + 6);
+        rooms.add(new RoomNode(first));
+
+        int attempts = 0;
+        while (rooms.size() < targetRooms && attempts++ < targetRooms * 80) {
+            RoomNode anchor = rooms.get(random.nextInt(rooms.size()));
+            BlockFace direction = randomDirection(random);
+            if (anchor.openings().contains(direction)) {
+                continue;
+            }
+            HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
+            RoomPlacement candidate = candidateRoom(anchor.placement(), layout, direction, random);
+            if (!isInsideBuildVolume(candidate) || intersectsAny(candidate, rooms)) {
+                continue;
+            }
+            RoomNode node = new RoomNode(candidate);
+            anchor.openings().add(direction);
+            node.openings().add(direction.getOppositeFace());
+            connections.add(new RoomConnection(anchor.placement(), candidate, direction));
+            rooms.add(node);
+        }
+        return new ExplorationPlan(rooms, connections);
     }
 
-    private RoomPlacement placeRoomAtCenter(HallsLayout layout, int centerX, int centerZ, Set<BlockFace> openings) {
-        return placeRoomAtStart(layout, centerX, centerZ - layout.depth() / 2, openings);
+    private RoomPlacement candidateRoom(RoomPlacement anchor, HallsLayout layout, BlockFace direction, Random random) {
+        int gap = 5 + random.nextInt(8);
+        int jitter = random.nextInt(9) - 4;
+        return switch (direction) {
+            case NORTH -> new RoomPlacement(layout, anchor.centerX() + jitter - layout.width() / 2,
+                    anchor.startZ() - gap - layout.depth());
+            case SOUTH -> new RoomPlacement(layout, anchor.centerX() + jitter - layout.width() / 2,
+                    anchor.startZ() + anchor.layout().depth() + gap);
+            case EAST -> new RoomPlacement(layout, anchor.startX() + anchor.layout().width() + gap,
+                    anchor.centerZ() + jitter - layout.depth() / 2);
+            case WEST -> new RoomPlacement(layout, anchor.startX() - gap - layout.width(),
+                    anchor.centerZ() + jitter - layout.depth() / 2);
+            default -> new RoomPlacement(layout, anchor.startX(), anchor.startZ());
+        };
+    }
+
+    private boolean isInsideBuildVolume(RoomPlacement room) {
+        return room.startX() - 2 >= origin.x() - CLEAR_RADIUS
+                && room.startX() + room.layout().width() + 2 <= origin.x() + CLEAR_RADIUS
+                && room.startZ() - 2 >= origin.z() - CLEAR_RADIUS
+                && room.startZ() + room.layout().depth() + 2 <= origin.z() + CLEAR_RADIUS;
+    }
+
+    private boolean intersectsAny(RoomPlacement candidate, List<RoomNode> rooms) {
+        RoomBounds candidateBounds = RoomBounds.of(candidate).inflate(4);
+        for (RoomNode room : rooms) {
+            if (candidateBounds.intersects(RoomBounds.of(room.placement()).inflate(4))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private BlockFace randomDirection(Random random) {
+        BlockFace[] directions = {BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST};
+        return directions[random.nextInt(directions.length)];
     }
 
     private List<HallsLayout> loadExplorationLayouts() {
@@ -478,7 +535,7 @@ public final class HallsSession {
                     }
                 } else {
                     for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
-                        setBlock(blockX, y + dy, blockZ, Material.AIR);
+                        setBlock(blockX, y + dy, blockZ, opening && dy >= 3 ? wall : Material.AIR);
                     }
                 }
             }
@@ -522,6 +579,36 @@ public final class HallsSession {
         }
     }
 
+    private void buildNormalConnector(RoomPlacement from, BlockFace fromFace, RoomPlacement to) {
+        ConnectorPoint start = connectorPoint(from, fromFace);
+        ConnectorPoint end = connectorPoint(to, fromFace.getOppositeFace());
+        if (start.x() == end.x()) {
+            buildVerticalConnector(start.x(), origin.y(), start.z(), end.z());
+            return;
+        }
+        if (start.z() == end.z()) {
+            buildHorizontalConnector(origin.y(), start.x(), end.x(), start.z());
+            return;
+        }
+        if (fromFace == BlockFace.NORTH || fromFace == BlockFace.SOUTH) {
+            buildVerticalConnector(start.x(), origin.y(), start.z(), end.z());
+            buildHorizontalConnector(origin.y(), start.x(), end.x(), end.z());
+        } else {
+            buildHorizontalConnector(origin.y(), start.x(), end.x(), start.z());
+            buildVerticalConnector(end.x(), origin.y(), start.z(), end.z());
+        }
+    }
+
+    private ConnectorPoint connectorPoint(RoomPlacement room, BlockFace face) {
+        return switch (face) {
+            case NORTH -> new ConnectorPoint(room.centerX(), room.northExitZ());
+            case SOUTH -> new ConnectorPoint(room.centerX(), room.southExitZ());
+            case EAST -> new ConnectorPoint(room.eastExitX(), room.centerZ());
+            case WEST -> new ConnectorPoint(room.westExitX(), room.centerZ());
+            default -> new ConnectorPoint(room.centerX(), room.centerZ());
+        };
+    }
+
     private void buildCorridorCell(int x, int y, int z, int halfWidth, boolean northSouth) {
         Material floor = Material.PACKED_MUD;
         Material wall = Material.DEEPSLATE_BRICKS;
@@ -543,7 +630,8 @@ public final class HallsSession {
         for (int y = 0; y <= 3; y++) {
             for (int x = -1; x <= 1; x++) {
                 setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, Material.AIR);
-                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS + 1, Material.AIR);
+                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS + 1,
+                        y >= 3 ? Material.DEEPSLATE_BRICKS : Material.AIR);
             }
         }
     }
@@ -947,6 +1035,47 @@ public final class HallsSession {
             }
         }
         return Material.IRON_BARS;
+    }
+
+    private record ExplorationPlan(List<RoomNode> rooms, List<RoomConnection> connections) {
+    }
+
+    private static final class RoomNode {
+        private final RoomPlacement placement;
+        private final Set<BlockFace> openings = new HashSet<>();
+
+        private RoomNode(RoomPlacement placement) {
+            this.placement = placement;
+        }
+
+        private RoomPlacement placement() {
+            return placement;
+        }
+
+        private Set<BlockFace> openings() {
+            return openings;
+        }
+    }
+
+    private record RoomConnection(RoomPlacement from, RoomPlacement to, BlockFace fromFace) {
+    }
+
+    private record ConnectorPoint(int x, int z) {
+    }
+
+    private record RoomBounds(int minX, int maxX, int minZ, int maxZ) {
+        private static RoomBounds of(RoomPlacement room) {
+            return new RoomBounds(room.startX() - 1, room.startX() + room.layout().width(),
+                    room.startZ() - 1, room.startZ() + room.layout().depth());
+        }
+
+        private RoomBounds inflate(int amount) {
+            return new RoomBounds(minX - amount, maxX + amount, minZ - amount, maxZ + amount);
+        }
+
+        private boolean intersects(RoomBounds other) {
+            return minX <= other.maxX && maxX >= other.minX && minZ <= other.maxZ && maxZ >= other.minZ;
+        }
     }
 
     private record BlockSnapshot(int x, int y, int z, BlockData blockData) {
