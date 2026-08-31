@@ -41,6 +41,7 @@ Last updated: 2026-08-31
 - `/hoc sessions` now includes the current floor for each active session.
 - Elevator button flow now closes the doors shortly after activation and starts the transition from the press action instead of feeling delayed until the button releases.
 - The elevator exterior vestibule and room corridor openings now keep overhead blocks/ceilings, avoiding visible sky gaps at exits and room attachments.
+- Exploration generation now reserves the elevator shell and generated room shells during corridor planning, validates a connector path before opening a room wall, uses wider randomized room offsets/gaps, and adds extra room-to-room loop corridors when a valid route exists.
 
 ## Current Scope
 
@@ -92,10 +93,12 @@ This is the first implementation slice. It focuses on:
 - Fixed the closed-door concrete backing by treating the block outside the door as a one-block exterior vestibule; when doors open, the vestibule opens without deleting the corridor side walls.
 - Replaced the deterministic four-room exploration layout with seeded randomized Howling Corridors generation using normal straight/90-degree corridor paths, while preserving repeatability for `/hoc floor` rebuilds.
 - Fixed the latest in-game review notes for elevator transition timing and visible sky gaps at the elevator exit and room corridor openings.
+- Addressed the current exploration-generation review pass: rooms are kept away from the elevator, corridor paths reserve elevator/room shells instead of carving through them, generation uses wider randomized offsets/gaps, and validated extra room-to-room corridors create loops in the connected network.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- Various problems
-- Rooms and corridors can destroy the elevator
-- Corridors should not be taking turns through room walls as it will fill part of the room and not end in the room but with a dead way.
-- The room placements are way too gridlike and should be really randomized, adding more to the maziness
-- There should be additional corridors connecting the rooms which are already connected to the network
+- Certain corridor bends are missing parts of the walls, could this be fixed by filling the whole area with wall material before the generation begins?
+- The corridors generate way too well, the bends are often one block before it ends on the other axis. The connections to rooms are also way too optimized. Make it more crazy, for example entrance to the room on the side where it makes no sense, making the coridors longer and more mazelike.
+- Are you taking the floor size from scenario file? It seems not.
+- Make the room offset even more crazy, I want it to not even resemble grid a little bit.
+- Make it so corridors can pass through rooms, however if they intersect, the corridor wont be generated, instead almost like if it were to create a new door.
+- My original idea was to have 2D array where the rooms and corridors were to be placed, but if your approach is better, keep it.

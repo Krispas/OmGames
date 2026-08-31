@@ -1159,6 +1159,7 @@ SQLite tables:
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
 - Current exploration floors use deterministic-per-session randomized Howling Corridors generation: Java places room shells, corridor openings, lights, props, and normal straight/90-degree corridors around interior-only `level/howling_corridors/exploration_*.txt` room masks.
+- Exploration corridor routing reserves the elevator shell and room shells, validates each planned path before adding room openings, and adds some extra room-to-room corridors after the main connected room network is built.
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
 - `HallsLayoutLoader` tolerates old copied room files by stripping a full `X` perimeter and treating non-`X` marker characters as open cells; this is runtime parsing tolerance, not file migration.
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.

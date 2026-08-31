@@ -2,8 +2,11 @@ package krispasi.omGames.hallsofcarnage;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -359,12 +362,27 @@ public final class HallsSession {
 
         RoomNode first = plan.rooms().getFirst();
         first.openings().add(BlockFace.NORTH);
-        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, first.placement().northExitZ());
+        List<List<ConnectorPoint>> connectorPaths = new ArrayList<>();
+        Set<ConnectorPoint> connectorPathCells = new HashSet<>();
+        for (RoomConnection connection : plan.connections()) {
+            List<ConnectorPoint> path = findConnectorPath(
+                    connectorPoint(connection.from().placement(), connection.fromFace()),
+                    connectorPoint(connection.to().placement(), connection.fromFace().getOppositeFace()),
+                    plan.rooms()
+            );
+            if (path.isEmpty()) {
+                plugin.getLogger().warning("Skipped blocked Halls connector in session " + id + ".");
+                continue;
+            }
+            connectorPaths.add(path);
+            connectorPathCells.addAll(path);
+        }
         for (RoomNode room : plan.rooms()) {
             buildLayoutRoom(room.placement().layout(), room.placement().startX(), origin.y(), room.placement().startZ(), room.openings());
         }
-        for (RoomConnection connection : plan.connections()) {
-            buildNormalConnector(connection.from(), connection.fromFace(), connection.to());
+        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, first.placement().northExitZ());
+        for (List<ConnectorPoint> path : connectorPaths) {
+            buildConnectorPath(path, connectorPathCells);
         }
         for (int i = 0; i < plan.rooms().size(); i++) {
             placeRoomContents(plan.rooms().get(i).placement(), random, floor, i);
@@ -389,21 +407,30 @@ public final class HallsSession {
             }
             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
             RoomPlacement candidate = candidateRoom(anchor.placement(), layout, direction, random);
-            if (!isInsideBuildVolume(candidate) || intersectsAny(candidate, rooms)) {
+            if (!isInsideBuildVolume(candidate) || intersectsProtectedElevator(candidate) || intersectsAny(candidate, rooms)) {
                 continue;
             }
             RoomNode node = new RoomNode(candidate);
+            RoomConnection connection = new RoomConnection(anchor, node, direction);
+            List<RoomNode> candidateRooms = new ArrayList<>(rooms);
+            candidateRooms.add(node);
+            if (findConnectorPath(connectorPoint(anchor.placement(), direction),
+                    connectorPoint(candidate, direction.getOppositeFace()), candidateRooms).isEmpty()) {
+                continue;
+            }
             anchor.openings().add(direction);
             node.openings().add(direction.getOppositeFace());
-            connections.add(new RoomConnection(anchor.placement(), candidate, direction));
+            connections.add(connection);
             rooms.add(node);
         }
+        addExtraConnections(rooms, connections, random);
         return new ExplorationPlan(rooms, connections);
     }
 
     private RoomPlacement candidateRoom(RoomPlacement anchor, HallsLayout layout, BlockFace direction, Random random) {
-        int gap = 5 + random.nextInt(8);
-        int jitter = random.nextInt(9) - 4;
+        int gap = 6 + random.nextInt(12);
+        int lateralRange = 7 + random.nextInt(8);
+        int jitter = random.nextInt(lateralRange * 2 + 1) - lateralRange;
         return switch (direction) {
             case NORTH -> new RoomPlacement(layout, anchor.centerX() + jitter - layout.width() / 2,
                     anchor.startZ() - gap - layout.depth());
@@ -417,11 +444,64 @@ public final class HallsSession {
         };
     }
 
+    private void addExtraConnections(List<RoomNode> rooms, List<RoomConnection> connections, Random random) {
+        int targetConnections = Math.max(1, rooms.size() / 4);
+        int added = 0;
+        int attempts = 0;
+        while (added < targetConnections && attempts++ < rooms.size() * rooms.size() * 2) {
+            RoomNode from = rooms.get(random.nextInt(rooms.size()));
+            RoomNode to = rooms.get(random.nextInt(rooms.size()));
+            if (from == to) {
+                continue;
+            }
+            BlockFace face = connectingFace(from.placement(), to.placement());
+            if (face == null || from.openings().contains(face) || to.openings().contains(face.getOppositeFace())
+                    || hasConnection(connections, from, to)) {
+                continue;
+            }
+            List<ConnectorPoint> path = findConnectorPath(connectorPoint(from.placement(), face),
+                    connectorPoint(to.placement(), face.getOppositeFace()), rooms);
+            if (path.isEmpty()) {
+                continue;
+            }
+            from.openings().add(face);
+            to.openings().add(face.getOppositeFace());
+            connections.add(new RoomConnection(from, to, face));
+            added++;
+        }
+    }
+
+    private BlockFace connectingFace(RoomPlacement from, RoomPlacement to) {
+        int dx = to.centerX() - from.centerX();
+        int dz = to.centerZ() - from.centerZ();
+        if (Math.abs(dx) > Math.abs(dz)) {
+            return dx > 0 ? BlockFace.EAST : BlockFace.WEST;
+        }
+        if (dz != 0) {
+            return dz > 0 ? BlockFace.SOUTH : BlockFace.NORTH;
+        }
+        return null;
+    }
+
+    private boolean hasConnection(List<RoomConnection> connections, RoomNode first, RoomNode second) {
+        for (RoomConnection connection : connections) {
+            if ((connection.from() == first && connection.to() == second)
+                    || (connection.from() == second && connection.to() == first)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isInsideBuildVolume(RoomPlacement room) {
         return room.startX() - 2 >= origin.x() - CLEAR_RADIUS
                 && room.startX() + room.layout().width() + 2 <= origin.x() + CLEAR_RADIUS
                 && room.startZ() - 2 >= origin.z() - CLEAR_RADIUS
                 && room.startZ() + room.layout().depth() + 2 <= origin.z() + CLEAR_RADIUS;
+    }
+
+    private boolean intersectsProtectedElevator(RoomPlacement room) {
+        return RoomBounds.of(room).inflate(2).intersects(protectedElevatorBounds());
     }
 
     private boolean intersectsAny(RoomPlacement candidate, List<RoomNode> rooms) {
@@ -567,38 +647,6 @@ public final class HallsSession {
         }
     }
 
-    private void buildVerticalConnector(int x, int y, int startZ, int endZ) {
-        for (int z = Math.min(startZ, endZ); z <= Math.max(startZ, endZ); z++) {
-            buildCorridorCell(x, y, z, 0, true);
-        }
-    }
-
-    private void buildHorizontalConnector(int y, int startX, int endX, int z) {
-        for (int x = Math.min(startX, endX); x <= Math.max(startX, endX); x++) {
-            buildCorridorCell(x, y, z, 0, false);
-        }
-    }
-
-    private void buildNormalConnector(RoomPlacement from, BlockFace fromFace, RoomPlacement to) {
-        ConnectorPoint start = connectorPoint(from, fromFace);
-        ConnectorPoint end = connectorPoint(to, fromFace.getOppositeFace());
-        if (start.x() == end.x()) {
-            buildVerticalConnector(start.x(), origin.y(), start.z(), end.z());
-            return;
-        }
-        if (start.z() == end.z()) {
-            buildHorizontalConnector(origin.y(), start.x(), end.x(), start.z());
-            return;
-        }
-        if (fromFace == BlockFace.NORTH || fromFace == BlockFace.SOUTH) {
-            buildVerticalConnector(start.x(), origin.y(), start.z(), end.z());
-            buildHorizontalConnector(origin.y(), start.x(), end.x(), end.z());
-        } else {
-            buildHorizontalConnector(origin.y(), start.x(), end.x(), start.z());
-            buildVerticalConnector(end.x(), origin.y(), start.z(), end.z());
-        }
-    }
-
     private ConnectorPoint connectorPoint(RoomPlacement room, BlockFace face) {
         return switch (face) {
             case NORTH -> new ConnectorPoint(room.centerX(), room.northExitZ());
@@ -617,6 +665,9 @@ public final class HallsSession {
         for (int offset = pathMin - 1; offset <= pathMax + 1; offset++) {
             int blockX = northSouth ? x + offset : x;
             int blockZ = northSouth ? z : z + offset;
+            if (isProtectedElevatorCell(blockX, blockZ)) {
+                continue;
+            }
             setBlock(blockX, y - 1, blockZ, floor);
             setBlock(blockX, y + 3, blockZ, wall);
             for (int dy = 0; dy < 3; dy++) {
@@ -624,6 +675,114 @@ public final class HallsSession {
                 setBlock(blockX, y + dy, blockZ, path ? Material.AIR : wall);
             }
         }
+    }
+
+    private void buildCorridorCell(int x, int y, int z, int halfWidth, boolean northSouth, Set<ConnectorPoint> openCells) {
+        Material floor = Material.PACKED_MUD;
+        Material wall = Material.DEEPSLATE_BRICKS;
+        int pathMin = -halfWidth;
+        int pathMax = halfWidth;
+        for (int offset = pathMin - 1; offset <= pathMax + 1; offset++) {
+            int blockX = northSouth ? x + offset : x;
+            int blockZ = northSouth ? z : z + offset;
+            if (isProtectedElevatorCell(blockX, blockZ)) {
+                continue;
+            }
+            boolean path = offset >= pathMin && offset <= pathMax
+                    || openCells.contains(new ConnectorPoint(blockX, blockZ));
+            setBlock(blockX, y - 1, blockZ, floor);
+            setBlock(blockX, y + 3, blockZ, wall);
+            for (int dy = 0; dy < 3; dy++) {
+                setBlock(blockX, y + dy, blockZ, path ? Material.AIR : wall);
+            }
+        }
+    }
+
+    private List<ConnectorPoint> findConnectorPath(ConnectorPoint start, ConnectorPoint end, List<RoomNode> rooms) {
+        int minX = origin.x() - CLEAR_RADIUS + 1;
+        int maxX = origin.x() + CLEAR_RADIUS - 1;
+        int minZ = origin.z() - CLEAR_RADIUS + 1;
+        int maxZ = origin.z() + CLEAR_RADIUS - 1;
+        Deque<ConnectorPoint> queue = new ArrayDeque<>();
+        Set<ConnectorPoint> visited = new HashSet<>();
+        Map<ConnectorPoint, ConnectorPoint> previous = new HashMap<>();
+        queue.add(start);
+        visited.add(start);
+        while (!queue.isEmpty()) {
+            ConnectorPoint current = queue.removeFirst();
+            if (current.equals(end)) {
+                return reconstructPath(previous, end);
+            }
+            for (ConnectorPoint next : orderedNeighbors(current, end)) {
+                if (next.x() < minX || next.x() > maxX || next.z() < minZ || next.z() > maxZ
+                        || visited.contains(next) || isBlockedConnectorPoint(next, start, end, rooms)) {
+                    continue;
+                }
+                visited.add(next);
+                previous.put(next, current);
+                queue.addLast(next);
+            }
+        }
+        return List.of();
+    }
+
+    private List<ConnectorPoint> orderedNeighbors(ConnectorPoint point, ConnectorPoint end) {
+        List<ConnectorPoint> neighbors = new ArrayList<>(List.of(
+                new ConnectorPoint(point.x() + 1, point.z()),
+                new ConnectorPoint(point.x() - 1, point.z()),
+                new ConnectorPoint(point.x(), point.z() + 1),
+                new ConnectorPoint(point.x(), point.z() - 1)
+        ));
+        neighbors.sort(Comparator.comparingInt(candidate ->
+                Math.abs(candidate.x() - end.x()) + Math.abs(candidate.z() - end.z())));
+        return neighbors;
+    }
+
+    private List<ConnectorPoint> reconstructPath(Map<ConnectorPoint, ConnectorPoint> previous, ConnectorPoint end) {
+        List<ConnectorPoint> path = new ArrayList<>();
+        ConnectorPoint current = end;
+        path.add(current);
+        while (previous.containsKey(current)) {
+            current = previous.get(current);
+            path.add(current);
+        }
+        Collections.reverse(path);
+        return path;
+    }
+
+    private boolean isBlockedConnectorPoint(ConnectorPoint point, ConnectorPoint start, ConnectorPoint end, List<RoomNode> rooms) {
+        if (point.equals(start) || point.equals(end)) {
+            return false;
+        }
+        if (isProtectedElevatorCell(point.x(), point.z())) {
+            return true;
+        }
+        for (RoomNode room : rooms) {
+            if (RoomBounds.of(room.placement()).contains(point.x(), point.z())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void buildConnectorPath(List<ConnectorPoint> path, Set<ConnectorPoint> openCells) {
+        for (int i = 0; i < path.size(); i++) {
+            ConnectorPoint previous = i == 0 ? null : path.get(i - 1);
+            ConnectorPoint current = path.get(i);
+            ConnectorPoint next = i + 1 >= path.size() ? null : path.get(i + 1);
+            boolean northSouth = (previous != null && previous.x() == current.x())
+                    || (next != null && next.x() == current.x());
+            buildCorridorCell(current.x(), origin.y(), current.z(), 0, northSouth, openCells);
+        }
+    }
+
+    private RoomBounds protectedElevatorBounds() {
+        return new RoomBounds(origin.x() - ELEVATOR_OUTER_RADIUS, origin.x() + ELEVATOR_OUTER_RADIUS,
+                origin.z() - ELEVATOR_OUTER_RADIUS, origin.z() + ELEVATOR_OUTER_RADIUS);
+    }
+
+    private boolean isProtectedElevatorCell(int x, int z) {
+        return protectedElevatorBounds().contains(x, z);
     }
 
     private void openElevatorDoors() {
@@ -1057,7 +1216,7 @@ public final class HallsSession {
         }
     }
 
-    private record RoomConnection(RoomPlacement from, RoomPlacement to, BlockFace fromFace) {
+    private record RoomConnection(RoomNode from, RoomNode to, BlockFace fromFace) {
     }
 
     private record ConnectorPoint(int x, int z) {
@@ -1075,6 +1234,10 @@ public final class HallsSession {
 
         private boolean intersects(RoomBounds other) {
             return minX <= other.maxX && maxX >= other.minX && minZ <= other.maxZ && maxZ >= other.minZ;
+        }
+
+        private boolean contains(int x, int z) {
+            return x >= minX && x <= maxX && z >= minZ && z <= maxZ;
         }
     }
 
