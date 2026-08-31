@@ -23,6 +23,9 @@ Last updated: 2026-08-31
 - Breakable props have initial lightweight movement pushback so players cannot freely stand inside them.
 - Active sessions send a placeholder action-bar HUD once per second showing floor, elapsed time, scrap counters, and sculk.
 - Active session participants are limited to the hotbar plus armor/offhand inventory shape. Player inventory storage slots `9-35`, drag placement into those slots, and shift-click transfers are blocked during sessions.
+- Empty player inventory storage slots `9-35` are filled with marked barrier placeholders while in an active session, preventing normal pickup overflow beyond the hotbar. Existing items in those slots are left untouched but remain inaccessible until session exit.
+- The elevator button on the temporary elevator now moves floor 1 sessions to a first placeholder floor 2 exploration room.
+- Floor 2 generates a larger test exploration room with several breakable props that award placeholder scrap/coins and update the HUD counters.
 
 ## Current Scope
 
@@ -40,7 +43,7 @@ This is the first implementation slice. It focuses on:
 
 - Dungeon generation.
 - Full multi-floor session runtime.
-- Elevator transition logic.
+- Real elevator transition animation/loading floor flow.
 - Ghost death state.
 - Physics-driven item drops.
 - Scrap storage and camp building runtime.
@@ -63,7 +66,14 @@ This is the first implementation slice. It focuses on:
 - Moved the breakable-object clarification into the GDD. Future item/breakable work should build entity props and physics item drops rather than placing ordinary loot blocks.
 - Added the first entity-driven breakable prop path for the start-floor barrel. This is intentionally still a placeholder: it always drops a normal `Building Blueprint` paper item until Halls item definitions, loot tables, and physics item drops are implemented.
 - Fixed the temporary elevator wall symmetry/backing issue and added a first action-bar HUD for in-game runtime feedback.
-- Added first-pass active-session inventory enforcement for the GDD hotbar-only inventory rule. This currently blocks storage-row access rather than deleting or migrating existing inventory contents.
+- Added first-pass active-session inventory enforcement for the GDD hotbar-only inventory rule. Storage-row access is blocked, and empty storage slots are filled with marked barriers during the session.
+- Added the first real floor progression hook: pressing the elevator button on floor 1 rebuilds the temporary play area as floor 2 with breakable scrap props and HUD counter updates.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- Fill rest of the inventory with barrier items, so player cant pickup more than can carry. Don't spend the whole development slice on this.
+- After session ends, empty player inventory as players should have nothing while in the lobby. If a game is saved in the camp (not implemented yet, I know), the player inventories should save too. Again, don't dedicate whole slice to this.
+- Shift clicking stuff to transfer into chests doesnt work as its claiming to use the invalid slots.
+- Make elevator door actually open. Also elevator is fully missing blockdata, the bars dont connect and the chest is facing north instead of east. The hopper should probably also face towards the wall.
+- I put the blueprint into the chest on floor one, it dropped out of the chest when I transfered floor to 2.
+- I am guessing its a testing enviroment, but dont forget the real rooms should be taking templates from resources.
+- Coins should not be acquired on resource pick, but when its deposited in the elevator.
+- The game is quite dark, there should be some lights around the place, it should be probably implmented later, once the level types are being worked on.

@@ -1,5 +1,6 @@
 package krispasi.omGames.hallsofcarnage;
 
+import io.papermc.paper.event.player.PrePlayerAttackEntityEvent;
 import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -9,15 +10,18 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.PlayerInventory;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -86,6 +90,13 @@ public final class HallsOfCarnageListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onPrePlayerAttackEntity(PrePlayerAttackEntityEvent event) {
+        if (manager.handleSessionEntityAttack(event.getPlayer(), event.getAttacked())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player player)) {
             return;
@@ -109,12 +120,21 @@ public final class HallsOfCarnageListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent event) {
-        if (!manager.isHallsWorld(event.getPlayer().getWorld())
-                || event.getClickedBlock() == null
-                || event.getClickedBlock().getType() != Material.SMITHING_TABLE) {
+        if (!manager.isHallsWorld(event.getPlayer().getWorld()) || event.getClickedBlock() == null) {
             return;
         }
-        event.setCancelled(true);
+        if (event.getClickedBlock().getType() == Material.SMITHING_TABLE) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
+        if (event.getAction() == Action.RIGHT_CLICK_BLOCK
+                && event.getClickedBlock().getType() == Material.STONE_BUTTON
+                && manager.handleElevatorButton(event.getPlayer(), event.getClickedBlock())) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -128,6 +148,10 @@ public final class HallsOfCarnageListener implements Listener {
                 || !manager.isHallsWorld(player.getWorld())) {
             return;
         }
+        if (manager.isLockedInventorySlotItem(event.getCurrentItem()) || manager.isLockedInventorySlotItem(event.getCursor())) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.isShiftClick()) {
             event.setCancelled(true);
             sendInventoryLimitActionBar(player);
@@ -136,6 +160,13 @@ public final class HallsOfCarnageListener implements Listener {
         if (event.getClickedInventory() instanceof PlayerInventory && isBlockedPlayerInventorySlot(event.getSlot())) {
             event.setCancelled(true);
             sendInventoryLimitActionBar(player);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerDropItem(PlayerDropItemEvent event) {
+        if (manager.isLockedInventorySlotItem(event.getItemDrop().getItemStack())) {
+            event.setCancelled(true);
         }
     }
 

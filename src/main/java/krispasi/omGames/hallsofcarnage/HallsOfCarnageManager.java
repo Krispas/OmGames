@@ -173,6 +173,10 @@ public final class HallsOfCarnageManager {
         return sessionId != null && activeSessions.containsKey(sessionId);
     }
 
+    public boolean isLockedInventorySlotItem(org.bukkit.inventory.ItemStack item) {
+        return HallsSession.isLockedSlotItem(plugin, item);
+    }
+
     public boolean handleSessionEntityAttack(Player player, Entity entity) {
         if (entity == null) {
             return false;
@@ -183,6 +187,15 @@ public final class HallsOfCarnageManager {
             }
         }
         return false;
+    }
+
+    public boolean handleElevatorButton(Player player, org.bukkit.block.Block block) {
+        if (player == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleElevatorButton(player, block);
     }
 
     public void pushOutOfSessionProps(Player player) {
@@ -332,6 +345,12 @@ public final class HallsOfCarnageManager {
             if (task != null) {
                 task.cancel();
             }
+            HallsSession session = activeSessions.get(sessionId);
+            if (session != null) {
+                session.handlePlayerJoin(player);
+            }
+        } else {
+            HallsSession.clearLockedInventoryBarriers(plugin, player);
         }
         prepareLobbyPlayer(player);
     }

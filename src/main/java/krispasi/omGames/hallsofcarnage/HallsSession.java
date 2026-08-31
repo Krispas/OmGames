@@ -29,6 +29,7 @@ import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -52,6 +53,12 @@ public final class HallsSession {
     private final Set<UUID> droppedSessionItems = new HashSet<>();
     private BukkitTask hudTask;
     private long startedAtMillis;
+    private int currentFloor = 1;
+    private int woodScrap;
+    private int ironScrap;
+    private int diamondScrap;
+    private int redstoneScrap;
+    private int coins;
     private boolean running;
 
     public HallsSession(JavaPlugin plugin,
@@ -106,14 +113,39 @@ public final class HallsSession {
         Location location = entity.getLocation();
         world.playSound(location, Sound.BLOCK_BARREL_CLOSE, 0.7f, 1.25f);
         world.spawnParticle(Particle.BLOCK, location.clone().add(0.0, 0.75, 0.0), 12, 0.25, 0.25, 0.25,
-                Material.BARREL.createBlockData());
+                prop.material().createBlockData());
         if (prop.health() <= 0) {
             breakBreakableProp(prop);
             if (player != null) {
-                player.sendMessage(Component.text("You broke open a dusty barrel.", NamedTextColor.GRAY));
+                player.sendMessage(Component.text(prop.breakMessage(), NamedTextColor.GRAY));
             }
         }
         return true;
+    }
+
+    public boolean handleElevatorButton(Player player, Block block) {
+        if (!running || player == null || block == null || !player.getWorld().equals(world)) {
+            return false;
+        }
+        if (block.getX() != origin.x() - ELEVATOR_INNER_RADIUS
+                || block.getY() != origin.y() + 1
+                || block.getZ() != origin.z()) {
+            return false;
+        }
+        if (currentFloor == 1) {
+            buildExplorationFloor();
+            player.sendMessage(Component.text("The elevator grinds deeper into the halls.", NamedTextColor.DARK_RED));
+        } else {
+            player.sendMessage(Component.text("Further floors are not implemented yet.", NamedTextColor.YELLOW));
+        }
+        return true;
+    }
+
+    public void handlePlayerJoin(Player player) {
+        if (player == null || !running || !participants.contains(player.getUniqueId())) {
+            return;
+        }
+        applyInventoryLimit(player);
     }
 
     public void pushOutOfSessionProps(Player player) {
@@ -164,6 +196,7 @@ public final class HallsSession {
             player.setFoodLevel(20);
             player.setSaturation(20.0f);
             player.setRespawnLocation(spawn, true);
+            applyInventoryLimit(player);
             player.sendMessage(Component.text("Entering " + scenario.name() + " floor 1.", NamedTextColor.DARK_RED));
         }
     }
@@ -175,7 +208,10 @@ public final class HallsSession {
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && fallback != null && player.getWorld().equals(world)) {
+                restoreInventoryLimit(player);
                 player.teleport(fallback);
+            } else if (player != null) {
+                restoreInventoryLimit(player);
             }
         }
         restoreBlocks();
@@ -191,6 +227,31 @@ public final class HallsSession {
         int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
         buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ);
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1);
+    }
+
+    private void buildExplorationFloor() {
+        removeSessionEntities();
+        clearBuildVolume();
+        buildElevator();
+        currentFloor = 2;
+        int startX = origin.x() - 6;
+        int startZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
+        buildRectRoom(startX, origin.y(), startZ, 13, 11);
+        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, startZ - 1);
+        spawnBreakableProp(startX + 2, origin.y(), startZ + 2, Material.BARREL, 3, PropReward.BLUEPRINT);
+        spawnBreakableProp(startX + 5, origin.y(), startZ + 3, Material.OAK_LOG, 2, PropReward.WOOD_SCRAP);
+        spawnBreakableProp(startX + 9, origin.y(), startZ + 3, Material.COPPER_ORE, 3, PropReward.IRON_SCRAP);
+        spawnBreakableProp(startX + 3, origin.y(), startZ + 7, Material.REDSTONE_ORE, 3, PropReward.REDSTONE_SCRAP);
+        spawnBreakableProp(startX + 7, origin.y(), startZ + 8, Material.BARREL, 2, PropReward.WOOD_SCRAP);
+        spawnBreakableProp(startX + 10, origin.y(), startZ + 7, Material.IRON_ORE, 3, PropReward.IRON_SCRAP);
+        Location spawn = new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5, 180.0f, 0.0f);
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                player.teleport(spawn);
+                player.sendTitle("Floor 2", "Gather what you can.", 10, 45, 15);
+            }
+        }
     }
 
     private void clearBuildVolume() {
@@ -264,7 +325,25 @@ public final class HallsSession {
                 }
             }
         }
-        spawnBreakableBarrel(startX + 1, y, startZ + 1);
+        spawnBreakableProp(startX + 1, y, startZ + 1, Material.BARREL, 3, PropReward.BLUEPRINT);
+    }
+
+    private void buildRectRoom(int startX, int y, int startZ, int width, int depth) {
+        Material floor = Material.PACKED_MUD;
+        Material ceiling = Material.TUFF_BRICKS;
+        Material wall = Material.DEEPSLATE_BRICKS;
+        for (int z = -1; z <= depth; z++) {
+            for (int x = -1; x <= width; x++) {
+                boolean border = x < 0 || z < 0 || x >= width || z >= depth;
+                int blockX = startX + x;
+                int blockZ = startZ + z;
+                setBlock(blockX, y - 1, blockZ, floor);
+                setBlock(blockX, y + ROOM_HEIGHT, blockZ, ceiling);
+                for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
+                    setBlock(blockX, y + dy, blockZ, border ? wall : Material.AIR);
+                }
+            }
+        }
     }
 
     private void buildConnector(int x, int y, int startZ, int endZ) {
@@ -299,11 +378,14 @@ public final class HallsSession {
         if (!running) {
             return;
         }
-        Component message = Component.text("Floor 1", NamedTextColor.DARK_RED)
+        Component message = Component.text("Floor " + currentFloor, NamedTextColor.DARK_RED)
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                 .append(Component.text(formatElapsedSeconds(), NamedTextColor.GRAY))
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("Scrap W0 I0 D0 R0", NamedTextColor.GOLD))
+                .append(Component.text("Scrap W" + woodScrap + " I" + ironScrap
+                        + " D" + diamondScrap + " R" + redstoneScrap, NamedTextColor.GOLD))
+                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                .append(Component.text("Coins " + coins, NamedTextColor.YELLOW))
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                 .append(Component.text("Sculk 0", NamedTextColor.AQUA));
         for (UUID playerId : participants) {
@@ -330,10 +412,10 @@ public final class HallsSession {
         snapshots.clear();
     }
 
-    private void spawnBreakableBarrel(int x, int y, int z) {
+    private void spawnBreakableProp(int x, int y, int z, Material material, int health, PropReward reward) {
         Location displayLocation = new Location(world, x, y, z);
         BlockDisplay display = world.spawn(displayLocation, BlockDisplay.class, entity -> {
-            entity.setBlock(Material.BARREL.createBlockData());
+            entity.setBlock(material.createBlockData());
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_breakable");
         });
@@ -345,7 +427,7 @@ public final class HallsSession {
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_breakable");
         });
-        BreakableProp prop = new BreakableProp(interaction.getUniqueId(), display.getUniqueId(), 3);
+        BreakableProp prop = new BreakableProp(interaction.getUniqueId(), display.getUniqueId(), health, material, reward);
         breakableProps.put(interaction.getUniqueId(), prop);
         breakableProps.put(display.getUniqueId(), prop);
     }
@@ -359,11 +441,41 @@ public final class HallsSession {
         removeBreakableProp(prop);
         if (dropLocation != null) {
             world.playSound(dropLocation, Sound.BLOCK_WOOD_BREAK, 0.8f, 1.0f);
-            Item drop = world.dropItemNaturally(dropLocation, blueprintPlaceholder());
-            drop.setPersistent(false);
-            drop.addScoreboardTag("omgames_hoc_session_drop");
-            droppedSessionItems.add(drop.getUniqueId());
+            applyReward(prop.reward(), dropLocation);
         }
+    }
+
+    private void applyReward(PropReward reward, Location dropLocation) {
+        switch (reward) {
+            case BLUEPRINT -> dropSessionItem(dropLocation, blueprintPlaceholder());
+            case WOOD_SCRAP -> {
+                woodScrap++;
+                coins++;
+                dropSessionItem(dropLocation, namedItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD));
+            }
+            case IRON_SCRAP -> {
+                ironScrap++;
+                coins++;
+                dropSessionItem(dropLocation, namedItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY));
+            }
+            case DIAMOND_SCRAP -> {
+                diamondScrap++;
+                coins++;
+                dropSessionItem(dropLocation, namedItem(Material.DIAMOND, "Diamond Scrap", NamedTextColor.AQUA));
+            }
+            case REDSTONE_SCRAP -> {
+                redstoneScrap++;
+                coins++;
+                dropSessionItem(dropLocation, namedItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED));
+            }
+        }
+    }
+
+    private void dropSessionItem(Location location, ItemStack stack) {
+        Item drop = world.dropItemNaturally(location, stack);
+        drop.setPersistent(false);
+        drop.addScoreboardTag("omgames_hoc_session_drop");
+        droppedSessionItems.add(drop.getUniqueId());
     }
 
     private void removeSessionEntities() {
@@ -394,10 +506,70 @@ public final class HallsSession {
     }
 
     private ItemStack blueprintPlaceholder() {
-        ItemStack item = new ItemStack(Material.PAPER);
+        return namedItem(Material.PAPER, "Building Blueprint", NamedTextColor.AQUA);
+    }
+
+    private ItemStack namedItem(Material material, String name, NamedTextColor color) {
+        ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text("Building Blueprint", NamedTextColor.AQUA));
+            meta.displayName(Component.text(name, color));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private void applyInventoryLimit(Player player) {
+        ItemStack barrier = lockedSlotItem();
+        for (int slot = 9; slot <= 35; slot++) {
+            ItemStack current = player.getInventory().getItem(slot);
+            if (current == null || current.getType().isAir() || isLockedSlotItem(plugin, current)) {
+                player.getInventory().setItem(slot, barrier.clone());
+            }
+        }
+        player.updateInventory();
+    }
+
+    private void restoreInventoryLimit(Player player) {
+        clearLockedInventoryBarriers(player);
+    }
+
+    public static void clearLockedInventoryBarriers(JavaPlugin plugin, Player player) {
+        if (player == null) {
+            return;
+        }
+        for (int slot = 9; slot <= 35; slot++) {
+            ItemStack item = player.getInventory().getItem(slot);
+            if (isLockedSlotItem(plugin, item)) {
+                player.getInventory().setItem(slot, null);
+            }
+        }
+        player.updateInventory();
+    }
+
+    public static boolean isLockedSlotItem(JavaPlugin plugin, ItemStack item) {
+        if (plugin == null || item == null || item.getType() != Material.BARRIER || !item.hasItemMeta()) {
+            return false;
+        }
+        Byte marker = item.getItemMeta().getPersistentDataContainer()
+                .get(new org.bukkit.NamespacedKey(plugin, "hoc_locked_inventory_slot"), PersistentDataType.BYTE);
+        return marker != null && marker == (byte) 1;
+    }
+
+    private void clearLockedInventoryBarriers(Player player) {
+        clearLockedInventoryBarriers(plugin, player);
+    }
+
+    private ItemStack lockedSlotItem() {
+        ItemStack item = new ItemStack(Material.BARRIER);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("Unavailable Slot", NamedTextColor.RED));
+            meta.getPersistentDataContainer().set(
+                    new org.bukkit.NamespacedKey(plugin, "hoc_locked_inventory_slot"),
+                    PersistentDataType.BYTE,
+                    (byte) 1
+            );
             item.setItemMeta(meta);
         }
         return item;
@@ -433,12 +605,16 @@ public final class HallsSession {
     private static final class BreakableProp {
         private final UUID interactionId;
         private final UUID displayId;
+        private final Material material;
+        private final PropReward reward;
         private int health;
 
-        private BreakableProp(UUID interactionId, UUID displayId, int health) {
+        private BreakableProp(UUID interactionId, UUID displayId, int health, Material material, PropReward reward) {
             this.interactionId = interactionId;
             this.displayId = displayId;
             this.health = health;
+            this.material = material;
+            this.reward = reward;
         }
 
         private UUID interactionId() {
@@ -453,8 +629,34 @@ public final class HallsSession {
             return health;
         }
 
+        private Material material() {
+            return material;
+        }
+
+        private PropReward reward() {
+            return reward;
+        }
+
+        private String breakMessage() {
+            return switch (reward) {
+                case BLUEPRINT -> "You broke open a dusty barrel.";
+                case WOOD_SCRAP -> "Recovered wood scrap.";
+                case IRON_SCRAP -> "Recovered iron scrap.";
+                case DIAMOND_SCRAP -> "Recovered diamond scrap.";
+                case REDSTONE_SCRAP -> "Recovered redstone scrap.";
+            };
+        }
+
         private void damage() {
             health--;
         }
+    }
+
+    private enum PropReward {
+        BLUEPRINT,
+        WOOD_SCRAP,
+        IRON_SCRAP,
+        DIAMOND_SCRAP,
+        REDSTONE_SCRAP
     }
 }
