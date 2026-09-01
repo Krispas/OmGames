@@ -141,8 +141,9 @@ This is the first implementation slice. It focuses on:
 - Falling ice candidates now require enough open floor around the trap cell, and random falling shards fall only on supported open cells around the trap instead of arbitrary blocked offsets.
 - Trap item displays now force `ItemDisplayTransform.NONE`, avoiding the default angled item transform that made sword traps appear 45 degrees off.
 - Poison darts now clamp their trigger/shooting lane to the first wall and set both entity rotation and directional block data from the mounted wall face.
+- Follow-up trap movement fix: moving trap item displays now animate by updating their `Transformation` translation each tick instead of relying on repeated entity teleports, so ceiling blades and wall spikes have explicit client-visible movement.
+- Swinging blade damage/particles now use the same computed visual position as the moving display transform.
+- Poison dart launcher displays no longer apply an extra entity yaw on top of directional block data, avoiding double-rotation of dispenser-like models.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- The blades of the ceiling trap and the wall trap are still no moving, is it even programmed in?
-- Only working traps are holes, bear traps, poison darts and mines, is the rest even hooked up?
-- Poison dart model is still wrongly rotated
+- Fix the traps! They still don't move!

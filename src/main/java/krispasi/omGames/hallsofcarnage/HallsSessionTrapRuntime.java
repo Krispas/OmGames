@@ -419,7 +419,7 @@ final class HallsSessionTrapRuntime {
 
     private List<UUID> buildWallSpikes(HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type) {
         UUID base = spawnWallBlockDisplay(cell, face, Material.BLACK_CONCRETE, 0.04f, 0.9f, 0.9f);
-        UUID spikes = spawnTrapItemDisplay(TrapKind.WALL_SPIKES, cell, face, type, Material.IRON_SWORD, 0.15);
+        UUID spikes = spawnTrapItemDisplay(TrapKind.WALL_SPIKES, cell, face, type, Material.IRON_SWORD, 0.0);
         return List.of(base, spikes);
     }
 
@@ -479,7 +479,7 @@ final class HallsSessionTrapRuntime {
             entity.addScoreboardTag("omgames_hoc_trap");
             entity.setTransformation(new Transformation(
                     wallDisplayTranslation(face, depth, width, height),
-                    wallDisplayRotation(face),
+                    new Quaternionf(),
                     wallDisplayScale(face, depth, width, height),
                     new Quaternionf()));
         });
@@ -511,7 +511,7 @@ final class HallsSessionTrapRuntime {
         display.setTeleportDuration(2);
         display.setPersistent(false);
         display.addScoreboardTag("omgames_hoc_trap");
-        display.setTransformation(trapModelTransformation(kind, face, type.modelScale()));
+        display.setTransformation(trapModelTransformation(kind, face, type.modelScale(), laneOffset));
         return display.getUniqueId();
     }
 
@@ -568,8 +568,7 @@ final class HallsSessionTrapRuntime {
         switch (trap.kind()) {
             case SWINGING_BLADE -> {
                 boolean active = age % trap.type().intervalTicks() < trap.type().activeTicks();
-                moveTrapDisplay(trap, age);
-                Location bladeCenter = movingTrapLocation(trap).orElse(center.clone().add(0.0, 1.3, 0.0));
+                Location bladeCenter = moveTrapDisplay(trap, age).orElse(center.clone().add(0.0, 1.3, 0.0));
                 if (age % 5L == 0L) {
                     world.spawnParticle(Particle.CRIT, bladeCenter, active ? 8 : 2, 0.35, 0.15, 0.35, 0.02);
                 }
@@ -641,13 +640,13 @@ final class HallsSessionTrapRuntime {
         traps.removeIf(candidate -> candidate == trap);
     }
 
-    private void moveTrapDisplay(HallsTrap trap, long age) {
+    private java.util.Optional<Location> moveTrapDisplay(HallsTrap trap, long age) {
         if (trap.movingDisplayId() == null) {
-            return;
+            return java.util.Optional.empty();
         }
         Entity display = Bukkit.getEntity(trap.movingDisplayId());
-        if (display == null) {
-            return;
+        if (!(display instanceof ItemDisplay itemDisplay)) {
+            return java.util.Optional.empty();
         }
         double offset;
         if (trap.kind() == TrapKind.WALL_SPIKES) {
@@ -657,15 +656,8 @@ final class HallsSessionTrapRuntime {
             double cycle = (age % trap.type().intervalTicks()) / (double) trap.type().intervalTicks();
             offset = Math.sin(cycle * Math.PI * 2.0) * 2.0;
         }
-        display.teleport(trapModelLocation(trap.kind(), new HallsExplorationGenerator.Cell(trap.x(), trap.z()), trap.face(), offset));
-    }
-
-    private java.util.Optional<Location> movingTrapLocation(HallsTrap trap) {
-        if (trap.movingDisplayId() == null) {
-            return java.util.Optional.empty();
-        }
-        Entity display = Bukkit.getEntity(trap.movingDisplayId());
-        return display == null ? java.util.Optional.empty() : java.util.Optional.of(display.getLocation());
+        itemDisplay.setTransformation(trapModelTransformation(trap.kind(), trap.face(), trap.type().modelScale(), offset));
+        return java.util.Optional.of(trapModelLocation(trap.kind(), new HallsExplorationGenerator.Cell(trap.x(), trap.z()), trap.face(), offset));
     }
 
     private Location trapModelLocation(TrapKind kind, HallsExplorationGenerator.Cell cell, BlockFace face, double laneOffset) {
@@ -707,10 +699,6 @@ final class HallsSessionTrapRuntime {
         return new Vector3f(x, height, z);
     }
 
-    private Quaternionf wallDisplayRotation(BlockFace face) {
-        return new Quaternionf().rotateY((float) Math.toRadians(yawDegrees(face)));
-    }
-
     private BlockData wallDisplayBlockData(Material material, BlockFace wallFace) {
         BlockData data = material.createBlockData();
         if (data instanceof Directional directional) {
@@ -720,6 +708,11 @@ final class HallsSessionTrapRuntime {
     }
 
     private Transformation trapModelTransformation(TrapKind kind, BlockFace face, float scale) {
+        return trapModelTransformation(kind, face, scale, 0.0);
+    }
+
+    private Transformation trapModelTransformation(TrapKind kind, BlockFace face, float scale, double laneOffset) {
+        Vector3f translation = trapModelTranslation(kind, face, laneOffset);
         Quaternionf rotation = new Quaternionf();
         if (kind == TrapKind.SWINGING_BLADE) {
             rotation.rotateX((float) Math.toRadians(180.0));
@@ -734,7 +727,22 @@ final class HallsSessionTrapRuntime {
         } else {
             rotation.rotateX((float) Math.toRadians(90.0));
         }
-        return new Transformation(new Vector3f(), rotation, new Vector3f(scale, scale, scale), new Quaternionf());
+        return new Transformation(translation, rotation, new Vector3f(scale, scale, scale), new Quaternionf());
+    }
+
+    private Vector3f trapModelTranslation(TrapKind kind, BlockFace face, double laneOffset) {
+        if (kind == TrapKind.SWINGING_BLADE) {
+            return face == BlockFace.EAST || face == BlockFace.WEST
+                    ? new Vector3f((float) laneOffset, 0.0f, 0.0f)
+                    : new Vector3f(0.0f, 0.0f, (float) laneOffset);
+        }
+        if (requiresWall(kind)) {
+            return new Vector3f(
+                    (float) (-face.getModX() * laneOffset),
+                    0.0f,
+                    (float) (-face.getModZ() * laneOffset));
+        }
+        return new Vector3f();
     }
 
     private void launchFallingIce(HallsTrap trap) {
