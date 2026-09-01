@@ -42,6 +42,8 @@ Last updated: 2026-09-01
 - Elevator button flow now closes the doors shortly after activation and starts the transition from the press action instead of feeling delayed until the button releases.
 - The elevator exterior vestibule and room corridor openings now keep overhead blocks/ceilings, avoiding visible sky gaps at exits and room attachments.
 - Exploration generation now reserves the elevator shell and generated room shells during corridor planning, validates a connector path before opening a room wall, uses wider randomized room offsets/gaps, and adds extra room-to-room loop corridors when a valid route exists.
+- Session-owned physics item drops now render as fixed flat item displays with randomized yaw, making placeholder scrap and blueprint drops read as lying on the floor.
+- Exploration generation now grows new rooms by connecting them to a selected anchor room with unused doorway faces, instead of routing every room into the nearest shared corridor network. The generated floor still validates reachability from the elevator after adding room-to-room loops and side branches.
 
 ## Current Scope
 
@@ -79,9 +81,12 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-
+- Addressed the reviewer drop-orientation request by applying a flat 90-degree display transform and randomized yaw when Halls physics drops spawn.
+- Reworked the normal exploration corridor growth pass to create room-to-room corridor clusters. Existing direct room loops, first-room extra exits, side branches, and final reachability validation remain in place.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- Make it so dropped items are rotated by 90 degrees to simulate being on the ground, perhaps adding other randomized rotations could help with immersion.
-- Some corridors now loop, however that is not exactly what I wanted, I wanted there to be multiple corridors network, all coridors are still connected together right now.
-- So the goal is to also rework the corridor system to suit the new approach more.
+For next slice:
+- Make it so that if a room has inner wall on the side, entrance won't generate there.
+- Generation is amazing now, however the rooms are way too gridlike when looking from out of bounds, could you increase their random offsets more?
+- Could you extract the breakables into .txt simillar to how rooms and scenarios are in resources? So a human can simply add more if needed. Also instead of randomly dropping scrap, blueprints, weapons and armor, could you add a simple loot table? For example, metal barrel can drop diamond,redstone,blueprint,armor,weapon while chair can only drop wood or iron.
+- Add a few more rooms for howling corridors, they should be a lot larger than the current ones, at least 10x10

@@ -28,6 +28,7 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.MultipleFacing;
 import org.bukkit.entity.BlockDisplay;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
@@ -38,7 +39,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 public final class HallsSession {
     private static final int CLEAR_RADIUS = 72;
@@ -1108,6 +1112,9 @@ public final class HallsSession {
             entity.setItemStack(stack.clone());
             entity.setInterpolationDelay(DISPLAY_INTERPOLATION_DELAY_TICKS);
             entity.setTeleportDuration(DISPLAY_TELEPORT_DURATION_TICKS);
+            entity.setBillboard(Display.Billboard.FIXED);
+            entity.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+            entity.setTransformation(sessionDropTransformation());
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_physics_drop");
         });
@@ -1123,6 +1130,18 @@ public final class HallsSession {
         physicsDrops.put(interaction.getUniqueId(), drop);
         physicsDrops.put(display.getUniqueId(), drop);
         startPhysicsDropTask();
+    }
+
+    private Transformation sessionDropTransformation() {
+        float yaw = (float) (Math.random() * Math.PI * 2.0);
+        Quaternionf rotation = new Quaternionf()
+                .rotateY(yaw)
+                .rotateX((float) Math.toRadians(90.0));
+        return new Transformation(
+                new Vector3f(),
+                rotation,
+                new Vector3f(0.75f, 0.75f, 0.75f),
+                new Quaternionf());
     }
 
     private void removeSessionEntities() {

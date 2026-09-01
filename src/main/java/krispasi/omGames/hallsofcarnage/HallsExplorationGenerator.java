@@ -77,19 +77,21 @@ final class HallsExplorationGenerator {
         int attempts = 0;
         while (rooms.size() < targetRooms && attempts++ < targetRooms * 1000) {
             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
-            Room candidate = randomRoom(layout);
-            if (!canPlaceRoom(candidate)) {
+            RoomConnection candidate = randomRoomConnection(layout);
+            if (candidate == null || !canPlaceRoom(candidate.room())) {
                 continue;
             }
-            BlockFace face = faceTowardNetwork(candidate);
-            int offset = doorOffset(layout, face);
-            Cell door = doorCell(candidate, face, offset);
-            List<Cell> path = findConnectorPath(door, networkCells, Bounds.of(candidate));
+            Cell candidateDoor = doorCell(candidate.room(), candidate.roomFace(), candidate.roomOffset());
+            Cell anchorDoor = doorCell(candidate.anchor(), candidate.anchorFace(), candidate.anchorOffset());
+            List<Cell> path = findConnectorPath(candidateDoor, Set.of(anchorDoor),
+                    List.of(Bounds.of(candidate.room()), Bounds.of(candidate.anchor())));
             if (path.isEmpty()) {
                 continue;
             }
-            candidate.openings().put(face, offset);
-            addRoom(candidate);
+            candidate.anchor().openings().put(candidate.anchorFace(), candidate.anchorOffset());
+            candidate.room().openings().put(candidate.roomFace(), candidate.roomOffset());
+            networkCells.add(anchorDoor);
+            addRoom(candidate.room());
             rememberCorridor(path);
         }
         addFirstRoomOnwardRoutes();
@@ -116,12 +118,20 @@ final class HallsExplorationGenerator {
         rememberCorridor(path);
     }
 
-    private Room randomRoom(HallsLayout layout) {
-        Room anchor = rooms.get(random.nextInt(rooms.size()));
-        BlockFace face = randomFace();
+    private RoomConnection randomRoomConnection(HallsLayout layout) {
+        List<Room> anchors = rooms.stream()
+                .filter(room -> !availableFaces(room).isEmpty())
+                .toList();
+        if (anchors.isEmpty()) {
+            return null;
+        }
+        Room anchor = anchors.get(random.nextInt(anchors.size()));
+        List<BlockFace> faces = availableFaces(anchor);
+        Collections.shuffle(faces, random);
+        BlockFace face = faces.getFirst();
         int gap = 3 + random.nextInt(6);
         int lateral = random.nextInt(15) - 7;
-        return switch (face) {
+        Room room = switch (face) {
             case NORTH -> new Room(layout, anchor.centerX() + lateral - layout.width() / 2,
                     anchor.startZ() - gap - layout.depth());
             case SOUTH -> new Room(layout, anchor.centerX() + lateral - layout.width() / 2,
@@ -132,6 +142,15 @@ final class HallsExplorationGenerator {
                     anchor.centerZ() + lateral - layout.depth() / 2);
             default -> randomRoomAnywhere(layout);
         };
+        BlockFace roomFace = face.getOppositeFace();
+        return new RoomConnection(
+                anchor,
+                room,
+                face,
+                roomFace,
+                doorOffset(anchor.layout(), face),
+                doorOffset(layout, roomFace)
+        );
     }
 
     private Room randomRoomAnywhere(HallsLayout layout) {
@@ -159,15 +178,6 @@ final class HallsExplorationGenerator {
             }
         }
         return true;
-    }
-
-    private BlockFace faceTowardNetwork(Room room) {
-        int dx = originX - room.centerX();
-        int dz = originZ - room.centerZ();
-        if (Math.abs(dx) > Math.abs(dz)) {
-            return dx > 0 ? BlockFace.EAST : BlockFace.WEST;
-        }
-        return dz > 0 ? BlockFace.SOUTH : BlockFace.NORTH;
     }
 
     private int doorOffset(HallsLayout layout, BlockFace face) {
@@ -274,11 +284,23 @@ final class HallsExplorationGenerator {
                 return false;
             }
             boolean target = i == path.size() - 1 && targets.contains(cell);
-            if (!canCorridorOccupy(cell, start, target, blockedBounds, true)) {
+            if (!canCorridorOccupy(cell, start, target, blockedBounds, isNearConnectorEndpoint(cell, start, targets))) {
                 return false;
             }
         }
         return targets.contains(path.getLast());
+    }
+
+    private boolean isNearConnectorEndpoint(Cell cell, Cell start, Set<Cell> targets) {
+        if (manhattanDistance(cell, start) <= 2) {
+            return true;
+        }
+        for (Cell target : targets) {
+            if (manhattanDistance(cell, target) <= 2) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean canCorridorOccupy(Cell cell, Cell start, boolean target, Bounds blockedCandidate) {
@@ -289,7 +311,7 @@ final class HallsExplorationGenerator {
                                       Cell start,
                                       boolean target,
                                       List<Bounds> blockedBounds,
-                                      boolean allowDoorAdjacency) {
+                                      boolean allowRoomShellAdjacency) {
         if (!insideBuildArea(cell) || protectedElevator.contains(cell.x(), cell.z())) {
             return false;
         }
@@ -303,7 +325,7 @@ final class HallsExplorationGenerator {
         if (cell.equals(start) || target || corridorCells.contains(cell)) {
             return true;
         }
-        if (allowDoorAdjacency && manhattanDistance(cell, start) <= 2) {
+        if (allowRoomShellAdjacency) {
             return !roomShellCells.contains(cell) && !roomInteriorCells.contains(cell);
         }
         return !roomShellCells.contains(cell) && !roomInteriorCells.contains(cell)
@@ -656,6 +678,14 @@ final class HallsExplorationGenerator {
     }
 
     record Cell(int x, int z) {
+    }
+
+    private record RoomConnection(Room anchor,
+                                  Room room,
+                                  BlockFace anchorFace,
+                                  BlockFace roomFace,
+                                  int anchorOffset,
+                                  int roomOffset) {
     }
 
     private record Bounds(int minX, int maxX, int minZ, int maxZ) {
