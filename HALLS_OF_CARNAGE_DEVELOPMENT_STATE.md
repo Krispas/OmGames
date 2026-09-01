@@ -98,4 +98,5 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For next slice:
+- Add a special /hoc give command which admin can use to give themselves items for testing
 - Start applying basic runtime behavior for defined gear items, beginning with melee/ranged/armor stat metadata and safe inventory/equip handling inside active Halls sessions.
