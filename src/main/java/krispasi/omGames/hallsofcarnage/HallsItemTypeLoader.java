@@ -1,7 +1,8 @@
 package krispasi.omGames.hallsofcarnage;
 
 import java.io.File;
-import java.util.ArrayList;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,14 +21,25 @@ public final class HallsItemTypeLoader {
         if (folder == null || !folder.isDirectory()) {
             return Map.of();
         }
-        File[] files = folder.listFiles((dir, name) -> name.endsWith(".txt")
-                || name.endsWith(".yml")
-                || name.endsWith(".yaml"));
-        if (files == null || files.length == 0) {
+        List<File> files;
+        try (java.util.stream.Stream<java.nio.file.Path> paths = Files.walk(folder.toPath())) {
+            files = paths
+                    .map(java.nio.file.Path::toFile)
+                    .filter(File::isFile)
+                    .filter(HallsItemTypeLoader::isItemFile)
+                    .sorted(Comparator.comparing(file -> folder.toPath().relativize(file.toPath()).toString()))
+                    .toList();
+        } catch (IOException ex) {
+            if (plugin != null) {
+                plugin.getLogger().warning("Failed to scan Halls item folder " + folder + ": " + ex.getMessage());
+            }
+            return Map.of();
+        }
+        if (files.isEmpty()) {
             return Map.of();
         }
         Map<String, HallsItemType> items = new LinkedHashMap<>();
-        for (File file : java.util.Arrays.stream(files).sorted(Comparator.comparing(File::getName)).toList()) {
+        for (File file : files) {
             try {
                 HallsItemType item = loadItem(file);
                 items.put(item.id(), item);
@@ -38,6 +50,11 @@ public final class HallsItemTypeLoader {
             }
         }
         return Map.copyOf(items);
+    }
+
+    private static boolean isItemFile(File file) {
+        String name = file.getName();
+        return name.endsWith(".txt") || name.endsWith(".yml") || name.endsWith(".yaml");
     }
 
     private static HallsItemType loadItem(File file) {

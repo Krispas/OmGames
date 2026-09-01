@@ -30,10 +30,17 @@ allowed-items:
     - cooking_pot_blueprint
     - weapon_bench_blueprint
     - armory_blueprint
-    - storage_locker_blueprint
+    - grindstone_blueprint
+    - storage_locker_small_blueprint
+    - storage_locker_medium_blueprint
+    - storage_locker_large_blueprint
     - elevator_drill_blueprint
     - scanner_blueprint
-    - sculk_purifier_blueprint
+    - bounty_board_blueprint
+    - mycelia_farm_blueprint
+    - sculk_purifier_small_blueprint
+    - sculk_purifier_medium_blueprint
+    - sculk_purifier_large_blueprint
   buildings:
     - cooking_pot
     - weapon_bench
@@ -54,11 +61,18 @@ blueprint-pools:
     - cooking_pot_blueprint
     - weapon_bench_blueprint
     - armory_blueprint
-    - storage_locker_blueprint
+    - storage_locker_small_blueprint
+    - storage_locker_medium_blueprint
+    - mycelia_farm_blueprint
     - scanner_blueprint
   rare:
+    - grindstone_blueprint
+    - storage_locker_large_blueprint
     - elevator_drill_blueprint
-    - sculk_purifier_blueprint
+    - bounty_board_blueprint
+    - sculk_purifier_small_blueprint
+    - sculk_purifier_medium_blueprint
+    - sculk_purifier_large_blueprint
 floors:
   - number: 1
     kind: start

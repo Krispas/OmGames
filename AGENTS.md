@@ -1148,7 +1148,7 @@ Files:
 - `level_type/**`
 - `modifiers/**`
 - `breakables/*.txt|*.yml|*.yaml`
-- `items/*.txt|*.yml|*.yaml`
+- `items/**/*.txt|*.yml|*.yaml`
 
 SQLite tables:
 - `hoc_shame`
@@ -1185,10 +1185,11 @@ SQLite tables:
 - Halls breakable prop archetypes are loaded from `plugins/OmGames/HallsOfCarnage/breakables/` and seeded from bundled defaults.
 - Breakable files define `id`, `break-message`, `hitbox-height`, `particle-material`, `parts`, and weighted `loot` entries.
 - Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
-- Halls item definitions are loaded from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults.
+- Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, `lore`, an unused-for-now `recipe` scrap cost map, and an optional `stats` map.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility.
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control blueprint keyword drops.
+- Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, storage lockers by size, mycelia farm, elevator drill, scanner, bounty board, and sculk purifiers by size.
 - Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `ranged`, `utility`, `rare_weapon`, `rare_armor`, `rare_ranged`, and `rare_utility`.
 - The generic `blueprint` loot keyword rolls the scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools.
 - `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions.

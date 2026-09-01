@@ -73,7 +73,9 @@ final class HallsExplorationGenerator {
         }
         int targetRooms = Math.max(1, floorDefinition.rooms());
         seedElevatorNetwork();
-        addFirstRoom(layouts.get(random.nextInt(layouts.size())));
+        if (!addFirstRoom(layouts)) {
+            return;
+        }
         int attempts = 0;
         while (rooms.size() < targetRooms && attempts++ < targetRooms * 1000) {
             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
@@ -107,15 +109,30 @@ final class HallsExplorationGenerator {
         }
     }
 
-    private void addFirstRoom(HallsLayout layout) {
-        Room first = new Room(layout, originX - layout.width() / 2, originZ + 12);
+    private boolean addFirstRoom(List<HallsLayout> layouts) {
+        HallsLayout layout = randomLayoutWithDoor(layouts, BlockFace.NORTH);
+        if (layout == null) {
+            return false;
+        }
         BlockFace face = BlockFace.NORTH;
-        int offset = layout.width() / 2;
+        int offset = doorOffset(layout, face);
+        Room first = new Room(layout, originX - offset, originZ + 12);
         Cell door = doorCell(first, face, offset);
         List<Cell> path = directVerticalPath(new Cell(originX, protectedElevator.maxZ() + 1), door);
         first.openings().put(face, offset);
         addRoom(first);
         rememberCorridor(path);
+        return true;
+    }
+
+    private HallsLayout randomLayoutWithDoor(List<HallsLayout> layouts, BlockFace face) {
+        List<HallsLayout> candidates = layouts.stream()
+                .filter(layout -> !validDoorOffsets(layout, face).isEmpty())
+                .toList();
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return candidates.get(random.nextInt(candidates.size()));
     }
 
     private RoomConnection randomRoomConnection(HallsLayout layout) {

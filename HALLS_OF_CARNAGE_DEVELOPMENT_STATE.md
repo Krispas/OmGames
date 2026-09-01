@@ -52,7 +52,7 @@ Last updated: 2026-09-01
 - Breakable resource files define display parts, hitbox height, particle material, break message, and weighted loot entries.
 - Breakable loot now rolls from each prop's configured loot table and supports placeholder scrap, random scrap, blueprint keywords, and coin drops.
 - Coin drops are session-owned physics items that add directly to the shared session coin counter on right-click pickup, bypassing normal hotbar capacity.
-- Item definitions now load from `plugins/OmGames/HallsOfCarnage/items/*.txt|*.yml|*.yaml`, seeded by bundled defaults for normal/rare weapons, ranged gear, armor, utility items, and building blueprints.
+- Item definitions now load recursively from `plugins/OmGames/HallsOfCarnage/items/**/*.txt|*.yml|*.yaml`, seeded by bundled defaults for normal/rare weapons, ranged gear, armors, utility items, and building blueprints grouped by category folder.
 - Item resource files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, `lore`, and recipe scrap costs for future camp crafting.
 - Item resource files now support `stats`; stats are written into item PDC as `hoc_stat_<stat_id>` and rendered in lore for test visibility.
 - Scenarios now parse `allowed-items` by category and `blueprint-pools.normal` / `blueprint-pools.rare`.
@@ -61,6 +61,9 @@ Last updated: 2026-09-01
 - `/hoc give <item> [amount]` is an OP-only self-target test command for loaded Halls item definitions.
 - `/hoc give` and Halls item loot share the same item factory so test-given items and dropped items get identical display, model, PDC, recipe, and stat metadata.
 - Halls armor items equip into empty matching armor slots from `/hoc give` and from right-click physics-drop pickup before falling back to hotbar insertion.
+- The first exploration room now uses validated doorway offsets for the elevator connection instead of always using the room's geometric center.
+- Bundled Howling Corridors resources now include twelve seeded exploration room templates.
+- Bundled blueprint item defaults now cover all current GDD building families and scenario blueprint pools reference the size-specific building ids.
 
 ## Current Scope
 
@@ -98,13 +101,9 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-- Added `/hoc give <item> [amount]`, moved Halls item stack construction into a shared factory, added parsed item stat metadata/lore, and made Halls armor items auto-equip into empty matching armor slots from the test command and physics-drop pickup.
+- Fixed the first exploration-room elevator connection to use validated doorway offsets, made Halls item loading recursive, reorganized bundled item defaults into category folders, added four more Howling Corridors room templates, and added all currently listed GDD building blueprints to the default item catalog and scenario pools.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For next slice:
-- I found a corridor leading into an inner wall of a room right from the elevator, making whole level inaccessble, is the BFS running per block and not per room?
-- Add more howling corridor rooms (at least 10)
-- Add rest of the blueprints from GDD
-- Separate items into their own folders, weapons into weapons (melee/ranged/util), armor into armors blueprints into blueprints and so on
-For future slice:
-- Start applying Halls item stats to actual combat/equipment behavior instead of metadata-only display.
+- Remove recipes from blueprints, they dont need those.
+- Add traps as described in GDD, all of them preferably. Don't forget to run the bfs. In case hole blocks movement from one part of a room to another, add bridges. Most stuff should be in the GDD.

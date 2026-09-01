@@ -1,0 +1,13 @@
+id: bounty_board_blueprint
+name: "Rare Blueprint: Bounty Board"
+category: blueprint
+rarity: rare
+material: PAPER
+item-model: om:hoc_rare_blueprint
+max-stack-size: 1
+lore:
+  - "Unlocks future camp quest offers."
+recipe:
+  wood_scrap: 12
+  iron_scrap: 8
+  redstone_scrap: 6
