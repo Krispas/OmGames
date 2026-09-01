@@ -61,6 +61,13 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/breakables/stool.txt",
             "hallsOfCarnage/breakables/radiator.txt",
             "hallsOfCarnage/breakables/metal_barrel.txt",
+            "hallsOfCarnage/traps/hole.txt",
+            "hallsOfCarnage/traps/bear_trap.txt",
+            "hallsOfCarnage/traps/proximity_mine.txt",
+            "hallsOfCarnage/traps/swinging_blade.txt",
+            "hallsOfCarnage/traps/wall_spikes.txt",
+            "hallsOfCarnage/traps/falling_ice.txt",
+            "hallsOfCarnage/traps/poison_darts.txt",
             "hallsOfCarnage/items/weapons/rusty_sword.txt",
             "hallsOfCarnage/items/weapons/echo_blade.txt",
             "hallsOfCarnage/items/weapons/miner_pick.txt",
@@ -107,6 +114,7 @@ public final class HallsOfCarnageManager {
     private Map<String, HallsLevelType> levelTypes = Map.of();
     private Map<String, HallsBreakableType> breakableTypes = Map.of();
     private Map<String, HallsItemType> itemTypes = Map.of();
+    private Map<String, HallsTrapType> trapTypes = Map.of();
     private int nextSessionId = 1;
 
     public HallsOfCarnageManager(JavaPlugin plugin) {
@@ -122,12 +130,13 @@ public final class HallsOfCarnageManager {
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
         itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
+        trapTypes = HallsTrapTypeLoader.loadTrapTypes(plugin, getTrapsFolder());
         shameService.load();
         applyWorldRules();
         spawnConfiguredMenuVillager();
         plugin.getLogger().info("Loaded " + scenarios.size() + " Halls of Carnage scenarios and "
                 + levelTypes.size() + " level types, " + breakableTypes.size() + " breakable types, "
-                + itemTypes.size() + " item types.");
+                + itemTypes.size() + " item types, " + trapTypes.size() + " trap types.");
     }
 
     public void shutdown() {
@@ -142,16 +151,17 @@ public final class HallsOfCarnageManager {
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
         itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
+        trapTypes = HallsTrapTypeLoader.loadTrapTypes(plugin, getTrapsFolder());
         applyWorldRules();
         spawnConfiguredMenuVillager();
         return Result.ok("Reloaded Halls of Carnage. Scenarios: " + scenarios.size()
                 + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size()
-                + ", items: " + itemTypes.size() + ".");
+                + ", items: " + itemTypes.size() + ", traps: " + trapTypes.size() + ".");
     }
 
     public Result resetGameResources(boolean confirmed) {
         if (!confirmed) {
-            return Result.fail("This deletes Halls scenario/level/level_type/modifier/breakable/item files and recopies bundled defaults. Use /hoc reset confirm.");
+            return Result.fail("This deletes Halls scenario/level/level_type/modifier/breakable/trap/item files and recopies bundled defaults. Use /hoc reset confirm.");
         }
         if (!activeSessions.isEmpty()) {
             return Result.fail("Stop active Halls sessions before resetting game resources.");
@@ -163,6 +173,7 @@ public final class HallsOfCarnageManager {
             deleteGameResourceFolder(new File(folder, "level_type"));
             deleteGameResourceFolder(new File(folder, "modifiers"));
             deleteGameResourceFolder(new File(folder, "breakables"));
+            deleteGameResourceFolder(new File(folder, "traps"));
             deleteGameResourceFolder(new File(folder, "items"));
         } catch (IOException ex) {
             return Result.fail("Failed to delete Halls game resources: " + ex.getMessage());
@@ -174,9 +185,10 @@ public final class HallsOfCarnageManager {
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
         itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
+        trapTypes = HallsTrapTypeLoader.loadTrapTypes(plugin, getTrapsFolder());
         return Result.ok("Reset Halls game resources from bundled defaults. Scenarios: " + scenarios.size()
                 + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size()
-                + ", items: " + itemTypes.size() + ".");
+                + ", items: " + itemTypes.size() + ", traps: " + trapTypes.size() + ".");
     }
 
     public List<HallsScenario> getScenarios() {
@@ -409,7 +421,7 @@ public final class HallsOfCarnageManager {
         int sessionId = nextSessionId++;
         int slot = firstFreeSessionSlot();
         HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot),
-                getDataFolder(), levelTypes, breakableTypes, itemTypes, players);
+                getDataFolder(), levelTypes, breakableTypes, itemTypes, trapTypes, players);
         try {
             session.start();
         } catch (IOException ex) {
@@ -731,6 +743,10 @@ public final class HallsOfCarnageManager {
 
     private File getItemsFolder() {
         return new File(getDataFolder(), "items");
+    }
+
+    private File getTrapsFolder() {
+        return new File(getDataFolder(), "traps");
     }
 
     private String normalizeId(String value) {

@@ -1,0 +1,9 @@
+id: proximity_mine
+kind: proximity_mine
+weight: 3
+block-material: STONE_PRESSURE_PLATE
+model-material: IRON_NUGGET
+item-model: ""
+model-scale: 1.0
+damage: 18
+explosion-power: 2.4

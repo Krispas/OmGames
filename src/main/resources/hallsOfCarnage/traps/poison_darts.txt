@@ -1,0 +1,9 @@
+id: poison_darts
+kind: poison_darts
+weight: 2
+level-types:
+  - deep_crypt
+block-material: DISPENSER
+damage: 4
+radius: 5.5
+interval-ticks: 55

@@ -64,6 +64,7 @@ public final class HallsSession {
     private final Map<String, HallsLevelType> levelTypes;
     private final Map<String, HallsBreakableType> breakableTypes;
     private final Map<String, HallsItemType> itemTypes;
+    private final Map<String, HallsTrapType> trapTypes;
     private final Set<UUID> participants;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
@@ -95,6 +96,7 @@ public final class HallsSession {
                         Map<String, HallsLevelType> levelTypes,
                         Map<String, HallsBreakableType> breakableTypes,
                         Map<String, HallsItemType> itemTypes,
+                        Map<String, HallsTrapType> trapTypes,
                         List<Player> players) {
         this.plugin = plugin;
         this.id = id;
@@ -105,11 +107,12 @@ public final class HallsSession {
         this.levelTypes = levelTypes == null ? Map.of() : Map.copyOf(levelTypes);
         this.breakableTypes = breakableTypes == null ? Map.of() : Map.copyOf(breakableTypes);
         this.itemTypes = itemTypes == null ? Map.of() : Map.copyOf(itemTypes);
+        this.trapTypes = trapTypes == null ? Map.of() : Map.copyOf(trapTypes);
         this.participants = new HashSet<>();
         for (Player player : players) {
             participants.add(player.getUniqueId());
         }
-        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::setBlock);
+        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::setBlock, this.trapTypes);
     }
 
     public int id() {
@@ -574,7 +577,7 @@ public final class HallsSession {
         for (int y = 0; y <= 3; y++) {
             for (int x = -ELEVATOR_OUTER_RADIUS; x <= ELEVATOR_OUTER_RADIUS; x++) {
                 Material backMaterial = Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : Math.abs(x) == 2 ? side : back;
-                Material frontMaterial = Math.abs(x) <= 1 ? door : Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : Math.abs(x) == 2 ? side : back;
+                Material frontMaterial = Math.abs(x) <= 1 && y <= 2 ? door : Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : Math.abs(x) == 2 ? side : back;
                 setBlock(origin.x() + x, origin.y() + y, origin.z() - ELEVATOR_OUTER_RADIUS, backMaterial);
                 setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, frontMaterial,
                         frontMaterial == door ? BlockFace.EAST : null);
@@ -795,20 +798,26 @@ public final class HallsSession {
     }
 
     private void openElevatorDoors() {
-        for (int y = 0; y <= 3; y++) {
+        for (int y = 0; y <= 2; y++) {
             for (int x = -1; x <= 1; x++) {
                 setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, Material.AIR);
             }
+        }
+        for (int x = -1; x <= 1; x++) {
+            setBlock(origin.x() + x, origin.y() + 3, origin.z() + ELEVATOR_OUTER_RADIUS, Material.DEEPSLATE_BRICKS);
         }
         buildElevatorVestibule(true);
     }
 
     private void closeElevatorDoors() {
         Material door = firstMaterial("WAXED_WEATHERED_COPPER_BARS", "WAXED_WEATHERED_COPPER_GRATE", "COPPER_BARS", "IRON_BARS");
-        for (int y = 0; y <= 3; y++) {
+        for (int y = 0; y <= 2; y++) {
             for (int x = -1; x <= 1; x++) {
                 setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, door, BlockFace.EAST);
             }
+        }
+        for (int x = -1; x <= 1; x++) {
+            setBlock(origin.x() + x, origin.y() + 3, origin.z() + ELEVATOR_OUTER_RADIUS, Material.DEEPSLATE_BRICKS);
         }
         buildElevatorVestibule(false);
     }

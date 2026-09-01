@@ -37,14 +37,6 @@ final class HallsItemFactory {
                         .map(entry -> Component.text(statName(entry.getKey()) + ": " + statValue(entry.getValue()), NamedTextColor.DARK_AQUA))
                         .forEach(lore::add);
             }
-            if (!type.recipe().isEmpty()) {
-                lore.add(Component.empty());
-                lore.add(Component.text("Recipe", NamedTextColor.DARK_GRAY));
-                type.recipe().entrySet().stream()
-                        .sorted(Map.Entry.comparingByKey())
-                        .map(entry -> Component.text("- " + entry.getKey() + " x" + entry.getValue(), NamedTextColor.GRAY))
-                        .forEach(lore::add);
-            }
             if (!lore.isEmpty()) {
                 meta.lore(lore);
             }

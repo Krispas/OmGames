@@ -94,7 +94,8 @@ public final class HallsScenarioLoader {
                     stringValue(map.get("difficulty"), "0"),
                     positiveInt(map.get("rooms"), 8),
                     positiveInt(map.get("items"), 0),
-                    positiveInt(map.get("breakables"), 16)
+                    positiveInt(map.get("breakables"), 16),
+                    positiveInt(map.get("traps"), 5)
             ));
         }
         floors.sort(Comparator.comparingInt(HallsScenario.FloorDefinition::firstFloor));
@@ -117,7 +118,8 @@ public final class HallsScenarioLoader {
                         + " difficulty=" + floor.difficulty()
                         + " rooms=" + floor.rooms()
                         + " items=" + floor.items()
-                        + " breakables=" + floor.breakables());
+                        + " breakables=" + floor.breakables()
+                        + " traps=" + floor.traps());
             }
         }
         lines.add("loaded-yaml:");

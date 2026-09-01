@@ -1149,6 +1149,7 @@ Files:
 - `level_type/**`
 - `modifiers/**`
 - `breakables/*.txt|*.yml|*.yaml`
+- `traps/*.txt|*.yml|*.yaml`
 - `items/**/*.txt|*.yml|*.yaml`
 
 SQLite tables:
@@ -1189,6 +1190,7 @@ SQLite tables:
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, `lore`, an unused-for-now `recipe` scrap cost map, and an optional `stats` map.
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
+- Item recipes are parsed for future crafting stations but should not be rendered directly on item lore.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility.
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control blueprint keyword drops.
 - Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, storage lockers by size, mycelia farm, elevator drill, scanner, bounty board, and sculk purifiers by size.
@@ -1208,3 +1210,7 @@ SQLite tables:
 - Howling Corridors room resources are seeded from all bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`.
 - Exploration floors have first-pass session-owned trap generation/runtime for holes, bridged holes, bear traps, proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, and Deep Crypt poison darts.
 - Trap placement uses the generated walkable mask and BFS reachability before accepting an unbridged pit; pits that would disconnect traversal receive a spruce bridge.
+- Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
+- Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth.
+- Exploration floor trap counts come from scenario floor field `traps`.
+- Hole traps carve a configurable 5x5-15x15 room-intersected mask instead of a single block.

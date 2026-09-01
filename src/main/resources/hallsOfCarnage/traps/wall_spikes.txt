@@ -1,0 +1,11 @@
+id: wall_spikes
+kind: wall_spikes
+weight: 3
+block-material: POINTED_DRIPSTONE
+model-material: IRON_NUGGET
+item-model: ""
+model-scale: 1.0
+damage: 12
+radius: 1.1
+interval-ticks: 70
+active-ticks: 12

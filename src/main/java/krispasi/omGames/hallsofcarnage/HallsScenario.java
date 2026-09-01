@@ -55,18 +55,19 @@ public record HallsScenario(
             String difficulty,
             int rooms,
             int items,
-            int breakables
+            int breakables,
+            int traps
     ) {
         public boolean includes(int floor) {
             return floor >= firstFloor && floor <= lastFloor;
         }
 
         public static FloorDefinition fallback(int floor) {
-            return new FloorDefinition(floor, floor, "exploration", "howling_corridors", "0", 8, 0, 16);
+            return new FloorDefinition(floor, floor, "exploration", "howling_corridors", "0", 8, 0, 16, 5);
         }
 
         public FloorDefinition atFloor(int floor) {
-            return new FloorDefinition(floor, floor, kind, levelType, difficulty, rooms, items, breakables);
+            return new FloorDefinition(floor, floor, kind, levelType, difficulty, rooms, items, breakables, traps);
         }
     }
 }
