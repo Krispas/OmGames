@@ -133,3 +133,4 @@ For next slice:
 - Make it so depositing scrap deposits only item selected in the hotbar
 - Implement wall spike trap, I also havent seen them generate, use simillar sword model for it like for swinging blade trap, it should be always mountaed as part of a wall
 - Implement poison dart trap, it should be always mounted as part of a wall
+- This may already be a thing, but add it if not: Rooms can generate rotated, making the levels feel less repetetive

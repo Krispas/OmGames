@@ -3,7 +3,7 @@ name: "Echo Blade"
 category: weapon
 rarity: rare
 material: NETHERITE_SWORD
-item-model: om:hoc_echo_blade
+item-model: om:endmetal_sword
 max-stack-size: 1
 lore:
   - "A rare blade that hums near old blood."
