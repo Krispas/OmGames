@@ -1,0 +1,17 @@
+id: barrel
+break-message: "You broke open a dusty barrel."
+hitbox-height: 1.0
+particle-material: BARREL
+parts:
+  - material: BARREL
+    offset: [0, 0, 0]
+loot:
+  - item: wood_scrap
+    weight: 45
+  - item: iron_scrap
+    weight: 20
+  - item: coin
+    weight: 25
+    amount: 1-3
+  - item: blueprint
+    weight: 5

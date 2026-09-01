@@ -1,0 +1,15 @@
+id: stool
+break-message: "You cracked apart a small stool."
+hitbox-height: 0.8
+particle-material: OAK_FENCE
+parts:
+  - material: OAK_FENCE
+    offset: [0, 0, 0]
+  - material: OAK_PRESSURE_PLATE
+    offset: [0, 1, 0]
+loot:
+  - item: wood_scrap
+    weight: 80
+  - item: coin
+    weight: 15
+    amount: 1-2

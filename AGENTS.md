@@ -1146,6 +1146,7 @@ Files:
 - `level/**`
 - `level_type/**`
 - `modifiers/**`
+- `breakables/*.txt|*.yml|*.yaml`
 
 SQLite tables:
 - `hoc_shame`
@@ -1179,6 +1180,10 @@ SQLite tables:
 - Halls physics item displays are fixed, flat item displays with randomized yaw so dropped items read as lying on the floor instead of upright.
 - Halls physics item displays and breakable prop block displays use tiny random per-axis scale jitter to reduce display z-fighting.
 - Halls breakable props are session-owned display/interactions and may be multi-part prop archetypes such as barrels, chests, tables, chairs, stools, radiators, and metal barrels; keep cleanup routed through `HallsSession`.
+- Halls breakable prop archetypes are loaded from `plugins/OmGames/HallsOfCarnage/breakables/` and seeded from bundled defaults.
+- Breakable files define `id`, `break-message`, `hitbox-height`, `particle-material`, `parts`, and weighted `loot` entries.
+- Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
+- Halls coin drops use session-owned physics drops but bypass normal inventory pickup; right-clicking the coin adds it directly to the shared session coin counter even when the hotbar is full.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
 - Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.

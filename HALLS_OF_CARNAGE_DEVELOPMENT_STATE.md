@@ -48,6 +48,10 @@ Last updated: 2026-09-01
 - Exploration room placement now uses wider randomized gaps and lateral offsets to reduce visible grid alignment when viewing generated floors from outside the dungeon bounds.
 - Bundled Howling Corridors resources now include eight seeded exploration room templates, including three larger 13x14+ templates.
 - Halls physics item displays and breakable prop block displays receive tiny random per-axis scale jitter to reduce display z-fighting.
+- Breakable prop archetypes now load from `plugins/OmGames/HallsOfCarnage/breakables/*.txt|*.yml|*.yaml`, seeded by bundled files for barrel, chest, table, chair, stool, radiator, and metal barrel.
+- Breakable resource files define display parts, hitbox height, particle material, break message, and weighted loot entries.
+- Breakable loot now rolls from each prop's configured loot table and supports placeholder scrap, random scrap, blueprint keywords, and coin drops.
+- Coin drops are session-owned physics items that add directly to the shared session coin counter on right-click pickup, bypassing normal hotbar capacity.
 
 ## Current Scope
 
@@ -67,11 +71,11 @@ This is the first implementation slice. It focuses on:
 - Full multi-floor session runtime.
 - Real elevator transition animation/loading floor flow.
 - Ghost death state.
-- Full configurable item/drop definitions beyond the current placeholder physics drops.
+- Full configurable item/drop definitions beyond the current placeholder physics drops and breakable loot keywords.
 - Scrap storage and camp building runtime.
 - Combat/exploration/camp floor gameplay.
 - Sculk, traps, modifiers, monster flood systems.
-- Config-driven breakable prop definitions, real loot tables, and physics-driven unpicked item entities.
+- Dedicated scenario blueprint pools, rare blueprint resolution, and real gear item definitions.
 - Dedicated elevator transfer chest inventory and item persistence rules.
 - Scenario-aware randomized template-driven exploration room selection from `resources/hallsOfCarnage/level/<level_type>/`.
 - Runtime use of level-type monster pools, modifier pools, and non-normal corridor algorithms beyond parsed metadata.
@@ -85,10 +89,10 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-- Doorway selection now rejects room-mask sides blocked by internal `X` cells, room placement has wider random spacing/lateral drift, bundled Howling Corridors resources include three larger room templates, and display entities get small random scale jitter.
+- Added resource-backed Halls breakable prop definitions under `hallsOfCarnage/breakables/`, loaded them during Halls load/reload/reset, routed exploration props through weighted per-prop loot tables, and added coin drops that can be picked up even with a full hotbar.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For next slice:
-- Could you extract the breakables into .txt simillar to how rooms and scenarios are in resources? So a human can simply add more if needed. Also instead of randomly dropping scrap, blueprints, weapons and armor, could you add a simple loot table? For example, metal barrel can drop diamond,redstone,blueprint,armor,weapon while chair can only drop wood or iron.
-- Simillar to how you separate breakables, also separate items. While scraps should be unique items, there should also be keywords, for example blueprint should yield a blueprint from a scenario pool based on rarity, while doing this, also make a new pool for scenario called rare blueprints, then we can guarantee a rare blueprint using rare_blueprint keyword and nomrla_blueprint keyword, while blueprint is still random with rare being rarer. Scrap should also refer to random scrap.
-- Make it so there is a chance for coins to drop out of breakables and add them to the loot pool. Coins are items, until picked up, can be picked up if inventory is full, since they are not a nromal item.
+- Separate item definitions from placeholder keyword handling, including scenario blueprint pools and rare blueprint support.
+- For example the crate on the first floor should always contain rare blueprint. Blueprint keyword can have rare blueprint, but chance for normal is higher. Add a rare blueprint loot table for scenarios.
+- While at this, also add support for armors and weapons, normal and rares, including ranged and utility, refer to the design doc. All of them should have recipes which are defined in item files. Recipes are right now unused and will be used later. Edit the scenario file to reflect them. And add drop chances for them into some breakables.

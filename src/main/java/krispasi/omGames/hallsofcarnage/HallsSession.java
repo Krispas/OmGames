@@ -62,6 +62,7 @@ public final class HallsSession {
     private final HallsConfig.BlockPoint origin;
     private final File dataFolder;
     private final Map<String, HallsLevelType> levelTypes;
+    private final Map<String, HallsBreakableType> breakableTypes;
     private final Set<UUID> participants;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
@@ -90,6 +91,7 @@ public final class HallsSession {
                         HallsConfig.BlockPoint origin,
                         File dataFolder,
                         Map<String, HallsLevelType> levelTypes,
+                        Map<String, HallsBreakableType> breakableTypes,
                         List<Player> players) {
         this.plugin = plugin;
         this.id = id;
@@ -98,6 +100,7 @@ public final class HallsSession {
         this.origin = origin;
         this.dataFolder = dataFolder;
         this.levelTypes = levelTypes == null ? Map.of() : Map.copyOf(levelTypes);
+        this.breakableTypes = breakableTypes == null ? Map.of() : Map.copyOf(breakableTypes);
         this.participants = new HashSet<>();
         for (Player player : players) {
             participants.add(player.getUniqueId());
@@ -156,6 +159,12 @@ public final class HallsSession {
         PhysicsDrop drop = physicsDrops.get(entity.getUniqueId());
         if (drop == null) {
             return false;
+        }
+        if (isCoinItem(drop.stack())) {
+            coins += Math.max(1, drop.stack().getAmount());
+            removePhysicsDrop(drop);
+            world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.8f);
+            return true;
         }
         if (!player.getInventory().getItemInMainHand().getType().isAir()) {
             player.sendActionBar(Component.text("Use an empty hand to pick up Halls items.", NamedTextColor.RED));
@@ -372,7 +381,7 @@ public final class HallsSession {
                 Map.of(BlockFace.NORTH, layout.width() / 2), levelType, new Random((((long) id) << 32) ^ 1));
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1, levelType);
         spawnBreakableProp(origin.x() - layout.width() / 2 + 1, origin.y(), roomStartZ + 1,
-                PropArchetype.BARREL, 3, PropReward.BLUEPRINT);
+                breakableType("barrel"), 3, List.of(new HallsBreakableType.LootEntry("blueprint", 1, 1, 1)));
         closeElevatorDoors();
     }
 
@@ -821,7 +830,7 @@ public final class HallsSession {
             Cell cell = cells.get(random.nextInt(cells.size()));
             spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
                     propArchetype(i, roomIndex, HallsLevelType.fallback("howling_corridors")),
-                    propHealth(i), propReward(floor, roomIndex, i));
+                    propHealth(i));
         }
     }
 
@@ -842,7 +851,7 @@ public final class HallsSession {
         for (int i = 0; i < props; i++) {
             Cell cell = cells.get(random.nextInt(cells.size()));
             spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
-                    propArchetype(i, roomIndex, levelType), propHealth(i), propReward(floor, roomIndex, i));
+                    propArchetype(i, roomIndex, levelType), propHealth(i));
         }
     }
 
@@ -878,27 +887,26 @@ public final class HallsSession {
         return x == room.layout().width() / 2 || z == room.layout().depth() / 2;
     }
 
-    private PropArchetype propArchetype(int index, int roomIndex, HallsLevelType levelType) {
-        PropArchetype[] archetypes = {
-                PropArchetype.BARREL,
-                PropArchetype.CHEST,
-                PropArchetype.TABLE,
-                PropArchetype.CHAIR,
-                PropArchetype.STOOL,
-                PropArchetype.RADIATOR,
-                PropArchetype.METAL_BARREL
-        };
+    private HallsBreakableType propArchetype(int index, int roomIndex, HallsLevelType levelType) {
+        List<HallsBreakableType> archetypes = new ArrayList<>(breakableTypes.values());
+        if (archetypes.isEmpty()) {
+            archetypes = new ArrayList<>(HallsBreakableTypeLoader.loadBreakableTypes(plugin, null).values());
+        }
+        archetypes.sort(Comparator.comparing(HallsBreakableType::id));
         int salt = levelType == null ? 0 : levelType.id().hashCode();
-        return archetypes[Math.floorMod(index + roomIndex + salt, archetypes.length)];
+        return archetypes.get(Math.floorMod(index + roomIndex + salt, archetypes.size()));
     }
 
     private int propHealth(int index) {
         return 2 + Math.floorMod(index, 3);
     }
 
-    private PropReward propReward(int floor, int roomIndex, int index) {
-        PropReward[] rewards = {PropReward.WOOD_SCRAP, PropReward.IRON_SCRAP, PropReward.REDSTONE_SCRAP, PropReward.DIAMOND_SCRAP};
-        return rewards[Math.floorMod(floor + roomIndex + index, rewards.length)];
+    private HallsBreakableType breakableType(String id) {
+        HallsBreakableType type = breakableTypes.get(id);
+        if (type != null) {
+            return type;
+        }
+        return HallsBreakableTypeLoader.loadBreakableTypes(plugin, null).values().iterator().next();
     }
 
     private void startHudTask() {
@@ -981,9 +989,18 @@ public final class HallsSession {
         return block.getState(false) instanceof Container container ? container : null;
     }
 
-    private void spawnBreakableProp(int x, int y, int z, PropArchetype archetype, int health, PropReward reward) {
+    private void spawnBreakableProp(int x, int y, int z, HallsBreakableType archetype, int health) {
+        spawnBreakableProp(x, y, z, archetype, health, archetype.loot());
+    }
+
+    private void spawnBreakableProp(int x,
+                                    int y,
+                                    int z,
+                                    HallsBreakableType archetype,
+                                    int health,
+                                    List<HallsBreakableType.LootEntry> loot) {
         List<UUID> displayIds = new ArrayList<>();
-        for (PropPart part : archetype.parts()) {
+        for (HallsBreakableType.Part part : archetype.parts()) {
             displayIds.add(spawnPropDisplay(x + part.offsetX(), y + part.offsetY(), z + part.offsetZ(), part.material()));
         }
         Location hitboxLocation = new Location(world, x + 0.5, y, z + 0.5);
@@ -995,7 +1012,7 @@ public final class HallsSession {
             entity.addScoreboardTag("omgames_hoc_breakable");
         });
         BreakableProp prop = new BreakableProp(interaction.getUniqueId(), displayIds, x, y, z, health,
-                archetype.particleMaterial(), reward, archetype.breakMessage());
+                archetype.particleMaterial(), loot, archetype.breakMessage());
         breakableProps.put(interaction.getUniqueId(), prop);
         for (UUID displayId : displayIds) {
             breakableProps.put(displayId, prop);
@@ -1023,26 +1040,62 @@ public final class HallsSession {
         wakePhysicsDropsNear(dropLocation);
         if (dropLocation != null) {
             world.playSound(dropLocation, Sound.BLOCK_WOOD_BREAK, 0.8f, 1.0f);
-            applyReward(prop.reward(), dropLocation);
+            applyLoot(prop.loot(), dropLocation);
         }
     }
 
-    private void applyReward(PropReward reward, Location dropLocation) {
-        switch (reward) {
-            case BLUEPRINT -> dropSessionItem(dropLocation, blueprintPlaceholder());
-            case WOOD_SCRAP -> {
-                dropSessionItem(dropLocation, scrapItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD, reward));
-            }
-            case IRON_SCRAP -> {
-                dropSessionItem(dropLocation, scrapItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY, reward));
-            }
-            case DIAMOND_SCRAP -> {
-                dropSessionItem(dropLocation, scrapItem(Material.DIAMOND, "Diamond Scrap", NamedTextColor.AQUA, reward));
-            }
-            case REDSTONE_SCRAP -> {
-                dropSessionItem(dropLocation, scrapItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED, reward));
+    private void applyLoot(List<HallsBreakableType.LootEntry> loot, Location dropLocation) {
+        HallsBreakableType.LootEntry entry = rollLoot(loot);
+        if (entry == null) {
+            return;
+        }
+        int amount = entry.minAmount();
+        if (entry.maxAmount() > entry.minAmount()) {
+            amount += new Random().nextInt(entry.maxAmount() - entry.minAmount() + 1);
+        }
+        applyReward(entry.item(), amount, dropLocation);
+    }
+
+    private HallsBreakableType.LootEntry rollLoot(List<HallsBreakableType.LootEntry> loot) {
+        if (loot == null || loot.isEmpty()) {
+            return null;
+        }
+        int totalWeight = loot.stream().mapToInt(HallsBreakableType.LootEntry::weight).sum();
+        int roll = new Random().nextInt(Math.max(1, totalWeight));
+        for (HallsBreakableType.LootEntry entry : loot) {
+            roll -= entry.weight();
+            if (roll < 0) {
+                return entry;
             }
         }
+        return loot.getLast();
+    }
+
+    private void applyReward(String reward, int amount, Location dropLocation) {
+        switch (reward) {
+            case "blueprint", "normal_blueprint", "rare_blueprint" -> dropSessionItem(dropLocation, blueprintPlaceholder());
+            case "coin", "coins" -> dropSessionItem(dropLocation, coinItem(amount));
+            case "wood_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD, PropReward.WOOD_SCRAP, amount));
+            case "iron_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY, PropReward.IRON_SCRAP, amount));
+            case "diamond_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.DIAMOND, "Diamond Scrap", NamedTextColor.AQUA, PropReward.DIAMOND_SCRAP, amount));
+            case "redstone_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED, PropReward.REDSTONE_SCRAP, amount));
+            case "random_scrap", "scrap" -> {
+                PropReward[] scraps = {PropReward.WOOD_SCRAP, PropReward.IRON_SCRAP, PropReward.DIAMOND_SCRAP, PropReward.REDSTONE_SCRAP};
+                PropReward selected = scraps[new Random().nextInt(scraps.length)];
+                applyReward(scrapRewardId(selected), amount, dropLocation);
+            }
+            default -> {
+            }
+        }
+    }
+
+    private String scrapRewardId(PropReward reward) {
+        return switch (reward) {
+            case WOOD_SCRAP -> "wood_scrap";
+            case IRON_SCRAP -> "iron_scrap";
+            case DIAMOND_SCRAP -> "diamond_scrap";
+            case REDSTONE_SCRAP -> "redstone_scrap";
+        };
     }
 
     private int depositScrap(PlayerInventory inventory) {
@@ -1326,6 +1379,21 @@ public final class HallsSession {
         return namedItem(Material.PAPER, "Building Blueprint", NamedTextColor.AQUA);
     }
 
+    private ItemStack coinItem(int amount) {
+        ItemStack item = namedItem(Material.GOLD_NUGGET, amount == 1 ? "Coin" : amount + " Coins", NamedTextColor.YELLOW);
+        item.setAmount(Math.max(1, amount));
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.getPersistentDataContainer().set(
+                    new org.bukkit.NamespacedKey(plugin, "hoc_coin"),
+                    PersistentDataType.BYTE,
+                    (byte) 1
+            );
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     private ItemStack namedItem(Material material, String name, NamedTextColor color) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
@@ -1336,8 +1404,9 @@ public final class HallsSession {
         return item;
     }
 
-    private ItemStack scrapItem(Material material, String name, NamedTextColor color, PropReward reward) {
+    private ItemStack scrapItem(Material material, String name, NamedTextColor color, PropReward reward, int amount) {
         ItemStack item = namedItem(material, name, color);
+        item.setAmount(Math.max(1, amount));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.setMaxStackSize(1);
@@ -1389,6 +1458,15 @@ public final class HallsSession {
         }
         return item.getItemMeta().getPersistentDataContainer()
                 .has(new org.bukkit.NamespacedKey(plugin, "hoc_scrap_type"), PersistentDataType.STRING);
+    }
+
+    private boolean isCoinItem(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return false;
+        }
+        Byte marker = item.getItemMeta().getPersistentDataContainer()
+                .get(new org.bukkit.NamespacedKey(plugin, "hoc_coin"), PersistentDataType.BYTE);
+        return marker != null && marker == (byte) 1;
     }
 
     private void applyInventoryLimit(Player player) {
@@ -1592,7 +1670,7 @@ public final class HallsSession {
         private final int y;
         private final int z;
         private final Material material;
-        private final PropReward reward;
+        private final List<HallsBreakableType.LootEntry> loot;
         private final String breakMessage;
         private int health;
 
@@ -1603,7 +1681,7 @@ public final class HallsSession {
                               int z,
                               int health,
                               Material material,
-                              PropReward reward,
+                              List<HallsBreakableType.LootEntry> loot,
                               String breakMessage) {
             this.interactionId = interactionId;
             this.displayIds = List.copyOf(displayIds);
@@ -1612,7 +1690,7 @@ public final class HallsSession {
             this.z = z;
             this.health = health;
             this.material = material;
-            this.reward = reward;
+            this.loot = List.copyOf(loot);
             this.breakMessage = breakMessage;
         }
 
@@ -1644,8 +1722,8 @@ public final class HallsSession {
             return material;
         }
 
-        private PropReward reward() {
-            return reward;
+        private List<HallsBreakableType.LootEntry> loot() {
+            return loot;
         }
 
         private String breakMessage() {
@@ -1658,63 +1736,9 @@ public final class HallsSession {
     }
 
     private enum PropReward {
-        BLUEPRINT,
         WOOD_SCRAP,
         IRON_SCRAP,
         DIAMOND_SCRAP,
         REDSTONE_SCRAP
-    }
-
-    private enum PropArchetype {
-        BARREL("You broke open a dusty barrel.", 1.0f, Material.BARREL,
-                new PropPart(0, 0, 0, Material.BARREL)),
-        CHEST("You smashed a rotting chest.", 1.0f, Material.CHEST,
-                new PropPart(0, 0, 0, Material.CHEST)),
-        TABLE("You splintered an old table.", 1.0f, Material.OAK_PLANKS,
-                new PropPart(0, 0, 0, Material.OAK_FENCE),
-                new PropPart(0, 1, 0, Material.OAK_PRESSURE_PLATE)),
-        CHAIR("You kicked apart a wooden chair.", 1.0f, Material.OAK_STAIRS,
-                new PropPart(0, 0, 0, Material.OAK_STAIRS),
-                new PropPart(0, 1, 0, Material.OAK_TRAPDOOR)),
-        STOOL("You cracked apart a small stool.", 0.8f, Material.OAK_FENCE,
-                new PropPart(0, 0, 0, Material.OAK_FENCE),
-                new PropPart(0, 1, 0, Material.OAK_PRESSURE_PLATE)),
-        RADIATOR("You tore scrap from a dead radiator.", 1.0f, Material.IRON_BARS,
-                new PropPart(0, 0, 0, Material.IRON_BARS),
-                new PropPart(0, 1, 0, Material.SMOOTH_QUARTZ_SLAB)),
-        METAL_BARREL("You dented open a metal barrel.", 1.0f, Material.CAULDRON,
-                new PropPart(0, 0, 0, Material.CAULDRON),
-                new PropPart(0, 1, 0, Material.HEAVY_WEIGHTED_PRESSURE_PLATE));
-
-        private final String breakMessage;
-        private final float hitboxHeight;
-        private final Material particleMaterial;
-        private final List<PropPart> parts;
-
-        PropArchetype(String breakMessage, float hitboxHeight, Material particleMaterial, PropPart... parts) {
-            this.breakMessage = breakMessage;
-            this.hitboxHeight = hitboxHeight;
-            this.particleMaterial = particleMaterial;
-            this.parts = List.of(parts);
-        }
-
-        private String breakMessage() {
-            return breakMessage;
-        }
-
-        private float hitboxHeight() {
-            return hitboxHeight;
-        }
-
-        private Material particleMaterial() {
-            return particleMaterial;
-        }
-
-        private List<PropPart> parts() {
-            return parts;
-        }
-    }
-
-    private record PropPart(int offsetX, int offsetY, int offsetZ, Material material) {
     }
 }

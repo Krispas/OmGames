@@ -46,7 +46,14 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/level_type/deep_crypt.txt",
             "hallsOfCarnage/modifiers/shared.yml",
             "hallsOfCarnage/modifiers/frozen_halls.yml",
-            "hallsOfCarnage/modifiers/deep_crypt.yml"
+            "hallsOfCarnage/modifiers/deep_crypt.yml",
+            "hallsOfCarnage/breakables/barrel.txt",
+            "hallsOfCarnage/breakables/chest.txt",
+            "hallsOfCarnage/breakables/table.txt",
+            "hallsOfCarnage/breakables/chair.txt",
+            "hallsOfCarnage/breakables/stool.txt",
+            "hallsOfCarnage/breakables/radiator.txt",
+            "hallsOfCarnage/breakables/metal_barrel.txt"
     };
 
     public record Result(boolean success, String message) {
@@ -68,6 +75,7 @@ public final class HallsOfCarnageManager {
     private HallsConfig config;
     private List<HallsScenario> scenarios = List.of();
     private Map<String, HallsLevelType> levelTypes = Map.of();
+    private Map<String, HallsBreakableType> breakableTypes = Map.of();
     private int nextSessionId = 1;
 
     public HallsOfCarnageManager(JavaPlugin plugin) {
@@ -81,11 +89,12 @@ public final class HallsOfCarnageManager {
         config = HallsConfig.load(getConfigFile());
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
+        breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
         shameService.load();
         applyWorldRules();
         spawnConfiguredMenuVillager();
         plugin.getLogger().info("Loaded " + scenarios.size() + " Halls of Carnage scenarios and "
-                + levelTypes.size() + " level types.");
+                + levelTypes.size() + " level types, " + breakableTypes.size() + " breakable types.");
     }
 
     public void shutdown() {
@@ -98,15 +107,16 @@ public final class HallsOfCarnageManager {
         config = HallsConfig.load(getConfigFile());
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
+        breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
         applyWorldRules();
         spawnConfiguredMenuVillager();
         return Result.ok("Reloaded Halls of Carnage. Scenarios: " + scenarios.size()
-                + ", level types: " + levelTypes.size() + ".");
+                + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size() + ".");
     }
 
     public Result resetGameResources(boolean confirmed) {
         if (!confirmed) {
-            return Result.fail("This deletes Halls scenario/level/level_type/modifier files and recopies bundled defaults. Use /hoc reset confirm.");
+            return Result.fail("This deletes Halls scenario/level/level_type/modifier/breakable files and recopies bundled defaults. Use /hoc reset confirm.");
         }
         if (!activeSessions.isEmpty()) {
             return Result.fail("Stop active Halls sessions before resetting game resources.");
@@ -117,6 +127,7 @@ public final class HallsOfCarnageManager {
             deleteGameResourceFolder(new File(folder, "level"));
             deleteGameResourceFolder(new File(folder, "level_type"));
             deleteGameResourceFolder(new File(folder, "modifiers"));
+            deleteGameResourceFolder(new File(folder, "breakables"));
         } catch (IOException ex) {
             return Result.fail("Failed to delete Halls game resources: " + ex.getMessage());
         }
@@ -125,8 +136,9 @@ public final class HallsOfCarnageManager {
         }
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
+        breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
         return Result.ok("Reset Halls game resources from bundled defaults. Scenarios: " + scenarios.size()
-                + ", level types: " + levelTypes.size() + ".");
+                + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size() + ".");
     }
 
     public List<HallsScenario> getScenarios() {
@@ -344,7 +356,7 @@ public final class HallsOfCarnageManager {
         int sessionId = nextSessionId++;
         int slot = firstFreeSessionSlot();
         HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot),
-                getDataFolder(), levelTypes, players);
+                getDataFolder(), levelTypes, breakableTypes, players);
         try {
             session.start();
         } catch (IOException ex) {
@@ -605,6 +617,10 @@ public final class HallsOfCarnageManager {
 
     private File getLevelTypesFolder() {
         return new File(getDataFolder(), "level_type");
+    }
+
+    private File getBreakablesFolder() {
+        return new File(getDataFolder(), "breakables");
     }
 
     private String normalizeId(String value) {
