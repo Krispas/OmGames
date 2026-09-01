@@ -129,8 +129,10 @@ final class HallsExplorationGenerator {
         List<BlockFace> faces = availableFaces(anchor);
         Collections.shuffle(faces, random);
         BlockFace face = faces.getFirst();
-        int gap = 3 + random.nextInt(6);
-        int lateral = random.nextInt(15) - 7;
+        int gap = 5 + random.nextInt(14);
+        int lateralRange = 10 + Math.max(anchor.layout().width(), anchor.layout().depth()) / 2
+                + Math.max(layout.width(), layout.depth()) / 2;
+        int lateral = random.nextInt(lateralRange * 2 + 1) - lateralRange;
         Room room = switch (face) {
             case NORTH -> new Room(layout, anchor.centerX() + lateral - layout.width() / 2,
                     anchor.startZ() - gap - layout.depth());
@@ -181,11 +183,36 @@ final class HallsExplorationGenerator {
     }
 
     private int doorOffset(HallsLayout layout, BlockFace face) {
+        List<Integer> offsets = validDoorOffsets(layout, face);
+        if (!offsets.isEmpty()) {
+            return offsets.get(random.nextInt(offsets.size()));
+        }
         int span = face == BlockFace.NORTH || face == BlockFace.SOUTH ? layout.width() : layout.depth();
         if (span <= 2) {
             return Math.max(0, span / 2);
         }
         return 1 + random.nextInt(span - 2);
+    }
+
+    private List<Integer> validDoorOffsets(HallsLayout layout, BlockFace face) {
+        int span = face == BlockFace.NORTH || face == BlockFace.SOUTH ? layout.width() : layout.depth();
+        List<Integer> offsets = new ArrayList<>();
+        for (int offset = 1; offset < span - 1; offset++) {
+            if (isValidDoorOffset(layout, face, offset)) {
+                offsets.add(offset);
+            }
+        }
+        return offsets;
+    }
+
+    private boolean isValidDoorOffset(HallsLayout layout, BlockFace face, int offset) {
+        return switch (face) {
+            case NORTH -> layout.at(offset, 0) == 'O' && layout.at(offset, 1) == 'O';
+            case SOUTH -> layout.at(offset, layout.depth() - 1) == 'O' && layout.at(offset, layout.depth() - 2) == 'O';
+            case EAST -> layout.at(layout.width() - 1, offset) == 'O' && layout.at(layout.width() - 2, offset) == 'O';
+            case WEST -> layout.at(0, offset) == 'O' && layout.at(1, offset) == 'O';
+            default -> false;
+        };
     }
 
     private Cell doorCell(Room room, BlockFace face, int offset) {
@@ -452,7 +479,7 @@ final class HallsExplorationGenerator {
     private List<BlockFace> availableFaces(Room room) {
         List<BlockFace> faces = new ArrayList<>();
         for (BlockFace face : CARDINAL_FACES) {
-            if (!room.openings().containsKey(face)) {
+            if (!room.openings().containsKey(face) && !validDoorOffsets(room.layout(), face).isEmpty()) {
                 faces.add(face);
             }
         }

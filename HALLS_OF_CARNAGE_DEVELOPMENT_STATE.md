@@ -44,6 +44,10 @@ Last updated: 2026-09-01
 - Exploration generation now reserves the elevator shell and generated room shells during corridor planning, validates a connector path before opening a room wall, uses wider randomized room offsets/gaps, and adds extra room-to-room loop corridors when a valid route exists.
 - Session-owned physics item drops now render as fixed flat item displays with randomized yaw, making placeholder scrap and blueprint drops read as lying on the floor.
 - Exploration generation now grows new rooms by connecting them to a selected anchor room with unused doorway faces, instead of routing every room into the nearest shared corridor network. The generated floor still validates reachability from the elevator after adding room-to-room loops and side branches.
+- Exploration doorway selection now rejects side offsets blocked by room-mask `X` cells at the edge or first inward cell, so generated entrances do not open into internal wall columns.
+- Exploration room placement now uses wider randomized gaps and lateral offsets to reduce visible grid alignment when viewing generated floors from outside the dungeon bounds.
+- Bundled Howling Corridors resources now include eight seeded exploration room templates, including three larger 13x14+ templates.
+- Halls physics item displays and breakable prop block displays receive tiny random per-axis scale jitter to reduce display z-fighting.
 
 ## Current Scope
 
@@ -81,16 +85,10 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-- Addressed the reviewer drop-orientation request by applying a flat 90-degree display transform and randomized yaw when Halls physics drops spawn.
-- Reworked the normal exploration corridor growth pass to create room-to-room corridor clusters. Existing direct room loops, first-room extra exits, side branches, and final reachability validation remain in place.
+- Doorway selection now rejects room-mask sides blocked by internal `X` cells, room placement has wider random spacing/lateral drift, bundled Howling Corridors resources include three larger room templates, and display entities get small random scale jitter.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For next slice:
-- Make it so that if a room has inner wall on the side, entrance won't generate there.
-- Generation is amazing now, however the rooms are way too gridlike when looking from out of bounds, could you increase their random offsets more?
-- Add a few more rooms for howling corridors, they should be a lot larger than the current ones, at least 10x10
-- Apply a small random scale modifier offest (0.98-1.02 randomly on all axis) to prevent z-fighting
-For the slice after this one:
 - Could you extract the breakables into .txt simillar to how rooms and scenarios are in resources? So a human can simply add more if needed. Also instead of randomly dropping scrap, blueprints, weapons and armor, could you add a simple loot table? For example, metal barrel can drop diamond,redstone,blueprint,armor,weapon while chair can only drop wood or iron.
 - Simillar to how you separate breakables, also separate items. While scraps should be unique items, there should also be keywords, for example blueprint should yield a blueprint from a scenario pool based on rarity, while doing this, also make a new pool for scenario called rare blueprints, then we can guarantee a rare blueprint using rare_blueprint keyword and nomrla_blueprint keyword, while blueprint is still random with rare being rarer. Scrap should also refer to random scrap.
 - Make it so there is a chance for coins to drop out of breakables and add them to the loot pool. Coins are items, until picked up, can be picked up if inventory is full, since they are not a nromal item.

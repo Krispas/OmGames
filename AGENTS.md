@@ -1177,6 +1177,7 @@ SQLite tables:
 - Halls physics item displays use a 1-tick interpolation delay and short teleport duration for smoother falling/pickup visuals.
 - Halls floor loot/drop placeholders should use session-owned physics drops (`ItemDisplay` plus `Interaction`) instead of vanilla dropped item entities; players pick them up by right-clicking with an empty hand.
 - Halls physics item displays are fixed, flat item displays with randomized yaw so dropped items read as lying on the floor instead of upright.
+- Halls physics item displays and breakable prop block displays use tiny random per-axis scale jitter to reduce display z-fighting.
 - Halls breakable props are session-owned display/interactions and may be multi-part prop archetypes such as barrels, chests, tables, chairs, stools, radiators, and metal barrels; keep cleanup routed through `HallsSession`.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
@@ -1185,3 +1186,5 @@ SQLite tables:
 - `HallsLayoutLoader` tolerates old copied room files by stripping a full `X` perimeter and treating non-`X` marker characters as open cells; this is runtime parsing tolerance, not file migration.
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
 - Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, ghost state, full item definitions, scrap storage, camps, traps, sculk, and monsters are pending.
+- Exploration doorway selection must reject side offsets where the room mask has `X` at the edge or first inward cell.
+- Howling Corridors room resources are seeded from all bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`.

@@ -1006,6 +1006,7 @@ public final class HallsSession {
         Location displayLocation = new Location(world, x, y, z);
         BlockDisplay display = world.spawn(displayLocation, BlockDisplay.class, entity -> {
             entity.setBlock(material.createBlockData());
+            entity.setTransformation(smallRandomScaleTransformation());
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_breakable");
         });
@@ -1140,8 +1141,20 @@ public final class HallsSession {
         return new Transformation(
                 new Vector3f(),
                 rotation,
-                new Vector3f(0.75f, 0.75f, 0.75f),
+                new Vector3f(randomDisplayScale(0.75f), randomDisplayScale(0.75f), randomDisplayScale(0.75f)),
                 new Quaternionf());
+    }
+
+    private Transformation smallRandomScaleTransformation() {
+        return new Transformation(
+                new Vector3f(),
+                new Quaternionf(),
+                new Vector3f(randomDisplayScale(1.0f), randomDisplayScale(1.0f), randomDisplayScale(1.0f)),
+                new Quaternionf());
+    }
+
+    private float randomDisplayScale(float base) {
+        return (float) (base * (0.98 + Math.random() * 0.04));
     }
 
     private void removeSessionEntities() {
