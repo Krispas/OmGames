@@ -103,6 +103,12 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                 }
                 result = manager.reload();
             }
+            case "reset" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                result = manager.resetGameResources(args.length == 2 && args[1].equalsIgnoreCase("confirm"));
+            }
             case "lobby" -> {
                 if (!requireOp(sender)) {
                     return true;
@@ -280,13 +286,16 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
     }
 
     private Component usage() {
-        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload", NamedTextColor.YELLOW);
+        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload | /hoc reset confirm", NamedTextColor.YELLOW);
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(args[0], "menu", "scenarios", "scenario", "sessions", "top", "shame", "tp", "start", "stop", "floor", "lobby", "reload");
+            return filter(args[0], "menu", "scenarios", "scenario", "sessions", "top", "shame", "tp", "start", "stop", "floor", "lobby", "reload", "reset");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
+            return filter(args[1], "confirm");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("scenario")) {
             return filter(args[1], manager.getScenarios().stream().map(HallsScenario::id).toArray(String[]::new));

@@ -46,6 +46,8 @@ public final class HallsSession {
     private static final int ROOM_HEIGHT = 5;
     private static final int ELEVATOR_INNER_RADIUS = 2;
     private static final int ELEVATOR_OUTER_RADIUS = 3;
+    private static final int DISPLAY_INTERPOLATION_DELAY_TICKS = 1;
+    private static final int DISPLAY_TELEPORT_DURATION_TICKS = 2;
     private static final double DROP_DISPLAY_SUPPORT_OFFSET = 0.08;
     private static final double DROP_SETTLE_VELOCITY_SQUARED = 0.0016;
 
@@ -537,6 +539,10 @@ public final class HallsSession {
                 setBlock(origin.x() + x, origin.y() + 4, origin.z() + z, ceiling);
             }
         }
+        setBlock(origin.x(), origin.y() + 4, origin.z(), Material.SEA_LANTERN);
+        for (int x = -2; x <= 2; x++) {
+            setBlock(origin.x() + x, origin.y() + 4, origin.z() + ELEVATOR_OUTER_RADIUS + 1, back);
+        }
         for (int y = 0; y <= 3; y++) {
             for (int x = -ELEVATOR_OUTER_RADIUS; x <= ELEVATOR_OUTER_RADIUS; x++) {
                 Material backMaterial = Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : Math.abs(x) == 2 ? side : back;
@@ -647,10 +653,10 @@ public final class HallsSession {
             if (isProtectedElevatorCell(blockX, blockZ)) {
                 continue;
             }
+            boolean path = offset >= pathMin && offset <= pathMax;
             setBlock(blockX, y - 1, blockZ, floor);
-            setBlock(blockX, y + 3, blockZ, ceiling);
+            setBlock(blockX, y + 3, blockZ, path && isCorridorLightCell(blockX, blockZ) ? levelType.light() : ceiling);
             for (int dy = 0; dy < 3; dy++) {
-                boolean path = offset >= pathMin && offset <= pathMax;
                 HallsExplorationGenerator.Cell point = new HallsExplorationGenerator.Cell(blockX, blockZ);
                 setBlock(blockX, y + dy, blockZ,
                         path ? Material.AIR : corridorWallMaterial(levelType, point, openCells));
@@ -714,7 +720,8 @@ public final class HallsSession {
             }
             setBlock(point.x(), origin.y() - 1, point.z(), floor);
             if (!insideRoomShell) {
-                setBlock(point.x(), origin.y() + 3, point.z(), ceiling);
+                setBlock(point.x(), origin.y() + 3, point.z(),
+                        open && isCorridorLightCell(point.x(), point.z()) ? levelType.light() : ceiling);
             }
             for (int dy = 0; dy < 3; dy++) {
                 setBlock(point.x(), origin.y() + dy, point.z(),
@@ -730,6 +737,10 @@ public final class HallsSession {
         boolean eastOpen = openCells.contains(new HallsExplorationGenerator.Cell(point.x() + 1, point.z()));
         boolean westOpen = openCells.contains(new HallsExplorationGenerator.Cell(point.x() - 1, point.z()));
         return (northOpen || southOpen) && (eastOpen || westOpen);
+    }
+
+    private boolean isCorridorLightCell(int x, int z) {
+        return Math.floorMod((x * 31) ^ (z * 17) ^ (id * 13) ^ currentFloor, 11) == 0;
     }
 
     private boolean isInsideGeneratedRoomShell(HallsExplorationGenerator.Cell point,
@@ -1080,6 +1091,8 @@ public final class HallsSession {
         Location spawnLocation = location.clone().add(0.0, 0.2, 0.0);
         ItemDisplay display = world.spawn(spawnLocation, ItemDisplay.class, entity -> {
             entity.setItemStack(stack.clone());
+            entity.setInterpolationDelay(DISPLAY_INTERPOLATION_DELAY_TICKS);
+            entity.setTeleportDuration(DISPLAY_TELEPORT_DURATION_TICKS);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_physics_drop");
         });

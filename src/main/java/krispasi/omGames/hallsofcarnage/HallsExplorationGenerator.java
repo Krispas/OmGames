@@ -113,6 +113,24 @@ final class HallsExplorationGenerator {
     }
 
     private Room randomRoom(HallsLayout layout) {
+        Room anchor = rooms.get(random.nextInt(rooms.size()));
+        BlockFace face = randomFace();
+        int gap = 4 + random.nextInt(8);
+        int lateral = random.nextInt(15) - 7;
+        return switch (face) {
+            case NORTH -> new Room(layout, anchor.centerX() + lateral - layout.width() / 2,
+                    anchor.startZ() - gap - layout.depth());
+            case SOUTH -> new Room(layout, anchor.centerX() + lateral - layout.width() / 2,
+                    anchor.startZ() + anchor.layout().depth() + gap);
+            case EAST -> new Room(layout, anchor.startX() + anchor.layout().width() + gap,
+                    anchor.centerZ() + lateral - layout.depth() / 2);
+            case WEST -> new Room(layout, anchor.startX() - gap - layout.width(),
+                    anchor.centerZ() + lateral - layout.depth() / 2);
+            default -> randomRoomAnywhere(layout);
+        };
+    }
+
+    private Room randomRoomAnywhere(HallsLayout layout) {
         int usableRadius = Math.min(LOGICAL_RADIUS - 8, Math.max(24, clearRadius - 8));
         int x = originX + random.nextInt(usableRadius * 2 + 1) - usableRadius - layout.width() / 2;
         int z = originZ + random.nextInt(usableRadius * 2 + 1) - usableRadius - layout.depth() / 2;
@@ -210,7 +228,11 @@ final class HallsExplorationGenerator {
         if (cell.equals(start) || target || corridorCells.contains(cell)) {
             return true;
         }
-        return !roomShellCells.contains(cell) && !roomInteriorCells.contains(cell);
+        if (manhattanDistance(cell, start) <= 2) {
+            return !roomShellCells.contains(cell) && !roomInteriorCells.contains(cell);
+        }
+        return !roomShellCells.contains(cell) && !roomInteriorCells.contains(cell)
+                && !isAdjacentToRoomShell(cell);
     }
 
     private List<Cell> reconstructPath(Map<Cell, Cell> previous, Cell end) {
@@ -285,10 +307,10 @@ final class HallsExplorationGenerator {
     }
 
     private void addLoopCorridors() {
-        int target = Math.max(2, rooms.size() / 5);
+        int target = Math.max(3, rooms.size() / 3);
         int added = 0;
         int attempts = 0;
-        while (added < target && attempts++ < rooms.size() * 20) {
+        while (added < target && attempts++ < rooms.size() * 60) {
             Room room = rooms.get(random.nextInt(rooms.size()));
             BlockFace face = randomFace();
             if (room.openings().containsKey(face)) {
@@ -301,7 +323,7 @@ final class HallsExplorationGenerator {
                 targets.remove(cell);
             }
             List<Cell> path = findConnectorPath(door, targets);
-            if (path.size() < 8) {
+            if (path.size() < 5) {
                 continue;
             }
             room.openings().put(face, offset);
@@ -321,6 +343,17 @@ final class HallsExplorationGenerator {
             }
         }
         return cells;
+    }
+
+    private boolean isAdjacentToRoomShell(Cell cell) {
+        return roomShellCells.contains(new Cell(cell.x() + 1, cell.z()))
+                || roomShellCells.contains(new Cell(cell.x() - 1, cell.z()))
+                || roomShellCells.contains(new Cell(cell.x(), cell.z() + 1))
+                || roomShellCells.contains(new Cell(cell.x(), cell.z() - 1));
+    }
+
+    private int manhattanDistance(Cell first, Cell second) {
+        return Math.abs(first.x() - second.x()) + Math.abs(first.z() - second.z());
     }
 
     private boolean insideBuildArea(Bounds bounds) {

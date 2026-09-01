@@ -4,8 +4,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -94,6 +96,31 @@ public final class HallsOfCarnageManager {
         applyWorldRules();
         spawnConfiguredMenuVillager();
         return Result.ok("Reloaded Halls of Carnage. Scenarios: " + scenarios.size()
+                + ", level types: " + levelTypes.size() + ".");
+    }
+
+    public Result resetGameResources(boolean confirmed) {
+        if (!confirmed) {
+            return Result.fail("This deletes Halls scenario/level/level_type/modifier files and recopies bundled defaults. Use /hoc reset confirm.");
+        }
+        if (!activeSessions.isEmpty()) {
+            return Result.fail("Stop active Halls sessions before resetting game resources.");
+        }
+        File folder = getDataFolder();
+        try {
+            deleteGameResourceFolder(new File(folder, "scenarios"));
+            deleteGameResourceFolder(new File(folder, "level"));
+            deleteGameResourceFolder(new File(folder, "level_type"));
+            deleteGameResourceFolder(new File(folder, "modifiers"));
+        } catch (IOException ex) {
+            return Result.fail("Failed to delete Halls game resources: " + ex.getMessage());
+        }
+        for (String resource : RESOURCE_FILES) {
+            copyResourceIfMissing(resource, new File(folder, resource.substring("hallsOfCarnage/".length())));
+        }
+        scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
+        levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
+        return Result.ok("Reset Halls game resources from bundled defaults. Scenarios: " + scenarios.size()
                 + ", level types: " + levelTypes.size() + ".");
     }
 
@@ -553,6 +580,22 @@ public final class HallsOfCarnageManager {
 
     private File getScenariosFolder() {
         return new File(getDataFolder(), "scenarios");
+    }
+
+    private void deleteGameResourceFolder(File folder) throws IOException {
+        if (!folder.exists()) {
+            return;
+        }
+        Path root = getDataFolder().getCanonicalFile().toPath();
+        Path target = folder.getCanonicalFile().toPath();
+        if (!target.startsWith(root) || target.equals(root)) {
+            throw new IOException("Refusing to delete outside the Halls data folder.");
+        }
+        try (java.util.stream.Stream<Path> paths = Files.walk(target)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        }
     }
 
     private File getLevelTypesFolder() {

@@ -10,7 +10,7 @@ materials:
 wall-palettes:
   ice_bricks:
     block: POLISHED_DIORITE
-    special-block: ICE
+    special-block: PRISMARINE
     special-chance: 0.10
   frozen_stone:
     block: TUFF_BRICKS

@@ -136,13 +136,15 @@ This is the first implementation slice. It focuses on:
 - The session renderer now consumes the baked corridor masks directly instead of reconstructing corridor shells one path at a time.
 - Added OP-only `/hoc scenario <scenario>` for debugging the active loaded scenario. It prints parsed floor definitions plus Bukkit's loaded YAML view, which should make stale copied server-side scenario files obvious.
 - Validation note: `git diff --check` passed, and the Halls package compiled with local JDK 25 plus Paper 26.2 API, SQLite, Adventure 5.2, JetBrains annotations, Guava, and Bungee chat jars. Full Maven packaging was not run because `mvn`/wrapper is unavailable in this shell.
+- Added OP-only `/hoc reset confirm`. It refuses to run with active Halls sessions, preserves `halls-of-carnage.yml`, deletes only game resource folders (`scenarios`, `level`, `level_type`, `modifiers`), and recopies bundled defaults.
+- Tuned baked exploration generation so rooms are placed closer to existing rooms, extra loop corridors are more common, and corridor routing avoids long runs directly adjacent to room walls except near doorway exits.
+- Corridor rendering now embeds occasional light blocks in the ceiling at `y+3`, preserving the 3-block walkable corridor height.
+- The elevator now has a ceiling light and an extra sealed vestibule ceiling outside the door to avoid visible sky at the entrance.
+- Session physics `ItemDisplay` drops now use a 1-tick interpolation delay and short teleport duration for smoother animation.
+- Validation note: `git diff --check` passed, and the Halls package compiled with local JDK 25 plus Paper 26.2 API, SQLite, Adventure 5.2, JetBrains annotations, Guava, and Bungee chat jars. Full Maven packaging was not run because `mvn`/wrapper is unavailable in this shell.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-For the next slice:
-- Add a reset command which requires confirm, it will delete all game related (not lobby related) Halls of Carnage configs and replace them with the ones from resources.
-- Add 1 tick teleport and interpolation delay to the item displays, making animations smoother
-- The new generation is pretty good, however the rooms should be a little bit closer to each other. Also I've seen some diagonal corridors, we dont want diagonal ones. On top of this, add extra corridors so the level is more interconnected also the corridors often "lean against" the walls of the rooms, this is not forbidden, but it shouldnt happen much.
-- I've also figured why you werent able to fix the room count, turned out I forgot to delete the old config files.
-- Add lighting into corridors, however it should be inbuilt into the ceiling so they remain 3 block tall
-- Add a light into the elevator
-- Elevator entrance has visible sky, this could have been prevented by generated solid out of bounds.
+For next slice
+- The diagonal corridors still happen, eleminate them
+- Corridors right now are way too optimized, add more randomness to them since right now its creating more of a tree structure, I want a maze like dungeon that's enjoyable to play in, that also means placing room entrances in places it doesnt make much sense buildervise.
+- There is still visible sky in front of the elevator, to elaborate more its the place where black concrete was during loading

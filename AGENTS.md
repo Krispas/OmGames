@@ -1124,6 +1124,7 @@ Operator subcommands:
 - `/hoc stop <session_id|*>`
 - `/hoc floor <session_id> <floor>`
 - `/hoc scenario <scenario>`
+- `/hoc reset confirm`
 - `/hoc shame set <player> <amount>`
 - `/hoc shame add <player> <amount>`
 - `/hoc lobby setspawn`
@@ -1160,6 +1161,7 @@ SQLite tables:
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
 - `/hoc scenario <scenario>` is an OP-only debug command that prints the loaded parsed scenario data and the YAML view copied from the active server data folder.
+- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
 - `HallsExplorationGenerator` owns deterministic-per-session exploration layout planning.
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.txt|*.yml|*.yaml`.
 - Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, and `pillar-palettes`; monster/modifier sections may exist in resource files for future systems.
@@ -1169,6 +1171,8 @@ SQLite tables:
 - Exploration floors grow their per-session generation/cleanup radius from the configured room count and retry with larger radii if planning underfills.
 - Exploration corridor routing uses BFS over the baked mask, targets only existing corridor/elevator/door network cells, keeps paths cardinal-only, adds a small number of loop corridors after the main connected network is built, and checks reachability from the elevator before the plan is accepted.
 - Exploration corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
+- Generated corridors use ceiling-embedded light blocks so the walkable corridor remains 3 blocks tall, and the elevator has a ceiling light.
+- Halls physics item displays use a 1-tick interpolation delay and short teleport duration for smoother falling/pickup visuals.
 - Halls floor loot/drop placeholders should use session-owned physics drops (`ItemDisplay` plus `Interaction`) instead of vanilla dropped item entities; players pick them up by right-clicking with an empty hand.
 - Halls breakable props are session-owned display/interactions and may be multi-part prop archetypes such as barrels, chests, tables, chairs, stools, radiators, and metal barrels; keep cleanup routed through `HallsSession`.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
