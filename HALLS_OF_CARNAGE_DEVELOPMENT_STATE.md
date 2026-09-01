@@ -115,6 +115,7 @@ This is the first implementation slice. It focuses on:
 - Exploration room templates now resolve from the active floor's configured `level-type`; missing level-specific room folders fall back to the placeholder exploration mask.
 - Exploration floor generation no longer caps configured room counts at 28. The session grows its generation/cleanup radius from the configured `rooms` value and retries with larger radii when planning underfills.
 - Generated rooms and corridors now use the active level type's floor, ceiling, light, wall palette, and pillar palette materials instead of hardcoded Howling Corridors blocks.
+- If a scenario has a gap in explicit floor definitions, runtime now reuses the nearest prior exploration floor definition for that requested floor instead of falling back to the hardcoded 8-room Howling Corridors placeholder.
 - Scrap placeholder items now also use the max stack size component set to `1`; the unique metadata marker remains as a harmless fallback and deposit identifier companion.
 - Corridor open cells inside a generated room shell no longer place the lower corridor ceiling block, preventing room/corridor openings from gaining a low cap.
 - Validation note: the extracted generator compiles against a temporary local `BlockFace` stub. Full Maven packaging is still blocked in this shell because `mvn`/wrapper are unavailable and the installed Java compiler is Java 18 while Paper 26.2 and the project target Java 25.
@@ -126,10 +127,21 @@ This is the first implementation slice. It focuses on:
 - Added parsed-floor visibility to `/hoc scenarios`; each scenario now shows configured floor/range kind, level type, and room count.
 - Added active floor generation visibility to `/hoc sessions` and `/hoc floor`; active sessions now report current level type plus generated/target room counts.
 - Added a systematic fallback room-placement pass after randomized exploration generation so scenarios requesting 16+ rooms do not depend only on random anchor selection.
+- Tuned exploration placement to use smaller room gaps, less conservative room spacing, and longer valid connector limits so 16-room floors have more room to fill before the session expands the build radius.
+- Breakable props now use first-pass prop archetypes instead of only single full-block materials. Exploration rooms can spawn barrels, chests, tables, chairs, stools, radiators, and metal barrels, with multi-part `BlockDisplay` visuals sharing the same `Interaction` hitbox/reward path.
 - Known level-type fallbacks now have distinct palettes for `frozen_halls` and `deep_crypt`; if the server data folder is missing those level-type files, scenario floors no longer visually collapse back to Howling Corridors materials.
 - Important runtime note: bundled resource defaults are still only copied when missing. If a server already has an older `plugins/OmGames/HallsOfCarnage/scenarios/UntoldDepths.txt`, `/hoc scenarios` will expose the old parsed values; delete that server-side scenario file and restart/reload if the bundled default should be recopied.
+- Local validation note: `git diff --check` passed, and the Halls package compiled with local JDK 25 plus the local Paper API/transitive jars. Full Maven packaging was not run because `mvn`/wrapper is unavailable in this shell.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- report from /hoc session
-- 1: Untold Depths (floor 4, howling_corridors rooms 8/8, 1 player, origin 2000) which is obviouslz wrong
-- for next slice fix the generation, but also add more breakables, stuff like chests, tables, chairs, stools, radiators, metal barrels and so on. For more complex stuff use more block/item displays ot make advanced models.
+- For the next slice, let's completely rework the generation, because we keep running into problems.
+
+I propse a new algorithm, of course I am not perfect, so fact check me.
+We begin by having a large area for the level, let's say 512x512 centered on the elevator, fill it with the level type wall block.
+Next we will start baking layout, only building it ingame once its finished.
+Place elevator, then place the rooms, all of this should be on different layers so the logic can work with it. Then for rooms, pick entrances, simillar to the logic we have now.
+Then add corridors on their own layer, which is under the room layer, effectively ignoring them. After this we can check spots for breakables and later stuf like traps.
+Then lets build it ingame, this way its like carving into stone instead of building walls and less error prone. There should also be BFS which checks if all walkable parts are reachable from the elevator, this will later become useful for traps. Also check if from one room entrance you can get to others in all rooms, once again, this is later for traps.
+As I said, I am not perfect, there may be problems to this approach.
+
+Also even after five slices, the ignoring of scenario config is not fixed. Add a command which will print the whole parsed sceneratio data into chat for debugging.

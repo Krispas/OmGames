@@ -1163,10 +1163,12 @@ SQLite tables:
 - Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, and `pillar-palettes`; monster/modifier sections may exist in resource files for future systems.
 - Current exploration floors use carving-mask generation: Java places room shells, corridor openings, lights, props, and normal straight/90-degree corridors around interior-only `level/<level_type>/exploration_*.txt` room masks.
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
+- If a scenario floor is not explicitly configured but a prior exploration floor is configured, runtime reuses that prior exploration floor definition for the requested floor instead of falling back to the generic 8-room placeholder.
 - Exploration floors grow their per-session generation/cleanup radius from the configured room count and retry with larger radii if planning underfills.
 - Exploration corridor routing uses explicit room and corridor masks, rejects corridor/corridor intersections, keeps paths cardinal-only, and adds a small number of validated room-to-room loop corridors after the main connected room network is built.
 - Exploration corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
 - Halls floor loot/drop placeholders should use session-owned physics drops (`ItemDisplay` plus `Interaction`) instead of vanilla dropped item entities; players pick them up by right-clicking with an empty hand.
+- Halls breakable props are session-owned display/interactions and may be multi-part prop archetypes such as barrels, chests, tables, chairs, stools, radiators, and metal barrels; keep cleanup routed through `HallsSession`.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
 - Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.

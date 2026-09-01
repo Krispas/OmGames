@@ -365,7 +365,8 @@ public final class HallsSession {
         buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ,
                 Map.of(BlockFace.NORTH, layout.width() / 2), levelType, new Random((((long) id) << 32) ^ 1));
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1, levelType);
-        spawnBreakableProp(origin.x() - layout.width() / 2 + 1, origin.y(), roomStartZ + 1, Material.BARREL, 3, PropReward.BLUEPRINT);
+        spawnBreakableProp(origin.x() - layout.width() / 2 + 1, origin.y(), roomStartZ + 1,
+                PropArchetype.BARREL, 3, PropReward.BLUEPRINT);
         closeElevatorDoors();
     }
 
@@ -803,7 +804,8 @@ public final class HallsSession {
         for (int i = 0; i < props; i++) {
             Cell cell = cells.get(random.nextInt(cells.size()));
             spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
-                    propMaterial(i, roomIndex), propHealth(i), propReward(floor, roomIndex, i));
+                    propArchetype(i, roomIndex, HallsLevelType.fallback("howling_corridors")),
+                    propHealth(i), propReward(floor, roomIndex, i));
         }
     }
 
@@ -824,7 +826,7 @@ public final class HallsSession {
         for (int i = 0; i < props; i++) {
             Cell cell = cells.get(random.nextInt(cells.size()));
             spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
-                    propMaterial(i, roomIndex), propHealth(i), propReward(floor, roomIndex, i));
+                    propArchetype(i, roomIndex, levelType), propHealth(i), propReward(floor, roomIndex, i));
         }
     }
 
@@ -860,9 +862,18 @@ public final class HallsSession {
         return x == room.layout().width() / 2 || z == room.layout().depth() / 2;
     }
 
-    private Material propMaterial(int index, int roomIndex) {
-        Material[] materials = {Material.BARREL, Material.OAK_LOG, Material.IRON_ORE, Material.REDSTONE_ORE, Material.DEEPSLATE_DIAMOND_ORE};
-        return materials[Math.floorMod(index + roomIndex, materials.length)];
+    private PropArchetype propArchetype(int index, int roomIndex, HallsLevelType levelType) {
+        PropArchetype[] archetypes = {
+                PropArchetype.BARREL,
+                PropArchetype.CHEST,
+                PropArchetype.TABLE,
+                PropArchetype.CHAIR,
+                PropArchetype.STOOL,
+                PropArchetype.RADIATOR,
+                PropArchetype.METAL_BARREL
+        };
+        int salt = levelType == null ? 0 : levelType.id().hashCode();
+        return archetypes[Math.floorMod(index + roomIndex + salt, archetypes.length)];
     }
 
     private int propHealth(int index) {
@@ -954,24 +965,35 @@ public final class HallsSession {
         return block.getState(false) instanceof Container container ? container : null;
     }
 
-    private void spawnBreakableProp(int x, int y, int z, Material material, int health, PropReward reward) {
+    private void spawnBreakableProp(int x, int y, int z, PropArchetype archetype, int health, PropReward reward) {
+        List<UUID> displayIds = new ArrayList<>();
+        for (PropPart part : archetype.parts()) {
+            displayIds.add(spawnPropDisplay(x + part.offsetX(), y + part.offsetY(), z + part.offsetZ(), part.material()));
+        }
+        Location hitboxLocation = new Location(world, x + 0.5, y, z + 0.5);
+        Interaction interaction = world.spawn(hitboxLocation, Interaction.class, entity -> {
+            entity.setInteractionWidth(1.0f);
+            entity.setInteractionHeight(archetype.hitboxHeight());
+            entity.setResponsive(true);
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_breakable");
+        });
+        BreakableProp prop = new BreakableProp(interaction.getUniqueId(), displayIds, x, y, z, health,
+                archetype.particleMaterial(), reward, archetype.breakMessage());
+        breakableProps.put(interaction.getUniqueId(), prop);
+        for (UUID displayId : displayIds) {
+            breakableProps.put(displayId, prop);
+        }
+    }
+
+    private UUID spawnPropDisplay(int x, int y, int z, Material material) {
         Location displayLocation = new Location(world, x, y, z);
         BlockDisplay display = world.spawn(displayLocation, BlockDisplay.class, entity -> {
             entity.setBlock(material.createBlockData());
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_breakable");
         });
-        Location hitboxLocation = new Location(world, x + 0.5, y, z + 0.5);
-        Interaction interaction = world.spawn(hitboxLocation, Interaction.class, entity -> {
-            entity.setInteractionWidth(1.0f);
-            entity.setInteractionHeight(1.0f);
-            entity.setResponsive(true);
-            entity.setPersistent(false);
-            entity.addScoreboardTag("omgames_hoc_breakable");
-        });
-        BreakableProp prop = new BreakableProp(interaction.getUniqueId(), display.getUniqueId(), x, y, z, health, material, reward);
-        breakableProps.put(interaction.getUniqueId(), prop);
-        breakableProps.put(display.getUniqueId(), prop);
+        return display.getUniqueId();
     }
 
     private void breakBreakableProp(BreakableProp prop) {
@@ -1103,14 +1125,18 @@ public final class HallsSession {
 
     private void removeBreakableProp(BreakableProp prop) {
         breakableProps.remove(prop.interactionId());
-        breakableProps.remove(prop.displayId());
+        for (UUID displayId : prop.displayIds()) {
+            breakableProps.remove(displayId);
+        }
         Entity interaction = Bukkit.getEntity(prop.interactionId());
         if (interaction != null) {
             interaction.remove();
         }
-        Entity display = Bukkit.getEntity(prop.displayId());
-        if (display != null) {
-            display.remove();
+        for (UUID displayId : prop.displayIds()) {
+            Entity display = Bukkit.getEntity(displayId);
+            if (display != null) {
+                display.remove();
+            }
         }
     }
 
@@ -1515,31 +1541,41 @@ public final class HallsSession {
 
     private static final class BreakableProp {
         private final UUID interactionId;
-        private final UUID displayId;
+        private final List<UUID> displayIds;
         private final int x;
         private final int y;
         private final int z;
         private final Material material;
         private final PropReward reward;
+        private final String breakMessage;
         private int health;
 
-        private BreakableProp(UUID interactionId, UUID displayId, int x, int y, int z, int health, Material material, PropReward reward) {
+        private BreakableProp(UUID interactionId,
+                              List<UUID> displayIds,
+                              int x,
+                              int y,
+                              int z,
+                              int health,
+                              Material material,
+                              PropReward reward,
+                              String breakMessage) {
             this.interactionId = interactionId;
-            this.displayId = displayId;
+            this.displayIds = List.copyOf(displayIds);
             this.x = x;
             this.y = y;
             this.z = z;
             this.health = health;
             this.material = material;
             this.reward = reward;
+            this.breakMessage = breakMessage;
         }
 
         private UUID interactionId() {
             return interactionId;
         }
 
-        private UUID displayId() {
-            return displayId;
+        private List<UUID> displayIds() {
+            return displayIds;
         }
 
         private int x() {
@@ -1567,13 +1603,7 @@ public final class HallsSession {
         }
 
         private String breakMessage() {
-            return switch (reward) {
-                case BLUEPRINT -> "You broke open a dusty barrel.";
-                case WOOD_SCRAP -> "Recovered wood scrap.";
-                case IRON_SCRAP -> "Recovered iron scrap.";
-                case DIAMOND_SCRAP -> "Recovered diamond scrap.";
-                case REDSTONE_SCRAP -> "Recovered redstone scrap.";
-            };
+            return breakMessage;
         }
 
         private void damage() {
@@ -1587,5 +1617,58 @@ public final class HallsSession {
         IRON_SCRAP,
         DIAMOND_SCRAP,
         REDSTONE_SCRAP
+    }
+
+    private enum PropArchetype {
+        BARREL("You broke open a dusty barrel.", 1.0f, Material.BARREL,
+                new PropPart(0, 0, 0, Material.BARREL)),
+        CHEST("You smashed a rotting chest.", 1.0f, Material.CHEST,
+                new PropPart(0, 0, 0, Material.CHEST)),
+        TABLE("You splintered an old table.", 1.0f, Material.OAK_PLANKS,
+                new PropPart(0, 0, 0, Material.OAK_FENCE),
+                new PropPart(0, 1, 0, Material.OAK_PRESSURE_PLATE)),
+        CHAIR("You kicked apart a wooden chair.", 1.0f, Material.OAK_STAIRS,
+                new PropPart(0, 0, 0, Material.OAK_STAIRS),
+                new PropPart(0, 1, 0, Material.OAK_TRAPDOOR)),
+        STOOL("You cracked apart a small stool.", 0.8f, Material.OAK_FENCE,
+                new PropPart(0, 0, 0, Material.OAK_FENCE),
+                new PropPart(0, 1, 0, Material.OAK_PRESSURE_PLATE)),
+        RADIATOR("You tore scrap from a dead radiator.", 1.0f, Material.IRON_BARS,
+                new PropPart(0, 0, 0, Material.IRON_BARS),
+                new PropPart(0, 1, 0, Material.SMOOTH_QUARTZ_SLAB)),
+        METAL_BARREL("You dented open a metal barrel.", 1.0f, Material.CAULDRON,
+                new PropPart(0, 0, 0, Material.CAULDRON),
+                new PropPart(0, 1, 0, Material.HEAVY_WEIGHTED_PRESSURE_PLATE));
+
+        private final String breakMessage;
+        private final float hitboxHeight;
+        private final Material particleMaterial;
+        private final List<PropPart> parts;
+
+        PropArchetype(String breakMessage, float hitboxHeight, Material particleMaterial, PropPart... parts) {
+            this.breakMessage = breakMessage;
+            this.hitboxHeight = hitboxHeight;
+            this.particleMaterial = particleMaterial;
+            this.parts = List.of(parts);
+        }
+
+        private String breakMessage() {
+            return breakMessage;
+        }
+
+        private float hitboxHeight() {
+            return hitboxHeight;
+        }
+
+        private Material particleMaterial() {
+            return particleMaterial;
+        }
+
+        private List<PropPart> parts() {
+            return parts;
+        }
+    }
+
+    private record PropPart(int offsetX, int offsetY, int offsetZ, Material material) {
     }
 }

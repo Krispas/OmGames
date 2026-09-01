@@ -18,6 +18,15 @@ public record HallsScenario(
                 return definition;
             }
         }
+        FloorDefinition nearestPriorExploration = null;
+        for (FloorDefinition definition : floors) {
+            if (definition.firstFloor() <= floor && definition.kind().equalsIgnoreCase("exploration")) {
+                nearestPriorExploration = definition;
+            }
+        }
+        if (nearestPriorExploration != null) {
+            return nearestPriorExploration.atFloor(floor);
+        }
         return FloorDefinition.fallback(floor);
     }
 
@@ -37,6 +46,10 @@ public record HallsScenario(
 
         public static FloorDefinition fallback(int floor) {
             return new FloorDefinition(floor, floor, "exploration", "howling_corridors", "0", 8, 0, 16);
+        }
+
+        public FloorDefinition atFloor(int floor) {
+            return new FloorDefinition(floor, floor, kind, levelType, difficulty, rooms, items, breakables);
         }
     }
 }

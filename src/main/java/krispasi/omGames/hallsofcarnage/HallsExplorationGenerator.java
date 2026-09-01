@@ -74,8 +74,8 @@ final class HallsExplorationGenerator {
             tryAddRoom(rooms.get(random.nextInt(rooms.size())),
                     layouts.get(random.nextInt(layouts.size())),
                     randomFace(),
-                    4 + random.nextInt(7),
-                    4 + random.nextInt(7));
+                    3 + random.nextInt(6),
+                    3 + random.nextInt(6));
         }
 
         fillRemainingRooms(layouts, targetRooms);
@@ -136,8 +136,8 @@ final class HallsExplorationGenerator {
                 List<BlockFace> faces = new ArrayList<>(List.of(CARDINAL_FACES));
                 Collections.shuffle(faces, random);
                 for (BlockFace face : faces) {
-                    for (int gap = 4; gap <= 14; gap += 2) {
-                        for (int lateralRange = 2; lateralRange <= 10; lateralRange += 2) {
+                    for (int gap = 3; gap <= 11; gap += 2) {
+                        for (int lateralRange = 2; lateralRange <= 12; lateralRange += 2) {
                             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
                             if (tryAddRoom(anchor, layout, face, gap, lateralRange)) {
                                 added = true;
@@ -169,12 +169,12 @@ final class HallsExplorationGenerator {
                 || room.startZ() + room.layout().depth() + 2 > originZ + clearRadius) {
             return false;
         }
-        Bounds bounds = Bounds.of(room).inflate(2);
+        Bounds bounds = Bounds.of(room).inflate(1);
         if (bounds.intersects(protectedElevator.inflate(3))) {
             return false;
         }
         for (Room existing : rooms) {
-            if (bounds.intersects(Bounds.of(existing).inflate(2))) {
+            if (bounds.intersects(Bounds.of(existing).inflate(1))) {
                 return false;
             }
         }
@@ -425,7 +425,7 @@ final class HallsExplorationGenerator {
     }
 
     private int maximumConnectorLength(Cell start, Cell end) {
-        return Math.min(58, manhattanDistance(start, end) + 22);
+        return Math.min(86, manhattanDistance(start, end) + 30);
     }
 
     private int manhattanDistance(Cell start, Cell end) {
