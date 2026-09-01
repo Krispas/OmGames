@@ -88,5 +88,9 @@ This is the first implementation slice. It focuses on:
 For next slice:
 - Make it so that if a room has inner wall on the side, entrance won't generate there.
 - Generation is amazing now, however the rooms are way too gridlike when looking from out of bounds, could you increase their random offsets more?
-- Could you extract the breakables into .txt simillar to how rooms and scenarios are in resources? So a human can simply add more if needed. Also instead of randomly dropping scrap, blueprints, weapons and armor, could you add a simple loot table? For example, metal barrel can drop diamond,redstone,blueprint,armor,weapon while chair can only drop wood or iron.
 - Add a few more rooms for howling corridors, they should be a lot larger than the current ones, at least 10x10
+- Apply a small random scale modifier offest (0.98-1.02 randomly on all axis) to prevent z-fighting
+For the slice after this one:
+- Could you extract the breakables into .txt simillar to how rooms and scenarios are in resources? So a human can simply add more if needed. Also instead of randomly dropping scrap, blueprints, weapons and armor, could you add a simple loot table? For example, metal barrel can drop diamond,redstone,blueprint,armor,weapon while chair can only drop wood or iron.
+- Simillar to how you separate breakables, also separate items. While scraps should be unique items, there should also be keywords, for example blueprint should yield a blueprint from a scenario pool based on rarity, while doing this, also make a new pool for scenario called rare blueprints, then we can guarantee a rare blueprint using rare_blueprint keyword and nomrla_blueprint keyword, while blueprint is still random with rare being rarer. Scrap should also refer to random scrap.
+- Make it so there is a chance for coins to drop out of breakables and add them to the loot pool. Coins are items, until picked up, can be picked up if inventory is full, since they are not a nromal item.
