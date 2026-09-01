@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -45,6 +46,8 @@ public final class HallsSession {
     private static final int ROOM_HEIGHT = 5;
     private static final int ELEVATOR_INNER_RADIUS = 2;
     private static final int ELEVATOR_OUTER_RADIUS = 3;
+    private static final double DROP_DISPLAY_SUPPORT_OFFSET = 0.08;
+    private static final double DROP_SETTLE_VELOCITY_SQUARED = 0.0016;
 
     private final JavaPlugin plugin;
     private final int id;
@@ -820,7 +823,7 @@ public final class HallsSession {
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_breakable");
         });
-        BreakableProp prop = new BreakableProp(interaction.getUniqueId(), display.getUniqueId(), health, material, reward);
+        BreakableProp prop = new BreakableProp(interaction.getUniqueId(), display.getUniqueId(), x, y, z, health, material, reward);
         breakableProps.put(interaction.getUniqueId(), prop);
         breakableProps.put(display.getUniqueId(), prop);
     }
@@ -832,6 +835,7 @@ public final class HallsSession {
             dropLocation = interaction.getLocation().clone().add(0.0, 0.25, 0.0);
         }
         removeBreakableProp(prop);
+        wakePhysicsDropsNear(dropLocation);
         if (dropLocation != null) {
             world.playSound(dropLocation, Sound.BLOCK_WOOD_BREAK, 0.8f, 1.0f);
             applyReward(prop.reward(), dropLocation);
@@ -899,10 +903,29 @@ public final class HallsSession {
         if (location == null || stack == null || stack.getType().isAir()) {
             return;
         }
+        int amount = shouldSplitSessionDrop(stack) ? Math.max(1, stack.getAmount()) : 1;
+        for (int i = 0; i < amount; i++) {
+            ItemStack singleStack = stack.clone();
+            singleStack.setAmount(shouldSplitSessionDrop(stack) ? 1 : stack.getAmount());
+            if (isScrapItem(singleStack)) {
+                markUniqueScrapItem(singleStack);
+            }
+            Vector splitVelocity = velocity == null ? new Vector() : velocity.clone();
+            if (amount > 1) {
+                splitVelocity.add(new Vector((Math.random() - 0.5) * 0.12, 0.03 * (i % 3), (Math.random() - 0.5) * 0.12));
+            }
+            dropSingleSessionItem(location, singleStack, splitVelocity);
+        }
+    }
+
+    private boolean shouldSplitSessionDrop(ItemStack stack) {
+        return stack.getType() != Material.ARROW && stack.getType() != Material.FIREWORK_ROCKET;
+    }
+
+    private void dropSingleSessionItem(Location location, ItemStack stack, Vector velocity) {
         Location spawnLocation = location.clone().add(0.0, 0.2, 0.0);
-        ItemStack singleStack = stack.clone();
         ItemDisplay display = world.spawn(spawnLocation, ItemDisplay.class, entity -> {
-            entity.setItemStack(singleStack.clone());
+            entity.setItemStack(stack.clone());
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_physics_drop");
         });
@@ -913,7 +936,7 @@ public final class HallsSession {
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_physics_drop");
         });
-        PhysicsDrop drop = new PhysicsDrop(interaction.getUniqueId(), display.getUniqueId(), singleStack, spawnLocation,
+        PhysicsDrop drop = new PhysicsDrop(interaction.getUniqueId(), display.getUniqueId(), stack.clone(), spawnLocation,
                 velocity == null ? new Vector() : velocity.clone().multiply(0.65));
         physicsDrops.put(interaction.getUniqueId(), drop);
         physicsDrops.put(display.getUniqueId(), drop);
@@ -985,7 +1008,12 @@ public final class HallsSession {
             if (!seen.add(drop.interactionId())) {
                 continue;
             }
-            tickPhysicsDrop(drop);
+            if (!drop.settled()) {
+                tickPhysicsDrop(drop);
+            }
+        }
+        if (physicsDrops.values().stream().allMatch(PhysicsDrop::settled)) {
+            stopPhysicsDropTask();
         }
     }
 
@@ -997,11 +1025,20 @@ public final class HallsSession {
             return;
         }
         Location next = drop.location().clone().add(drop.velocity());
-        Block supportBlock = supportBlockBelow(next);
-        if (supportBlock != null) {
-            next.setY(supportBlock.getY() + 1.08);
-            drop.velocity().setY(Math.max(0.0, -drop.velocity().getY() * 0.2));
-            drop.velocity().multiply(0.72);
+        Optional<Double> supportY = supportYBelow(next);
+        if (supportY.isPresent()) {
+            next.setY(supportY.get() + DROP_DISPLAY_SUPPORT_OFFSET);
+            if (drop.velocity().lengthSquared() <= DROP_SETTLE_VELOCITY_SQUARED) {
+                drop.velocity().zero();
+                drop.setSettled(true);
+            } else {
+                drop.velocity().setY(Math.max(0.0, -drop.velocity().getY() * 0.2));
+                drop.velocity().multiply(0.66);
+                if (drop.velocity().lengthSquared() <= DROP_SETTLE_VELOCITY_SQUARED) {
+                    drop.velocity().zero();
+                    drop.setSettled(true);
+                }
+            }
         } else {
             drop.velocity().setY(Math.max(-0.55, drop.velocity().getY() - 0.04));
             drop.velocity().multiply(new Vector(0.96, 0.98, 0.96));
@@ -1013,9 +1050,48 @@ public final class HallsSession {
         interaction.teleport(next.clone().add(0.0, -0.15, 0.0));
     }
 
-    private Block supportBlockBelow(Location location) {
+    private Optional<Double> supportYBelow(Location location) {
         Block block = world.getBlockAt(location.getBlockX(), (int) Math.floor(location.getY() - 0.08), location.getBlockZ());
-        return block.getType().isSolid() ? block : null;
+        if (block.getType().isSolid()) {
+            return Optional.of(block.getY() + 1.0);
+        }
+        return breakableSupportYBelow(location);
+    }
+
+    private Optional<Double> breakableSupportYBelow(Location location) {
+        double bestY = Double.NEGATIVE_INFINITY;
+        for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
+            if (location.getX() < prop.x() || location.getX() > prop.x() + 1.0
+                    || location.getZ() < prop.z() || location.getZ() > prop.z() + 1.0) {
+                continue;
+            }
+            double topY = prop.y() + 1.0;
+            if (location.getY() >= topY - 0.18 && location.getY() <= topY + 0.7 && topY > bestY) {
+                bestY = topY;
+            }
+        }
+        return bestY == Double.NEGATIVE_INFINITY ? Optional.empty() : Optional.of(bestY);
+    }
+
+    private void wakePhysicsDropsNear(Location location) {
+        if (location == null) {
+            return;
+        }
+        boolean wokeAny = false;
+        Set<UUID> seen = new HashSet<>();
+        for (PhysicsDrop drop : Set.copyOf(physicsDrops.values())) {
+            if (!seen.add(drop.interactionId()) || !drop.settled()
+                    || !drop.location().getWorld().equals(location.getWorld())
+                    || drop.location().distanceSquared(location) > 4.0) {
+                continue;
+            }
+            drop.setSettled(false);
+            drop.velocity().setY(0.04);
+            wokeAny = true;
+        }
+        if (wokeAny) {
+            startPhysicsDropTask();
+        }
     }
 
     private int firstAvailableHotbarSlot(PlayerInventory inventory) {
@@ -1051,9 +1127,27 @@ public final class HallsSession {
                     PersistentDataType.STRING,
                     reward.name()
             );
+            meta.getPersistentDataContainer().set(
+                    new org.bukkit.NamespacedKey(plugin, "hoc_scrap_unique"),
+                    PersistentDataType.STRING,
+                    UUID.randomUUID().toString()
+            );
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private void markUniqueScrapItem(ItemStack item) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        meta.getPersistentDataContainer().set(
+                new org.bukkit.NamespacedKey(plugin, "hoc_scrap_unique"),
+                PersistentDataType.STRING,
+                UUID.randomUUID().toString()
+        );
+        item.setItemMeta(meta);
     }
 
     private PropReward scrapType(ItemStack item) {
@@ -1197,13 +1291,49 @@ public final class HallsSession {
     private record BlockSnapshot(int x, int y, int z, BlockData blockData) {
     }
 
-    private record PhysicsDrop(
-            UUID interactionId,
-            UUID displayId,
-            ItemStack stack,
-            Location location,
-            Vector velocity
-    ) {
+    private static final class PhysicsDrop {
+        private final UUID interactionId;
+        private final UUID displayId;
+        private final ItemStack stack;
+        private final Location location;
+        private final Vector velocity;
+        private boolean settled;
+
+        private PhysicsDrop(UUID interactionId, UUID displayId, ItemStack stack, Location location, Vector velocity) {
+            this.interactionId = interactionId;
+            this.displayId = displayId;
+            this.stack = stack;
+            this.location = location;
+            this.velocity = velocity;
+        }
+
+        private UUID interactionId() {
+            return interactionId;
+        }
+
+        private UUID displayId() {
+            return displayId;
+        }
+
+        private ItemStack stack() {
+            return stack;
+        }
+
+        private Location location() {
+            return location;
+        }
+
+        private Vector velocity() {
+            return velocity;
+        }
+
+        private boolean settled() {
+            return settled;
+        }
+
+        private void setSettled(boolean settled) {
+            this.settled = settled;
+        }
     }
 
     private record RoomPlacement(HallsLayout layout, int startX, int startZ) {
@@ -1238,13 +1368,19 @@ public final class HallsSession {
     private static final class BreakableProp {
         private final UUID interactionId;
         private final UUID displayId;
+        private final int x;
+        private final int y;
+        private final int z;
         private final Material material;
         private final PropReward reward;
         private int health;
 
-        private BreakableProp(UUID interactionId, UUID displayId, int health, Material material, PropReward reward) {
+        private BreakableProp(UUID interactionId, UUID displayId, int x, int y, int z, int health, Material material, PropReward reward) {
             this.interactionId = interactionId;
             this.displayId = displayId;
+            this.x = x;
+            this.y = y;
+            this.z = z;
             this.health = health;
             this.material = material;
             this.reward = reward;
@@ -1256,6 +1392,18 @@ public final class HallsSession {
 
         private UUID displayId() {
             return displayId;
+        }
+
+        private int x() {
+            return x;
+        }
+
+        private int y() {
+            return y;
+        }
+
+        private int z() {
+            return z;
         }
 
         private int health() {

@@ -71,7 +71,7 @@ final class HallsExplorationGenerator {
         rooms.add(first);
 
         int attempts = 0;
-        while (rooms.size() < targetRooms && attempts++ < targetRooms * 120) {
+        while (rooms.size() < targetRooms && attempts++ < targetRooms * 320) {
             Room anchor = rooms.get(random.nextInt(rooms.size()));
             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
             BlockFace placementFace = randomFace();
@@ -99,8 +99,8 @@ final class HallsExplorationGenerator {
     }
 
     private Room candidateRoom(Room anchor, HallsLayout layout, BlockFace direction) {
-        int gap = 7 + random.nextInt(13);
-        int lateralRange = 9 + random.nextInt(12);
+        int gap = 5 + random.nextInt(9);
+        int lateralRange = 6 + random.nextInt(9);
         int jitter = random.nextInt(lateralRange * 2 + 1) - lateralRange;
         return switch (direction) {
             case NORTH -> new Room(layout, anchor.centerX() + jitter - layout.width() / 2,
@@ -122,17 +122,17 @@ final class HallsExplorationGenerator {
                 || room.startZ() + room.layout().depth() + 2 > originZ + clearRadius) {
             return false;
         }
-        Bounds bounds = Bounds.of(room).inflate(4);
+        Bounds bounds = Bounds.of(room).inflate(2);
         if (bounds.intersects(protectedElevator.inflate(3))) {
             return false;
         }
         for (Room existing : rooms) {
-            if (bounds.intersects(Bounds.of(existing).inflate(4))) {
+            if (bounds.intersects(Bounds.of(existing).inflate(2))) {
                 return false;
             }
         }
         for (Cell shellCell : roomShellCells(room)) {
-            if (corridorMask.contains(shellCell) || corridorShellMask.contains(shellCell)) {
+            if (corridorMask.contains(shellCell)) {
                 return false;
             }
         }
@@ -304,7 +304,7 @@ final class HallsExplorationGenerator {
     }
 
     private void addLoopCorridors() {
-        int target = Math.max(1, rooms.size() / 6);
+        int target = Math.max(2, rooms.size() / 4);
         int added = 0;
         int attempts = 0;
         while (added < target && attempts++ < rooms.size() * rooms.size()) {

@@ -106,6 +106,10 @@ This is the first implementation slice. It focuses on:
 - Reworked Howling Corridors generation to use a carving-mask approach: rooms are placed first, corridor candidates are cardinal step-by-step paths, and accepted corridors are remembered in masks so later corridors cannot intersect or visually cut through them.
 - Corridor generation now only returns orthogonally contiguous cell paths, so diagonal-looking corridor plans should no longer be possible from the planner.
 - Physics drops now settle on the exact top of the support block, fixing the previous behavior where they could sink deep into the floor after falling.
+- The Howling Corridors placement pass now makes more attempts, uses tighter room spacing, only rejects actual room/corridor path overlap, and adds more room-to-room loop corridors. Floors 2-4 in Untold Depths should now be much more likely to reach the configured 16 rooms instead of stopping around 8.
+- Session physics drops now stop ticking once settled. Destroying a nearby breakable prop wakes settled drops so items resting on that prop can fall after the support disappears.
+- Physics drops can now use active breakable props as support surfaces, allowing items to rest on top of table-like props.
+- Placeholder Halls scrap drops are split into single-item drops and marked with unique metadata so scrap does not stack in the hotbar.
 - Validation note: the extracted generator compiles against a temporary local `BlockFace` stub. Full Maven packaging is still blocked in this shell because `mvn`/wrapper are unavailable and the installed Java compiler is Java 18 while Paper 26.2 and the project target Java 25.
 
 ## Reviewer note (Delete entries once done, but keep the header)
@@ -113,8 +117,8 @@ This is the first implementation slice. It focuses on:
 - My original idea was to have 2D array where the rooms and corridors were to be placed, but if your approach is better, keep it.
 But just to talk about it more, I was thinking of level as having masks, like room mask, corridor mask and so on, which are then put on top of each other. The game still knows where rooms and the doors are so traps can adjust. Anyways if you have a better approach, keep it.
 - For next slice:
-- Add a few more corridors to worldgen based on room count for more interconnectiness
-- Item drops are almost fine, however they jitter around the ground, try to make it stop by disabling the physics once they land, only reanabling them when a breakable is broken close by.
-- Items should be able to land on top of breakables, like if it was a table
-- Scrap items right now stack, they shouldnt
-- I see 8 rooms on the lower floors, the generation should make 16 if based on untold depths scenario
+- To make items not stack, you could have just used the max stack size component.
+- If scenario says that for example, floor should have 100 rooms, it should generate 100 rooms. If you cannot place a new room, just expand the level size.
+- When corridor intersects with a room, its ceiling should not generate.
+- In the original design, if corridor tries to generate and collides with another, the generation stops and a t crossing is formed. Try to do that to add more natural shape.
+- The biggest change in this slice: Level type definitions, in GDD it is specified how they work, look into resources, there is a dummy file inside with instructions in it.

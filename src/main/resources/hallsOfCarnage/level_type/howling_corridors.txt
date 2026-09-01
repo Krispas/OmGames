@@ -1,2 +1,9 @@
 Should contain stuff like what blocks are ont he walls, what are on corners. If there is a block pallete instead of a normal block.
 Monsters, and so on refer to the main doc
+
+For example howling corridors should have packed mud for floors, tuff bricks for ceiling, sea lanterns for lights
+Then walls, for example lets have 2 wall types, one full of deepslate bricks with special block (occassional block that sometimes generates) being deepslate and second will be cobbled deepslate with also a chance for deepslate.
+When generating walls, one of these will be randomly picked for the wall and build from it.
+Then we have pillars, we are going to have only 1 pillar definition which is fully from reinforced deepslate, no special block. This thing will generate on corner walls.
+
+Howling mines have the basic corridor generation we already have, but add a field where we will be able to change it once more corridor types are implemented.
