@@ -1108,6 +1108,7 @@ Behavior notes:
   - Initial Halls of Carnage implementation.
   - Owns `/hoc`, Halls config/resource loading, lobby/menu-villager handling, scenario discovery, and Halls shame persistence.
   - Keep Halls logic isolated from BedWars, Egg Hunt, Chess, Bank, and Random classes.
+  - `HallsSession` owns active session state; `HallsSessionTrapRuntime` is its session-owned trap placement/ticking helper.
 
 ### 7.2 Command Surface
 
@@ -1187,6 +1188,7 @@ SQLite tables:
 - Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, `lore`, an unused-for-now `recipe` scrap cost map, and an optional `stats` map.
+- Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility.
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control blueprint keyword drops.
 - Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, storage lockers by size, mycelia farm, elevator drill, scanner, bounty board, and sculk purifiers by size.
@@ -1201,6 +1203,8 @@ SQLite tables:
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
 - `HallsLayoutLoader` tolerates old copied room files by stripping a full `X` perimeter and treating non-`X` marker characters as open cells; this is runtime parsing tolerance, not file migration.
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
-- Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, ghost state, full item definitions, scrap storage, camps, traps, sculk, and monsters are pending.
+- Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, ghost state, full item definitions, scrap storage, camps, polished trap visuals/config, sculk, and monsters are pending.
 - Exploration doorway selection must reject side offsets where the room mask has `X` at the edge or first inward cell.
 - Howling Corridors room resources are seeded from all bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`.
+- Exploration floors have first-pass session-owned trap generation/runtime for holes, bridged holes, bear traps, proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, and Deep Crypt poison darts.
+- Trap placement uses the generated walkable mask and BFS reachability before accepting an unbridged pit; pits that would disconnect traversal receive a spruce bridge.

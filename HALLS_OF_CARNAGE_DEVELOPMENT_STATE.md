@@ -53,7 +53,7 @@ Last updated: 2026-09-01
 - Breakable loot now rolls from each prop's configured loot table and supports placeholder scrap, random scrap, blueprint keywords, and coin drops.
 - Coin drops are session-owned physics items that add directly to the shared session coin counter on right-click pickup, bypassing normal hotbar capacity.
 - Item definitions now load recursively from `plugins/OmGames/HallsOfCarnage/items/**/*.txt|*.yml|*.yaml`, seeded by bundled defaults for normal/rare weapons, ranged gear, armors, utility items, and building blueprints grouped by category folder.
-- Item resource files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, `lore`, and recipe scrap costs for future camp crafting.
+- Item resource files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, and `lore`; non-blueprint items may also define recipe scrap costs for future camp crafting.
 - Item resource files now support `stats`; stats are written into item PDC as `hoc_stat_<stat_id>` and rendered in lore for test visibility.
 - Scenarios now parse `allowed-items` by category and `blueprint-pools.normal` / `blueprint-pools.rare`.
 - Breakable loot can reference concrete item ids, scenario-aware category keywords (`weapon`, `armor`, `ranged`, `utility` and rare variants), and scenario blueprint keywords.
@@ -64,6 +64,10 @@ Last updated: 2026-09-01
 - The first exploration room now uses validated doorway offsets for the elevator connection instead of always using the room's geometric center.
 - Bundled Howling Corridors resources now include twelve seeded exploration room templates.
 - Bundled blueprint item defaults now cover all current GDD building families and scenario blueprint pools reference the size-specific building ids.
+- Bundled blueprint item defaults no longer define scrap recipes; blueprint costs belong to future building/camp logic, not the blueprint item definitions.
+- Exploration floors now place first-pass trap hazards: holes, bridged holes, bear traps, proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, and Deep Crypt poison darts.
+- Trap placement uses the exploration walkable mask and reruns BFS-style reachability checks before leaving a pit unbridged. If removing the pit cell would disconnect the generated floor, the pit receives a spruce bridge instead.
+- Trap runtime is session-owned through `HallsSessionTrapRuntime` and cleaned up with floor rebuilds/session stop. Player movement and the trap tick both check hazards so pressure traps feel responsive while timed traps can pulse independently.
 
 ## Current Scope
 
@@ -86,7 +90,7 @@ This is the first implementation slice. It focuses on:
 - Full item behavior beyond current catalog-defined placeholder drops.
 - Scrap storage and camp building runtime.
 - Combat/exploration/camp floor gameplay.
-- Sculk, traps, modifiers, monster flood systems.
+- Sculk, modifiers, monster flood systems, and polished trap visuals/config.
 - Real item effects, equipment stats, crafting/building recipe consumers, and persisted unlock/storage systems.
 - Dedicated elevator transfer chest inventory and item persistence rules.
 - Scenario-aware randomized template-driven exploration room selection from `resources/hallsOfCarnage/level/<level_type>/`.
@@ -101,9 +105,15 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-- Fixed the first exploration-room elevator connection to use validated doorway offsets, made Halls item loading recursive, reorganized bundled item defaults into category folders, added four more Howling Corridors room templates, and added all currently listed GDD building blueprints to the default item catalog and scenario pools.
+- Removed recipe sections from bundled Halls blueprint item defaults.
+- Added first-pass exploration trap generation/runtime with BFS reachability checks for pits and automatic spruce bridging when a pit would disconnect traversal.
+- Implemented placeholder behavior for holes, bear traps, proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, and Deep Crypt poison darts.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For next slice:
-- Remove recipes from blueprints, they dont need those.
-- Add traps as described in GDD, all of them preferably. Don't forget to run the bfs. In case hole blocks movement from one part of a room to another, add bridges. Most stuff should be in the GDD.
+- Separate traps into text files, for those with models add a way to define them, for those with custom behaviour, let me edit stats.
+- Base the amount of traps per level from scenario file, edit the scenario file to add them there.
+- Recipes show scrap ids instead of their names, fix this. Don't show recipes on the items, they are meant to be shown only in crafting stations.
+- Make elevator door 1 block lower and the replace the top block with wall
+- Add abillity to insert scrap into the elevator as per GDD, don't also forget to reward the player with a coin for this.
+- Holes are meant to be a lot bigger, generate them using a new mask which creates 5x5 - 15x15 holes which are then intersected with room mask only

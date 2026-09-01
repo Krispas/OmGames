@@ -327,6 +327,17 @@ public final class HallsOfCarnageManager {
         }
     }
 
+    public void handlePlayerMove(Player player) {
+        if (player == null) {
+            return;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (session != null) {
+            session.handlePlayerMove(player);
+        }
+    }
+
     public boolean isHallsWorld(World world) {
         World lobbyWorld = config == null ? null : config.resolveLobbyWorld();
         return world != null && lobbyWorld != null && world.equals(lobbyWorld);

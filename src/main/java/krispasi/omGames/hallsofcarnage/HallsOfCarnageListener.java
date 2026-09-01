@@ -52,6 +52,7 @@ public final class HallsOfCarnageListener implements Listener {
     public void onPlayerMove(PlayerMoveEvent event) {
         if (manager.isHallsWorld(event.getPlayer().getWorld())) {
             manager.pushOutOfSessionProps(event.getPlayer());
+            manager.handlePlayerMove(event.getPlayer());
         }
     }
 

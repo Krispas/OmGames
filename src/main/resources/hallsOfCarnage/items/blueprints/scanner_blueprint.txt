@@ -6,6 +6,3 @@ material: PAPER
 max-stack-size: 1
 lore:
   - "Unlocks future modifier scouting."
-recipe:
-  iron_scrap: 6
-  redstone_scrap: 8

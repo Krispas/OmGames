@@ -68,6 +68,7 @@ public final class HallsSession {
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
+    private final HallsSessionTrapRuntime trapRuntime;
     private BukkitTask hudTask;
     private BukkitTask physicsDropTask;
     private long startedAtMillis;
@@ -108,6 +109,7 @@ public final class HallsSession {
         for (Player player : players) {
             participants.add(player.getUniqueId());
         }
+        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::setBlock);
     }
 
     public int id() {
@@ -325,6 +327,10 @@ public final class HallsSession {
         }
     }
 
+    public boolean handlePlayerMove(Player player) {
+        return trapRuntime.handlePlayerMove(player, running);
+    }
+
     public void start() throws IOException {
         if (running) {
             return;
@@ -491,6 +497,7 @@ public final class HallsSession {
         for (int i = 0; i < plan.rooms().size(); i++) {
             placeGeneratedRoomContents(plan.rooms().get(i), random, floor, i, floorDefinition, levelType);
         }
+        trapRuntime.placeGeneratedTraps(plan, random, floorDefinition, levelType);
     }
 
     private List<HallsLayout> loadExplorationLayouts(HallsLevelType levelType) {
@@ -1281,6 +1288,7 @@ public final class HallsSession {
     }
 
     private void removeSessionEntities() {
+        trapRuntime.clear();
         for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
             removeBreakableProp(prop);
         }
@@ -1833,4 +1841,5 @@ public final class HallsSession {
         DIAMOND_SCRAP,
         REDSTONE_SCRAP
     }
+
 }

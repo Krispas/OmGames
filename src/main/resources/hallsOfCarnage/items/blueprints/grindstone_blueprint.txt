@@ -7,7 +7,3 @@ item-model: om:hoc_rare_blueprint
 max-stack-size: 1
 lore:
   - "Unlocks future camp gear upgrading."
-recipe:
-  iron_scrap: 14
-  diamond_scrap: 8
-  redstone_scrap: 4

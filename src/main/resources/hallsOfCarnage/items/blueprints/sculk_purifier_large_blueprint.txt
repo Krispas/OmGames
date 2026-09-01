@@ -7,6 +7,3 @@ item-model: om:hoc_rare_blueprint
 max-stack-size: 1
 lore:
   - "Unlocks future large sculk suppression."
-recipe:
-  diamond_scrap: 8
-  redstone_scrap: 16
