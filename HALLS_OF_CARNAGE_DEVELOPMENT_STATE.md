@@ -135,11 +135,14 @@ This is the first implementation slice. It focuses on:
 - Hole traps now kill lower in the pit, near the configured pit bottom, so players fall before being killed/returned.
 - Poison darts now trigger only when a participant is in the forward lane, use a default 5-block reach, and apply a 3-second per-trap cooldown after firing.
 - Trap fallback defaults in `HallsTrapTypeLoader` were updated to match bundled resource defaults.
+- Deep trap follow-up: placement now validates the actual runtime lane for swinging blades, wall spikes, poison darts, and falling ice instead of only validating the chosen origin cell.
+- Swinging blade candidates now require a full 5-block lane on the selected axis before placement, preventing visible blade traps whose moving sword is hidden inside room walls.
+- Wall spikes now default to a 3-block reach, retract automatically after their active pulse, and clamp their display/damage lane to the first solid wall.
+- Falling ice candidates now require enough open floor around the trap cell, and random falling shards fall only on supported open cells around the trap instead of arbitrary blocked offsets.
+- Trap item displays now force `ItemDisplayTransform.NONE`, avoiding the default angled item transform that made sword traps appear 45 degrees off.
+- Poison darts now clamp their trigger/shooting lane to the first wall and set both entity rotation and directional block data from the mounted wall face.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- Wall spikes should not be permanent, they should retract back into the wall and out automatically. The sword is also not facing the right way, also make it have only a 3 block reach, stopping at walls.
-- I still am finding blade traps which are not active
-- I still am finding not working wall spikes
-- You have to do a DEEP search on whats causing this
-- Found not working falling ice, seems that issue also wasnt fixed
-- Poison darts only shoot once and their model is not rotated based on the mounted wall
+- The blades of the ceiling trap and the wall trap are still no moving, is it even programmed in?
+- Only working traps are holes, bear traps, poison darts and mines, is the rest even hooked up?
+- Poison dart model is still wrongly rotated

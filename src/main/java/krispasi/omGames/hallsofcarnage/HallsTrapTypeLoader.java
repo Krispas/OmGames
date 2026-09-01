@@ -79,7 +79,8 @@ public final class HallsTrapTypeLoader {
 
     private static double defaultRadius(String kind) {
         return switch (kind) {
-            case "poison_darts", "wall_spikes" -> 5.0;
+            case "poison_darts" -> 5.0;
+            case "wall_spikes" -> 3.0;
             case "swinging_blade" -> 1.15;
             default -> 1.0;
         };
@@ -127,7 +128,7 @@ public final class HallsTrapTypeLoader {
         add(types, "bear_trap", "bear_trap", 4, List.of(), Material.IRON_TRAPDOOR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 1.0, 60, 16, 2.4f);
         add(types, "proximity_mine", "proximity_mine", 3, List.of(), Material.STONE_PRESSURE_PLATE, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 18.0, 3.0, 60, 16, 2.4f);
         add(types, "swinging_blade", "swinging_blade", 3, List.of(), Material.IRON_BARS, Material.AIR, Material.IRON_SWORD, "", 1.4f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.15, 60, 16, 2.4f);
-        add(types, "wall_spikes", "wall_spikes", 6, List.of(), Material.BLACK_CONCRETE, Material.AIR, Material.IRON_SWORD, "", 1.1f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 5.0, 70, 12, 2.4f);
+        add(types, "wall_spikes", "wall_spikes", 6, List.of(), Material.BLACK_CONCRETE, Material.AIR, Material.IRON_SWORD, "", 1.1f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 3.0, 70, 12, 2.4f);
         add(types, "falling_ice", "falling_ice", 9, List.of("frozen_halls"), Material.AIR, Material.POINTED_DRIPSTONE, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.0, 55, 1, 2.4f);
         add(types, "poison_darts", "poison_darts", 9, List.of("deep_crypt"), Material.DISPENSER, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 5.0, 60, 1, 2.4f);
         return Map.copyOf(types);

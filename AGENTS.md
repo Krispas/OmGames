@@ -1223,6 +1223,6 @@ SQLite tables:
 - Proximity mines trigger in a larger radius and reserve/validate a 3x3 obstacle footprint for traversal.
 - Swinging blade traps use a stretched ceiling `BlockDisplay` rail plus a moving vanilla iron-sword `ItemDisplay` blade by default.
 - Wall spikes and poison darts mount from adjacent room walls as display-only fixtures instead of solid blocks, and wall-trap candidates should stay away from room entrances.
-- Wall spikes animate a sword display inward from the wall and check a forward lane up to their configured radius, defaulting to 5 blocks.
+- Wall spikes animate a sword display inward from the wall and check a forward lane up to their configured radius, defaulting to 3 blocks and stopping at walls.
 - Falling ice traps use display-only ceiling fixtures, spawn temporary falling block-display shards around the trap cell, and must not place solid trap blocks.
 - Poison darts trigger only when a player crosses the forward lane, defaulting to 5 blocks with a 3-second cooldown.

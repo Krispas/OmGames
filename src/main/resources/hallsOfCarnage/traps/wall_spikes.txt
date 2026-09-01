@@ -6,6 +6,6 @@ model-material: IRON_SWORD
 item-model: ""
 model-scale: 1.1
 damage: 12
-radius: 5.0
+radius: 3.0
 interval-ticks: 70
 active-ticks: 12
