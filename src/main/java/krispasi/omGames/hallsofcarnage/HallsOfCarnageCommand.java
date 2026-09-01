@@ -45,6 +45,13 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                 sendScenarios(sender);
                 return true;
             }
+            case "scenario" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                sendScenarioDebug(sender, args);
+                return true;
+            }
             case "sessions" -> {
                 sendSessions(sender);
                 return true;
@@ -201,6 +208,22 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
         }
     }
 
+    private void sendScenarioDebug(CommandSender sender, String[] args) {
+        if (args.length != 2) {
+            sender.sendMessage(Component.text("Usage: /hoc scenario <scenario>", NamedTextColor.RED));
+            return;
+        }
+        HallsScenario scenario = manager.getScenario(args[1]);
+        if (scenario == null) {
+            sender.sendMessage(Component.text("Unknown Halls scenario: " + args[1] + ".", NamedTextColor.RED));
+            return;
+        }
+        sender.sendMessage(Component.text("Parsed Halls scenario debug: " + scenario.id(), NamedTextColor.GOLD));
+        for (String line : scenario.debugLines()) {
+            sender.sendMessage(Component.text(line, NamedTextColor.GRAY));
+        }
+    }
+
     private String floorLabel(HallsScenario.FloorDefinition floor) {
         if (floor.firstFloor() == floor.lastFloor()) {
             return "floor " + floor.firstFloor();
@@ -257,13 +280,16 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
     }
 
     private Component usage() {
-        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc sessions | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload", NamedTextColor.YELLOW);
+        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload", NamedTextColor.YELLOW);
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(args[0], "menu", "scenarios", "sessions", "top", "shame", "tp", "start", "stop", "floor", "lobby", "reload");
+            return filter(args[0], "menu", "scenarios", "scenario", "sessions", "top", "shame", "tp", "start", "stop", "floor", "lobby", "reload");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("scenario")) {
+            return filter(args[1], manager.getScenarios().stream().map(HallsScenario::id).toArray(String[]::new));
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("start")) {
             return filter(args[1], manager.getScenarios().stream().map(HallsScenario::id).toArray(String[]::new));

@@ -10,7 +10,8 @@ public record HallsScenario(
         int minPlayers,
         int maxPlayers,
         int floorCount,
-        List<FloorDefinition> floors
+        List<FloorDefinition> floors,
+        List<String> debugLines
 ) {
     public FloorDefinition floor(int floor) {
         for (FloorDefinition definition : floors) {

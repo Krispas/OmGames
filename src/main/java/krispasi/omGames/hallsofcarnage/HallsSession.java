@@ -441,7 +441,7 @@ public final class HallsSession {
         );
         int targetRooms = activeTargetRooms;
         int expansions = 0;
-        while (plan.rooms().size() < targetRooms && expansions++ < 4) {
+        while ((plan.rooms().size() < targetRooms || !plan.reachable()) && expansions++ < 4) {
             activeClearRadius += 32;
             clearBuildVolume();
             buildElevator();
@@ -461,14 +461,10 @@ public final class HallsSession {
         }
         activeGeneratedRooms = plan.rooms().size();
 
-        HallsExplorationGenerator.Room first = plan.rooms().getFirst();
         for (HallsExplorationGenerator.Room room : plan.rooms()) {
             buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(), room.openings(), levelType, random);
         }
-        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, first.northExitZ(), levelType);
-        for (List<HallsExplorationGenerator.Cell> path : plan.corridors()) {
-            buildGeneratedConnectorPath(path, plan.rooms(), levelType, random);
-        }
+        buildGeneratedCorridorMask(plan, levelType);
         for (int i = 0; i < plan.rooms().size(); i++) {
             placeGeneratedRoomContents(plan.rooms().get(i), random, floor, i, floorDefinition, levelType);
         }
@@ -702,27 +698,17 @@ public final class HallsSession {
         return palette.material(columnRandom);
     }
 
-    private void buildGeneratedConnectorPath(List<HallsExplorationGenerator.Cell> path,
-                                             List<HallsExplorationGenerator.Room> rooms,
-                                             HallsLevelType levelType,
-                                             Random random) {
-        Set<HallsExplorationGenerator.Cell> openCells = new HashSet<>(path);
-        Set<HallsExplorationGenerator.Cell> shellCells = new HashSet<>();
-        for (HallsExplorationGenerator.Cell point : openCells) {
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    shellCells.add(new HallsExplorationGenerator.Cell(point.x() + dx, point.z() + dz));
-                }
-            }
-        }
+    private void buildGeneratedCorridorMask(HallsExplorationGenerator.Plan plan,
+                                            HallsLevelType levelType) {
+        Set<HallsExplorationGenerator.Cell> openCells = plan.corridorCells();
         Material floor = levelType.corridorFloor();
         Material ceiling = levelType.corridorCeiling();
-        for (HallsExplorationGenerator.Cell point : shellCells) {
+        for (HallsExplorationGenerator.Cell point : plan.corridorShellCells()) {
             if (isProtectedElevatorCell(point.x(), point.z())) {
                 continue;
             }
             boolean open = openCells.contains(point);
-            boolean insideRoomShell = isInsideGeneratedRoomShell(point, rooms);
+            boolean insideRoomShell = isInsideGeneratedRoomShell(point, plan.rooms());
             if (!open && insideRoomShell) {
                 continue;
             }

@@ -55,7 +55,7 @@ public final class HallsScenarioLoader {
             return null;
         }
         return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers,
-                floorCount, List.copyOf(floors));
+                floorCount, List.copyOf(floors), debugLines(file, config, floors));
     }
 
     private static List<HallsScenario.FloorDefinition> loadFloors(YamlConfiguration config) {
@@ -81,6 +81,32 @@ public final class HallsScenarioLoader {
         }
         floors.sort(Comparator.comparingInt(HallsScenario.FloorDefinition::firstFloor));
         return floors;
+    }
+
+    private static List<String> debugLines(File file,
+                                           YamlConfiguration config,
+                                           List<HallsScenario.FloorDefinition> floors) {
+        List<String> lines = new ArrayList<>();
+        lines.add("source-file: " + file.getName());
+        lines.add("parsed-floor-definitions:");
+        if (floors.isEmpty()) {
+            lines.add("  <none>");
+        } else {
+            for (HallsScenario.FloorDefinition floor : floors) {
+                lines.add("  " + floor.firstFloor() + "-" + floor.lastFloor()
+                        + " kind=" + floor.kind()
+                        + " level-type=" + floor.levelType()
+                        + " difficulty=" + floor.difficulty()
+                        + " rooms=" + floor.rooms()
+                        + " items=" + floor.items()
+                        + " breakables=" + floor.breakables());
+            }
+        }
+        lines.add("loaded-yaml:");
+        config.saveToString().lines()
+                .map(line -> "  " + line)
+                .forEach(lines::add);
+        return List.copyOf(lines);
     }
 
     private static FloorRange floorRange(Object value) {

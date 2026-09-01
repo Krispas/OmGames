@@ -132,16 +132,17 @@ This is the first implementation slice. It focuses on:
 - Known level-type fallbacks now have distinct palettes for `frozen_halls` and `deep_crypt`; if the server data folder is missing those level-type files, scenario floors no longer visually collapse back to Howling Corridors materials.
 - Important runtime note: bundled resource defaults are still only copied when missing. If a server already has an older `plugins/OmGames/HallsOfCarnage/scenarios/UntoldDepths.txt`, `/hoc scenarios` will expose the old parsed values; delete that server-side scenario file and restart/reload if the bundled default should be recopied.
 - Local validation note: `git diff --check` passed, and the Halls package compiled with local JDK 25 plus the local Paper API/transitive jars. Full Maven packaging was not run because `mvn`/wrapper is unavailable in this shell.
+- Reworked `HallsExplorationGenerator` into a baked layered planner: it now creates explicit room, corridor, corridor-shell, and walkable masks in memory, uses BFS to connect new room doors into the existing elevator/corridor/door network, and reports whether all generated rooms are reachable from the elevator before world rendering.
+- The session renderer now consumes the baked corridor masks directly instead of reconstructing corridor shells one path at a time.
+- Added OP-only `/hoc scenario <scenario>` for debugging the active loaded scenario. It prints parsed floor definitions plus Bukkit's loaded YAML view, which should make stale copied server-side scenario files obvious.
+- Validation note: `git diff --check` passed, and the Halls package compiled with local JDK 25 plus Paper 26.2 API, SQLite, Adventure 5.2, JetBrains annotations, Guava, and Bungee chat jars. Full Maven packaging was not run because `mvn`/wrapper is unavailable in this shell.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- For the next slice, let's completely rework the generation, because we keep running into problems.
-
-I propse a new algorithm, of course I am not perfect, so fact check me.
-We begin by having a large area for the level, let's say 512x512 centered on the elevator, fill it with the level type wall block.
-Next we will start baking layout, only building it ingame once its finished.
-Place elevator, then place the rooms, all of this should be on different layers so the logic can work with it. Then for rooms, pick entrances, simillar to the logic we have now.
-Then add corridors on their own layer, which is under the room layer, effectively ignoring them. After this we can check spots for breakables and later stuf like traps.
-Then lets build it ingame, this way its like carving into stone instead of building walls and less error prone. There should also be BFS which checks if all walkable parts are reachable from the elevator, this will later become useful for traps. Also check if from one room entrance you can get to others in all rooms, once again, this is later for traps.
-As I said, I am not perfect, there may be problems to this approach.
-
-Also even after five slices, the ignoring of scenario config is not fixed. Add a command which will print the whole parsed sceneratio data into chat for debugging.
+For the next slice:
+- Add a reset command which requires confirm, it will delete all game related (not lobby related) Halls of Carnage configs and replace them with the ones from resources.
+- Add 1 tick teleport and interpolation delay to the item displays, making animations smoother
+- The new generation is pretty good, however the rooms should be a little bit closer to each other. Also I've seen some diagonal corridors, we dont want diagonal ones. On top of this, add extra corridors so the level is more interconnected also the corridors often "lean against" the walls of the rooms, this is not forbidden, but it shouldnt happen much.
+- I've also figured why you werent able to fix the room count, turned out I forgot to delete the old config files.
+- Add lighting into corridors, however it should be inbuilt into the ceiling so they remain 3 block tall
+- Add a light into the elevator
+- Elevator entrance has visible sky, this could have been prevented by generated solid out of bounds.
