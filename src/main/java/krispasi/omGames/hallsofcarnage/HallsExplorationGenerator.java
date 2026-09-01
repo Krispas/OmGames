@@ -26,7 +26,6 @@ final class HallsExplorationGenerator {
     private final List<Room> rooms = new ArrayList<>();
     private final List<List<Cell>> corridors = new ArrayList<>();
     private final Set<Cell> corridorMask = new HashSet<>();
-    private final Set<Cell> corridorShellMask = new HashSet<>();
 
     private HallsExplorationGenerator(int originX, int originZ, int clearRadius, Bounds protectedElevator, Random random) {
         this.originX = originX;
@@ -71,36 +70,48 @@ final class HallsExplorationGenerator {
         rooms.add(first);
 
         int attempts = 0;
-        while (rooms.size() < targetRooms && attempts++ < targetRooms * 320) {
-            Room anchor = rooms.get(random.nextInt(rooms.size()));
-            HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
-            BlockFace placementFace = randomFace();
-            Room candidate = candidateRoom(anchor, layout, placementFace);
-            if (!canPlaceRoom(candidate)) {
-                continue;
-            }
-            BlockFace anchorFace = chooseDoorFace(anchor, placementFace);
-            BlockFace candidateFace = chooseDoorFace(candidate, placementFace.getOppositeFace());
-            int anchorOffset = doorOffset(anchor.layout(), anchorFace);
-            int candidateOffset = doorOffset(candidate.layout(), candidateFace);
-            Cell anchorDoor = doorCell(anchor, anchorFace, anchorOffset);
-            Cell candidateDoor = doorCell(candidate, candidateFace, candidateOffset);
-            List<Cell> carvedPath = carveConnector(anchorDoor, candidateDoor);
-            if (carvedPath.isEmpty()) {
-                continue;
-            }
-            anchor.openings().put(anchorFace, anchorOffset);
-            candidate.openings().put(candidateFace, candidateOffset);
-            rooms.add(candidate);
-            rememberCorridor(carvedPath);
+        while (rooms.size() < targetRooms && attempts++ < targetRooms * 600) {
+            tryAddRoom(rooms.get(random.nextInt(rooms.size())),
+                    layouts.get(random.nextInt(layouts.size())),
+                    randomFace(),
+                    4 + random.nextInt(7),
+                    4 + random.nextInt(7));
         }
 
+        fillRemainingRooms(layouts, targetRooms);
         addLoopCorridors();
     }
 
-    private Room candidateRoom(Room anchor, HallsLayout layout, BlockFace direction) {
-        int gap = 5 + random.nextInt(9);
-        int lateralRange = 6 + random.nextInt(9);
+    private boolean tryAddRoom(Room anchor, HallsLayout layout, BlockFace placementFace, int gap, int lateralRange) {
+        Room candidate = candidateRoom(anchor, layout, placementFace, gap, lateralRange);
+        if (!canPlaceRoom(candidate)) {
+            return false;
+        }
+        BlockFace anchorFace = chooseDoorFace(anchor, placementFace);
+        BlockFace candidateFace = chooseDoorFace(candidate, placementFace.getOppositeFace());
+        int anchorOffset = doorOffset(anchor.layout(), anchorFace);
+        int candidateOffset = doorOffset(candidate.layout(), candidateFace);
+        Cell anchorDoor = doorCell(anchor, anchorFace, anchorOffset);
+        Cell candidateDoor = doorCell(candidate, candidateFace, candidateOffset);
+        List<Cell> carvedPath = carveConnector(anchorDoor, candidateDoor);
+        boolean openedAnchor = true;
+        if (carvedPath.isEmpty()) {
+            carvedPath = carveTerminatingConnector(candidateDoor, anchorDoor);
+            openedAnchor = false;
+        }
+        if (carvedPath.isEmpty()) {
+            return false;
+        }
+        if (openedAnchor) {
+            anchor.openings().put(anchorFace, anchorOffset);
+        }
+        candidate.openings().put(candidateFace, candidateOffset);
+        rooms.add(candidate);
+        rememberCorridor(carvedPath);
+        return true;
+    }
+
+    private Room candidateRoom(Room anchor, HallsLayout layout, BlockFace direction, int gap, int lateralRange) {
         int jitter = random.nextInt(lateralRange * 2 + 1) - lateralRange;
         return switch (direction) {
             case NORTH -> new Room(layout, anchor.centerX() + jitter - layout.width() / 2,
@@ -113,6 +124,42 @@ final class HallsExplorationGenerator {
                     anchor.centerZ() + jitter - layout.depth() / 2);
             default -> new Room(layout, anchor.startX(), anchor.startZ());
         };
+    }
+
+    private void fillRemainingRooms(List<HallsLayout> layouts, int targetRooms) {
+        int attempts = 0;
+        while (rooms.size() < targetRooms && attempts++ < targetRooms * 900) {
+            List<Room> anchors = new ArrayList<>(rooms);
+            Collections.shuffle(anchors, random);
+            boolean added = false;
+            for (Room anchor : anchors) {
+                List<BlockFace> faces = new ArrayList<>(List.of(CARDINAL_FACES));
+                Collections.shuffle(faces, random);
+                for (BlockFace face : faces) {
+                    for (int gap = 4; gap <= 14; gap += 2) {
+                        for (int lateralRange = 2; lateralRange <= 10; lateralRange += 2) {
+                            HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
+                            if (tryAddRoom(anchor, layout, face, gap, lateralRange)) {
+                                added = true;
+                                break;
+                            }
+                        }
+                        if (added) {
+                            break;
+                        }
+                    }
+                    if (added) {
+                        break;
+                    }
+                }
+                if (added || rooms.size() >= targetRooms) {
+                    break;
+                }
+            }
+            if (!added) {
+                return;
+            }
+        }
     }
 
     private boolean canPlaceRoom(Room room) {
@@ -128,11 +175,6 @@ final class HallsExplorationGenerator {
         }
         for (Room existing : rooms) {
             if (bounds.intersects(Bounds.of(existing).inflate(2))) {
-                return false;
-            }
-        }
-        for (Cell shellCell : roomShellCells(room)) {
-            if (corridorMask.contains(shellCell)) {
                 return false;
             }
         }
@@ -175,12 +217,28 @@ final class HallsExplorationGenerator {
         int maxLength = maximumConnectorLength(start, end);
         for (int attempt = 0; attempt < 14; attempt++) {
             List<Cell> path = buildOrthogonalCandidate(start, end);
-            if (path.size() <= maxLength && canCarve(path, start, end)) {
-                return path;
+            List<Cell> carved = carveablePath(path, start, end, false);
+            if (carved.size() <= maxLength && !carved.isEmpty()) {
+                return carved;
             }
         }
         List<Cell> directPath = buildDirectCandidate(start, end, random.nextBoolean());
-        return directPath.size() <= maxLength && canCarve(directPath, start, end) ? directPath : List.of();
+        List<Cell> carved = carveablePath(directPath, start, end, false);
+        return carved.size() <= maxLength ? carved : List.of();
+    }
+
+    private List<Cell> carveTerminatingConnector(Cell start, Cell end) {
+        int maxLength = maximumConnectorLength(start, end);
+        for (int attempt = 0; attempt < 18; attempt++) {
+            List<Cell> path = buildOrthogonalCandidate(start, end);
+            List<Cell> carved = carveablePath(path, start, end, true);
+            if (carved.size() <= maxLength && terminatesOnExistingCorridor(carved, end)) {
+                return carved;
+            }
+        }
+        List<Cell> directPath = buildDirectCandidate(start, end, random.nextBoolean());
+        List<Cell> carved = carveablePath(directPath, start, end, true);
+        return carved.size() <= maxLength && terminatesOnExistingCorridor(carved, end) ? carved : List.of();
     }
 
     private List<Cell> buildOrthogonalCandidate(Cell start, Cell end) {
@@ -228,34 +286,53 @@ final class HallsExplorationGenerator {
         return path;
     }
 
-    private boolean canCarve(List<Cell> path, Cell start, Cell end) {
+    private List<Cell> carveablePath(List<Cell> path, Cell start, Cell end, boolean allowExistingCorridorTermination) {
         if (path.isEmpty()) {
-            return false;
+            return List.of();
         }
         Set<Cell> pathCells = new HashSet<>(path);
         if (pathCells.size() != path.size()) {
-            return false;
+            return List.of();
         }
         for (int i = 1; i < path.size(); i++) {
             if (manhattanDistance(path.get(i - 1), path.get(i)) != 1) {
-                return false;
+                return List.of();
             }
         }
+        List<Cell> carved = new ArrayList<>();
         for (Cell cell : path) {
             if (!insideBuildArea(cell) || protectedElevator.contains(cell.x(), cell.z())) {
-                return false;
+                return List.of();
             }
-            if (!cell.equals(start) && !cell.equals(end) && (corridorMask.contains(cell) || insideAnyRoom(cell))) {
-                return false;
+            boolean endpoint = cell.equals(start) || cell.equals(end);
+            if (!endpoint && insideAnyRoom(cell)) {
+                return List.of();
             }
+            if (!endpoint && corridorMask.contains(cell)) {
+                if (allowExistingCorridorTermination && carved.size() > 1) {
+                    carved.add(cell);
+                    return shellIsCarveable(carved) ? List.copyOf(carved) : List.of();
+                }
+                return List.of();
+            }
+            carved.add(cell);
         }
+        return shellIsCarveable(carved) ? List.copyOf(carved) : List.of();
+    }
+
+    private boolean shellIsCarveable(List<Cell> path) {
+        Set<Cell> pathCells = new HashSet<>(path);
         for (Cell shellCell : corridorShellCells(pathCells)) {
             if (!pathCells.contains(shellCell)
-                    && (corridorMask.contains(shellCell) || protectedElevator.contains(shellCell.x(), shellCell.z()))) {
+                    && protectedElevator.contains(shellCell.x(), shellCell.z())) {
                 return false;
             }
         }
         return true;
+    }
+
+    private boolean terminatesOnExistingCorridor(List<Cell> path, Cell fullTarget) {
+        return !path.isEmpty() && !path.getLast().equals(fullTarget) && corridorMask.contains(path.getLast());
     }
 
     private boolean insideBuildArea(Cell cell) {
@@ -277,7 +354,6 @@ final class HallsExplorationGenerator {
     private void rememberCorridor(List<Cell> path) {
         Set<Cell> openCells = new HashSet<>(path);
         corridorMask.addAll(openCells);
-        corridorShellMask.addAll(corridorShellCells(openCells));
         corridors.add(List.copyOf(path));
     }
 

@@ -71,6 +71,9 @@ public final class HallsSession {
     private int coins;
     private ItemStack[] elevatorChestContents = new ItemStack[27];
     private int activeClearRadius = CLEAR_RADIUS;
+    private String activeLevelTypeId = "howling_corridors";
+    private int activeTargetRooms;
+    private int activeGeneratedRooms;
     private boolean transitioning;
     private boolean running;
 
@@ -109,6 +112,18 @@ public final class HallsSession {
 
     public int currentFloor() {
         return currentFloor;
+    }
+
+    public String activeLevelTypeId() {
+        return activeLevelTypeId;
+    }
+
+    public int activeTargetRooms() {
+        return activeTargetRooms;
+    }
+
+    public int activeGeneratedRooms() {
+        return activeGeneratedRooms;
     }
 
     public boolean isTransitioning() {
@@ -336,11 +351,15 @@ public final class HallsSession {
 
     private void buildStartArea() throws IOException {
         currentFloor = 1;
+        HallsScenario.FloorDefinition floorDefinition = scenario.floor(1);
+        HallsLevelType levelType = levelTypeFor(floorDefinition);
+        activeLevelTypeId = levelType.id();
+        activeTargetRooms = 1;
+        activeGeneratedRooms = 1;
         clearBuildVolume();
         activeClearRadius = CLEAR_RADIUS;
         clearBuildVolume();
         buildElevator();
-        HallsLevelType levelType = levelTypeFor(scenario.floor(1));
         HallsLayout layout = HallsLayoutLoader.load(new File(dataFolder, "level/special/start_floor.txt"));
         int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
         buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ,
@@ -405,6 +424,9 @@ public final class HallsSession {
     private void buildExplorationRooms(int floor) {
         HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
         HallsLevelType levelType = levelTypeFor(floorDefinition);
+        activeLevelTypeId = levelType.id();
+        activeTargetRooms = Math.max(1, floorDefinition.rooms());
+        activeGeneratedRooms = 0;
         List<HallsLayout> layouts = loadExplorationLayouts(levelType);
         Random random = new Random((((long) id) << 32) ^ floor);
         HallsExplorationGenerator.Plan plan = HallsExplorationGenerator.generate(
@@ -416,7 +438,7 @@ public final class HallsSession {
                 floorDefinition,
                 random
         );
-        int targetRooms = Math.max(1, floorDefinition.rooms());
+        int targetRooms = activeTargetRooms;
         int expansions = 0;
         while (plan.rooms().size() < targetRooms && expansions++ < 4) {
             activeClearRadius += 32;
@@ -436,6 +458,7 @@ public final class HallsSession {
         if (plan.rooms().isEmpty()) {
             return;
         }
+        activeGeneratedRooms = plan.rooms().size();
 
         HallsExplorationGenerator.Room first = plan.rooms().getFirst();
         for (HallsExplorationGenerator.Room room : plan.rooms()) {
@@ -548,8 +571,6 @@ public final class HallsSession {
                                  Random random) {
         Material floor = levelType.floor();
         Material ceiling = levelType.ceiling();
-        HallsLevelType.BlockPalette wallPalette = levelType.wallPalette(random);
-        HallsLevelType.BlockPalette pillarPalette = levelType.pillarPalette(random);
         for (int z = -1; z <= layout.depth(); z++) {
             for (int x = -1; x <= layout.width(); x++) {
                 boolean border = x < 0 || z < 0 || x >= layout.width() || z >= layout.depth();
@@ -557,9 +578,7 @@ public final class HallsSession {
                 char cell = border ? 'X' : layout.at(x, z);
                 int blockX = startX + x;
                 int blockZ = startZ + z;
-                Material wall = isRoomCorner(layout, x, z)
-                        ? pillarPalette.material(random)
-                        : wallPalette.material(random);
+                Material wall = roomWallMaterial(levelType, layout, x, z, blockX, blockZ);
                 setBlock(blockX, y - 1, blockZ, floor);
                 setBlock(blockX, y + ROOM_HEIGHT, blockZ, ceiling);
                 if (!opening && (border || cell == 'X')) {
@@ -617,9 +636,14 @@ public final class HallsSession {
                                    Random random) {
         Material floor = levelType.corridorFloor();
         Material ceiling = levelType.corridorCeiling();
-        HallsLevelType.BlockPalette wallPalette = levelType.wallPalette(random);
         int pathMin = -halfWidth;
         int pathMax = halfWidth;
+        Set<HallsExplorationGenerator.Cell> openCells = new HashSet<>();
+        for (int offset = pathMin; offset <= pathMax; offset++) {
+            int openX = northSouth ? x + offset : x;
+            int openZ = northSouth ? z : z + offset;
+            openCells.add(new HallsExplorationGenerator.Cell(openX, openZ));
+        }
         for (int offset = pathMin - 1; offset <= pathMax + 1; offset++) {
             int blockX = northSouth ? x + offset : x;
             int blockZ = northSouth ? z : z + offset;
@@ -630,13 +654,51 @@ public final class HallsSession {
             setBlock(blockX, y + 3, blockZ, ceiling);
             for (int dy = 0; dy < 3; dy++) {
                 boolean path = offset >= pathMin && offset <= pathMax;
-                setBlock(blockX, y + dy, blockZ, path ? Material.AIR : wallPalette.material(random));
+                HallsExplorationGenerator.Cell point = new HallsExplorationGenerator.Cell(blockX, blockZ);
+                setBlock(blockX, y + dy, blockZ,
+                        path ? Material.AIR : corridorWallMaterial(levelType, point, openCells));
             }
         }
     }
 
     private boolean isRoomCorner(HallsLayout layout, int x, int z) {
         return (x < 0 || x >= layout.width()) && (z < 0 || z >= layout.depth());
+    }
+
+    private boolean isRoomPillarColumn(HallsLayout layout, int x, int z) {
+        if (isRoomCorner(layout, x, z)) {
+            return true;
+        }
+        if (x < 0 || z < 0 || x >= layout.width() || z >= layout.depth() || layout.at(x, z) != 'X') {
+            return false;
+        }
+        boolean northOpen = layout.at(x, z - 1) == 'O';
+        boolean southOpen = layout.at(x, z + 1) == 'O';
+        boolean eastOpen = layout.at(x + 1, z) == 'O';
+        boolean westOpen = layout.at(x - 1, z) == 'O';
+        return (northOpen || southOpen) && (eastOpen || westOpen);
+    }
+
+    private Material roomWallMaterial(HallsLevelType levelType, HallsLayout layout, int x, int z, int blockX, int blockZ) {
+        return wallMaterial(levelType, blockX, blockZ, isRoomPillarColumn(layout, x, z), 0x5A17);
+    }
+
+    private Material corridorWallMaterial(HallsLevelType levelType,
+                                          HallsExplorationGenerator.Cell point,
+                                          Set<HallsExplorationGenerator.Cell> openCells) {
+        return wallMaterial(levelType, point.x(), point.z(), isCorridorPillarColumn(point, openCells), 0xC011);
+    }
+
+    private Material wallMaterial(HallsLevelType levelType, int x, int z, boolean pillar, long salt) {
+        Random columnRandom = new Random((((long) x) * 341873128712L)
+                ^ (((long) z) * 132897987541L)
+                ^ (((long) id) << 24)
+                ^ (((long) currentFloor) << 8)
+                ^ salt);
+        HallsLevelType.BlockPalette palette = pillar
+                ? levelType.pillarPalette(columnRandom)
+                : levelType.wallPalette(columnRandom);
+        return palette.material(columnRandom);
     }
 
     private void buildGeneratedConnectorPath(List<HallsExplorationGenerator.Cell> path,
@@ -654,7 +716,6 @@ public final class HallsSession {
         }
         Material floor = levelType.corridorFloor();
         Material ceiling = levelType.corridorCeiling();
-        HallsLevelType.BlockPalette wallPalette = levelType.wallPalette(random);
         for (HallsExplorationGenerator.Cell point : shellCells) {
             if (isProtectedElevatorCell(point.x(), point.z())) {
                 continue;
@@ -669,9 +730,19 @@ public final class HallsSession {
                 setBlock(point.x(), origin.y() + 3, point.z(), ceiling);
             }
             for (int dy = 0; dy < 3; dy++) {
-                setBlock(point.x(), origin.y() + dy, point.z(), open ? Material.AIR : wallPalette.material(random));
+                setBlock(point.x(), origin.y() + dy, point.z(),
+                        open ? Material.AIR : corridorWallMaterial(levelType, point, openCells));
             }
         }
+    }
+
+    private boolean isCorridorPillarColumn(HallsExplorationGenerator.Cell point,
+                                           Set<HallsExplorationGenerator.Cell> openCells) {
+        boolean northOpen = openCells.contains(new HallsExplorationGenerator.Cell(point.x(), point.z() - 1));
+        boolean southOpen = openCells.contains(new HallsExplorationGenerator.Cell(point.x(), point.z() + 1));
+        boolean eastOpen = openCells.contains(new HallsExplorationGenerator.Cell(point.x() + 1, point.z()));
+        boolean westOpen = openCells.contains(new HallsExplorationGenerator.Cell(point.x() - 1, point.z()));
+        return (northOpen || southOpen) && (eastOpen || westOpen);
     }
 
     private boolean isInsideGeneratedRoomShell(HallsExplorationGenerator.Cell point,

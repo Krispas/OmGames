@@ -17,8 +17,43 @@ public record HallsLevelType(
         List<BlockPalette> pillars
 ) {
     public static HallsLevelType fallback(String id) {
+        String normalizedId = id == null || id.isBlank() ? "howling_corridors" : id;
+        if (normalizedId.equals("frozen_halls")) {
+            return new HallsLevelType(
+                    normalizedId,
+                    "Frozen Halls",
+                    "normal",
+                    Material.PACKED_ICE,
+                    Material.BLUE_ICE,
+                    Material.PACKED_ICE,
+                    Material.BLUE_ICE,
+                    Material.PEARLESCENT_FROGLIGHT,
+                    List.of(
+                            new BlockPalette(Material.POLISHED_DIORITE, Material.ICE, 0.10),
+                            new BlockPalette(Material.TUFF_BRICKS, Material.BLUE_ICE, 0.06)
+                    ),
+                    List.of(new BlockPalette(Material.PACKED_ICE, Material.BLUE_ICE, 0.12))
+            );
+        }
+        if (normalizedId.equals("deep_crypt")) {
+            return new HallsLevelType(
+                    normalizedId,
+                    "Deep Crypt",
+                    "normal",
+                    Material.SMOOTH_SANDSTONE,
+                    Material.CHISELED_SANDSTONE,
+                    Material.CUT_SANDSTONE,
+                    Material.CHISELED_SANDSTONE,
+                    Material.OCHRE_FROGLIGHT,
+                    List.of(
+                            new BlockPalette(Material.SANDSTONE, Material.CHISELED_SANDSTONE, 0.08),
+                            new BlockPalette(Material.RED_SANDSTONE, Material.CHISELED_RED_SANDSTONE, 0.06)
+                    ),
+                    List.of(new BlockPalette(Material.CUT_SANDSTONE, Material.CHISELED_SANDSTONE, 0.10))
+            );
+        }
         return new HallsLevelType(
-                id == null || id.isBlank() ? "howling_corridors" : id,
+                normalizedId,
                 "Howling Corridors",
                 "normal",
                 Material.PACKED_MUD,

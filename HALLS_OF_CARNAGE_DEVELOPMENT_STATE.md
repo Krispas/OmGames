@@ -118,14 +118,18 @@ This is the first implementation slice. It focuses on:
 - Scrap placeholder items now also use the max stack size component set to `1`; the unique metadata marker remains as a harmless fallback and deposit identifier companion.
 - Corridor open cells inside a generated room shell no longer place the lower corridor ceiling block, preventing room/corridor openings from gaining a low cap.
 - Validation note: the extracted generator compiles against a temporary local `BlockFace` stub. Full Maven packaging is still blocked in this shell because `mvn`/wrapper are unavailable and the installed Java compiler is Java 18 while Paper 26.2 and the project target Java 25.
+- Corridor planning now supports truncated connectors that terminate on an existing corridor mask cell, forming T-junctions instead of rejecting every corridor intersection.
+- Exploration room placement is less conservative around existing corridor masks, and generation uses tighter room gaps with more placement attempts to better reach scenario room counts such as the 16-room early Untold Depths floors.
+- Room and corridor walls now choose level-type wall palettes per x/z column instead of once per room/path render pass.
+- Room internal wall corners and corridor inner bend/junction corners now use the level-type pillar palette.
+- Local validation note: `git diff --check` passed; full Maven packaging remains blocked because `mvn`/wrapper are unavailable and the installed `javac` is Java 18 while the project targets Java 25.
+- Added parsed-floor visibility to `/hoc scenarios`; each scenario now shows configured floor/range kind, level type, and room count.
+- Added active floor generation visibility to `/hoc sessions` and `/hoc floor`; active sessions now report current level type plus generated/target room counts.
+- Added a systematic fallback room-placement pass after randomized exploration generation so scenarios requesting 16+ rooms do not depend only on random anchor selection.
+- Known level-type fallbacks now have distinct palettes for `frozen_halls` and `deep_crypt`; if the server data folder is missing those level-type files, scenario floors no longer visually collapse back to Howling Corridors materials.
+- Important runtime note: bundled resource defaults are still only copied when missing. If a server already has an older `plugins/OmGames/HallsOfCarnage/scenarios/UntoldDepths.txt`, `/hoc scenarios` will expose the old parsed values; delete that server-side scenario file and restart/reload if the bundled default should be recopied.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- Make it so corridors can pass through rooms, however if they intersect, the corridor wont be generated, instead almost like if it were to create a new door.
-- My original idea was to have 2D array where the rooms and corridors were to be placed, but if your approach is better, keep it.
-But just to talk about it more, I was thinking of level as having masks, like room mask, corridor mask and so on, which are then put on top of each other. The game still knows where rooms and the doors are so traps can adjust. Anyways if you have a better approach, keep it.
-- For next slice:
-- In the original design, if corridor tries to generate and collides with another, the generation stops and a t crossing is formed. Try to do that to add more natural shape.
-- Great, however wall types were misunderstood, right now there is a picked wall type per room, however instead make it so each column of blocks has randomized wall type
-- Pillars are misunderstood too, if there is a inner corner on corridor or inner wall, place pillar set there instead of the normal wall type.
-- The corridors still dont intersect
-- There is still only 8 rooms despite scenario saying more.
+- report from /hoc session
+- 1: Untold Depths (floor 4, howling_corridors rooms 8/8, 1 player, origin 2000) which is obviouslz wrong
+- for next slice fix the generation, but also add more breakables, stuff like chests, tables, chairs, stools, radiators, metal barrels and so on. For more complex stuff use more block/item displays ot make advanced models.

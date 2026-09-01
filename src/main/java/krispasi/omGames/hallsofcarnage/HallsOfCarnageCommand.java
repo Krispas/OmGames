@@ -194,7 +194,18 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
             sender.sendMessage(Component.text("- " + scenario.id() + " (" + scenario.name() + ", "
                     + scenario.floorCount() + " floors, " + scenario.minPlayers() + "-" + scenario.maxPlayers()
                     + " players)", NamedTextColor.YELLOW));
+            for (HallsScenario.FloorDefinition floor : scenario.floors()) {
+                sender.sendMessage(Component.text("  " + floorLabel(floor) + ": " + floor.kind()
+                        + ", " + floor.levelType() + ", rooms " + floor.rooms(), NamedTextColor.GRAY));
+            }
         }
+    }
+
+    private String floorLabel(HallsScenario.FloorDefinition floor) {
+        if (floor.firstFloor() == floor.lastFloor()) {
+            return "floor " + floor.firstFloor();
+        }
+        return "floors " + floor.firstFloor() + "-" + floor.lastFloor();
     }
 
     private void sendLeaderboard(CommandSender sender) {
@@ -222,7 +233,9 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
         for (HallsSession session : sessions) {
             HallsConfig.BlockPoint origin = session.origin();
             sender.sendMessage(Component.text("- " + session.id() + ": " + session.scenario().name()
-                    + " (floor " + session.currentFloor() + ", " + session.participants().size() + " players, origin "
+                    + " (floor " + session.currentFloor() + ", " + session.activeLevelTypeId()
+                    + ", rooms " + session.activeGeneratedRooms() + "/" + session.activeTargetRooms()
+                    + ", " + session.participants().size() + " players, origin "
                     + origin.x() + " " + origin.y() + " " + origin.z() + ")", NamedTextColor.YELLOW));
         }
     }

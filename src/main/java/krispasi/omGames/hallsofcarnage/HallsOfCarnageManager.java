@@ -372,7 +372,9 @@ public final class HallsOfCarnageManager {
         if (!session.forceBuildFloor(floor)) {
             return Result.fail("Could not rebuild Halls session " + sessionId + ".");
         }
-        return Result.ok("Rebuilt Halls session " + sessionId + " at floor " + floor + ".");
+        return Result.ok("Rebuilt Halls session " + sessionId + " at floor " + floor + " ("
+                + session.activeLevelTypeId() + ", rooms " + session.activeGeneratedRooms()
+                + "/" + session.activeTargetRooms() + ").");
     }
 
     public void handlePlayerQuit(Player player) {
