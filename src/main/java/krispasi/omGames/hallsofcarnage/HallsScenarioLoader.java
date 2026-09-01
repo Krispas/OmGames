@@ -3,8 +3,10 @@ package krispasi.omGames.hallsofcarnage;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -48,6 +50,8 @@ public final class HallsScenarioLoader {
         ConfigurationSection players = config.getConfigurationSection("players");
         int minPlayers = players == null ? 1 : Math.max(1, players.getInt("min", 1));
         int maxPlayers = players == null ? 6 : clamp(players.getInt("max", 6), minPlayers, 6);
+        Map<String, List<String>> allowedItems = loadStringListMap(config.getConfigurationSection("allowed-items"));
+        Map<String, List<String>> blueprintPools = loadStringListMap(config.getConfigurationSection("blueprint-pools"));
         List<HallsScenario.FloorDefinition> floors = loadFloors(config);
         int floorCount = floors.stream().mapToInt(HallsScenario.FloorDefinition::lastFloor).max().orElse(0);
         if (id.isBlank() || name == null || name.isBlank()) {
@@ -55,7 +59,21 @@ public final class HallsScenarioLoader {
             return null;
         }
         return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers,
-                floorCount, List.copyOf(floors), debugLines(file, config, floors));
+                floorCount, allowedItems, blueprintPools, List.copyOf(floors), debugLines(file, config, floors));
+    }
+
+    private static Map<String, List<String>> loadStringListMap(ConfigurationSection section) {
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, List<String>> values = new LinkedHashMap<>();
+        for (String key : section.getKeys(false)) {
+            values.put(normalizeId(key), section.getStringList(key).stream()
+                    .map(HallsScenarioLoader::normalizeId)
+                    .filter(value -> !value.isBlank())
+                    .toList());
+        }
+        return Map.copyOf(values);
     }
 
     private static List<HallsScenario.FloorDefinition> loadFloors(YamlConfiguration config) {

@@ -1,0 +1,11 @@
+id: armory_blueprint
+name: "Blueprint: Armory"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Unlocks camp armor crafting."
+recipe:
+  wood_scrap: 8
+  iron_scrap: 8

@@ -19,3 +19,11 @@ loot:
   - item: coin
     weight: 22
     amount: 2-5
+  - item: rare_weapon
+    weight: 4
+  - item: rare_armor
+    weight: 3
+  - item: rare_utility
+    weight: 3
+  - item: rare_blueprint
+    weight: 3

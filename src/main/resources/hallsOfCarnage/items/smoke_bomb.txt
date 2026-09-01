@@ -1,0 +1,11 @@
+id: smoke_bomb
+name: "Smoke Bomb"
+category: utility
+rarity: normal
+material: FIREWORK_STAR
+max-stack-size: 1
+lore:
+  - "A future utility item for breaking pursuit."
+recipe:
+  redstone_scrap: 3
+  wood_scrap: 2

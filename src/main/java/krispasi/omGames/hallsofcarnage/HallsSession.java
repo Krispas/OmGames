@@ -18,6 +18,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
@@ -63,6 +64,7 @@ public final class HallsSession {
     private final File dataFolder;
     private final Map<String, HallsLevelType> levelTypes;
     private final Map<String, HallsBreakableType> breakableTypes;
+    private final Map<String, HallsItemType> itemTypes;
     private final Set<UUID> participants;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
@@ -92,6 +94,7 @@ public final class HallsSession {
                         File dataFolder,
                         Map<String, HallsLevelType> levelTypes,
                         Map<String, HallsBreakableType> breakableTypes,
+                        Map<String, HallsItemType> itemTypes,
                         List<Player> players) {
         this.plugin = plugin;
         this.id = id;
@@ -101,6 +104,7 @@ public final class HallsSession {
         this.dataFolder = dataFolder;
         this.levelTypes = levelTypes == null ? Map.of() : Map.copyOf(levelTypes);
         this.breakableTypes = breakableTypes == null ? Map.of() : Map.copyOf(breakableTypes);
+        this.itemTypes = itemTypes == null ? Map.of() : Map.copyOf(itemTypes);
         this.participants = new HashSet<>();
         for (Player player : players) {
             participants.add(player.getUniqueId());
@@ -381,7 +385,7 @@ public final class HallsSession {
                 Map.of(BlockFace.NORTH, layout.width() / 2), levelType, new Random((((long) id) << 32) ^ 1));
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1, levelType);
         spawnBreakableProp(origin.x() - layout.width() / 2 + 1, origin.y(), roomStartZ + 1,
-                breakableType("barrel"), 3, List.of(new HallsBreakableType.LootEntry("blueprint", 1, 1, 1)));
+                breakableType("barrel"), 3, List.of(new HallsBreakableType.LootEntry("rare_blueprint", 1, 1, 1)));
         closeElevatorDoors();
     }
 
@@ -1072,8 +1076,15 @@ public final class HallsSession {
     }
 
     private void applyReward(String reward, int amount, Location dropLocation) {
+        ItemStack resolvedItem = resolveCatalogReward(reward, amount);
+        if (resolvedItem != null) {
+            dropSessionItem(dropLocation, resolvedItem);
+            return;
+        }
         switch (reward) {
-            case "blueprint", "normal_blueprint", "rare_blueprint" -> dropSessionItem(dropLocation, blueprintPlaceholder());
+            case "blueprint" -> dropSessionItem(dropLocation, blueprintFromScenario("normal", 8));
+            case "normal_blueprint" -> dropSessionItem(dropLocation, blueprintFromScenario("normal", 0));
+            case "rare_blueprint" -> dropSessionItem(dropLocation, blueprintFromScenario("rare", 0));
             case "coin", "coins" -> dropSessionItem(dropLocation, coinItem(amount));
             case "wood_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD, PropReward.WOOD_SCRAP, amount));
             case "iron_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY, PropReward.IRON_SCRAP, amount));
@@ -1087,6 +1098,97 @@ public final class HallsSession {
             default -> {
             }
         }
+    }
+
+    private ItemStack resolveCatalogReward(String reward, int amount) {
+        HallsItemType direct = itemTypes.get(reward);
+        if (direct != null) {
+            return definedItem(direct, amount);
+        }
+        return switch (reward) {
+            case "weapon", "armor", "ranged", "utility" -> randomAllowedItem(reward, "normal", amount);
+            case "rare_weapon" -> randomAllowedItem("weapon", "rare", amount);
+            case "rare_armor" -> randomAllowedItem("armor", "rare", amount);
+            case "rare_ranged" -> randomAllowedItem("ranged", "rare", amount);
+            case "rare_utility" -> randomAllowedItem("utility", "rare", amount);
+            default -> null;
+        };
+    }
+
+    private ItemStack randomAllowedItem(String category, String rarity, int amount) {
+        List<HallsItemType> candidates = scenario.allowedItems(category).stream()
+                .map(itemTypes::get)
+                .filter(item -> item != null && item.category().equals(category) && item.rarity().equals(rarity))
+                .sorted(Comparator.comparing(HallsItemType::id))
+                .toList();
+        if (candidates.isEmpty()) {
+            return null;
+        }
+        return definedItem(candidates.get(new Random().nextInt(candidates.size())), amount);
+    }
+
+    private ItemStack blueprintFromScenario(String preferredPool, int rareChancePercent) {
+        String pool = preferredPool;
+        if (rareChancePercent > 0 && !scenario.blueprintPool("rare").isEmpty()
+                && new Random().nextInt(100) < rareChancePercent) {
+            pool = "rare";
+        }
+        List<String> ids = scenario.blueprintPool(pool);
+        if (ids.isEmpty() && !pool.equals("normal")) {
+            ids = scenario.blueprintPool("normal");
+        }
+        if (ids.isEmpty()) {
+            return blueprintPlaceholder();
+        }
+        List<HallsItemType> candidates = ids.stream()
+                .map(itemTypes::get)
+                .filter(item -> item != null && item.category().equals("blueprint"))
+                .sorted(Comparator.comparing(HallsItemType::id))
+                .toList();
+        if (candidates.isEmpty()) {
+            return blueprintPlaceholder();
+        }
+        return definedItem(candidates.get(new Random().nextInt(candidates.size())), 1);
+    }
+
+    private ItemStack definedItem(HallsItemType type, int amount) {
+        ItemStack item = namedItem(type.material(), type.name(), itemColor(type));
+        item.setAmount(Math.max(1, Math.min(amount, type.maxStackSize())));
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setMaxStackSize(type.maxStackSize());
+            List<Component> lore = new ArrayList<>();
+            for (String line : type.lore()) {
+                lore.add(Component.text(line, NamedTextColor.GRAY));
+            }
+            if (!type.recipe().isEmpty()) {
+                lore.add(Component.empty());
+                lore.add(Component.text("Recipe stored for camp crafting.", NamedTextColor.DARK_GRAY));
+            }
+            if (!lore.isEmpty()) {
+                meta.lore(lore);
+            }
+            if (type.itemModel() != null && !type.itemModel().isBlank()) {
+                NamespacedKey modelKey = NamespacedKey.fromString(type.itemModel());
+                if (modelKey != null) {
+                    meta.setItemModel(modelKey);
+                }
+            }
+            meta.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "hoc_item_id"),
+                    PersistentDataType.STRING,
+                    type.id()
+            );
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private NamedTextColor itemColor(HallsItemType type) {
+        if (type.category().equals("blueprint")) {
+            return type.rarity().equals("rare") ? NamedTextColor.LIGHT_PURPLE : NamedTextColor.AQUA;
+        }
+        return type.rarity().equals("rare") ? NamedTextColor.GOLD : NamedTextColor.WHITE;
     }
 
     private String scrapRewardId(PropReward reward) {

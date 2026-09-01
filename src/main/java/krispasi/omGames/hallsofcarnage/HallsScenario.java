@@ -1,6 +1,7 @@
 package krispasi.omGames.hallsofcarnage;
 
 import java.util.List;
+import java.util.Map;
 
 public record HallsScenario(
         String id,
@@ -10,9 +11,24 @@ public record HallsScenario(
         int minPlayers,
         int maxPlayers,
         int floorCount,
+        Map<String, List<String>> allowedItems,
+        Map<String, List<String>> blueprintPools,
         List<FloorDefinition> floors,
         List<String> debugLines
 ) {
+    public HallsScenario {
+        allowedItems = Map.copyOf(allowedItems);
+        blueprintPools = Map.copyOf(blueprintPools);
+    }
+
+    public List<String> allowedItems(String category) {
+        return allowedItems.getOrDefault(category, List.of());
+    }
+
+    public List<String> blueprintPool(String rarity) {
+        return blueprintPools.getOrDefault(rarity, List.of());
+    }
+
     public FloorDefinition floor(int floor) {
         for (FloorDefinition definition : floors) {
             if (definition.includes(floor)) {

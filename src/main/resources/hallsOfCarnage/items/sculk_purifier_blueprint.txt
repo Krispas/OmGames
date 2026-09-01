@@ -1,0 +1,12 @@
+id: sculk_purifier_blueprint
+name: "Rare Blueprint: Sculk Purifier"
+category: blueprint
+rarity: rare
+material: PAPER
+item-model: om:hoc_rare_blueprint
+max-stack-size: 1
+lore:
+  - "Unlocks future sculk suppression buildings."
+recipe:
+  diamond_scrap: 6
+  redstone_scrap: 12

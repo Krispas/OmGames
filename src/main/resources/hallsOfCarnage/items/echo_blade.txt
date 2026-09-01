@@ -1,0 +1,13 @@
+id: echo_blade
+name: "Echo Blade"
+category: weapon
+rarity: rare
+material: NETHERITE_SWORD
+item-model: om:hoc_echo_blade
+max-stack-size: 1
+lore:
+  - "A rare blade that hums near old blood."
+recipe:
+  iron_scrap: 12
+  diamond_scrap: 5
+  redstone_scrap: 4

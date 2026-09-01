@@ -53,7 +53,23 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/breakables/chair.txt",
             "hallsOfCarnage/breakables/stool.txt",
             "hallsOfCarnage/breakables/radiator.txt",
-            "hallsOfCarnage/breakables/metal_barrel.txt"
+            "hallsOfCarnage/breakables/metal_barrel.txt",
+            "hallsOfCarnage/items/rusty_sword.txt",
+            "hallsOfCarnage/items/echo_blade.txt",
+            "hallsOfCarnage/items/miner_pick.txt",
+            "hallsOfCarnage/items/short_bow.txt",
+            "hallsOfCarnage/items/storm_crossbow.txt",
+            "hallsOfCarnage/items/padded_armor.txt",
+            "hallsOfCarnage/items/reinforced_chestplate.txt",
+            "hallsOfCarnage/items/smoke_bomb.txt",
+            "hallsOfCarnage/items/warding_totem.txt",
+            "hallsOfCarnage/items/cooking_pot_blueprint.txt",
+            "hallsOfCarnage/items/weapon_bench_blueprint.txt",
+            "hallsOfCarnage/items/armory_blueprint.txt",
+            "hallsOfCarnage/items/storage_locker_blueprint.txt",
+            "hallsOfCarnage/items/elevator_drill_blueprint.txt",
+            "hallsOfCarnage/items/scanner_blueprint.txt",
+            "hallsOfCarnage/items/sculk_purifier_blueprint.txt"
     };
 
     public record Result(boolean success, String message) {
@@ -76,6 +92,7 @@ public final class HallsOfCarnageManager {
     private List<HallsScenario> scenarios = List.of();
     private Map<String, HallsLevelType> levelTypes = Map.of();
     private Map<String, HallsBreakableType> breakableTypes = Map.of();
+    private Map<String, HallsItemType> itemTypes = Map.of();
     private int nextSessionId = 1;
 
     public HallsOfCarnageManager(JavaPlugin plugin) {
@@ -90,11 +107,13 @@ public final class HallsOfCarnageManager {
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
+        itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
         shameService.load();
         applyWorldRules();
         spawnConfiguredMenuVillager();
         plugin.getLogger().info("Loaded " + scenarios.size() + " Halls of Carnage scenarios and "
-                + levelTypes.size() + " level types, " + breakableTypes.size() + " breakable types.");
+                + levelTypes.size() + " level types, " + breakableTypes.size() + " breakable types, "
+                + itemTypes.size() + " item types.");
     }
 
     public void shutdown() {
@@ -108,15 +127,17 @@ public final class HallsOfCarnageManager {
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
+        itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
         applyWorldRules();
         spawnConfiguredMenuVillager();
         return Result.ok("Reloaded Halls of Carnage. Scenarios: " + scenarios.size()
-                + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size() + ".");
+                + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size()
+                + ", items: " + itemTypes.size() + ".");
     }
 
     public Result resetGameResources(boolean confirmed) {
         if (!confirmed) {
-            return Result.fail("This deletes Halls scenario/level/level_type/modifier/breakable files and recopies bundled defaults. Use /hoc reset confirm.");
+            return Result.fail("This deletes Halls scenario/level/level_type/modifier/breakable/item files and recopies bundled defaults. Use /hoc reset confirm.");
         }
         if (!activeSessions.isEmpty()) {
             return Result.fail("Stop active Halls sessions before resetting game resources.");
@@ -128,6 +149,7 @@ public final class HallsOfCarnageManager {
             deleteGameResourceFolder(new File(folder, "level_type"));
             deleteGameResourceFolder(new File(folder, "modifiers"));
             deleteGameResourceFolder(new File(folder, "breakables"));
+            deleteGameResourceFolder(new File(folder, "items"));
         } catch (IOException ex) {
             return Result.fail("Failed to delete Halls game resources: " + ex.getMessage());
         }
@@ -137,8 +159,10 @@ public final class HallsOfCarnageManager {
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
+        itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
         return Result.ok("Reset Halls game resources from bundled defaults. Scenarios: " + scenarios.size()
-                + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size() + ".");
+                + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size()
+                + ", items: " + itemTypes.size() + ".");
     }
 
     public List<HallsScenario> getScenarios() {
@@ -356,7 +380,7 @@ public final class HallsOfCarnageManager {
         int sessionId = nextSessionId++;
         int slot = firstFreeSessionSlot();
         HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot),
-                getDataFolder(), levelTypes, breakableTypes, players);
+                getDataFolder(), levelTypes, breakableTypes, itemTypes, players);
         try {
             session.start();
         } catch (IOException ex) {
@@ -621,6 +645,10 @@ public final class HallsOfCarnageManager {
 
     private File getBreakablesFolder() {
         return new File(getDataFolder(), "breakables");
+    }
+
+    private File getItemsFolder() {
+        return new File(getDataFolder(), "items");
     }
 
     private String normalizeId(String value) {

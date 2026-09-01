@@ -1,0 +1,11 @@
+id: cooking_pot_blueprint
+name: "Blueprint: Cooking Pot"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Unlocks camp cooking pot construction."
+recipe:
+  wood_scrap: 8
+  iron_scrap: 4

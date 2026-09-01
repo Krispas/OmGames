@@ -52,6 +52,11 @@ Last updated: 2026-09-01
 - Breakable resource files define display parts, hitbox height, particle material, break message, and weighted loot entries.
 - Breakable loot now rolls from each prop's configured loot table and supports placeholder scrap, random scrap, blueprint keywords, and coin drops.
 - Coin drops are session-owned physics items that add directly to the shared session coin counter on right-click pickup, bypassing normal hotbar capacity.
+- Item definitions now load from `plugins/OmGames/HallsOfCarnage/items/*.txt|*.yml|*.yaml`, seeded by bundled defaults for normal/rare weapons, ranged gear, armor, utility items, and building blueprints.
+- Item resource files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, `lore`, and recipe scrap costs for future camp crafting.
+- Scenarios now parse `allowed-items` by category and `blueprint-pools.normal` / `blueprint-pools.rare`.
+- Breakable loot can reference concrete item ids, scenario-aware category keywords (`weapon`, `armor`, `ranged`, `utility` and rare variants), and scenario blueprint keywords.
+- The first-floor crate now forces a rare blueprint drop through the scenario rare blueprint pool.
 
 ## Current Scope
 
@@ -71,11 +76,11 @@ This is the first implementation slice. It focuses on:
 - Full multi-floor session runtime.
 - Real elevator transition animation/loading floor flow.
 - Ghost death state.
-- Full configurable item/drop definitions beyond the current placeholder physics drops and breakable loot keywords.
+- Full item behavior beyond current catalog-defined placeholder drops.
 - Scrap storage and camp building runtime.
 - Combat/exploration/camp floor gameplay.
 - Sculk, traps, modifiers, monster flood systems.
-- Dedicated scenario blueprint pools, rare blueprint resolution, and real gear item definitions.
+- Real item effects, equipment stats, crafting/building recipe consumers, and persisted unlock/storage systems.
 - Dedicated elevator transfer chest inventory and item persistence rules.
 - Scenario-aware randomized template-driven exploration room selection from `resources/hallsOfCarnage/level/<level_type>/`.
 - Runtime use of level-type monster pools, modifier pools, and non-normal corridor algorithms beyond parsed metadata.
@@ -89,10 +94,8 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-- Added resource-backed Halls breakable prop definitions under `hallsOfCarnage/breakables/`, loaded them during Halls load/reload/reset, routed exploration props through weighted per-prop loot tables, and added coin drops that can be picked up even with a full hotbar.
+- Added resource-backed Halls item definitions under `hallsOfCarnage/items/`, parsed scenario `allowed-items` and normal/rare blueprint pools, routed breakable loot keywords to concrete item drops, and changed the first-floor crate to force a rare blueprint.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For next slice:
-- Separate item definitions from placeholder keyword handling, including scenario blueprint pools and rare blueprint support.
-- For example the crate on the first floor should always contain rare blueprint. Blueprint keyword can have rare blueprint, but chance for normal is higher. Add a rare blueprint loot table for scenarios.
-- While at this, also add support for armors and weapons, normal and rares, including ranged and utility, refer to the design doc. All of them should have recipes which are defined in item files. Recipes are right now unused and will be used later. Edit the scenario file to reflect them. And add drop chances for them into some breakables.
+- Start applying basic runtime behavior for defined gear items, beginning with melee/ranged/armor stat metadata and safe inventory/equip handling inside active Halls sessions.

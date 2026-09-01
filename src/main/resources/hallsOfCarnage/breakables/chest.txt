@@ -19,3 +19,9 @@ loot:
     amount: 1-4
   - item: blueprint
     weight: 8
+  - item: weapon
+    weight: 6
+  - item: armor
+    weight: 5
+  - item: utility
+    weight: 4

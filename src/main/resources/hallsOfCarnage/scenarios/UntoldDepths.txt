@@ -13,11 +13,27 @@ allowed-items:
     - iron
     - diamond
     - redstone
-  gear:
+  weapon:
     - rusty_sword
     - miner_pick
+    - echo_blade
+  ranged:
     - short_bow
+    - storm_crossbow
+  armor:
     - padded_armor
+    - reinforced_chestplate
+  utility:
+    - smoke_bomb
+    - warding_totem
+  blueprint:
+    - cooking_pot_blueprint
+    - weapon_bench_blueprint
+    - armory_blueprint
+    - storage_locker_blueprint
+    - elevator_drill_blueprint
+    - scanner_blueprint
+    - sculk_purifier_blueprint
   buildings:
     - cooking_pot
     - weapon_bench
@@ -33,6 +49,16 @@ allowed-items:
     - sculk_purifier_small
     - sculk_purifier_medium
     - sculk_purifier_large
+blueprint-pools:
+  normal:
+    - cooking_pot_blueprint
+    - weapon_bench_blueprint
+    - armory_blueprint
+    - storage_locker_blueprint
+    - scanner_blueprint
+  rare:
+    - elevator_drill_blueprint
+    - sculk_purifier_blueprint
 floors:
   - number: 1
     kind: start

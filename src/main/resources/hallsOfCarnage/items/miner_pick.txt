@@ -1,0 +1,11 @@
+id: miner_pick
+name: "Miner Pick"
+category: weapon
+rarity: normal
+material: IRON_PICKAXE
+max-stack-size: 1
+lore:
+  - "Heavy enough to hurt."
+recipe:
+  iron_scrap: 5
+  wood_scrap: 3
