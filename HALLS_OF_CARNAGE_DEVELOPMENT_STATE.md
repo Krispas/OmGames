@@ -94,11 +94,16 @@ This is the first implementation slice. It focuses on:
 - Replaced the deterministic four-room exploration layout with seeded randomized Howling Corridors generation using normal straight/90-degree corridor paths, while preserving repeatability for `/hoc floor` rebuilds.
 - Fixed the latest in-game review notes for elevator transition timing and visible sky gaps at the elevator exit and room corridor openings.
 - Addressed the current exploration-generation review pass: rooms are kept away from the elevator, corridor paths reserve elevator/room shells instead of carving through them, generation uses wider randomized offsets/gaps, and validated extra room-to-room corridors create loops in the connected network.
+- Halls scenarios now keep parsed floor definitions, including floor ranges and configured `rooms`, `items`, and `breakables`, instead of only retaining the highest floor number.
+- Exploration floor generation now uses the active scenario floor definition for target room count and breakable prop density.
+- Exploration corridors now use off-center room doors, sometimes on intentionally non-obvious room sides, plus randomized waypoint routing so paths are less direct and less grid-like.
+- Corridor rendering now builds a full shell around the union of path cells before carving the walkable route, which should keep 90-degree bends from missing wall sections.
+- Local validation note: `git diff --check` passed; full Maven packaging was not run because neither `mvn` nor a Maven wrapper is available in this shell, and the only visible `javac` is Java 18 while the project targets Java 25.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- Certain corridor bends are missing parts of the walls, could this be fixed by filling the whole area with wall material before the generation begins?
-- The corridors generate way too well, the bends are often one block before it ends on the other axis. The connections to rooms are also way too optimized. Make it more crazy, for example entrance to the room on the side where it makes no sense, making the coridors longer and more mazelike.
-- Are you taking the floor size from scenario file? It seems not.
-- Make the room offset even more crazy, I want it to not even resemble grid a little bit.
 - Make it so corridors can pass through rooms, however if they intersect, the corridor wont be generated, instead almost like if it were to create a new door.
 - My original idea was to have 2D array where the rooms and corridors were to be placed, but if your approach is better, keep it.
+But just to talk about it more, I was thinking of level as having masks, like room mask, corridor mask and so on, which are then put on top of each other. The game still knows where rooms and the doors are so traps can adjust. Anyways if you have a better approach, keep it.
+- Okay, so I think you've maybe overdone it with the corridor randomness. Try to keep it less chaotic, but still chaotic, we are closer to the intended behaviour now. Also some corridors are now leading diagonaly, which shouldnt happen.
+- Some corridors are way too long for it leading to good gameplay feel
+- For next slice, also try to add the physics for dropped items, as described in GDD and fix the generation

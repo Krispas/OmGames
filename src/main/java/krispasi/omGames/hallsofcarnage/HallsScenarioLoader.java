@@ -48,42 +48,76 @@ public final class HallsScenarioLoader {
         ConfigurationSection players = config.getConfigurationSection("players");
         int minPlayers = players == null ? 1 : Math.max(1, players.getInt("min", 1));
         int maxPlayers = players == null ? 6 : clamp(players.getInt("max", 6), minPlayers, 6);
-        int floorCount = countFloors(config);
+        List<HallsScenario.FloorDefinition> floors = loadFloors(config);
+        int floorCount = floors.stream().mapToInt(HallsScenario.FloorDefinition::lastFloor).max().orElse(0);
         if (id.isBlank() || name == null || name.isBlank()) {
             plugin.getLogger().warning("Skipping invalid Halls scenario file " + file.getName() + ".");
             return null;
         }
-        return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers, floorCount);
+        return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers,
+                floorCount, List.copyOf(floors));
     }
 
-    private static int countFloors(YamlConfiguration config) {
-        int highest = 0;
+    private static List<HallsScenario.FloorDefinition> loadFloors(YamlConfiguration config) {
+        List<HallsScenario.FloorDefinition> floors = new ArrayList<>();
         for (Object row : config.getList("floors", List.of())) {
             if (!(row instanceof java.util.Map<?, ?> map)) {
                 continue;
             }
-            Object number = map.get("number");
-            highest = Math.max(highest, highestFloor(number));
+            FloorRange range = floorRange(map.get("number"));
+            if (range.lastFloor() <= 0) {
+                continue;
+            }
+            floors.add(new HallsScenario.FloorDefinition(
+                    range.firstFloor(),
+                    range.lastFloor(),
+                    stringValue(map.get("kind"), "exploration"),
+                    normalizeId(stringValue(map.get("level-type"), "howling_corridors")),
+                    stringValue(map.get("difficulty"), "0"),
+                    positiveInt(map.get("rooms"), 8),
+                    positiveInt(map.get("items"), 0),
+                    positiveInt(map.get("breakables"), 16)
+            ));
         }
-        return highest;
+        floors.sort(Comparator.comparingInt(HallsScenario.FloorDefinition::firstFloor));
+        return floors;
     }
 
-    private static int highestFloor(Object value) {
+    private static FloorRange floorRange(Object value) {
         if (value instanceof Number number) {
-            return Math.max(0, number.intValue());
+            int floor = Math.max(0, number.intValue());
+            return new FloorRange(floor, floor);
         }
         if (!(value instanceof String text)) {
-            return 0;
+            return new FloorRange(0, 0);
         }
         String trimmed = text.trim();
         int dash = trimmed.indexOf('-');
         if (dash >= 0 && dash + 1 < trimmed.length()) {
-            trimmed = trimmed.substring(dash + 1);
+            int first = parsePositiveInt(trimmed.substring(0, dash), 0);
+            int last = parsePositiveInt(trimmed.substring(dash + 1), first);
+            return new FloorRange(Math.min(first, last), Math.max(first, last));
         }
+        int floor = parsePositiveInt(trimmed, 0);
+        return new FloorRange(floor, floor);
+    }
+
+    private static String stringValue(Object value, String fallback) {
+        return value == null ? fallback : String.valueOf(value);
+    }
+
+    private static int positiveInt(Object value, int fallback) {
+        if (value instanceof Number number) {
+            return Math.max(0, number.intValue());
+        }
+        return parsePositiveInt(String.valueOf(value), fallback);
+    }
+
+    private static int parsePositiveInt(String text, int fallback) {
         try {
-            return Math.max(0, Integer.parseInt(trimmed.trim()));
+            return Math.max(0, Integer.parseInt(text.trim()));
         } catch (NumberFormatException ignored) {
-            return 0;
+            return fallback;
         }
     }
 
@@ -96,5 +130,8 @@ public final class HallsScenarioLoader {
 
     private static int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private record FloorRange(int firstFloor, int lastFloor) {
     }
 }

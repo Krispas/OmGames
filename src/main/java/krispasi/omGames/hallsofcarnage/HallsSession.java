@@ -43,7 +43,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
 public final class HallsSession {
-    private static final int CLEAR_RADIUS = 40;
+    private static final int CLEAR_RADIUS = 72;
     private static final int CLEAR_HEIGHT = 9;
     private static final int ROOM_HEIGHT = 5;
     private static final int ELEVATOR_INNER_RADIUS = 2;
@@ -296,7 +296,8 @@ public final class HallsSession {
         buildElevator();
         HallsLayout layout = HallsLayoutLoader.load(new File(dataFolder, "level/special/start_floor.txt"));
         int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
-        buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ, Set.of(BlockFace.NORTH));
+        buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ,
+                Map.of(BlockFace.NORTH, layout.width() / 2));
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1);
         spawnBreakableProp(origin.x() - layout.width() / 2 + 1, origin.y(), roomStartZ + 1, Material.BARREL, 3, PropReward.BLUEPRINT);
         closeElevatorDoors();
@@ -354,55 +355,54 @@ public final class HallsSession {
 
     private void buildExplorationRooms(int floor) {
         List<HallsLayout> layouts = loadExplorationLayouts();
+        HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
         Random random = new Random((((long) id) << 32) ^ floor);
-        ExplorationPlan plan = generateNormalExplorationRooms(layouts, floor, random);
+        ExplorationPlan plan = generateNormalExplorationRooms(layouts, floorDefinition, random);
         if (plan.rooms().isEmpty()) {
             return;
         }
 
         RoomNode first = plan.rooms().getFirst();
-        first.openings().add(BlockFace.NORTH);
+        first.openings().put(BlockFace.NORTH, first.placement().layout().width() / 2);
         List<List<ConnectorPoint>> connectorPaths = new ArrayList<>();
-        Set<ConnectorPoint> connectorPathCells = new HashSet<>();
         for (RoomConnection connection : plan.connections()) {
-            List<ConnectorPoint> path = findConnectorPath(
-                    connectorPoint(connection.from().placement(), connection.fromFace()),
-                    connectorPoint(connection.to().placement(), connection.fromFace().getOppositeFace()),
-                    plan.rooms()
-            );
+            List<ConnectorPoint> path = findConnectorPath(connection.fromDoor(), connection.toDoor(), plan.rooms(), random);
             if (path.isEmpty()) {
                 plugin.getLogger().warning("Skipped blocked Halls connector in session " + id + ".");
                 continue;
             }
             connectorPaths.add(path);
-            connectorPathCells.addAll(path);
         }
         for (RoomNode room : plan.rooms()) {
             buildLayoutRoom(room.placement().layout(), room.placement().startX(), origin.y(), room.placement().startZ(), room.openings());
         }
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, first.placement().northExitZ());
         for (List<ConnectorPoint> path : connectorPaths) {
-            buildConnectorPath(path, connectorPathCells);
+            buildConnectorPath(path, plan.rooms());
         }
         for (int i = 0; i < plan.rooms().size(); i++) {
-            placeRoomContents(plan.rooms().get(i).placement(), random, floor, i);
+            placeRoomContents(plan.rooms().get(i).placement(), random, floor, i, floorDefinition);
         }
     }
 
-    private ExplorationPlan generateNormalExplorationRooms(List<HallsLayout> layouts, int floor, Random random) {
-        int targetRooms = Math.min(12, 6 + Math.min(4, floor));
+    private ExplorationPlan generateNormalExplorationRooms(List<HallsLayout> layouts,
+                                                           HallsScenario.FloorDefinition floorDefinition,
+                                                           Random random) {
+        int targetRooms = Math.max(1, Math.min(28, floorDefinition.rooms()));
         List<RoomNode> rooms = new ArrayList<>();
         List<RoomConnection> connections = new ArrayList<>();
         HallsLayout firstLayout = layouts.get(random.nextInt(layouts.size()));
         RoomPlacement first = new RoomPlacement(firstLayout, origin.x() - firstLayout.width() / 2,
                 origin.z() + ELEVATOR_OUTER_RADIUS + 6);
-        rooms.add(new RoomNode(first));
+        RoomNode firstNode = new RoomNode(first);
+        firstNode.openings().put(BlockFace.NORTH, firstLayout.width() / 2);
+        rooms.add(firstNode);
 
         int attempts = 0;
         while (rooms.size() < targetRooms && attempts++ < targetRooms * 80) {
             RoomNode anchor = rooms.get(random.nextInt(rooms.size()));
             BlockFace direction = randomDirection(random);
-            if (anchor.openings().contains(direction)) {
+            if (anchor.openings().containsKey(direction)) {
                 continue;
             }
             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
@@ -411,15 +411,20 @@ public final class HallsSession {
                 continue;
             }
             RoomNode node = new RoomNode(candidate);
-            RoomConnection connection = new RoomConnection(anchor, node, direction);
+            BlockFace anchorFace = unusedDoorFace(anchor, direction, random);
+            BlockFace candidateFace = unusedDoorFace(node, direction.getOppositeFace(), random);
+            int anchorDoorOffset = doorOffset(anchor.placement().layout(), anchorFace, random);
+            int candidateDoorOffset = doorOffset(candidate.layout(), candidateFace, random);
+            ConnectorPoint fromDoor = connectorPoint(anchor.placement(), anchorFace, anchorDoorOffset);
+            ConnectorPoint toDoor = connectorPoint(candidate, candidateFace, candidateDoorOffset);
+            RoomConnection connection = new RoomConnection(anchor, node, anchorFace, candidateFace, fromDoor, toDoor);
             List<RoomNode> candidateRooms = new ArrayList<>(rooms);
             candidateRooms.add(node);
-            if (findConnectorPath(connectorPoint(anchor.placement(), direction),
-                    connectorPoint(candidate, direction.getOppositeFace()), candidateRooms).isEmpty()) {
+            if (findConnectorPath(fromDoor, toDoor, candidateRooms, random).isEmpty()) {
                 continue;
             }
-            anchor.openings().add(direction);
-            node.openings().add(direction.getOppositeFace());
+            anchor.openings().put(anchorFace, anchorDoorOffset);
+            node.openings().put(candidateFace, candidateDoorOffset);
             connections.add(connection);
             rooms.add(node);
         }
@@ -428,8 +433,8 @@ public final class HallsSession {
     }
 
     private RoomPlacement candidateRoom(RoomPlacement anchor, HallsLayout layout, BlockFace direction, Random random) {
-        int gap = 6 + random.nextInt(12);
-        int lateralRange = 7 + random.nextInt(8);
+        int gap = 10 + random.nextInt(20);
+        int lateralRange = 14 + random.nextInt(18);
         int jitter = random.nextInt(lateralRange * 2 + 1) - lateralRange;
         return switch (direction) {
             case NORTH -> new RoomPlacement(layout, anchor.centerX() + jitter - layout.width() / 2,
@@ -454,33 +459,47 @@ public final class HallsSession {
             if (from == to) {
                 continue;
             }
-            BlockFace face = connectingFace(from.placement(), to.placement());
-            if (face == null || from.openings().contains(face) || to.openings().contains(face.getOppositeFace())
+            BlockFace fromFace = unusedDoorFace(from, randomDirection(random), random);
+            BlockFace toFace = unusedDoorFace(to, randomDirection(random), random);
+            if (from.openings().containsKey(fromFace) || to.openings().containsKey(toFace)
                     || hasConnection(connections, from, to)) {
                 continue;
             }
-            List<ConnectorPoint> path = findConnectorPath(connectorPoint(from.placement(), face),
-                    connectorPoint(to.placement(), face.getOppositeFace()), rooms);
+            int fromOffset = doorOffset(from.placement().layout(), fromFace, random);
+            int toOffset = doorOffset(to.placement().layout(), toFace, random);
+            ConnectorPoint fromDoor = connectorPoint(from.placement(), fromFace, fromOffset);
+            ConnectorPoint toDoor = connectorPoint(to.placement(), toFace, toOffset);
+            List<ConnectorPoint> path = findConnectorPath(fromDoor, toDoor, rooms, random);
             if (path.isEmpty()) {
                 continue;
             }
-            from.openings().add(face);
-            to.openings().add(face.getOppositeFace());
-            connections.add(new RoomConnection(from, to, face));
+            from.openings().put(fromFace, fromOffset);
+            to.openings().put(toFace, toOffset);
+            connections.add(new RoomConnection(from, to, fromFace, toFace, fromDoor, toDoor));
             added++;
         }
     }
 
-    private BlockFace connectingFace(RoomPlacement from, RoomPlacement to) {
-        int dx = to.centerX() - from.centerX();
-        int dz = to.centerZ() - from.centerZ();
-        if (Math.abs(dx) > Math.abs(dz)) {
-            return dx > 0 ? BlockFace.EAST : BlockFace.WEST;
+    private BlockFace unusedDoorFace(RoomNode room, BlockFace preferred, Random random) {
+        if (!room.openings().containsKey(preferred) && random.nextDouble() < 0.45) {
+            return preferred;
         }
-        if (dz != 0) {
-            return dz > 0 ? BlockFace.SOUTH : BlockFace.NORTH;
+        List<BlockFace> faces = new ArrayList<>(List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST));
+        Collections.shuffle(faces, random);
+        for (BlockFace face : faces) {
+            if (!room.openings().containsKey(face)) {
+                return face;
+            }
         }
-        return null;
+        return preferred;
+    }
+
+    private int doorOffset(HallsLayout layout, BlockFace face, Random random) {
+        int span = face == BlockFace.NORTH || face == BlockFace.SOUTH ? layout.width() : layout.depth();
+        if (span <= 2) {
+            return Math.max(0, span / 2);
+        }
+        return 1 + random.nextInt(span - 2);
     }
 
     private boolean hasConnection(List<RoomConnection> connections, RoomNode first, RoomNode second) {
@@ -596,7 +615,7 @@ public final class HallsSession {
         setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 2, origin.z(), machine);
     }
 
-    private void buildLayoutRoom(HallsLayout layout, int startX, int y, int startZ, Set<BlockFace> openings) {
+    private void buildLayoutRoom(HallsLayout layout, int startX, int y, int startZ, Map<BlockFace, Integer> openings) {
         Material floor = Material.PACKED_MUD;
         Material ceiling = Material.TUFF_BRICKS;
         Material wall = Material.DEEPSLATE_BRICKS;
@@ -622,20 +641,20 @@ public final class HallsSession {
         }
     }
 
-    private boolean isRoomOpening(HallsLayout layout, int x, int z, Set<BlockFace> openings) {
+    private boolean isRoomOpening(HallsLayout layout, int x, int z, Map<BlockFace, Integer> openings) {
         int centerX = layout.width() / 2;
         int centerZ = layout.depth() / 2;
-        if (z == -1 && x == centerX) {
-            return openings.contains(BlockFace.NORTH);
+        if (z == -1) {
+            return x == openings.getOrDefault(BlockFace.NORTH, centerX + 1000);
         }
-        if (z == layout.depth() && x == centerX) {
-            return openings.contains(BlockFace.SOUTH);
+        if (z == layout.depth()) {
+            return x == openings.getOrDefault(BlockFace.SOUTH, centerX + 1000);
         }
-        if (x == -1 && z == centerZ) {
-            return openings.contains(BlockFace.WEST);
+        if (x == -1) {
+            return z == openings.getOrDefault(BlockFace.WEST, centerZ + 1000);
         }
-        if (x == layout.width() && z == centerZ) {
-            return openings.contains(BlockFace.EAST);
+        if (x == layout.width()) {
+            return z == openings.getOrDefault(BlockFace.EAST, centerZ + 1000);
         }
         return false;
     }
@@ -647,12 +666,12 @@ public final class HallsSession {
         }
     }
 
-    private ConnectorPoint connectorPoint(RoomPlacement room, BlockFace face) {
+    private ConnectorPoint connectorPoint(RoomPlacement room, BlockFace face, int offset) {
         return switch (face) {
-            case NORTH -> new ConnectorPoint(room.centerX(), room.northExitZ());
-            case SOUTH -> new ConnectorPoint(room.centerX(), room.southExitZ());
-            case EAST -> new ConnectorPoint(room.eastExitX(), room.centerZ());
-            case WEST -> new ConnectorPoint(room.westExitX(), room.centerZ());
+            case NORTH -> new ConnectorPoint(room.startX() + offset, room.northExitZ());
+            case SOUTH -> new ConnectorPoint(room.startX() + offset, room.southExitZ());
+            case EAST -> new ConnectorPoint(room.eastExitX(), room.startZ() + offset);
+            case WEST -> new ConnectorPoint(room.westExitX(), room.startZ() + offset);
             default -> new ConnectorPoint(room.centerX(), room.centerZ());
         };
     }
@@ -677,28 +696,58 @@ public final class HallsSession {
         }
     }
 
-    private void buildCorridorCell(int x, int y, int z, int halfWidth, boolean northSouth, Set<ConnectorPoint> openCells) {
-        Material floor = Material.PACKED_MUD;
-        Material wall = Material.DEEPSLATE_BRICKS;
-        int pathMin = -halfWidth;
-        int pathMax = halfWidth;
-        for (int offset = pathMin - 1; offset <= pathMax + 1; offset++) {
-            int blockX = northSouth ? x + offset : x;
-            int blockZ = northSouth ? z : z + offset;
-            if (isProtectedElevatorCell(blockX, blockZ)) {
-                continue;
+    private List<ConnectorPoint> findConnectorPath(ConnectorPoint start, ConnectorPoint end, List<RoomNode> rooms, Random random) {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            List<ConnectorPoint> targets = connectorWaypoints(start, end, random);
+            List<ConnectorPoint> wholePath = new ArrayList<>();
+            ConnectorPoint current = start;
+            boolean complete = true;
+            for (ConnectorPoint target : targets) {
+                List<ConnectorPoint> segment = findDirectConnectorPath(current, target, rooms, random);
+                if (segment.isEmpty()) {
+                    complete = false;
+                    break;
+                }
+                if (!wholePath.isEmpty()) {
+                    segment = segment.subList(1, segment.size());
+                }
+                wholePath.addAll(segment);
+                current = target;
             }
-            boolean path = offset >= pathMin && offset <= pathMax
-                    || openCells.contains(new ConnectorPoint(blockX, blockZ));
-            setBlock(blockX, y - 1, blockZ, floor);
-            setBlock(blockX, y + 3, blockZ, wall);
-            for (int dy = 0; dy < 3; dy++) {
-                setBlock(blockX, y + dy, blockZ, path ? Material.AIR : wall);
+            if (complete && wholePath.size() > manhattanDistance(start, end) + 8) {
+                return wholePath;
             }
         }
+        return findDirectConnectorPath(start, end, rooms, random);
     }
 
-    private List<ConnectorPoint> findConnectorPath(ConnectorPoint start, ConnectorPoint end, List<RoomNode> rooms) {
+    private List<ConnectorPoint> connectorWaypoints(ConnectorPoint start, ConnectorPoint end, Random random) {
+        List<ConnectorPoint> waypoints = new ArrayList<>();
+        int minX = Math.max(origin.x() - CLEAR_RADIUS + 4, Math.min(start.x(), end.x()) - 14);
+        int maxX = Math.min(origin.x() + CLEAR_RADIUS - 4, Math.max(start.x(), end.x()) + 14);
+        int minZ = Math.max(origin.z() - CLEAR_RADIUS + 4, Math.min(start.z(), end.z()) - 14);
+        int maxZ = Math.min(origin.z() + CLEAR_RADIUS - 4, Math.max(start.z(), end.z()) + 14);
+        int count = 1 + random.nextInt(3);
+        for (int i = 0; i < count; i++) {
+            if (random.nextBoolean()) {
+                int x = minX + random.nextInt(Math.max(1, maxX - minX + 1));
+                int z = i % 2 == 0 ? start.z() : end.z();
+                waypoints.add(new ConnectorPoint(x, z));
+            } else {
+                int x = i % 2 == 0 ? start.x() : end.x();
+                int z = minZ + random.nextInt(Math.max(1, maxZ - minZ + 1));
+                waypoints.add(new ConnectorPoint(x, z));
+            }
+        }
+        waypoints.add(end);
+        return waypoints;
+    }
+
+    private int manhattanDistance(ConnectorPoint start, ConnectorPoint end) {
+        return Math.abs(start.x() - end.x()) + Math.abs(start.z() - end.z());
+    }
+
+    private List<ConnectorPoint> findDirectConnectorPath(ConnectorPoint start, ConnectorPoint end, List<RoomNode> rooms, Random random) {
         int minX = origin.x() - CLEAR_RADIUS + 1;
         int maxX = origin.x() + CLEAR_RADIUS - 1;
         int minZ = origin.z() - CLEAR_RADIUS + 1;
@@ -713,7 +762,7 @@ public final class HallsSession {
             if (current.equals(end)) {
                 return reconstructPath(previous, end);
             }
-            for (ConnectorPoint next : orderedNeighbors(current, end)) {
+            for (ConnectorPoint next : orderedNeighbors(current, end, random)) {
                 if (next.x() < minX || next.x() > maxX || next.z() < minZ || next.z() > maxZ
                         || visited.contains(next) || isBlockedConnectorPoint(next, start, end, rooms)) {
                     continue;
@@ -726,15 +775,20 @@ public final class HallsSession {
         return List.of();
     }
 
-    private List<ConnectorPoint> orderedNeighbors(ConnectorPoint point, ConnectorPoint end) {
+    private List<ConnectorPoint> orderedNeighbors(ConnectorPoint point, ConnectorPoint end, Random random) {
         List<ConnectorPoint> neighbors = new ArrayList<>(List.of(
                 new ConnectorPoint(point.x() + 1, point.z()),
                 new ConnectorPoint(point.x() - 1, point.z()),
                 new ConnectorPoint(point.x(), point.z() + 1),
                 new ConnectorPoint(point.x(), point.z() - 1)
         ));
+        Collections.shuffle(neighbors, random);
+        Map<ConnectorPoint, Integer> penalties = new HashMap<>();
+        for (ConnectorPoint neighbor : neighbors) {
+            penalties.put(neighbor, random.nextInt(18));
+        }
         neighbors.sort(Comparator.comparingInt(candidate ->
-                Math.abs(candidate.x() - end.x()) + Math.abs(candidate.z() - end.z())));
+                Math.abs(candidate.x() - end.x()) + Math.abs(candidate.z() - end.z()) + penalties.get(candidate)));
         return neighbors;
     }
 
@@ -765,15 +819,41 @@ public final class HallsSession {
         return false;
     }
 
-    private void buildConnectorPath(List<ConnectorPoint> path, Set<ConnectorPoint> openCells) {
-        for (int i = 0; i < path.size(); i++) {
-            ConnectorPoint previous = i == 0 ? null : path.get(i - 1);
-            ConnectorPoint current = path.get(i);
-            ConnectorPoint next = i + 1 >= path.size() ? null : path.get(i + 1);
-            boolean northSouth = (previous != null && previous.x() == current.x())
-                    || (next != null && next.x() == current.x());
-            buildCorridorCell(current.x(), origin.y(), current.z(), 0, northSouth, openCells);
+    private void buildConnectorPath(List<ConnectorPoint> path, List<RoomNode> rooms) {
+        Set<ConnectorPoint> openCells = new HashSet<>(path);
+        Set<ConnectorPoint> shellCells = new HashSet<>();
+        for (ConnectorPoint point : openCells) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    shellCells.add(new ConnectorPoint(point.x() + dx, point.z() + dz));
+                }
+            }
         }
+        Material floor = Material.PACKED_MUD;
+        Material wall = Material.DEEPSLATE_BRICKS;
+        for (ConnectorPoint point : shellCells) {
+            if (isProtectedElevatorCell(point.x(), point.z())) {
+                continue;
+            }
+            boolean open = openCells.contains(point);
+            if (!open && isInsideRoomShell(point, rooms)) {
+                continue;
+            }
+            setBlock(point.x(), origin.y() - 1, point.z(), floor);
+            setBlock(point.x(), origin.y() + 3, point.z(), wall);
+            for (int dy = 0; dy < 3; dy++) {
+                setBlock(point.x(), origin.y() + dy, point.z(), open ? Material.AIR : wall);
+            }
+        }
+    }
+
+    private boolean isInsideRoomShell(ConnectorPoint point, List<RoomNode> rooms) {
+        for (RoomNode room : rooms) {
+            if (RoomBounds.of(room.placement()).contains(point.x(), point.z())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private RoomBounds protectedElevatorBounds() {
@@ -805,14 +885,19 @@ public final class HallsSession {
         }
     }
 
-    private void placeRoomContents(RoomPlacement room, Random random, int floor, int roomIndex) {
+    private void placeRoomContents(RoomPlacement room,
+                                   Random random,
+                                   int floor,
+                                   int roomIndex,
+                                   HallsScenario.FloorDefinition floorDefinition) {
         List<Cell> cells = openInteriorCells(room);
         if (cells.isEmpty()) {
             return;
         }
         Cell light = cells.get(Math.floorMod(roomIndex * 3 + floor, cells.size()));
         setBlock(room.startX() + light.x(), origin.y() + ROOM_HEIGHT - 1, room.startZ() + light.z(), Material.SEA_LANTERN);
-        int props = Math.min(cells.size(), 2 + (roomIndex == 0 ? 1 : 0));
+        int baseProps = Math.max(1, floorDefinition.breakables() / Math.max(1, floorDefinition.rooms()));
+        int props = Math.min(cells.size(), baseProps + (roomIndex < floorDefinition.breakables() % Math.max(1, floorDefinition.rooms()) ? 1 : 0));
         for (int i = 0; i < props; i++) {
             Cell cell = cells.get(random.nextInt(cells.size()));
             spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
@@ -1201,7 +1286,7 @@ public final class HallsSession {
 
     private static final class RoomNode {
         private final RoomPlacement placement;
-        private final Set<BlockFace> openings = new HashSet<>();
+        private final Map<BlockFace, Integer> openings = new HashMap<>();
 
         private RoomNode(RoomPlacement placement) {
             this.placement = placement;
@@ -1211,12 +1296,19 @@ public final class HallsSession {
             return placement;
         }
 
-        private Set<BlockFace> openings() {
+        private Map<BlockFace, Integer> openings() {
             return openings;
         }
     }
 
-    private record RoomConnection(RoomNode from, RoomNode to, BlockFace fromFace) {
+    private record RoomConnection(
+            RoomNode from,
+            RoomNode to,
+            BlockFace fromFace,
+            BlockFace toFace,
+            ConnectorPoint fromDoor,
+            ConnectorPoint toDoor
+    ) {
     }
 
     private record ConnectorPoint(int x, int z) {
