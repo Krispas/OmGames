@@ -1212,6 +1212,7 @@ SQLite tables:
 - Frozen Halls and Deep Crypt room resources are also seeded from their bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`; use `/hoc reset confirm` to copy newly bundled resource files into an existing server data folder.
 - Exploration floors have first-pass session-owned trap generation/runtime for holes, bridged holes, bear traps, proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, and Deep Crypt poison darts.
 - Trap placement uses the generated walkable mask and BFS reachability before accepting an unbridged pit; pits that would disconnect traversal receive a spruce bridge.
+- Halls trap animation/cooldown logic must use `HallsSessionTrapRuntime`'s session-local scheduler tick, not world time, because the Halls dimension may have frozen or nonstandard time progression.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth.
 - Exploration floor trap counts come from scenario floor field `traps`.

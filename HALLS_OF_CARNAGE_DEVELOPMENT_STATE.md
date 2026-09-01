@@ -144,6 +144,12 @@ This is the first implementation slice. It focuses on:
 - Follow-up trap movement fix: moving trap item displays now animate by updating their `Transformation` translation each tick instead of relying on repeated entity teleports, so ceiling blades and wall spikes have explicit client-visible movement.
 - Swinging blade damage/particles now use the same computed visual position as the moving display transform.
 - Poison dart launcher displays no longer apply an extra entity yaw on top of directional block data, avoiding double-rotation of dispenser-like models.
+- Critical trap clock fix: `HallsSessionTrapRuntime` now uses a session-local tick counter advanced by its own Bukkit task instead of `world.getFullTime()`. This fixes animated/timed traps freezing when the Halls world time is frozen or not advancing normally.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- Fix the traps! They still don't move!
+Next slice:
+- Great the ceiling blade trap is finally moving, however its doing no damage on colission
+- Make the ceiling blade traps have various widths which adjust to the surrounding terrain
+- Separate holes from traps as their own feature and add a hole amount to the scenario file for each level
+- Another ceiling blade trap got me, seems it only works sometimes
+- Expand poison dart width range detection, so player can actually bait out the trap.

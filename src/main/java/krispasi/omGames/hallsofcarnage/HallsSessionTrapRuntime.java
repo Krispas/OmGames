@@ -52,6 +52,7 @@ final class HallsSessionTrapRuntime {
     private final Map<HallsTrap, Long> trapNextTriggerTicks = new IdentityHashMap<>();
     private final Set<UUID> transientTrapDisplays = new HashSet<>();
     private BukkitTask trapTask;
+    private long trapRuntimeTick;
 
     HallsSessionTrapRuntime(JavaPlugin plugin,
                             World world,
@@ -86,6 +87,7 @@ final class HallsSessionTrapRuntime {
         trapNextTriggerTicks.clear();
         transientTrapDisplays.clear();
         trapDamageCooldowns.clear();
+        trapRuntimeTick = 0L;
         stopTrapTask();
     }
 
@@ -532,9 +534,9 @@ final class HallsSessionTrapRuntime {
     private void addTrap(HallsTrap trap, Random random) {
         traps.add(trap);
         if (trap.kind() == TrapKind.FALLING_ICE) {
-            trapNextTriggerTicks.put(trap, world.getFullTime() + 25L + random.nextInt(Math.max(1, trap.type().intervalTicks())));
+            trapNextTriggerTicks.put(trap, trapRuntimeTick + 25L + random.nextInt(Math.max(1, trap.type().intervalTicks())));
         } else if (trap.kind() == TrapKind.POISON_DARTS) {
-            trapNextTriggerTicks.put(trap, world.getFullTime());
+            trapNextTriggerTicks.put(trap, trapRuntimeTick);
         }
     }
 
@@ -550,7 +552,7 @@ final class HallsSessionTrapRuntime {
             stopTrapTask();
             return;
         }
-        long tick = world.getFullTime();
+        long tick = ++trapRuntimeTick;
         for (HallsTrap trap : List.copyOf(traps)) {
             tickTrap(trap, tick);
         }

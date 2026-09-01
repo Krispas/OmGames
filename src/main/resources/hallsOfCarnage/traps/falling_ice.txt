@@ -3,7 +3,7 @@ kind: falling_ice
 weight: 9
 level-types:
   - frozen_halls
-ceiling-material: POINTED_DRIPSTONE
-damage: 200
+ceiling-material: AIR
+damage: 5
 radius: 1.0
 interval-ticks: 55

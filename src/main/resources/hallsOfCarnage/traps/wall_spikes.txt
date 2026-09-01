@@ -5,7 +5,7 @@ block-material: BLACK_CONCRETE
 model-material: IRON_SWORD
 item-model: ""
 model-scale: 1.1
-damage: 12
+damage: 5
 radius: 3.0
 interval-ticks: 70
 active-ticks: 12
