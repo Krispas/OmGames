@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-08-31
+Last updated: 2026-09-01
 
 ## Implemented
 
@@ -102,10 +102,19 @@ This is the first implementation slice. It focuses on:
 - Tuned the randomized corridor pass back toward readable gameplay: room gaps/lateral offsets are smaller, preferred door sides are used more often, waypoint detours are shorter and capped, and connector paths are rejected unless every step is orthogonal/contiguous.
 - Added first-pass session-owned physics drops for Halls items. Breakable rewards and player-dropped session items now become an `ItemDisplay` visual plus `Interaction` pickup hitbox with simple gravity/friction movement.
 - Physics drops are picked up by right-clicking the hitbox with an empty main hand and are placed only into the hotbar. Session cleanup removes their display/hitbox entities and stops the physics task.
+- Extracted exploration layout planning into `HallsExplorationGenerator`, keeping `HallsSession` focused on session ownership, block rendering, entities, HUD, and item/drop runtime.
+- Reworked Howling Corridors generation to use a carving-mask approach: rooms are placed first, corridor candidates are cardinal step-by-step paths, and accepted corridors are remembered in masks so later corridors cannot intersect or visually cut through them.
+- Corridor generation now only returns orthogonally contiguous cell paths, so diagonal-looking corridor plans should no longer be possible from the planner.
+- Physics drops now settle on the exact top of the support block, fixing the previous behavior where they could sink deep into the floor after falling.
+- Validation note: the extracted generator compiles against a temporary local `BlockFace` stub. Full Maven packaging is still blocked in this shell because `mvn`/wrapper are unavailable and the installed Java compiler is Java 18 while Paper 26.2 and the project target Java 25.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 - Make it so corridors can pass through rooms, however if they intersect, the corridor wont be generated, instead almost like if it were to create a new door.
 - My original idea was to have 2D array where the rooms and corridors were to be placed, but if your approach is better, keep it.
 But just to talk about it more, I was thinking of level as having masks, like room mask, corridor mask and so on, which are then put on top of each other. The game still knows where rooms and the doors are so traps can adjust. Anyways if you have a better approach, keep it.
-- Item physics are almost fine, however they bury themselves deep into the floor before they stop falling
-- For the next slice, completely rework the generation and use my "carving" approach, it should ensure corridors won't cut through each other. Also try to fix the diagonal corridors, they are still present. Of course if you remake the whole generation, that will hopefully get fixed.
+- For next slice:
+- Add a few more corridors to worldgen based on room count for more interconnectiness
+- Item drops are almost fine, however they jitter around the ground, try to make it stop by disabling the physics once they land, only reanabling them when a breakable is broken close by.
+- Items should be able to land on top of breakables, like if it was a table
+- Scrap items right now stack, they shouldnt
+- I see 8 rooms on the lower floors, the generation should make 16 if based on untold depths scenario

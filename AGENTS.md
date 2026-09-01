@@ -1158,12 +1158,13 @@ SQLite tables:
 - `/hoc start <scenario> [player...]` allocates a session origin, builds the first start floor/elevator shell, teleports players into it, and tracks changed blocks for cleanup.
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
-- Current exploration floors use deterministic-per-session randomized Howling Corridors generation: Java places room shells, corridor openings, lights, props, and normal straight/90-degree corridors around interior-only `level/howling_corridors/exploration_*.txt` room masks.
+- `HallsExplorationGenerator` owns deterministic-per-session Howling Corridors exploration layout planning.
+- Current exploration floors use carving-mask generation: Java places room shells, corridor openings, lights, props, and normal straight/90-degree corridors around interior-only `level/howling_corridors/exploration_*.txt` room masks.
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
-- Exploration corridor routing reserves the elevator shell and room shells, validates each planned path before adding room openings, and adds some extra room-to-room corridors after the main connected room network is built.
-- Exploration corridors use off-center door cells and randomized waypoint routing; corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
+- Exploration corridor routing uses explicit room and corridor masks, rejects corridor/corridor intersections, keeps paths cardinal-only, and adds a small number of validated room-to-room loop corridors after the main connected room network is built.
+- Exploration corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
 - Halls floor loot/drop placeholders should use session-owned physics drops (`ItemDisplay` plus `Interaction`) instead of vanilla dropped item entities; players pick them up by right-clicking with an empty hand.
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
 - `HallsLayoutLoader` tolerates old copied room files by stripping a full `X` perimeter and treating non-`X` marker characters as open cells; this is runtime parsing tolerance, not file migration.
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
-- Current Halls implementation is still early; randomized dungeon generation, real floor progression, elevator transitions, ghost state, item physics, scrap storage, camps, traps, sculk, and monsters are pending.
+- Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, ghost state, full item definitions, scrap storage, camps, traps, sculk, and monsters are pending.
