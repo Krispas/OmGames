@@ -5,5 +5,5 @@ level-types:
   - deep_crypt
 block-material: DISPENSER
 damage: 4
-radius: 5.5
-interval-ticks: 45
+radius: 5.0
+interval-ticks: 60

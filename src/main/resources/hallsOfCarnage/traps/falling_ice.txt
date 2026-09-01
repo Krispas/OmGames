@@ -6,4 +6,4 @@ level-types:
 ceiling-material: POINTED_DRIPSTONE
 damage: 200
 radius: 1.0
-interval-ticks: 70
+interval-ticks: 55

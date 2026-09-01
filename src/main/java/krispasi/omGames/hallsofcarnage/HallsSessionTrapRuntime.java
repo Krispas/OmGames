@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.IdentityHashMap;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -46,6 +47,7 @@ final class HallsSessionTrapRuntime {
     private final Map<String, HallsTrapType> trapTypes;
     private final List<HallsTrap> traps = new ArrayList<>();
     private final Map<UUID, Long> trapDamageCooldowns = new java.util.HashMap<>();
+    private final Map<HallsTrap, Long> trapNextTriggerTicks = new IdentityHashMap<>();
     private final Set<UUID> transientTrapDisplays = new HashSet<>();
     private BukkitTask trapTask;
 
@@ -79,6 +81,7 @@ final class HallsSessionTrapRuntime {
             }
         }
         traps.clear();
+        trapNextTriggerTicks.clear();
         transientTrapDisplays.clear();
         trapDamageCooldowns.clear();
         stopTrapTask();
@@ -133,7 +136,7 @@ final class HallsSessionTrapRuntime {
                 TrapKind kind = bridgeCells.isEmpty() ? TrapKind.HOLE : TrapKind.HOLE_BRIDGE;
                 for (HallsExplorationGenerator.Cell pitCell : pitCells) {
                     if (!bridgeCells.contains(pitCell)) {
-                        traps.add(new HallsTrap(kind, pitCell.x(), pitCell.z(), random.nextInt(80), type, null, List.of(), BlockFace.SELF));
+                        addTrap(new HallsTrap(kind, pitCell.x(), pitCell.z(), random.nextInt(80), type, null, List.of(), BlockFace.SELF), random);
                     }
                 }
                 occupied.addAll(pitCells);
@@ -152,7 +155,7 @@ final class HallsSessionTrapRuntime {
                     continue;
                 }
                 List<UUID> displayIds = buildTrap(kind, cell, face, type);
-                traps.add(new HallsTrap(kind, cell.x(), cell.z(), random.nextInt(80), type, movingDisplayId(kind, displayIds), displayIds, face));
+                addTrap(new HallsTrap(kind, cell.x(), cell.z(), random.nextInt(80), type, movingDisplayId(kind, displayIds), displayIds, face), random);
                 occupied.addAll(footprint);
             }
             placed++;
@@ -183,11 +186,30 @@ final class HallsSessionTrapRuntime {
                 if (room.layout().at(x, z) == 'O'
                         && x != room.layout().width() / 2
                         && z != room.layout().depth() / 2) {
-                    cells.add(new HallsExplorationGenerator.Cell(room.startX() + x, room.startZ() + z));
+                    HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(room.startX() + x, room.startZ() + z);
+                    if (!nearRoomOpening(room, cell)) {
+                        cells.add(cell);
+                    }
                 }
             }
         }
         return cells;
+    }
+
+    private boolean nearRoomOpening(HallsExplorationGenerator.Room room, HallsExplorationGenerator.Cell cell) {
+        for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
+            HallsExplorationGenerator.Cell interior = switch (opening.getKey()) {
+                case NORTH -> new HallsExplorationGenerator.Cell(room.startX() + opening.getValue(), room.startZ());
+                case SOUTH -> new HallsExplorationGenerator.Cell(room.startX() + opening.getValue(), room.startZ() + room.layout().depth() - 1);
+                case EAST -> new HallsExplorationGenerator.Cell(room.startX() + room.layout().width() - 1, room.startZ() + opening.getValue());
+                case WEST -> new HallsExplorationGenerator.Cell(room.startX(), room.startZ() + opening.getValue());
+                default -> cell;
+            };
+            if (Math.abs(cell.x() - interior.x()) + Math.abs(cell.z() - interior.z()) <= 2) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<HallsExplorationGenerator.Cell> roomOpenCells(HallsExplorationGenerator.Room room) {
@@ -356,10 +378,8 @@ final class HallsSessionTrapRuntime {
             }
             case SWINGING_BLADE -> buildSwingingBlade(cell, face, type);
             case WALL_SPIKES -> buildWallSpikes(cell, face, type);
-            case FALLING_ICE -> {
-                setBlock(cell.x(), origin.y() + ROOM_HEIGHT - 1, cell.z(), type.ceilingMaterial(), BlockFace.DOWN);
-                yield List.of();
-            }
+            case FALLING_ICE -> List.of(spawnCeilingBlockDisplay(cell, type.ceilingMaterial().isAir()
+                    ? Material.POINTED_DRIPSTONE : type.ceilingMaterial()));
             case POISON_DARTS -> buildPoisonDartLauncher(cell, face, type);
             default -> List.of();
         };
@@ -396,12 +416,30 @@ final class HallsSessionTrapRuntime {
 
     private List<UUID> buildWallSpikes(HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type) {
         UUID base = spawnWallBlockDisplay(cell, face, Material.BLACK_CONCRETE, 0.04f, 0.9f, 0.9f);
-        UUID spikes = spawnTrapItemDisplay(TrapKind.WALL_SPIKES, cell, face, type, Material.IRON_SWORD, 0.0);
+        UUID spikes = spawnTrapItemDisplay(TrapKind.WALL_SPIKES, cell, face, type, Material.IRON_SWORD, 0.15);
         return List.of(base, spikes);
     }
 
     private List<UUID> buildPoisonDartLauncher(HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type) {
         return List.of(spawnWallBlockDisplay(cell, face, type.blockMaterial(), 0.08f, 0.65f, 0.65f));
+    }
+
+    private UUID spawnCeilingBlockDisplay(HallsExplorationGenerator.Cell cell, Material material) {
+        Location location = new Location(world, cell.x() + 0.5, origin.y() + ROOM_HEIGHT - 0.15, cell.z() + 0.5);
+        BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
+            entity.setBlock(material.createBlockData());
+            entity.setBillboard(Display.Billboard.FIXED);
+            entity.setInterpolationDelay(1);
+            entity.setTeleportDuration(2);
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_trap");
+            entity.setTransformation(new Transformation(
+                    new Vector3f(-0.18f, -0.55f, -0.18f),
+                    new Quaternionf(),
+                    new Vector3f(0.36f, 1.1f, 0.36f),
+                    new Quaternionf()));
+        });
+        return display.getUniqueId();
     }
 
     private UUID spawnRailDisplay(HallsExplorationGenerator.Cell cell, boolean eastWest) {
@@ -474,7 +512,7 @@ final class HallsSessionTrapRuntime {
     }
 
     private UUID movingDisplayId(TrapKind kind, List<UUID> displayIds) {
-        if (kind != TrapKind.SWINGING_BLADE || displayIds.size() < 2) {
+        if ((kind != TrapKind.SWINGING_BLADE && kind != TrapKind.WALL_SPIKES) || displayIds.size() < 2) {
             return null;
         }
         return displayIds.get(1);
@@ -484,6 +522,15 @@ final class HallsSessionTrapRuntime {
         stopTrapTask();
         if (!traps.isEmpty()) {
             trapTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickTraps, 1L, 1L);
+        }
+    }
+
+    private void addTrap(HallsTrap trap, Random random) {
+        traps.add(trap);
+        if (trap.kind() == TrapKind.FALLING_ICE) {
+            trapNextTriggerTicks.put(trap, world.getFullTime() + 25L + random.nextInt(Math.max(1, trap.type().intervalTicks())));
+        } else if (trap.kind() == TrapKind.POISON_DARTS) {
+            trapNextTriggerTicks.put(trap, world.getFullTime());
         }
     }
 
@@ -527,26 +574,30 @@ final class HallsSessionTrapRuntime {
                 }
             }
             case WALL_SPIKES -> {
-                boolean active = age % trap.type().intervalTicks() < trap.type().activeTicks();
+                long activeAge = age % trap.type().intervalTicks();
+                boolean active = activeAge < trap.type().activeTicks();
+                moveTrapDisplay(trap, active ? activeAge : 0L);
                 if (active) {
-                    world.spawnParticle(Particle.BLOCK, center, 10, 0.45, 0.25, 0.45, Material.POINTED_DRIPSTONE.createBlockData());
-                    damagePlayersNear(center, trap.type().radius(), trap.type().damage(), "Wall spikes pierce you.");
+                    spawnWallSpikeParticles(trap);
+                    damagePlayersInLine(trap, trap.type().radius(), trap.type().damage(), "Wall spikes pierce you.");
                 }
             }
             case FALLING_ICE -> {
-                if (age % trap.type().intervalTicks() == 0L) {
+                if (tick >= trapNextTriggerTicks.getOrDefault(trap, tick + trap.type().intervalTicks())) {
                     launchFallingIce(trap);
+                    long delay = Math.max(20L, trap.type().intervalTicks() / 2L)
+                            + java.util.concurrent.ThreadLocalRandom.current().nextLong(Math.max(1L, trap.type().intervalTicks()));
+                    trapNextTriggerTicks.put(trap, tick + delay);
                 }
             }
             case POISON_DARTS -> {
-                if (age % trap.type().intervalTicks() == 0L) {
+                if (tick >= trapNextTriggerTicks.getOrDefault(trap, 0L) && participantInDartLine(trap)) {
                     spawnDartLine(trap);
-                    for (Player player : nearbyParticipants(center, trap.type().radius())) {
-                        if (isInDartLine(trap, player)) {
-                            player.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 100, 1));
-                            damagePlayerFromTrap(player, trap.type().damage(), "Poison darts strike from the wall.");
-                        }
+                    for (Player player : participantsInLine(trap, trap.type().radius())) {
+                        player.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 100, 1));
+                        damagePlayerFromTrap(player, trap.type().damage(), "Poison darts strike from the wall.");
                     }
+                    trapNextTriggerTicks.put(trap, tick + Math.max(60L, trap.type().intervalTicks()));
                 }
             }
             default -> {
@@ -567,7 +618,7 @@ final class HallsSessionTrapRuntime {
                 case BEAR_TRAP -> damagePlayerFromTrap(player, trap.type().damage(), "A bear trap snaps shut.");
                 case PROXIMITY_MINE -> triggerProximityMine(trap, player);
                 case HOLE -> {
-                    if (player.getLocation().getY() < origin.y()) {
+                    if (player.getLocation().getY() <= origin.y() - Math.max(3, trap.type().depth() - 2)) {
                         damagePlayerFromTrap(player, 200.0, "The pit swallows you.");
                         teleportPlayerToElevator(player);
                     }
@@ -594,8 +645,14 @@ final class HallsSessionTrapRuntime {
         if (display == null) {
             return;
         }
-        double cycle = (age % trap.type().intervalTicks()) / (double) trap.type().intervalTicks();
-        double offset = Math.sin(cycle * Math.PI * 2.0) * 2.0;
+        double offset;
+        if (trap.kind() == TrapKind.WALL_SPIKES) {
+            double activeProgress = Math.min(1.0, age / (double) Math.max(1, trap.type().activeTicks()));
+            offset = 0.15 + Math.sin(activeProgress * Math.PI) * Math.min(5.0, trap.type().radius());
+        } else {
+            double cycle = (age % trap.type().intervalTicks()) / (double) trap.type().intervalTicks();
+            offset = Math.sin(cycle * Math.PI * 2.0) * 2.0;
+        }
         display.teleport(trapModelLocation(trap.kind(), new HallsExplorationGenerator.Cell(trap.x(), trap.z()), trap.face(), offset));
     }
 
@@ -619,9 +676,9 @@ final class HallsSessionTrapRuntime {
                 z += laneOffset;
             }
         } else if (requiresWall(kind)) {
-            x += face.getModX() * 0.48;
+            x += face.getModX() * 0.48 - face.getModX() * laneOffset;
             y = origin.y() + 1.55;
-            z += face.getModZ() * 0.48;
+            z += face.getModZ() * 0.48 - face.getModZ() * laneOffset;
         }
         return new Location(world, x, y, z);
     }
@@ -649,12 +706,14 @@ final class HallsSessionTrapRuntime {
     private Transformation trapModelTransformation(TrapKind kind, BlockFace face, float scale) {
         Quaternionf rotation = new Quaternionf();
         if (kind == TrapKind.SWINGING_BLADE) {
-            rotation.rotateZ((float) Math.toRadians(90.0));
-            if (face == BlockFace.NORTH || face == BlockFace.SOUTH) {
-                rotation.rotateY((float) Math.toRadians(90.0));
+            rotation.rotateX((float) Math.toRadians(180.0));
+            if (face == BlockFace.EAST || face == BlockFace.WEST) {
+                rotation.rotateZ((float) Math.toRadians(90.0));
             }
-        } else if (requiresWall(kind)) {
+        } else if (kind == TrapKind.WALL_SPIKES) {
+            rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
             rotation.rotateX((float) Math.toRadians(90.0));
+        } else if (requiresWall(kind)) {
             rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
         } else {
             rotation.rotateX((float) Math.toRadians(90.0));
@@ -663,7 +722,9 @@ final class HallsSessionTrapRuntime {
     }
 
     private void launchFallingIce(HallsTrap trap) {
-        Location start = new Location(world, trap.x() + 0.5, origin.y() + ROOM_HEIGHT - 0.2, trap.z() + 0.5);
+        double xOffset = java.util.concurrent.ThreadLocalRandom.current().nextInt(-1, 2);
+        double zOffset = java.util.concurrent.ThreadLocalRandom.current().nextInt(-1, 2);
+        Location start = new Location(world, trap.x() + 0.5 + xOffset, origin.y() + ROOM_HEIGHT - 0.2, trap.z() + 0.5 + zOffset);
         BlockDisplay display = world.spawn(start, BlockDisplay.class, entity -> {
             entity.setBlock(Material.PACKED_ICE.createBlockData());
             entity.setBillboard(Display.Billboard.FIXED);
@@ -713,16 +774,48 @@ final class HallsSessionTrapRuntime {
         world.playSound(start, Sound.ENTITY_ARROW_SHOOT, 0.6f, 1.6f);
     }
 
-    private boolean isInDartLine(HallsTrap trap, Player player) {
-        int px = player.getLocation().getBlockX();
-        int pz = player.getLocation().getBlockZ();
-        return switch (trap.face()) {
-            case NORTH -> px == trap.x() && pz <= trap.z() && trap.z() - pz <= trap.type().radius();
-            case SOUTH -> px == trap.x() && pz >= trap.z() && pz - trap.z() <= trap.type().radius();
-            case EAST -> pz == trap.z() && px >= trap.x() && px - trap.x() <= trap.type().radius();
-            case WEST -> pz == trap.z() && px <= trap.x() && trap.x() - px <= trap.type().radius();
-            default -> false;
-        };
+    private boolean participantInDartLine(HallsTrap trap) {
+        return !participantsInLine(trap, trap.type().radius()).isEmpty();
+    }
+
+    private List<Player> participantsInLine(HallsTrap trap, double radius) {
+        List<Player> players = new ArrayList<>();
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)
+                    && isLocationInLine(trap, player.getLocation(), radius, 0.75)) {
+                players.add(player);
+            }
+        }
+        return players;
+    }
+
+    private void damagePlayersInLine(HallsTrap trap, double radius, double damage, String message) {
+        for (Player player : participantsInLine(trap, radius)) {
+            damagePlayerFromTrap(player, damage, message);
+        }
+    }
+
+    private boolean isLocationInLine(HallsTrap trap, Location location, double radius, double width) {
+        double dx = location.getX() - (trap.x() + 0.5);
+        double dz = location.getZ() - (trap.z() + 0.5);
+        double forward = -(dx * trap.face().getModX() + dz * trap.face().getModZ());
+        double lateral = Math.abs(trap.face().getModX() == 0 ? dx : dz);
+        return forward >= 0.0 && forward <= radius && lateral <= width;
+    }
+
+    private void spawnWallSpikeParticles(HallsTrap trap) {
+        Location start = new Location(world,
+                trap.x() + 0.5 + trap.face().getModX() * 0.45,
+                origin.y() + 1.45,
+                trap.z() + 0.5 + trap.face().getModZ() * 0.45);
+        for (double distance = 0.2; distance <= trap.type().radius(); distance += 0.6) {
+            Location point = start.clone().add(
+                    -trap.face().getModX() * distance,
+                    0.0,
+                    -trap.face().getModZ() * distance);
+            world.spawnParticle(Particle.BLOCK, point, 2, 0.08, 0.08, 0.08, Material.POINTED_DRIPSTONE.createBlockData());
+        }
     }
 
     private void damagePlayersNear(Location center, double radius, double damage, String message) {
