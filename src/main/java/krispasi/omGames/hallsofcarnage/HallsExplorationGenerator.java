@@ -64,7 +64,7 @@ final class HallsExplorationGenerator {
         if (layouts.isEmpty()) {
             return;
         }
-        int targetRooms = Math.max(1, Math.min(28, floorDefinition.rooms()));
+        int targetRooms = Math.max(1, floorDefinition.rooms());
         HallsLayout firstLayout = layouts.get(random.nextInt(layouts.size()));
         Room first = new Room(firstLayout, originX - firstLayout.width() / 2, originZ + 9);
         first.openings().put(BlockFace.NORTH, firstLayout.width() / 2);

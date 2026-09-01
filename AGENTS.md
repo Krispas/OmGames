@@ -1158,15 +1158,18 @@ SQLite tables:
 - `/hoc start <scenario> [player...]` allocates a session origin, builds the first start floor/elevator shell, teleports players into it, and tracks changed blocks for cleanup.
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
-- `HallsExplorationGenerator` owns deterministic-per-session Howling Corridors exploration layout planning.
-- Current exploration floors use carving-mask generation: Java places room shells, corridor openings, lights, props, and normal straight/90-degree corridors around interior-only `level/howling_corridors/exploration_*.txt` room masks.
+- `HallsExplorationGenerator` owns deterministic-per-session exploration layout planning.
+- Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.txt|*.yml|*.yaml`.
+- Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, and `pillar-palettes`; monster/modifier sections may exist in resource files for future systems.
+- Current exploration floors use carving-mask generation: Java places room shells, corridor openings, lights, props, and normal straight/90-degree corridors around interior-only `level/<level_type>/exploration_*.txt` room masks.
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
+- Exploration floors grow their per-session generation/cleanup radius from the configured room count and retry with larger radii if planning underfills.
 - Exploration corridor routing uses explicit room and corridor masks, rejects corridor/corridor intersections, keeps paths cardinal-only, and adds a small number of validated room-to-room loop corridors after the main connected room network is built.
 - Exploration corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
 - Halls floor loot/drop placeholders should use session-owned physics drops (`ItemDisplay` plus `Interaction`) instead of vanilla dropped item entities; players pick them up by right-clicking with an empty hand.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
-- Placeholder Halls scrap items are split into single-item drops and marked unique so they do not stack in player inventories.
+- Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
 - `HallsLayoutLoader` tolerates old copied room files by stripping a full `X` perimeter and treating non-`X` marker characters as open cells; this is runtime parsing tolerance, not file migration.
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.

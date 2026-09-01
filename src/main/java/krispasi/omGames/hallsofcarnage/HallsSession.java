@@ -55,6 +55,7 @@ public final class HallsSession {
     private final World world;
     private final HallsConfig.BlockPoint origin;
     private final File dataFolder;
+    private final Map<String, HallsLevelType> levelTypes;
     private final Set<UUID> participants;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
@@ -69,6 +70,7 @@ public final class HallsSession {
     private int redstoneScrap;
     private int coins;
     private ItemStack[] elevatorChestContents = new ItemStack[27];
+    private int activeClearRadius = CLEAR_RADIUS;
     private boolean transitioning;
     private boolean running;
 
@@ -78,6 +80,7 @@ public final class HallsSession {
                         World world,
                         HallsConfig.BlockPoint origin,
                         File dataFolder,
+                        Map<String, HallsLevelType> levelTypes,
                         List<Player> players) {
         this.plugin = plugin;
         this.id = id;
@@ -85,6 +88,7 @@ public final class HallsSession {
         this.world = world;
         this.origin = origin;
         this.dataFolder = dataFolder;
+        this.levelTypes = levelTypes == null ? Map.of() : Map.copyOf(levelTypes);
         this.participants = new HashSet<>();
         for (Player player : players) {
             participants.add(player.getUniqueId());
@@ -333,12 +337,15 @@ public final class HallsSession {
     private void buildStartArea() throws IOException {
         currentFloor = 1;
         clearBuildVolume();
+        activeClearRadius = CLEAR_RADIUS;
+        clearBuildVolume();
         buildElevator();
+        HallsLevelType levelType = levelTypeFor(scenario.floor(1));
         HallsLayout layout = HallsLayoutLoader.load(new File(dataFolder, "level/special/start_floor.txt"));
         int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
         buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ,
-                Map.of(BlockFace.NORTH, layout.width() / 2));
-        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1);
+                Map.of(BlockFace.NORTH, layout.width() / 2), levelType, new Random((((long) id) << 32) ^ 1));
+        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1, levelType);
         spawnBreakableProp(origin.x() - layout.width() / 2 + 1, origin.y(), roomStartZ + 1, Material.BARREL, 3, PropReward.BLUEPRINT);
         closeElevatorDoors();
     }
@@ -374,10 +381,12 @@ public final class HallsSession {
         captureElevatorChestContents();
         removeSessionEntities();
         clearBuildVolume();
+        activeClearRadius = clearRadiusFor(scenario.floor(floor));
+        clearBuildVolume();
         buildElevator();
-        restoreElevatorChestContents();
         currentFloor = floor;
         buildExplorationRooms(floor);
+        restoreElevatorChestContents();
         closeElevatorDoors();
         teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
     }
@@ -394,37 +403,55 @@ public final class HallsSession {
     }
 
     private void buildExplorationRooms(int floor) {
-        List<HallsLayout> layouts = loadExplorationLayouts();
         HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
+        HallsLevelType levelType = levelTypeFor(floorDefinition);
+        List<HallsLayout> layouts = loadExplorationLayouts(levelType);
         Random random = new Random((((long) id) << 32) ^ floor);
         HallsExplorationGenerator.Plan plan = HallsExplorationGenerator.generate(
                 origin.x(),
                 origin.z(),
-                CLEAR_RADIUS,
+                activeClearRadius,
                 ELEVATOR_OUTER_RADIUS,
                 layouts,
                 floorDefinition,
                 random
         );
+        int targetRooms = Math.max(1, floorDefinition.rooms());
+        int expansions = 0;
+        while (plan.rooms().size() < targetRooms && expansions++ < 4) {
+            activeClearRadius += 32;
+            clearBuildVolume();
+            buildElevator();
+            random = new Random(((((long) id) << 32) ^ floor) + expansions * 9973L);
+            plan = HallsExplorationGenerator.generate(
+                    origin.x(),
+                    origin.z(),
+                    activeClearRadius,
+                    ELEVATOR_OUTER_RADIUS,
+                    layouts,
+                    floorDefinition,
+                    random
+            );
+        }
         if (plan.rooms().isEmpty()) {
             return;
         }
 
         HallsExplorationGenerator.Room first = plan.rooms().getFirst();
         for (HallsExplorationGenerator.Room room : plan.rooms()) {
-            buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(), room.openings());
+            buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(), room.openings(), levelType, random);
         }
-        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, first.northExitZ());
+        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, first.northExitZ(), levelType);
         for (List<HallsExplorationGenerator.Cell> path : plan.corridors()) {
-            buildGeneratedConnectorPath(path, plan.rooms());
+            buildGeneratedConnectorPath(path, plan.rooms(), levelType, random);
         }
         for (int i = 0; i < plan.rooms().size(); i++) {
-            placeGeneratedRoomContents(plan.rooms().get(i), random, floor, i, floorDefinition);
+            placeGeneratedRoomContents(plan.rooms().get(i), random, floor, i, floorDefinition, levelType);
         }
     }
 
-    private List<HallsLayout> loadExplorationLayouts() {
-        File folder = new File(dataFolder, "level/howling_corridors");
+    private List<HallsLayout> loadExplorationLayouts(HallsLevelType levelType) {
+        File folder = new File(dataFolder, "level/" + levelType.id());
         File[] files = folder.listFiles((dir, name) -> name.startsWith("exploration_") && name.endsWith(".txt"));
         if (files == null || files.length == 0) {
             return List.of(fallbackExplorationLayout());
@@ -440,6 +467,18 @@ public final class HallsSession {
         return layouts.isEmpty() ? List.of(fallbackExplorationLayout()) : layouts;
     }
 
+    private HallsLevelType levelTypeFor(HallsScenario.FloorDefinition floorDefinition) {
+        if (floorDefinition == null) {
+            return levelTypes.getOrDefault("howling_corridors", HallsLevelType.fallback("howling_corridors"));
+        }
+        return levelTypes.getOrDefault(floorDefinition.levelType(), HallsLevelType.fallback(floorDefinition.levelType()));
+    }
+
+    private int clearRadiusFor(HallsScenario.FloorDefinition floorDefinition) {
+        int rooms = Math.max(1, floorDefinition.rooms());
+        return Math.max(CLEAR_RADIUS, 30 + (int) Math.ceil(Math.sqrt(rooms) * 14.0));
+    }
+
     private HallsLayout fallbackExplorationLayout() {
         return new HallsLayout(List.of(
                 "OOOOOOOOO",
@@ -452,9 +491,9 @@ public final class HallsSession {
     }
 
     private void clearBuildVolume() {
-        for (int x = origin.x() - CLEAR_RADIUS; x <= origin.x() + CLEAR_RADIUS; x++) {
+        for (int x = origin.x() - activeClearRadius; x <= origin.x() + activeClearRadius; x++) {
             for (int y = origin.y() - 1; y <= origin.y() + CLEAR_HEIGHT; y++) {
-                for (int z = origin.z() - CLEAR_RADIUS; z <= origin.z() + CLEAR_RADIUS; z++) {
+                for (int z = origin.z() - activeClearRadius; z <= origin.z() + activeClearRadius; z++) {
                     setBlock(x, y, z, Material.AIR);
                 }
             }
@@ -500,10 +539,17 @@ public final class HallsSession {
         setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 2, origin.z(), machine);
     }
 
-    private void buildLayoutRoom(HallsLayout layout, int startX, int y, int startZ, Map<BlockFace, Integer> openings) {
-        Material floor = Material.PACKED_MUD;
-        Material ceiling = Material.TUFF_BRICKS;
-        Material wall = Material.DEEPSLATE_BRICKS;
+    private void buildLayoutRoom(HallsLayout layout,
+                                 int startX,
+                                 int y,
+                                 int startZ,
+                                 Map<BlockFace, Integer> openings,
+                                 HallsLevelType levelType,
+                                 Random random) {
+        Material floor = levelType.floor();
+        Material ceiling = levelType.ceiling();
+        HallsLevelType.BlockPalette wallPalette = levelType.wallPalette(random);
+        HallsLevelType.BlockPalette pillarPalette = levelType.pillarPalette(random);
         for (int z = -1; z <= layout.depth(); z++) {
             for (int x = -1; x <= layout.width(); x++) {
                 boolean border = x < 0 || z < 0 || x >= layout.width() || z >= layout.depth();
@@ -511,6 +557,9 @@ public final class HallsSession {
                 char cell = border ? 'X' : layout.at(x, z);
                 int blockX = startX + x;
                 int blockZ = startZ + z;
+                Material wall = isRoomCorner(layout, x, z)
+                        ? pillarPalette.material(random)
+                        : wallPalette.material(random);
                 setBlock(blockX, y - 1, blockZ, floor);
                 setBlock(blockX, y + ROOM_HEIGHT, blockZ, ceiling);
                 if (!opening && (border || cell == 'X')) {
@@ -545,15 +594,30 @@ public final class HallsSession {
     }
 
     private void buildConnector(int x, int y, int startZ, int endZ) {
+        buildConnector(x, y, startZ, endZ, HallsLevelType.fallback("howling_corridors"));
+    }
+
+    private void buildConnector(int x, int y, int startZ, int endZ, HallsLevelType levelType) {
         for (int z = Math.min(startZ, endZ); z <= Math.max(startZ, endZ); z++) {
             int halfWidth = z == origin.z() + ELEVATOR_OUTER_RADIUS + 1 ? 1 : 0;
-            buildCorridorCell(x, y, z, halfWidth, true);
+            buildCorridorCell(x, y, z, halfWidth, true, levelType, new Random((((long) x) << 32) ^ z));
         }
     }
 
     private void buildCorridorCell(int x, int y, int z, int halfWidth, boolean northSouth) {
-        Material floor = Material.PACKED_MUD;
-        Material wall = Material.DEEPSLATE_BRICKS;
+        buildCorridorCell(x, y, z, halfWidth, northSouth, HallsLevelType.fallback("howling_corridors"), new Random());
+    }
+
+    private void buildCorridorCell(int x,
+                                   int y,
+                                   int z,
+                                   int halfWidth,
+                                   boolean northSouth,
+                                   HallsLevelType levelType,
+                                   Random random) {
+        Material floor = levelType.corridorFloor();
+        Material ceiling = levelType.corridorCeiling();
+        HallsLevelType.BlockPalette wallPalette = levelType.wallPalette(random);
         int pathMin = -halfWidth;
         int pathMax = halfWidth;
         for (int offset = pathMin - 1; offset <= pathMax + 1; offset++) {
@@ -563,16 +627,22 @@ public final class HallsSession {
                 continue;
             }
             setBlock(blockX, y - 1, blockZ, floor);
-            setBlock(blockX, y + 3, blockZ, wall);
+            setBlock(blockX, y + 3, blockZ, ceiling);
             for (int dy = 0; dy < 3; dy++) {
                 boolean path = offset >= pathMin && offset <= pathMax;
-                setBlock(blockX, y + dy, blockZ, path ? Material.AIR : wall);
+                setBlock(blockX, y + dy, blockZ, path ? Material.AIR : wallPalette.material(random));
             }
         }
     }
 
+    private boolean isRoomCorner(HallsLayout layout, int x, int z) {
+        return (x < 0 || x >= layout.width()) && (z < 0 || z >= layout.depth());
+    }
+
     private void buildGeneratedConnectorPath(List<HallsExplorationGenerator.Cell> path,
-                                             List<HallsExplorationGenerator.Room> rooms) {
+                                             List<HallsExplorationGenerator.Room> rooms,
+                                             HallsLevelType levelType,
+                                             Random random) {
         Set<HallsExplorationGenerator.Cell> openCells = new HashSet<>(path);
         Set<HallsExplorationGenerator.Cell> shellCells = new HashSet<>();
         for (HallsExplorationGenerator.Cell point : openCells) {
@@ -582,20 +652,24 @@ public final class HallsSession {
                 }
             }
         }
-        Material floor = Material.PACKED_MUD;
-        Material wall = Material.DEEPSLATE_BRICKS;
+        Material floor = levelType.corridorFloor();
+        Material ceiling = levelType.corridorCeiling();
+        HallsLevelType.BlockPalette wallPalette = levelType.wallPalette(random);
         for (HallsExplorationGenerator.Cell point : shellCells) {
             if (isProtectedElevatorCell(point.x(), point.z())) {
                 continue;
             }
             boolean open = openCells.contains(point);
-            if (!open && isInsideGeneratedRoomShell(point, rooms)) {
+            boolean insideRoomShell = isInsideGeneratedRoomShell(point, rooms);
+            if (!open && insideRoomShell) {
                 continue;
             }
             setBlock(point.x(), origin.y() - 1, point.z(), floor);
-            setBlock(point.x(), origin.y() + 3, point.z(), wall);
+            if (!insideRoomShell) {
+                setBlock(point.x(), origin.y() + 3, point.z(), ceiling);
+            }
             for (int dy = 0; dy < 3; dy++) {
-                setBlock(point.x(), origin.y() + dy, point.z(), open ? Material.AIR : wall);
+                setBlock(point.x(), origin.y() + dy, point.z(), open ? Material.AIR : wallPalette.material(random));
             }
         }
     }
@@ -666,13 +740,14 @@ public final class HallsSession {
                                             Random random,
                                             int floor,
                                             int roomIndex,
-                                            HallsScenario.FloorDefinition floorDefinition) {
+                                            HallsScenario.FloorDefinition floorDefinition,
+                                            HallsLevelType levelType) {
         List<Cell> cells = openInteriorCells(room);
         if (cells.isEmpty()) {
             return;
         }
         Cell light = cells.get(Math.floorMod(roomIndex * 3 + floor, cells.size()));
-        setBlock(room.startX() + light.x(), origin.y() + ROOM_HEIGHT - 1, room.startZ() + light.z(), Material.SEA_LANTERN);
+        setBlock(room.startX() + light.x(), origin.y() + ROOM_HEIGHT - 1, room.startZ() + light.z(), levelType.light());
         int baseProps = Math.max(1, floorDefinition.breakables() / Math.max(1, floorDefinition.rooms()));
         int props = Math.min(cells.size(), baseProps + (roomIndex < floorDefinition.breakables() % Math.max(1, floorDefinition.rooms()) ? 1 : 0));
         for (int i = 0; i < props; i++) {
@@ -1122,6 +1197,7 @@ public final class HallsSession {
         ItemStack item = namedItem(material, name, color);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
+            meta.setMaxStackSize(1);
             meta.getPersistentDataContainer().set(
                     new org.bukkit.NamespacedKey(plugin, "hoc_scrap_type"),
                     PersistentDataType.STRING,
@@ -1142,6 +1218,7 @@ public final class HallsSession {
         if (meta == null) {
             return;
         }
+        meta.setMaxStackSize(1);
         meta.getPersistentDataContainer().set(
                 new org.bukkit.NamespacedKey(plugin, "hoc_scrap_unique"),
                 PersistentDataType.STRING,

@@ -39,9 +39,23 @@ floors:
     level-type: howling_corridors
     difficulty: 5
     layout: special/start_floor.txt
-  - number: 2-4
+  - number: 2
     kind: exploration
     level-type: howling_corridors
+    difficulty: 10
+    rooms: 16
+    items: 8
+    breakables: 24
+  - number: 3
+    kind: exploration
+    level-type: frozen_halls
+    difficulty: 10
+    rooms: 16
+    items: 8
+    breakables: 24
+  - number: 4
+    kind: exploration
+    level-type: deep_crypt
     difficulty: 10
     rooms: 16
     items: 8

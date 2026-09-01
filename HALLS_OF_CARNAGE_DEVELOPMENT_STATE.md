@@ -68,7 +68,7 @@ This is the first implementation slice. It focuses on:
 - Config-driven breakable prop definitions, real loot tables, and physics-driven unpicked item entities.
 - Dedicated elevator transfer chest inventory and item persistence rules.
 - Scenario-aware randomized template-driven exploration room selection from `resources/hallsOfCarnage/level/<level_type>/`.
-- Level-type material palettes beyond the current placeholder Howling Corridors materials.
+- Runtime use of level-type monster pools, modifier pools, and non-normal corridor algorithms beyond parsed metadata.
 
 ## Resume Notes
 
@@ -110,6 +110,13 @@ This is the first implementation slice. It focuses on:
 - Session physics drops now stop ticking once settled. Destroying a nearby breakable prop wakes settled drops so items resting on that prop can fall after the support disappears.
 - Physics drops can now use active breakable props as support surfaces, allowing items to rest on top of table-like props.
 - Placeholder Halls scrap drops are split into single-item drops and marked with unique metadata so scrap does not stack in the hotbar.
+- Added first-pass `HallsLevelType` and `HallsLevelTypeLoader` support. Runtime now loads `level_type/*.txt|*.yml|*.yaml` files and keeps parsed material palettes plus corridor-generation ids available for floor rendering.
+- Replaced the dummy Howling Corridors level type resource with a real editable definition, and added initial Frozen Halls and Deep Crypt level type resources.
+- Exploration room templates now resolve from the active floor's configured `level-type`; missing level-specific room folders fall back to the placeholder exploration mask.
+- Exploration floor generation no longer caps configured room counts at 28. The session grows its generation/cleanup radius from the configured `rooms` value and retries with larger radii when planning underfills.
+- Generated rooms and corridors now use the active level type's floor, ceiling, light, wall palette, and pillar palette materials instead of hardcoded Howling Corridors blocks.
+- Scrap placeholder items now also use the max stack size component set to `1`; the unique metadata marker remains as a harmless fallback and deposit identifier companion.
+- Corridor open cells inside a generated room shell no longer place the lower corridor ceiling block, preventing room/corridor openings from gaining a low cap.
 - Validation note: the extracted generator compiles against a temporary local `BlockFace` stub. Full Maven packaging is still blocked in this shell because `mvn`/wrapper are unavailable and the installed Java compiler is Java 18 while Paper 26.2 and the project target Java 25.
 
 ## Reviewer note (Delete entries once done, but keep the header)
@@ -117,8 +124,8 @@ This is the first implementation slice. It focuses on:
 - My original idea was to have 2D array where the rooms and corridors were to be placed, but if your approach is better, keep it.
 But just to talk about it more, I was thinking of level as having masks, like room mask, corridor mask and so on, which are then put on top of each other. The game still knows where rooms and the doors are so traps can adjust. Anyways if you have a better approach, keep it.
 - For next slice:
-- To make items not stack, you could have just used the max stack size component.
-- If scenario says that for example, floor should have 100 rooms, it should generate 100 rooms. If you cannot place a new room, just expand the level size.
-- When corridor intersects with a room, its ceiling should not generate.
 - In the original design, if corridor tries to generate and collides with another, the generation stops and a t crossing is formed. Try to do that to add more natural shape.
-- The biggest change in this slice: Level type definitions, in GDD it is specified how they work, look into resources, there is a dummy file inside with instructions in it.
+- Great, however wall types were misunderstood, right now there is a picked wall type per room, however instead make it so each column of blocks has randomized wall type
+- Pillars are misunderstood too, if there is a inner corner on corridor or inner wall, place pillar set there instead of the normal wall type.
+- The corridors still dont intersect
+- There is still only 8 rooms despite scenario saying more.

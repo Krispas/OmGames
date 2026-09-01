@@ -35,6 +35,8 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/level/howling_corridors/exploration_2.txt",
             "hallsOfCarnage/level/howling_corridors/exploration_3.txt",
             "hallsOfCarnage/level_type/howling_corridors.txt",
+            "hallsOfCarnage/level_type/frozen_halls.txt",
+            "hallsOfCarnage/level_type/deep_crypt.txt",
             "hallsOfCarnage/modifiers/shared.yml",
             "hallsOfCarnage/modifiers/frozen_halls.yml",
             "hallsOfCarnage/modifiers/deep_crypt.yml"
@@ -58,6 +60,7 @@ public final class HallsOfCarnageManager {
     private final Map<Integer, BukkitTask> disconnectGraceTasks = new HashMap<>();
     private HallsConfig config;
     private List<HallsScenario> scenarios = List.of();
+    private Map<String, HallsLevelType> levelTypes = Map.of();
     private int nextSessionId = 1;
 
     public HallsOfCarnageManager(JavaPlugin plugin) {
@@ -70,10 +73,12 @@ public final class HallsOfCarnageManager {
         ensureDefaultFiles();
         config = HallsConfig.load(getConfigFile());
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
+        levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         shameService.load();
         applyWorldRules();
         spawnConfiguredMenuVillager();
-        plugin.getLogger().info("Loaded " + scenarios.size() + " Halls of Carnage scenarios.");
+        plugin.getLogger().info("Loaded " + scenarios.size() + " Halls of Carnage scenarios and "
+                + levelTypes.size() + " level types.");
     }
 
     public void shutdown() {
@@ -85,9 +90,11 @@ public final class HallsOfCarnageManager {
         scenarios = List.of();
         config = HallsConfig.load(getConfigFile());
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
+        levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         applyWorldRules();
         spawnConfiguredMenuVillager();
-        return Result.ok("Reloaded Halls of Carnage. Scenarios: " + scenarios.size() + ".");
+        return Result.ok("Reloaded Halls of Carnage. Scenarios: " + scenarios.size()
+                + ", level types: " + levelTypes.size() + ".");
     }
 
     public List<HallsScenario> getScenarios() {
@@ -304,7 +311,8 @@ public final class HallsOfCarnageManager {
         }
         int sessionId = nextSessionId++;
         int slot = firstFreeSessionSlot();
-        HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot), getDataFolder(), players);
+        HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot),
+                getDataFolder(), levelTypes, players);
         try {
             session.start();
         } catch (IOException ex) {
@@ -543,6 +551,10 @@ public final class HallsOfCarnageManager {
 
     private File getScenariosFolder() {
         return new File(getDataFolder(), "scenarios");
+    }
+
+    private File getLevelTypesFolder() {
+        return new File(getDataFolder(), "level_type");
     }
 
     private String normalizeId(String value) {
