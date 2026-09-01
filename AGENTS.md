@@ -1169,9 +1169,10 @@ SQLite tables:
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
 - If a scenario floor is not explicitly configured but a prior exploration floor is configured, runtime reuses that prior exploration floor definition for the requested floor instead of falling back to the generic 8-room placeholder.
 - Exploration floors grow their per-session generation/cleanup radius from the configured room count and retry with larger radii if planning underfills.
-- Exploration corridor routing uses BFS over the baked mask, targets only existing corridor/elevator/door network cells, keeps paths cardinal-only, adds a small number of loop corridors after the main connected network is built, and checks reachability from the elevator before the plan is accepted.
+- Exploration corridor routing uses turn-aware cardinal pathing over the baked mask, targets only existing corridor/elevator/door network cells, rejects short zigzag paths that read as diagonal, adds loop corridors and side branches after the main connected network is built, and checks reachability from the elevator before the plan is accepted.
 - Exploration corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
 - Generated corridors use ceiling-embedded light blocks so the walkable corridor remains 3 blocks tall, and the elevator has a ceiling light.
+- The elevator exterior vestibule is generated as a sealed mini-tunnel outside the door; opening the door clears only the passage while preserving the vestibule floor, side walls, and ceiling.
 - Halls physics item displays use a 1-tick interpolation delay and short teleport duration for smoother falling/pickup visuals.
 - Halls floor loot/drop placeholders should use session-owned physics drops (`ItemDisplay` plus `Interaction`) instead of vanilla dropped item entities; players pick them up by right-clicking with an empty hand.
 - Halls breakable props are session-owned display/interactions and may be multi-part prop archetypes such as barrels, chests, tables, chairs, stools, radiators, and metal barrels; keep cleanup routed through `HallsSession`.

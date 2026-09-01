@@ -142,9 +142,11 @@ This is the first implementation slice. It focuses on:
 - The elevator now has a ceiling light and an extra sealed vestibule ceiling outside the door to avoid visible sky at the entrance.
 - Session physics `ItemDisplay` drops now use a 1-tick interpolation delay and short teleport duration for smoother animation.
 - Validation note: `git diff --check` passed, and the Halls package compiled with local JDK 25 plus Paper 26.2 API, SQLite, Adventure 5.2, JetBrains annotations, Guava, and Bungee chat jars. Full Maven packaging was not run because `mvn`/wrapper is unavailable in this shell.
+- Replaced plain BFS corridor search with a turn-aware cardinal path search and rejected short alternating zigzags, addressing corridors that visually read as diagonal.
+- Added post-network maze branches in addition to loop corridors, so generated exploration floors have more side paths and less of a strict tree shape.
+- Room placement now anchors closer to existing generated rooms while still connecting through the baked corridor/door network.
+- Reworked the elevator exterior door cell into a sealed vestibule mini-tunnel. The loading black-concrete passage now opens without deleting the vestibule floor, side walls, or ceiling, closing the visible-sky gap in front of the elevator.
+- Validation note: `git diff --check` passed, and the Halls package compiled with local JDK 25 plus Paper 26.2 API, SQLite, Adventure 5.2, JetBrains annotations, Guava, and Bungee chat jars. Full Maven packaging was not run because `mvn`/wrapper is unavailable in this shell.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-For next slice
-- The diagonal corridors still happen, eleminate them
-- Corridors right now are way too optimized, add more randomness to them since right now its creating more of a tree structure, I want a maze like dungeon that's enjoyable to play in, that also means placing room entrances in places it doesnt make much sense buildervise.
-- There is still visible sky in front of the elevator, to elaborate more its the place where black concrete was during loading
+- Levels are still not interconnected enough, I want to see stuff like loops between parts of the dungeon generated and so on, I want to see corridors which begin in one room and end in another, right now its just one large corridor network which offers no looping or maze like aspects. Also make it somehow that elevator leads always into a room and then there are more than 1 way onward from that room.
