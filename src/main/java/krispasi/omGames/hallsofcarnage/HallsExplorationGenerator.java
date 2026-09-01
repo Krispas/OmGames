@@ -3,12 +3,10 @@ package krispasi.omGames.hallsofcarnage;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
@@ -22,6 +20,8 @@ final class HallsExplorationGenerator {
             BlockFace.WEST
     };
     private static final int LOGICAL_RADIUS = 256;
+    private static final int MAX_CONNECTOR_TARGETS = 18;
+    private static final int CONNECTOR_CANDIDATE_ATTEMPTS = 28;
 
     private final int originX;
     private final int originZ;
@@ -92,7 +92,8 @@ final class HallsExplorationGenerator {
             addRoom(candidate);
             rememberCorridor(path);
         }
-        addLoopCorridors();
+        addFirstRoomOnwardRoutes();
+        addRoomToRoomLoops();
         addMazeBranches(Math.max(rooms.size() / 2, 4));
     }
 
@@ -188,81 +189,116 @@ final class HallsExplorationGenerator {
     }
 
     private List<Cell> findConnectorPath(Cell start, Set<Cell> targets) {
-        return findConnectorPath(start, targets, null);
+        return findConnectorPath(start, targets, List.of());
     }
 
     private List<Cell> findConnectorPath(Cell start, Set<Cell> targets, Bounds blockedCandidate) {
-        if (!insideBuildArea(start)) {
+        return findConnectorPath(start, targets, blockedCandidate == null ? List.of() : List.of(blockedCandidate));
+    }
+
+    private List<Cell> findConnectorPath(Cell start, Set<Cell> targets, List<Bounds> blockedBounds) {
+        if (!insideBuildArea(start) || targets.isEmpty()) {
             return List.of();
         }
-        PriorityQueue<SearchStep> queue = new PriorityQueue<>(Comparator.comparingInt(SearchStep::cost)
-                .thenComparingInt(SearchStep::order));
-        Map<SearchNode, Integer> bestCosts = new HashMap<>();
-        Map<SearchNode, SearchNode> previous = new HashMap<>();
-        SearchNode startNode = new SearchNode(start, null);
-        queue.add(new SearchStep(0, 0, startNode));
-        bestCosts.put(startNode, 0);
-        int maxVisited = Math.max(6000, clearRadius * clearRadius);
-        int visited = 0;
-        int order = 1;
-        while (!queue.isEmpty() && visited++ < maxVisited) {
-            SearchStep step = queue.remove();
-            SearchNode current = step.node();
-            if (step.cost() != bestCosts.getOrDefault(current, Integer.MAX_VALUE)) {
-                continue;
-            }
-            if (!current.cell().equals(start) && targets.contains(current.cell())) {
-                List<Cell> path = reconstructPath(previous, current);
-                if (!hasShortZigzags(path)) {
+        List<Cell> candidates = closestTargets(start, targets);
+        for (Cell target : candidates) {
+            for (int attempt = 0; attempt < CONNECTOR_CANDIDATE_ATTEMPTS; attempt++) {
+                List<Cell> path = orthogonalCandidatePath(start, target, attempt);
+                if (isValidConnectorPath(path, start, targets, blockedBounds)) {
                     return path;
                 }
-                continue;
-            }
-            List<BlockFace> faces = new ArrayList<>(List.of(CARDINAL_FACES));
-            Collections.shuffle(faces, random);
-            for (BlockFace face : faces) {
-                Cell next = step(current.cell(), face);
-                if (!canCorridorOccupy(next, start, targets.contains(next), blockedCandidate, true)) {
-                    continue;
-                }
-                SearchNode nextNode = new SearchNode(next, face);
-                int nextCost = step.cost() + movementCost(current, next, face, targets.contains(next));
-                if (nextCost >= bestCosts.getOrDefault(nextNode, Integer.MAX_VALUE)) {
-                    continue;
-                }
-                bestCosts.put(nextNode, nextCost);
-                previous.put(nextNode, current);
-                queue.add(new SearchStep(nextCost, order++, nextNode));
             }
         }
         return List.of();
     }
 
-    private int movementCost(SearchNode current, Cell next, BlockFace face, boolean target) {
-        int cost = 10 + random.nextInt(4);
-        if (current.face() != null && current.face() != face) {
-            cost += 18;
+    private List<Cell> closestTargets(Cell start, Set<Cell> targets) {
+        List<Cell> sorted = new ArrayList<>(targets);
+        sorted.sort(java.util.Comparator.comparingInt(target -> manhattanDistance(start, target)));
+        if (sorted.size() > MAX_CONNECTOR_TARGETS) {
+            sorted = new ArrayList<>(sorted.subList(0, MAX_CONNECTOR_TARGETS));
         }
-        if (!target && isAdjacentToRoomShell(next)) {
-            cost += 14;
+        Collections.shuffle(sorted, random);
+        return sorted;
+    }
+
+    private List<Cell> orthogonalCandidatePath(Cell start, Cell target, int attempt) {
+        List<Cell> waypoints = new ArrayList<>();
+        boolean horizontalFirst = attempt % 2 == 0;
+        int detour = attempt < 4 ? 0 : 2 + random.nextInt(9);
+        if (detour == 0) {
+            waypoints.add(horizontalFirst ? new Cell(target.x(), start.z()) : new Cell(start.x(), target.z()));
+        } else if (horizontalFirst) {
+            int x = clamp(random.nextBoolean() ? Math.max(start.x(), target.x()) + detour : Math.min(start.x(), target.x()) - detour,
+                    originX - clearRadius + 2, originX + clearRadius - 2);
+            waypoints.add(new Cell(x, start.z()));
+            waypoints.add(new Cell(x, target.z()));
+        } else {
+            int z = clamp(random.nextBoolean() ? Math.max(start.z(), target.z()) + detour : Math.min(start.z(), target.z()) - detour,
+                    originZ - clearRadius + 2, originZ + clearRadius - 2);
+            waypoints.add(new Cell(start.x(), z));
+            waypoints.add(new Cell(target.x(), z));
         }
-        return cost;
+        waypoints.add(target);
+        return pathThrough(start, waypoints);
+    }
+
+    private List<Cell> pathThrough(Cell start, List<Cell> waypoints) {
+        List<Cell> path = new ArrayList<>();
+        Cell current = start;
+        path.add(current);
+        for (Cell waypoint : waypoints) {
+            while (current.x() != waypoint.x()) {
+                current = new Cell(current.x() + Integer.compare(waypoint.x(), current.x()), current.z());
+                path.add(current);
+            }
+            while (current.z() != waypoint.z()) {
+                current = new Cell(current.x(), current.z() + Integer.compare(waypoint.z(), current.z()));
+                path.add(current);
+            }
+        }
+        return path;
+    }
+
+    private boolean isValidConnectorPath(List<Cell> path, Cell start, Set<Cell> targets, List<Bounds> blockedBounds) {
+        if (path.size() < 2 || hasShortZigzags(path)) {
+            return false;
+        }
+        Set<Cell> seen = new HashSet<>();
+        for (int i = 0; i < path.size(); i++) {
+            Cell cell = path.get(i);
+            if (!seen.add(cell)) {
+                return false;
+            }
+            if (i > 0 && manhattanDistance(path.get(i - 1), cell) != 1) {
+                return false;
+            }
+            boolean target = i == path.size() - 1 && targets.contains(cell);
+            if (!canCorridorOccupy(cell, start, target, blockedBounds, true)) {
+                return false;
+            }
+        }
+        return targets.contains(path.getLast());
     }
 
     private boolean canCorridorOccupy(Cell cell, Cell start, boolean target, Bounds blockedCandidate) {
-        return canCorridorOccupy(cell, start, target, blockedCandidate, true);
+        return canCorridorOccupy(cell, start, target, blockedCandidate == null ? List.of() : List.of(blockedCandidate), true);
     }
 
     private boolean canCorridorOccupy(Cell cell,
                                       Cell start,
                                       boolean target,
-                                      Bounds blockedCandidate,
+                                      List<Bounds> blockedBounds,
                                       boolean allowDoorAdjacency) {
         if (!insideBuildArea(cell) || protectedElevator.contains(cell.x(), cell.z())) {
             return false;
         }
-        if (!cell.equals(start) && blockedCandidate != null && blockedCandidate.contains(cell.x(), cell.z())) {
-            return false;
+        if (!cell.equals(start) && !target) {
+            for (Bounds blocked : blockedBounds) {
+                if (blocked.contains(cell.x(), cell.z())) {
+                    return false;
+                }
+            }
         }
         if (cell.equals(start) || target || corridorCells.contains(cell)) {
             return true;
@@ -272,18 +308,6 @@ final class HallsExplorationGenerator {
         }
         return !roomShellCells.contains(cell) && !roomInteriorCells.contains(cell)
                 && !isAdjacentToRoomShell(cell);
-    }
-
-    private List<Cell> reconstructPath(Map<SearchNode, SearchNode> previous, SearchNode end) {
-        List<Cell> path = new ArrayList<>();
-        SearchNode current = end;
-        path.add(current.cell());
-        while (previous.containsKey(current)) {
-            current = previous.get(current);
-            path.add(current.cell());
-        }
-        Collections.reverse(path);
-        return path;
     }
 
     private Cell step(Cell cell, BlockFace face) {
@@ -345,31 +369,72 @@ final class HallsExplorationGenerator {
         }
     }
 
-    private void addLoopCorridors() {
-        int target = Math.max(3, rooms.size() / 3);
+    private void addFirstRoomOnwardRoutes() {
+        if (rooms.size() < 3) {
+            return;
+        }
+        Room first = rooms.getFirst();
+        int wantedOpenings = Math.min(3, Math.max(2, rooms.size() / 5));
+        int attempts = 0;
+        while (first.openings().size() < wantedOpenings && attempts++ < rooms.size() * 8) {
+            Room target = rooms.get(1 + random.nextInt(rooms.size() - 1));
+            if (connectRooms(first, target, true)) {
+                continue;
+            }
+            connectRooms(target, first, true);
+        }
+    }
+
+    private void addRoomToRoomLoops() {
+        int target = Math.max(rooms.size() / 2, 5);
         int added = 0;
         int attempts = 0;
-        while (added < target && attempts++ < rooms.size() * 60) {
-            Room room = rooms.get(random.nextInt(rooms.size()));
-            BlockFace face = randomFace();
-            if (room.openings().containsKey(face)) {
+        while (added < target && attempts++ < rooms.size() * rooms.size() * 5) {
+            Room from = rooms.get(random.nextInt(rooms.size()));
+            Room to = rooms.get(random.nextInt(rooms.size()));
+            if (from == to || manhattanDistance(new Cell(from.centerX(), from.centerZ()), new Cell(to.centerX(), to.centerZ())) < 12) {
                 continue;
             }
-            int offset = doorOffset(room.layout(), face);
-            Cell door = doorCell(room, face, offset);
-            Set<Cell> targets = new HashSet<>(networkCells);
-            for (Cell cell : openInteriorCells(room)) {
-                targets.remove(cell);
+            if (connectRooms(from, to, false)) {
+                added++;
             }
-            List<Cell> path = findConnectorPath(door, targets);
-            if (path.size() < 5) {
-                continue;
-            }
-            room.openings().put(face, offset);
-            networkCells.add(door);
-            rememberCorridor(path);
-            added++;
         }
+    }
+
+    private boolean connectRooms(Room from, Room to, boolean allowShort) {
+        List<BlockFace> fromFaces = availableFaces(from);
+        List<BlockFace> toFaces = availableFaces(to);
+        Collections.shuffle(fromFaces, random);
+        Collections.shuffle(toFaces, random);
+        for (BlockFace fromFace : fromFaces) {
+            int fromOffset = doorOffset(from.layout(), fromFace);
+            Cell fromDoor = doorCell(from, fromFace, fromOffset);
+            for (BlockFace toFace : toFaces) {
+                int toOffset = doorOffset(to.layout(), toFace);
+                Cell toDoor = doorCell(to, toFace, toOffset);
+                List<Cell> path = findConnectorPath(fromDoor, Set.of(toDoor), List.of(Bounds.of(from), Bounds.of(to)));
+                if (path.size() < (allowShort ? 4 : 10)) {
+                    continue;
+                }
+                from.openings().put(fromFace, fromOffset);
+                to.openings().put(toFace, toOffset);
+                networkCells.add(fromDoor);
+                networkCells.add(toDoor);
+                rememberCorridor(path);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<BlockFace> availableFaces(Room room) {
+        List<BlockFace> faces = new ArrayList<>();
+        for (BlockFace face : CARDINAL_FACES) {
+            if (!room.openings().containsKey(face)) {
+                faces.add(face);
+            }
+        }
+        return faces;
     }
 
     private void addMazeBranches(int targetBranches) {
@@ -389,7 +454,7 @@ final class HallsExplorationGenerator {
                 int length = 3 + random.nextInt(8);
                 for (int step = 0; step < length; step++) {
                     Cell next = step(current, direction);
-                    if (!canCorridorOccupy(next, current, false, null, false)) {
+                    if (!canCorridorOccupy(next, current, false, List.of(), false)) {
                         failed = true;
                         break;
                     }
@@ -435,6 +500,10 @@ final class HallsExplorationGenerator {
 
     private int manhattanDistance(Cell first, Cell second) {
         return Math.abs(first.x() - second.x()) + Math.abs(first.z() - second.z());
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private boolean hasShortZigzags(List<Cell> path) {
@@ -587,12 +656,6 @@ final class HallsExplorationGenerator {
     }
 
     record Cell(int x, int z) {
-    }
-
-    private record SearchNode(Cell cell, BlockFace face) {
-    }
-
-    private record SearchStep(int cost, int order, SearchNode node) {
     }
 
     private record Bounds(int minX, int maxX, int minZ, int maxZ) {

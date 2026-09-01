@@ -147,6 +147,13 @@ This is the first implementation slice. It focuses on:
 - Room placement now anchors closer to existing generated rooms while still connecting through the baked corridor/door network.
 - Reworked the elevator exterior door cell into a sealed vestibule mini-tunnel. The loading black-concrete passage now opens without deleting the vestibule floor, side walls, or ceiling, closing the visible-sky gap in front of the elevator.
 - Validation note: `git diff --check` passed, and the Halls package compiled with local JDK 25 plus Paper 26.2 API, SQLite, Adventure 5.2, JetBrains annotations, Guava, and Bungee chat jars. Full Maven packaging was not run because `mvn`/wrapper is unavailable in this shell.
+- Added explicit room-to-room loop corridor generation. Extra links now open doors on two generated rooms and path between those doors, instead of only terminating new branches into the shared corridor network.
+- The first exploration room after the elevator now tries to gain multiple onward room-to-room exits when enough rooms exist, preventing the elevator from feeding into only one route.
+- Maze branches still add side paths, but the stronger loop pass now makes interconnected room graph shape the primary source of dungeon loops.
+- Validation note: targeted Halls package compile passed with local JDK 25 and Paper/API dependency jars. Full Maven packaging was not run because `mvn`/wrapper is unavailable in this shell.
+- Hotfixed an exploration-transfer crash/hang risk from the room-to-room loop pass. The expensive Dijkstra-style connector search was replaced with bounded orthogonal candidate routing: each connector now checks a capped nearby target list and a fixed number of L/dogleg paths, so floor generation cannot spend unbounded time searching loops synchronously.
+- Validation note: `git diff --check` passed, and the Halls package compiled with local JDK 25 plus Paper 26.2 API, SQLite, Adventure 5.2, JetBrains annotations, Guava, and Bungee chat jars. Full Maven packaging was not run because `mvn`/wrapper is unavailable in this shell.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- Levels are still not interconnected enough, I want to see stuff like loops between parts of the dungeon generated and so on, I want to see corridors which begin in one room and end in another, right now its just one large corridor network which offers no looping or maze like aspects. Also make it somehow that elevator leads always into a room and then there are more than 1 way onward from that room.
+- Make it so dropped items are rotated by 90 degrees to simulate being on the ground, perhaps adding other randomized rotations could help with immersion.
+- Some corridors now loop, however that is not exactly what I wanted, I wanted there to be multiple corridors network, all coridors are still connected together right now.
