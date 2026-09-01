@@ -5,5 +5,5 @@ block-material: STONE_PRESSURE_PLATE
 model-material: IRON_NUGGET
 item-model: ""
 model-scale: 1.0
-damage: 18
+damage: 5
 explosion-power: 2.4

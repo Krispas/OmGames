@@ -5,4 +5,4 @@ block-material: IRON_TRAPDOOR
 model-material: IRON_NUGGET
 item-model: ""
 model-scale: 1.0
-damage: 12
+damage: 8

@@ -6,7 +6,7 @@ parts:
   - material: IRON_BARS
     offset: [0, 0, 0]
   - material: SMOOTH_QUARTZ_SLAB
-    offset: [0, 1, 0]
+    offset: [0, 0.5, 0]
 loot:
   - item: iron_scrap
     weight: 55

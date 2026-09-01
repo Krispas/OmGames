@@ -5,8 +5,6 @@ particle-material: OAK_STAIRS
 parts:
   - material: OAK_STAIRS
     offset: [0, 0, 0]
-  - material: OAK_TRAPDOOR
-    offset: [0, 1, 0]
 loot:
   - item: wood_scrap
     weight: 75
