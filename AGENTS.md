@@ -1124,6 +1124,7 @@ Operator subcommands:
 - `/hoc stop <session_id|*>`
 - `/hoc floor <session_id> <floor>`
 - `/hoc scenario <scenario>`
+- `/hoc give <item> [amount]`
 - `/hoc reset confirm`
 - `/hoc shame set <player> <amount>`
 - `/hoc shame add <player> <amount>`
@@ -1185,10 +1186,13 @@ SQLite tables:
 - Breakable files define `id`, `break-message`, `hitbox-height`, `particle-material`, `parts`, and weighted `loot` entries.
 - Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
 - Halls item definitions are loaded from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults.
-- Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, `lore`, and an unused-for-now `recipe` scrap cost map.
+- Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, `lore`, an unused-for-now `recipe` scrap cost map, and an optional `stats` map.
+- Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility.
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control blueprint keyword drops.
 - Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `ranged`, `utility`, `rare_weapon`, `rare_armor`, `rare_ranged`, and `rare_utility`.
 - The generic `blueprint` loot keyword rolls the scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools.
+- `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions.
+- Halls armor items equip into empty matching armor slots from `/hoc give` and from right-click physics-drop pickup before falling back to hotbar insertion.
 - Halls coin drops use session-owned physics drops but bypass normal inventory pickup; right-clicking the coin adds it directly to the shared session coin counter even when the hotbar is full.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.

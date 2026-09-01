@@ -6,6 +6,10 @@ material: IRON_PICKAXE
 max-stack-size: 1
 lore:
   - "Heavy enough to hurt."
+stats:
+  melee-damage: 4
+  attack-speed: 1.2
+  durability: 55
 recipe:
   iron_scrap: 5
   wood_scrap: 3

@@ -12,9 +12,11 @@ public record HallsItemType(String id,
                             String itemModel,
                             int maxStackSize,
                             List<String> lore,
+                            Map<String, Double> stats,
                             Map<String, Integer> recipe) {
     public HallsItemType {
         lore = List.copyOf(lore);
+        stats = Map.copyOf(stats);
         recipe = Map.copyOf(recipe);
     }
 }

@@ -50,11 +50,23 @@ public final class HallsItemTypeLoader {
         String itemModel = yaml.getString("item-model", "");
         int maxStackSize = Math.max(1, yaml.getInt("max-stack-size", 1));
         List<String> lore = yaml.getStringList("lore");
+        Map<String, Double> stats = stats(yaml.getConfigurationSection("stats"));
         Map<String, Integer> recipe = recipe(yaml.getConfigurationSection("recipe"));
         if (id.isBlank()) {
             throw new IllegalArgumentException("id must not be blank");
         }
-        return new HallsItemType(id, name, category, rarity, material, itemModel, maxStackSize, lore, recipe);
+        return new HallsItemType(id, name, category, rarity, material, itemModel, maxStackSize, lore, stats, recipe);
+    }
+
+    private static Map<String, Double> stats(ConfigurationSection section) {
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, Double> stats = new LinkedHashMap<>();
+        for (String key : section.getKeys(false)) {
+            stats.put(normalizeId(key), section.getDouble(key, 0.0));
+        }
+        return stats;
     }
 
     private static Map<String, Integer> recipe(ConfigurationSection section) {

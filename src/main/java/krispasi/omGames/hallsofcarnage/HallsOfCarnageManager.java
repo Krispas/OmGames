@@ -20,6 +20,9 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.entity.Villager;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
@@ -173,6 +176,10 @@ public final class HallsOfCarnageManager {
         return activeSessions.values().stream()
                 .sorted(java.util.Comparator.comparingInt(HallsSession::id))
                 .toList();
+    }
+
+    public List<String> getItemIds() {
+        return itemTypes.keySet().stream().sorted().toList();
     }
 
     public HallsScenario getScenario(String id) {
@@ -641,6 +648,59 @@ public final class HallsOfCarnageManager {
 
     private File getLevelTypesFolder() {
         return new File(getDataFolder(), "level_type");
+    }
+
+    public Result giveItem(Player player, String rawItemId, int amount) {
+        if (player == null) {
+            return Result.fail("Only players can receive Halls items.");
+        }
+        String itemId = normalizeId(rawItemId);
+        HallsItemType type = itemTypes.get(itemId);
+        if (type == null) {
+            return Result.fail("Unknown Halls item: " + rawItemId + ".");
+        }
+        ItemStack item = HallsItemFactory.create(plugin, type, amount);
+        if (tryEquipEmptyArmorSlot(player.getInventory(), item)) {
+            return Result.ok("Gave and equipped " + type.name() + ".");
+        }
+        int slot = firstAvailableHotbarSlot(player.getInventory());
+        if (slot < 0) {
+            return Result.fail("Your hotbar is full.");
+        }
+        player.getInventory().setItem(slot, item);
+        return Result.ok("Gave " + type.name() + ".");
+    }
+
+    private boolean tryEquipEmptyArmorSlot(PlayerInventory inventory, ItemStack item) {
+        EquipmentSlot slot = armorSlot(item);
+        if (slot == null || inventory.getItem(slot) != null) {
+            return false;
+        }
+        inventory.setItem(slot, item);
+        return true;
+    }
+
+    private EquipmentSlot armorSlot(ItemStack item) {
+        return switch (item.getType()) {
+            case LEATHER_HELMET, CHAINMAIL_HELMET, IRON_HELMET, GOLDEN_HELMET, DIAMOND_HELMET, NETHERITE_HELMET,
+                 TURTLE_HELMET -> EquipmentSlot.HEAD;
+            case LEATHER_CHESTPLATE, CHAINMAIL_CHESTPLATE, IRON_CHESTPLATE, GOLDEN_CHESTPLATE, DIAMOND_CHESTPLATE,
+                 NETHERITE_CHESTPLATE, ELYTRA -> EquipmentSlot.CHEST;
+            case LEATHER_LEGGINGS, CHAINMAIL_LEGGINGS, IRON_LEGGINGS, GOLDEN_LEGGINGS, DIAMOND_LEGGINGS,
+                 NETHERITE_LEGGINGS -> EquipmentSlot.LEGS;
+            case LEATHER_BOOTS, CHAINMAIL_BOOTS, IRON_BOOTS, GOLDEN_BOOTS, DIAMOND_BOOTS, NETHERITE_BOOTS -> EquipmentSlot.FEET;
+            default -> null;
+        };
+    }
+
+    private int firstAvailableHotbarSlot(PlayerInventory inventory) {
+        for (int slot = 0; slot <= 8; slot++) {
+            ItemStack item = inventory.getItem(slot);
+            if (item == null || item.getType().isAir()) {
+                return slot;
+            }
+        }
+        return -1;
     }
 
     private File getBreakablesFolder() {

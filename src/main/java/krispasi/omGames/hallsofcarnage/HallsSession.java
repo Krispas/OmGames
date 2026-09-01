@@ -18,7 +18,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
@@ -172,6 +171,11 @@ public final class HallsSession {
         }
         if (!player.getInventory().getItemInMainHand().getType().isAir()) {
             player.sendActionBar(Component.text("Use an empty hand to pick up Halls items.", NamedTextColor.RED));
+            return true;
+        }
+        if (tryEquipEmptyArmorSlot(player.getInventory(), drop.stack().clone())) {
+            removePhysicsDrop(drop);
+            world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.4f);
             return true;
         }
         int slot = firstAvailableHotbarSlot(player.getInventory());
@@ -1152,43 +1156,7 @@ public final class HallsSession {
     }
 
     private ItemStack definedItem(HallsItemType type, int amount) {
-        ItemStack item = namedItem(type.material(), type.name(), itemColor(type));
-        item.setAmount(Math.max(1, Math.min(amount, type.maxStackSize())));
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            meta.setMaxStackSize(type.maxStackSize());
-            List<Component> lore = new ArrayList<>();
-            for (String line : type.lore()) {
-                lore.add(Component.text(line, NamedTextColor.GRAY));
-            }
-            if (!type.recipe().isEmpty()) {
-                lore.add(Component.empty());
-                lore.add(Component.text("Recipe stored for camp crafting.", NamedTextColor.DARK_GRAY));
-            }
-            if (!lore.isEmpty()) {
-                meta.lore(lore);
-            }
-            if (type.itemModel() != null && !type.itemModel().isBlank()) {
-                NamespacedKey modelKey = NamespacedKey.fromString(type.itemModel());
-                if (modelKey != null) {
-                    meta.setItemModel(modelKey);
-                }
-            }
-            meta.getPersistentDataContainer().set(
-                    new NamespacedKey(plugin, "hoc_item_id"),
-                    PersistentDataType.STRING,
-                    type.id()
-            );
-            item.setItemMeta(meta);
-        }
-        return item;
-    }
-
-    private NamedTextColor itemColor(HallsItemType type) {
-        if (type.category().equals("blueprint")) {
-            return type.rarity().equals("rare") ? NamedTextColor.LIGHT_PURPLE : NamedTextColor.AQUA;
-        }
-        return type.rarity().equals("rare") ? NamedTextColor.GOLD : NamedTextColor.WHITE;
+        return HallsItemFactory.create(plugin, type, amount);
     }
 
     private String scrapRewardId(PropReward reward) {
@@ -1475,6 +1443,28 @@ public final class HallsSession {
             }
         }
         return -1;
+    }
+
+    private boolean tryEquipEmptyArmorSlot(PlayerInventory inventory, ItemStack item) {
+        org.bukkit.inventory.EquipmentSlot slot = armorSlot(item);
+        if (slot == null || inventory.getItem(slot) != null) {
+            return false;
+        }
+        inventory.setItem(slot, item);
+        return true;
+    }
+
+    private org.bukkit.inventory.EquipmentSlot armorSlot(ItemStack item) {
+        return switch (item.getType()) {
+            case LEATHER_HELMET, CHAINMAIL_HELMET, IRON_HELMET, GOLDEN_HELMET, DIAMOND_HELMET, NETHERITE_HELMET,
+                 TURTLE_HELMET -> org.bukkit.inventory.EquipmentSlot.HEAD;
+            case LEATHER_CHESTPLATE, CHAINMAIL_CHESTPLATE, IRON_CHESTPLATE, GOLDEN_CHESTPLATE, DIAMOND_CHESTPLATE,
+                 NETHERITE_CHESTPLATE, ELYTRA -> org.bukkit.inventory.EquipmentSlot.CHEST;
+            case LEATHER_LEGGINGS, CHAINMAIL_LEGGINGS, IRON_LEGGINGS, GOLDEN_LEGGINGS, DIAMOND_LEGGINGS,
+                 NETHERITE_LEGGINGS -> org.bukkit.inventory.EquipmentSlot.LEGS;
+            case LEATHER_BOOTS, CHAINMAIL_BOOTS, IRON_BOOTS, GOLDEN_BOOTS, DIAMOND_BOOTS, NETHERITE_BOOTS -> org.bukkit.inventory.EquipmentSlot.FEET;
+            default -> null;
+        };
     }
 
     private ItemStack blueprintPlaceholder() {

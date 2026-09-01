@@ -97,6 +97,12 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                     result = manager.forceSessionFloor(args[1], args[2]);
                 }
             }
+            case "give" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                result = handleGive(sender, args);
+            }
             case "reload" -> {
                 if (!requireOp(sender)) {
                     return true;
@@ -163,6 +169,24 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
             }
         }
         return manager.startScenario(initiator, args[1], players);
+    }
+
+    private HallsOfCarnageManager.Result handleGive(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            return HallsOfCarnageManager.Result.fail("Only players can receive Halls items.");
+        }
+        if (args.length < 2 || args.length > 3) {
+            return HallsOfCarnageManager.Result.fail("Usage: /hoc give <item> [amount]");
+        }
+        int amount = 1;
+        if (args.length == 3) {
+            Integer parsed = parseInt(args[2]);
+            if (parsed == null || parsed <= 0) {
+                return HallsOfCarnageManager.Result.fail("Amount must be a positive whole number.");
+            }
+            amount = parsed;
+        }
+        return manager.giveItem(player, args[1], amount);
     }
 
     private void handleShame(CommandSender sender, String[] args) {
@@ -286,13 +310,16 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
     }
 
     private Component usage() {
-        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload | /hoc reset confirm", NamedTextColor.YELLOW);
+        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc give <item> [amount] | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload | /hoc reset confirm", NamedTextColor.YELLOW);
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(args[0], "menu", "scenarios", "scenario", "sessions", "top", "shame", "tp", "start", "stop", "floor", "lobby", "reload", "reset");
+            return filter(args[0], "menu", "scenarios", "scenario", "sessions", "top", "shame", "tp", "start", "stop", "floor", "give", "lobby", "reload", "reset");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("give")) {
+            return filter(args[1], manager.getItemIds().toArray(String[]::new));
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
             return filter(args[1], "confirm");

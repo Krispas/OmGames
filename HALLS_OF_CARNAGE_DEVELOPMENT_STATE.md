@@ -54,9 +54,13 @@ Last updated: 2026-09-01
 - Coin drops are session-owned physics items that add directly to the shared session coin counter on right-click pickup, bypassing normal hotbar capacity.
 - Item definitions now load from `plugins/OmGames/HallsOfCarnage/items/*.txt|*.yml|*.yaml`, seeded by bundled defaults for normal/rare weapons, ranged gear, armor, utility items, and building blueprints.
 - Item resource files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, `lore`, and recipe scrap costs for future camp crafting.
+- Item resource files now support `stats`; stats are written into item PDC as `hoc_stat_<stat_id>` and rendered in lore for test visibility.
 - Scenarios now parse `allowed-items` by category and `blueprint-pools.normal` / `blueprint-pools.rare`.
 - Breakable loot can reference concrete item ids, scenario-aware category keywords (`weapon`, `armor`, `ranged`, `utility` and rare variants), and scenario blueprint keywords.
 - The first-floor crate now forces a rare blueprint drop through the scenario rare blueprint pool.
+- `/hoc give <item> [amount]` is an OP-only self-target test command for loaded Halls item definitions.
+- `/hoc give` and Halls item loot share the same item factory so test-given items and dropped items get identical display, model, PDC, recipe, and stat metadata.
+- Halls armor items equip into empty matching armor slots from `/hoc give` and from right-click physics-drop pickup before falling back to hotbar insertion.
 
 ## Current Scope
 
@@ -94,9 +98,13 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-- Added resource-backed Halls item definitions under `hallsOfCarnage/items/`, parsed scenario `allowed-items` and normal/rare blueprint pools, routed breakable loot keywords to concrete item drops, and changed the first-floor crate to force a rare blueprint.
+- Added `/hoc give <item> [amount]`, moved Halls item stack construction into a shared factory, added parsed item stat metadata/lore, and made Halls armor items auto-equip into empty matching armor slots from the test command and physics-drop pickup.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For next slice:
-- Add a special /hoc give command which admin can use to give themselves items for testing
-- Start applying basic runtime behavior for defined gear items, beginning with melee/ranged/armor stat metadata and safe inventory/equip handling inside active Halls sessions.
+- I found a corridor leading into an inner wall of a room right from the elevator, making whole level inaccessble, is the BFS running per block and not per room?
+- Add more howling corridor rooms (at least 10)
+- Add rest of the blueprints from GDD
+- Separate items into their own folders, weapons into weapons (melee/ranged/util), armor into armors blueprints into blueprints and so on
+For future slice:
+- Start applying Halls item stats to actual combat/equipment behavior instead of metadata-only display.
