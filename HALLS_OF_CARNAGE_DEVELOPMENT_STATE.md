@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-01
+Last updated: 2026-09-02
 
 ## Implemented
 
@@ -84,6 +84,12 @@ Last updated: 2026-09-01
 - Wall spikes and poison darts now mount from adjacent room-wall cells and keep their active hazard on the open floor cell in front of the wall.
 - Falling ice now spawns a temporary falling `BlockDisplay` shard before impact and tracks it for session cleanup.
 - Elevator scrap deposit now consumes only the currently selected hotbar stack.
+- Bundled Frozen Halls and Deep Crypt exploration room files are now listed in `HallsOfCarnageManager.RESOURCE_FILES`, so `/hoc reset confirm` or a fresh data folder can seed their level-specific room templates.
+- Trap placement now rejects full pit masks near any already reserved trap cell, preventing bear traps/mines/blades from ending up on hole masks selected later.
+- Swinging blade ceiling rails are now stretched `BlockDisplay` entities instead of real black-concrete blocks, and the moving blade uses a visible vanilla iron sword by default instead of a missing custom model.
+- Trap ticking now runs every tick; swinging blade damage follows the moving blade display rather than the static trap center.
+- Wall spikes and poison dart launchers are display-only wall fixtures. Poison darts no longer place a solid dispenser block and now render a directional particle line when firing.
+- Default trap weights now bias Frozen Halls toward falling ice and Deep Crypt toward poison darts for easier playtest visibility.
 
 ## Current Scope
 
@@ -121,19 +127,24 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-- Randomized exploration floor rebuilds per attempt and added runtime rotations for room templates.
-- Moved trap generation ahead of breakable placement and reserved trap footprints so props no longer overlap hazards.
-- Tightened hole generation into full open-room rectangular pits, added exposed pit walls, and extended floor cleanup depth to cover old pit bottoms.
-- Treated proximity mines as 3x3 traversal obstacles during placement and increased their default trigger/damage radius.
-- Added first visible implementations for moving swinging-blade item displays, wall-mounted spikes/darts, and falling-ice block-display impacts.
-- Changed elevator hopper scrap deposit to consume only the selected hotbar stack.
+- Added Frozen Halls and Deep Crypt exploration resource files to the manager seed list.
+- Reworked trap display handling so swinging blade rails, wall spikes, and poison dart launchers are session-owned displays rather than solid trap blocks.
+- Made swinging blade movement smoother and tied damage to the moving blade display position.
+- Removed missing custom-model defaults for swinging blades/wall spikes and switched their defaults to visible vanilla iron swords.
+- Prevented later hole masks from overlapping already placed traps.
+- Increased level-specific trap weights/timing so falling ice and poison darts are easier to see in playtests.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For next slice:
-- Playtest wall-mounted trap frequency in each level type; generation now requires a valid adjacent wall face, so low counts may need resource weight tuning.
-- I found a beartrap on top of a hole
-- Swinging blades concrete should be a single block display strecthced an positioned as a bar, not real blocks. Also the blades either dont move or do reallz weirdly, The model is a missing texture and its not moving
-- I cannot see wall spikes generating, I've seen something on walls in frozen halls
-- I am either really unlucky or there is not falling ice generating in frozen halls
-- I added rooms for frozen halls and deep crypt, make it so the game generates those files for those levels instead of those for howling corridors
-- Poison dart trap is not working, it also shouldnt be solid, use block display and implace it into a wall
+- Swinging blade models are now correct, however on one, particles happen but the sword is sideways, on other there are no particles and the sword is almost down, but not quite (swords are 45 degrees rotated), the blades also don't move, fix that
+- I found walls spike trap on a room entrance, it wasnt working
+- I found walls spikes which were always active, again blade isnt moving, the blade is also "plastered" on the wall, not rotated properly
+- Falling ice is now generating, however it is solid, no trap except the holes should be solid
+- Holes should kill players lower, so they fall for a bit
+- I found one falling ice which was working, spamming the ice incredibly fast, perhaps all of them spawn at this one?
+- The ice should also fall in the area around the trap (1 block radius) and at random short intervals
+- Wall spikes should have reach up to 5 blocks if not meeting a wall
+- I found a poison dart trap correctly in the wall, but its not shooting me
+- I found a poison dart trap which is spamming it, like the ice
+- Poison darts should fire only when player passes before it with 5 block range, it should have a cooldown of 3 seconds so player can bait it and then pass
+- I found a wall spike trap which has the sword pierced into it and not "plastered"

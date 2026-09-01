@@ -1209,6 +1209,7 @@ SQLite tables:
 - Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, ghost state, full item definitions, scrap storage, camps, polished trap visuals/config, sculk, and monsters are pending.
 - Exploration doorway selection must reject side offsets where the room mask has `X` at the edge or first inward cell.
 - Howling Corridors room resources are seeded from all bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`.
+- Frozen Halls and Deep Crypt room resources are also seeded from their bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`; use `/hoc reset confirm` to copy newly bundled resource files into an existing server data folder.
 - Exploration floors have first-pass session-owned trap generation/runtime for holes, bridged holes, bear traps, proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, and Deep Crypt poison darts.
 - Trap placement uses the generated walkable mask and BFS reachability before accepting an unbridged pit; pits that would disconnect traversal receive a spruce bridge.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
@@ -1218,7 +1219,8 @@ SQLite tables:
 - Exploration floor generation uses a fresh random seed per floor rebuild/session attempt instead of replaying the same layout from scenario and floor id.
 - Trap placement reserves occupied cells before breakable placement; breakables should not spawn on trap footprints.
 - Hole traps carve a rectangular configurable 5x5-15x15 fully open room mask, build pit walls, and clear down to the current maximum pit depth during floor rebuild cleanup.
+- Hole trap masks are rejected if any pit cell is near an already placed trap, so later full-mask holes should not overlap bear traps/mines/blades.
 - Proximity mines trigger in a larger radius and reserve/validate a 3x3 obstacle footprint for traversal.
-- Swinging blade traps use a ceiling black-concrete rail plus a moving item-display blade model.
-- Wall spikes and poison darts mount from adjacent room walls instead of being freestanding floor traps.
+- Swinging blade traps use a stretched ceiling `BlockDisplay` rail plus a moving vanilla iron-sword `ItemDisplay` blade by default.
+- Wall spikes and poison darts mount from adjacent room walls as display-only fixtures instead of solid blocks.
 - Falling ice traps spawn a temporary falling block-display shard before impact.
