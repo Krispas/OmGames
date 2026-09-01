@@ -283,7 +283,7 @@ public final class HallsSession {
                 || block.getZ() != origin.z()) {
             return false;
         }
-        int deposited = depositScrap(player.getInventory());
+        int deposited = depositSelectedScrap(player.getInventory());
         if (deposited <= 0) {
             player.sendActionBar(Component.text("No scrap to deposit.", NamedTextColor.GRAY));
             return true;
@@ -461,7 +461,7 @@ public final class HallsSession {
         activeTargetRooms = Math.max(1, floorDefinition.rooms());
         activeGeneratedRooms = 0;
         List<HallsLayout> layouts = loadExplorationLayouts(levelType);
-        Random random = new Random((((long) id) << 32) ^ floor);
+        Random random = new Random(System.nanoTime() ^ (((long) id) << 32) ^ ((long) floor << 12));
         HallsExplorationGenerator.Plan plan = HallsExplorationGenerator.generate(
                 origin.x(),
                 origin.z(),
@@ -477,7 +477,7 @@ public final class HallsSession {
             activeClearRadius += 32;
             clearBuildVolume();
             buildElevator();
-            random = new Random(((((long) id) << 32) ^ floor) + expansions * 9973L);
+            random = new Random(System.nanoTime() ^ ((((long) id) << 32) ^ floor) ^ (expansions * 9973L));
             plan = HallsExplorationGenerator.generate(
                     origin.x(),
                     origin.z(),
@@ -497,10 +497,10 @@ public final class HallsSession {
             buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(), room.openings(), levelType, random);
         }
         buildGeneratedCorridorMask(plan, levelType);
+        Set<HallsExplorationGenerator.Cell> reservedCells = trapRuntime.placeGeneratedTraps(plan, random, floorDefinition, levelType);
         for (int i = 0; i < plan.rooms().size(); i++) {
-            placeGeneratedRoomContents(plan.rooms().get(i), random, floor, i, floorDefinition, levelType);
+            placeGeneratedRoomContents(plan.rooms().get(i), random, floor, i, floorDefinition, levelType, reservedCells);
         }
-        trapRuntime.placeGeneratedTraps(plan, random, floorDefinition, levelType);
     }
 
     private List<HallsLayout> loadExplorationLayouts(HallsLevelType levelType) {
@@ -512,12 +512,34 @@ public final class HallsSession {
         List<HallsLayout> layouts = new ArrayList<>();
         for (File file : java.util.Arrays.stream(files).sorted(Comparator.comparing(File::getName)).toList()) {
             try {
-                layouts.add(HallsLayoutLoader.load(file));
+                addLayoutRotations(layouts, HallsLayoutLoader.load(file));
             } catch (IOException ex) {
                 plugin.getLogger().warning("Failed to load Halls exploration template " + file + ": " + ex.getMessage());
             }
         }
         return layouts.isEmpty() ? List.of(fallbackExplorationLayout()) : layouts;
+    }
+
+    private void addLayoutRotations(List<HallsLayout> layouts, HallsLayout layout) {
+        HallsLayout current = layout;
+        for (int i = 0; i < 4; i++) {
+            if (!layouts.contains(current)) {
+                layouts.add(current);
+            }
+            current = rotateClockwise(current);
+        }
+    }
+
+    private HallsLayout rotateClockwise(HallsLayout layout) {
+        List<String> rows = new ArrayList<>();
+        for (int z = 0; z < layout.width(); z++) {
+            StringBuilder row = new StringBuilder();
+            for (int x = layout.depth() - 1; x >= 0; x--) {
+                row.append(layout.at(z, x));
+            }
+            rows.add(row.toString());
+        }
+        return new HallsLayout(rows, layout.depth(), layout.width());
     }
 
     private HallsLevelType levelTypeFor(HallsScenario.FloorDefinition floorDefinition) {
@@ -545,7 +567,7 @@ public final class HallsSession {
 
     private void clearBuildVolume() {
         for (int x = origin.x() - activeClearRadius; x <= origin.x() + activeClearRadius; x++) {
-            for (int y = origin.y() - 1; y <= origin.y() + CLEAR_HEIGHT; y++) {
+            for (int y = origin.y() - 16; y <= origin.y() + CLEAR_HEIGHT; y++) {
                 for (int z = origin.z() - activeClearRadius; z <= origin.z() + activeClearRadius; z++) {
                     setBlock(x, y, z, Material.AIR);
                 }
@@ -863,7 +885,8 @@ public final class HallsSession {
                                             int floor,
                                             int roomIndex,
                                             HallsScenario.FloorDefinition floorDefinition,
-                                            HallsLevelType levelType) {
+                                            HallsLevelType levelType,
+                                            Set<HallsExplorationGenerator.Cell> reservedCells) {
         List<Cell> cells = openInteriorCells(room);
         if (cells.isEmpty()) {
             return;
@@ -872,11 +895,32 @@ public final class HallsSession {
         setBlock(room.startX() + light.x(), origin.y() + ROOM_HEIGHT - 1, room.startZ() + light.z(), levelType.light());
         int baseProps = Math.max(1, floorDefinition.breakables() / Math.max(1, floorDefinition.rooms()));
         int props = Math.min(cells.size(), baseProps + (roomIndex < floorDefinition.breakables() % Math.max(1, floorDefinition.rooms()) ? 1 : 0));
+        Set<HallsExplorationGenerator.Cell> usedCells = new HashSet<>();
         for (int i = 0; i < props; i++) {
-            Cell cell = cells.get(random.nextInt(cells.size()));
+            Cell cell = randomFreeContentCell(cells, room, random, reservedCells, usedCells);
+            if (cell == null) {
+                return;
+            }
+            usedCells.add(new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()));
             spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
                     propArchetype(i, roomIndex, levelType), propHealth(i));
         }
+    }
+
+    private Cell randomFreeContentCell(List<Cell> cells,
+                                       HallsExplorationGenerator.Room room,
+                                       Random random,
+                                       Set<HallsExplorationGenerator.Cell> reservedCells,
+                                       Set<HallsExplorationGenerator.Cell> usedCells) {
+        List<Cell> shuffled = new ArrayList<>(cells);
+        java.util.Collections.shuffle(shuffled, random);
+        for (Cell cell : shuffled) {
+            HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z());
+            if ((reservedCells == null || !reservedCells.contains(absolute)) && !usedCells.contains(absolute)) {
+                return cell;
+            }
+        }
+        return null;
     }
 
     private List<Cell> openInteriorCells(RoomPlacement room) {
@@ -1184,18 +1228,12 @@ public final class HallsSession {
         };
     }
 
-    private int depositScrap(PlayerInventory inventory) {
-        int deposited = 0;
-        for (int slot = 0; slot <= 8; slot++) {
-            deposited += depositScrapStack(inventory.getItem(slot));
-            if (isScrapItem(inventory.getItem(slot))) {
-                inventory.setItem(slot, null);
-            }
-        }
-        ItemStack offhand = inventory.getItemInOffHand();
-        deposited += depositScrapStack(offhand);
-        if (isScrapItem(offhand)) {
-            inventory.setItemInOffHand(null);
+    private int depositSelectedScrap(PlayerInventory inventory) {
+        int slot = inventory.getHeldItemSlot();
+        ItemStack selected = inventory.getItem(slot);
+        int deposited = depositScrapStack(selected);
+        if (deposited > 0) {
+            inventory.setItem(slot, null);
         }
         return deposited;
     }

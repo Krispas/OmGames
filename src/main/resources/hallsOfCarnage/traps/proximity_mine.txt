@@ -6,4 +6,5 @@ model-material: IRON_NUGGET
 item-model: ""
 model-scale: 1.0
 damage: 5
+radius: 3.0
 explosion-power: 2.4

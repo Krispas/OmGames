@@ -3,7 +3,7 @@ name: "Reinforced Chestplate"
 category: armor
 rarity: rare
 material: DIAMOND_CHESTPLATE
-item-model: om:hoc_reinforced_chestplate
+item-model: om:astral_chestplate
 max-stack-size: 1
 lore:
   - "A rare plate patched with dense salvage."

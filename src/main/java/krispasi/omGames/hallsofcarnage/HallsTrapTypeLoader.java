@@ -125,9 +125,9 @@ public final class HallsTrapTypeLoader {
         Map<String, HallsTrapType> types = new LinkedHashMap<>();
         add(types, "hole", "hole", 3, List.of(), Material.AIR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 5, 15, 10, 200.0, 1.0, 60, 16, 2.4f);
         add(types, "bear_trap", "bear_trap", 4, List.of(), Material.IRON_TRAPDOOR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 1.0, 60, 16, 2.4f);
-        add(types, "proximity_mine", "proximity_mine", 3, List.of(), Material.STONE_PRESSURE_PLATE, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 18.0, 1.0, 60, 16, 2.4f);
-        add(types, "swinging_blade", "swinging_blade", 3, List.of(), Material.IRON_BARS, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.15, 60, 16, 2.4f);
-        add(types, "wall_spikes", "wall_spikes", 3, List.of(), Material.POINTED_DRIPSTONE, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 1.1, 70, 12, 2.4f);
+        add(types, "proximity_mine", "proximity_mine", 3, List.of(), Material.STONE_PRESSURE_PLATE, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 18.0, 3.0, 60, 16, 2.4f);
+        add(types, "swinging_blade", "swinging_blade", 3, List.of(), Material.IRON_BARS, Material.AIR, Material.IRON_NUGGET, "om:hoc_swinging_blade", 1.8f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.15, 60, 16, 2.4f);
+        add(types, "wall_spikes", "wall_spikes", 3, List.of(), Material.BLACK_CONCRETE, Material.AIR, Material.IRON_NUGGET, "om:hoc_wall_spikes", 1.4f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 1.1, 70, 12, 2.4f);
         add(types, "falling_ice", "falling_ice", 2, List.of("frozen_halls"), Material.AIR, Material.POINTED_DRIPSTONE, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.0, 90, 1, 2.4f);
         add(types, "poison_darts", "poison_darts", 2, List.of("deep_crypt"), Material.DISPENSER, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 5.5, 55, 1, 2.4f);
         return Map.copyOf(types);

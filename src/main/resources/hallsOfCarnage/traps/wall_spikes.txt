@@ -1,10 +1,10 @@
 id: wall_spikes
 kind: wall_spikes
 weight: 3
-block-material: POINTED_DRIPSTONE
+block-material: BLACK_CONCRETE
 model-material: IRON_NUGGET
-item-model: ""
-model-scale: 1.0
+item-model: "om:hoc_wall_spikes"
+model-scale: 1.4
 damage: 12
 radius: 1.1
 interval-ticks: 70

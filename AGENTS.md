@@ -1202,6 +1202,7 @@ SQLite tables:
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
 - Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.
+- Elevator scrap deposit consumes only the currently selected hotbar stack, not every scrap item in the player hotbar/offhand.
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
 - `HallsLayoutLoader` tolerates old copied room files by stripping a full `X` perimeter and treating non-`X` marker characters as open cells; this is runtime parsing tolerance, not file migration.
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
@@ -1213,4 +1214,11 @@ SQLite tables:
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth.
 - Exploration floor trap counts come from scenario floor field `traps`.
-- Hole traps carve a configurable 5x5-15x15 room-intersected mask instead of a single block.
+- Exploration floor layout templates are loaded with runtime rotations so repeated room files can appear in different orientations.
+- Exploration floor generation uses a fresh random seed per floor rebuild/session attempt instead of replaying the same layout from scenario and floor id.
+- Trap placement reserves occupied cells before breakable placement; breakables should not spawn on trap footprints.
+- Hole traps carve a rectangular configurable 5x5-15x15 fully open room mask, build pit walls, and clear down to the current maximum pit depth during floor rebuild cleanup.
+- Proximity mines trigger in a larger radius and reserve/validate a 3x3 obstacle footprint for traversal.
+- Swinging blade traps use a ceiling black-concrete rail plus a moving item-display blade model.
+- Wall spikes and poison darts mount from adjacent room walls instead of being freestanding floor traps.
+- Falling ice traps spawn a temporary falling block-display shard before impact.

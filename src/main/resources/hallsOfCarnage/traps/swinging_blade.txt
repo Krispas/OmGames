@@ -3,8 +3,8 @@ kind: swinging_blade
 weight: 3
 block-material: IRON_BARS
 model-material: IRON_NUGGET
-item-model: ""
-model-scale: 1.0
+item-model: "om:hoc_swinging_blade"
+model-scale: 1.8
 damage: 200
 radius: 1.15
 interval-ticks: 60

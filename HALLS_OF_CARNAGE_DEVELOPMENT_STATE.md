@@ -72,9 +72,18 @@ Last updated: 2026-09-01
 - Trap definitions are loaded from `plugins/OmGames/HallsOfCarnage/traps/*.txt|*.yml|*.yaml`, seeded by bundled defaults.
 - Trap files define kind, weight, level-type restrictions, block/display model materials, optional item model id, damage/radius, timing, mine explosion power, and hole sizing/depth.
 - Scenario exploration floors now parse `traps`, which controls generated trap count for that floor/range.
-- Hole traps now carve a configurable 5x5-15x15 mask intersected with the current room mask instead of a single floor block.
+- Hole traps now carve a configurable 5x5-15x15 fully open rectangular room mask instead of a single floor block.
 - Halls item recipes are still parsed into item type data, but recipes are no longer rendered in item lore. Future crafting stations should own recipe display.
 - Elevator copper-bar doors are now three blocks tall with the former top door row replaced by wall.
+- Exploration floor rebuilds now use fresh runtime randomness instead of deterministic session/floor seeds.
+- Exploration room templates are added to the layout pool in all four rotations.
+- Trap placement now runs before breakable placement and returns reserved cells, preventing breakables from spawning on pits, proximity-mine footprints, swinging-blade lanes, and other trap cells.
+- Hole traps now require full open-room rectangular masks, add deepslate-brick pit walls around exposed pit edges, and floor cleanup clears down to `origin.y - 16` so old pit concrete does not persist between generated floors.
+- Proximity mines now reserve and reachability-check a 3x3 obstacle footprint and have a larger default `radius: 3.0`.
+- Swinging blades now build a ceiling black-concrete rail and animate an item-display blade across the trap lane when a model is configured.
+- Wall spikes and poison darts now mount from adjacent room-wall cells and keep their active hazard on the open floor cell in front of the wall.
+- Falling ice now spawns a temporary falling `BlockDisplay` shard before impact and tracks it for session cleanup.
+- Elevator scrap deposit now consumes only the currently selected hotbar stack.
 
 ## Current Scope
 
@@ -112,25 +121,19 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-- Removed recipe sections from bundled Halls blueprint item defaults.
-- Added first-pass exploration trap generation/runtime with BFS reachability checks for pits and automatic spruce bridging when a pit would disconnect traversal.
-- Implemented placeholder behavior for holes, bear traps, proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, and Deep Crypt poison darts.
-- Added bundled trap resource files and `HallsTrapType`/`HallsTrapTypeLoader`.
-- Moved trap amount tuning into scenario floor definitions via `traps`.
-- Removed item recipe lore output from generated Halls items.
-- Adjusted elevator doors to a three-block copper-bar opening with a wall top row.
-- Expanded holes to configurable room-intersected masks.
+- Randomized exploration floor rebuilds per attempt and added runtime rotations for room templates.
+- Moved trap generation ahead of breakable placement and reserved trap footprints so props no longer overlap hazards.
+- Tightened hole generation into full open-room rectangular pits, added exposed pit walls, and extended floor cleanup depth to cover old pit bottoms.
+- Treated proximity mines as 3x3 traversal obstacles during placement and increased their default trigger/damage radius.
+- Added first visible implementations for moving swinging-blade item displays, wall-mounted spikes/darts, and falling-ice block-display impacts.
+- Changed elevator hopper scrap deposit to consume only the selected hotbar stack.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For next slice:
-- Exploration floors should not be dependant on scenario/future save file seed and instead be random each time
-- Holes are often small or not rectangular, they are missing walls and bridge generation doesnt make sense, I also seen breakables and traps on top of holes.
-- Proximity mines should have bigger range and in BFS be treated as 3x3 obstacle
-- Implement the swinging blade trap to have custom sword model swinging from side to side, on the ceiling put a black bar (concrete?) model which represents its path
-- Old hole concrete is not cleaned after the game ends
-- Traps and breakables shouldnt overlap
-- Implement the falling icicle trap
-- Make it so depositing scrap deposits only item selected in the hotbar
-- Implement wall spike trap, I also havent seen them generate, use simillar sword model for it like for swinging blade trap, it should be always mountaed as part of a wall
-- Implement poison dart trap, it should be always mounted as part of a wall
-- This may already be a thing, but add it if not: Rooms can generate rotated, making the levels feel less repetetive
+- Playtest wall-mounted trap frequency in each level type; generation now requires a valid adjacent wall face, so low counts may need resource weight tuning.
+- I found a beartrap on top of a hole
+- Swinging blades concrete should be a single block display strecthced an positioned as a bar, not real blocks. Also the blades either dont move or do reallz weirdly, The model is a missing texture and its not moving
+- I cannot see wall spikes generating, I've seen something on walls in frozen halls
+- I am either really unlucky or there is not falling ice generating in frozen halls
+- I added rooms for frozen halls and deep crypt, make it so the game generates those files for those levels instead of those for howling corridors
+- Poison dart trap is not working, it also shouldnt be solid, use block display and implace it into a wall
