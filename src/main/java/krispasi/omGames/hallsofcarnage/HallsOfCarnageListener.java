@@ -108,6 +108,11 @@ public final class HallsOfCarnageListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
+        if (event.getHand() == EquipmentSlot.HAND
+                && manager.handlePhysicsDropPickup(event.getPlayer(), event.getRightClicked())) {
+            event.setCancelled(true);
+            return;
+        }
         if (!manager.isMenuVillager(event.getRightClicked())) {
             if (manager.isSessionEntity(event.getRightClicked())) {
                 event.setCancelled(true);
@@ -175,7 +180,9 @@ public final class HallsOfCarnageListener implements Listener {
     public void onPlayerDropItem(PlayerDropItemEvent event) {
         if (manager.isLockedInventorySlotItem(event.getItemDrop().getItemStack())) {
             event.setCancelled(true);
+            return;
         }
+        manager.handlePlayerDroppedItem(event.getPlayer(), event.getItemDrop());
     }
 
     @EventHandler(ignoreCancelled = true)

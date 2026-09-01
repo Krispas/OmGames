@@ -32,7 +32,7 @@ import org.bukkit.block.data.MultipleFacing;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Interaction;
-import org.bukkit.entity.Item;
+import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -58,8 +58,9 @@ public final class HallsSession {
     private final Set<UUID> participants;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
-    private final Set<UUID> droppedSessionItems = new HashSet<>();
+    private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
     private BukkitTask hudTask;
+    private BukkitTask physicsDropTask;
     private long startedAtMillis;
     private int currentFloor = 1;
     private int woodScrap;
@@ -119,7 +120,46 @@ public final class HallsSession {
     }
 
     public boolean isSessionEntity(Entity entity) {
-        return entity != null && breakableProps.containsKey(entity.getUniqueId());
+        return entity != null && (breakableProps.containsKey(entity.getUniqueId())
+                || physicsDrops.containsKey(entity.getUniqueId()));
+    }
+
+    public boolean handlePhysicsDropPickup(Player player, Entity entity) {
+        if (player == null || entity == null || !running || !player.getWorld().equals(world)) {
+            return false;
+        }
+        PhysicsDrop drop = physicsDrops.get(entity.getUniqueId());
+        if (drop == null) {
+            return false;
+        }
+        if (!player.getInventory().getItemInMainHand().getType().isAir()) {
+            player.sendActionBar(Component.text("Use an empty hand to pick up Halls items.", NamedTextColor.RED));
+            return true;
+        }
+        int slot = firstAvailableHotbarSlot(player.getInventory());
+        if (slot < 0) {
+            player.sendActionBar(Component.text("Your hotbar is full.", NamedTextColor.RED));
+            return true;
+        }
+        player.getInventory().setItem(slot, drop.stack().clone());
+        removePhysicsDrop(drop);
+        world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.4f);
+        return true;
+    }
+
+    public boolean handlePlayerDroppedItem(Player player, org.bukkit.entity.Item itemDrop) {
+        if (player == null || itemDrop == null || !running || !player.getWorld().equals(world)) {
+            return false;
+        }
+        ItemStack stack = itemDrop.getItemStack();
+        if (stack == null || stack.getType().isAir() || isLockedSlotItem(plugin, stack)) {
+            return false;
+        }
+        Location location = itemDrop.getLocation();
+        Vector velocity = itemDrop.getVelocity();
+        itemDrop.remove();
+        dropSessionItem(location, stack, velocity);
+        return true;
     }
 
     public boolean handleBreakableAttack(Player player, Entity entity) {
@@ -433,8 +473,8 @@ public final class HallsSession {
     }
 
     private RoomPlacement candidateRoom(RoomPlacement anchor, HallsLayout layout, BlockFace direction, Random random) {
-        int gap = 10 + random.nextInt(20);
-        int lateralRange = 14 + random.nextInt(18);
+        int gap = 8 + random.nextInt(14);
+        int lateralRange = 10 + random.nextInt(14);
         int jitter = random.nextInt(lateralRange * 2 + 1) - lateralRange;
         return switch (direction) {
             case NORTH -> new RoomPlacement(layout, anchor.centerX() + jitter - layout.width() / 2,
@@ -481,7 +521,7 @@ public final class HallsSession {
     }
 
     private BlockFace unusedDoorFace(RoomNode room, BlockFace preferred, Random random) {
-        if (!room.openings().containsKey(preferred) && random.nextDouble() < 0.45) {
+        if (!room.openings().containsKey(preferred) && random.nextDouble() < 0.65) {
             return preferred;
         }
         List<BlockFace> faces = new ArrayList<>(List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST));
@@ -697,6 +737,7 @@ public final class HallsSession {
     }
 
     private List<ConnectorPoint> findConnectorPath(ConnectorPoint start, ConnectorPoint end, List<RoomNode> rooms, Random random) {
+        int maximumLength = maximumConnectorLength(start, end);
         for (int attempt = 0; attempt < 5; attempt++) {
             List<ConnectorPoint> targets = connectorWaypoints(start, end, random);
             List<ConnectorPoint> wholePath = new ArrayList<>();
@@ -714,20 +755,22 @@ public final class HallsSession {
                 wholePath.addAll(segment);
                 current = target;
             }
-            if (complete && wholePath.size() > manhattanDistance(start, end) + 8) {
+            if (complete && wholePath.size() <= maximumLength && isContiguousPath(wholePath)
+                    && wholePath.size() >= manhattanDistance(start, end) + 4) {
                 return wholePath;
             }
         }
-        return findDirectConnectorPath(start, end, rooms, random);
+        List<ConnectorPoint> directPath = findDirectConnectorPath(start, end, rooms, random);
+        return isContiguousPath(directPath) ? directPath : List.of();
     }
 
     private List<ConnectorPoint> connectorWaypoints(ConnectorPoint start, ConnectorPoint end, Random random) {
         List<ConnectorPoint> waypoints = new ArrayList<>();
-        int minX = Math.max(origin.x() - CLEAR_RADIUS + 4, Math.min(start.x(), end.x()) - 14);
-        int maxX = Math.min(origin.x() + CLEAR_RADIUS - 4, Math.max(start.x(), end.x()) + 14);
-        int minZ = Math.max(origin.z() - CLEAR_RADIUS + 4, Math.min(start.z(), end.z()) - 14);
-        int maxZ = Math.min(origin.z() + CLEAR_RADIUS - 4, Math.max(start.z(), end.z()) + 14);
-        int count = 1 + random.nextInt(3);
+        int minX = Math.max(origin.x() - CLEAR_RADIUS + 4, Math.min(start.x(), end.x()) - 8);
+        int maxX = Math.min(origin.x() + CLEAR_RADIUS - 4, Math.max(start.x(), end.x()) + 8);
+        int minZ = Math.max(origin.z() - CLEAR_RADIUS + 4, Math.min(start.z(), end.z()) - 8);
+        int maxZ = Math.min(origin.z() + CLEAR_RADIUS - 4, Math.max(start.z(), end.z()) + 8);
+        int count = random.nextDouble() < 0.75 ? 1 : 2;
         for (int i = 0; i < count; i++) {
             if (random.nextBoolean()) {
                 int x = minX + random.nextInt(Math.max(1, maxX - minX + 1));
@@ -745,6 +788,22 @@ public final class HallsSession {
 
     private int manhattanDistance(ConnectorPoint start, ConnectorPoint end) {
         return Math.abs(start.x() - end.x()) + Math.abs(start.z() - end.z());
+    }
+
+    private int maximumConnectorLength(ConnectorPoint start, ConnectorPoint end) {
+        return Math.min(72, manhattanDistance(start, end) * 2 + 18);
+    }
+
+    private boolean isContiguousPath(List<ConnectorPoint> path) {
+        if (path.isEmpty()) {
+            return false;
+        }
+        for (int i = 1; i < path.size(); i++) {
+            if (manhattanDistance(path.get(i - 1), path.get(i)) != 1) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private List<ConnectorPoint> findDirectConnectorPath(ConnectorPoint start, ConnectorPoint end, List<RoomNode> rooms, Random random) {
@@ -785,7 +844,7 @@ public final class HallsSession {
         Collections.shuffle(neighbors, random);
         Map<ConnectorPoint, Integer> penalties = new HashMap<>();
         for (ConnectorPoint neighbor : neighbors) {
-            penalties.put(neighbor, random.nextInt(18));
+            penalties.put(neighbor, random.nextInt(8));
         }
         neighbors.sort(Comparator.comparingInt(candidate ->
                 Math.abs(candidate.x() - end.x()) + Math.abs(candidate.z() - end.z()) + penalties.get(candidate)));
@@ -1101,10 +1160,33 @@ public final class HallsSession {
     }
 
     private void dropSessionItem(Location location, ItemStack stack) {
-        Item drop = world.dropItemNaturally(location, stack);
-        drop.setPersistent(false);
-        drop.addScoreboardTag("omgames_hoc_session_drop");
-        droppedSessionItems.add(drop.getUniqueId());
+        Vector velocity = new Vector((Math.random() - 0.5) * 0.18, 0.22, (Math.random() - 0.5) * 0.18);
+        dropSessionItem(location, stack, velocity);
+    }
+
+    private void dropSessionItem(Location location, ItemStack stack, Vector velocity) {
+        if (location == null || stack == null || stack.getType().isAir()) {
+            return;
+        }
+        Location spawnLocation = location.clone().add(0.0, 0.2, 0.0);
+        ItemStack singleStack = stack.clone();
+        ItemDisplay display = world.spawn(spawnLocation, ItemDisplay.class, entity -> {
+            entity.setItemStack(singleStack.clone());
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_physics_drop");
+        });
+        Interaction interaction = world.spawn(spawnLocation.clone().add(0.0, -0.15, 0.0), Interaction.class, entity -> {
+            entity.setInteractionWidth(0.8f);
+            entity.setInteractionHeight(0.8f);
+            entity.setResponsive(true);
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_physics_drop");
+        });
+        PhysicsDrop drop = new PhysicsDrop(interaction.getUniqueId(), display.getUniqueId(), singleStack, spawnLocation,
+                velocity == null ? new Vector() : velocity.clone().multiply(0.65));
+        physicsDrops.put(interaction.getUniqueId(), drop);
+        physicsDrops.put(display.getUniqueId(), drop);
+        startPhysicsDropTask();
     }
 
     private void removeSessionEntities() {
@@ -1112,13 +1194,11 @@ public final class HallsSession {
             removeBreakableProp(prop);
         }
         breakableProps.clear();
-        for (UUID entityId : Set.copyOf(droppedSessionItems)) {
-            Entity entity = Bukkit.getEntity(entityId);
-            if (entity != null) {
-                entity.remove();
-            }
+        for (PhysicsDrop drop : Set.copyOf(physicsDrops.values())) {
+            removePhysicsDrop(drop);
         }
-        droppedSessionItems.clear();
+        physicsDrops.clear();
+        stopPhysicsDropTask();
     }
 
     private void removeBreakableProp(BreakableProp prop) {
@@ -1132,6 +1212,87 @@ public final class HallsSession {
         if (display != null) {
             display.remove();
         }
+    }
+
+    private void removePhysicsDrop(PhysicsDrop drop) {
+        physicsDrops.remove(drop.interactionId());
+        physicsDrops.remove(drop.displayId());
+        Entity interaction = Bukkit.getEntity(drop.interactionId());
+        if (interaction != null) {
+            interaction.remove();
+        }
+        Entity display = Bukkit.getEntity(drop.displayId());
+        if (display != null) {
+            display.remove();
+        }
+        if (physicsDrops.isEmpty()) {
+            stopPhysicsDropTask();
+        }
+    }
+
+    private void startPhysicsDropTask() {
+        if (physicsDropTask != null) {
+            return;
+        }
+        physicsDropTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickPhysicsDrops, 1L, 1L);
+    }
+
+    private void stopPhysicsDropTask() {
+        if (physicsDropTask != null) {
+            physicsDropTask.cancel();
+            physicsDropTask = null;
+        }
+    }
+
+    private void tickPhysicsDrops() {
+        if (!running || physicsDrops.isEmpty()) {
+            stopPhysicsDropTask();
+            return;
+        }
+        Set<UUID> seen = new HashSet<>();
+        for (PhysicsDrop drop : Set.copyOf(physicsDrops.values())) {
+            if (!seen.add(drop.interactionId())) {
+                continue;
+            }
+            tickPhysicsDrop(drop);
+        }
+    }
+
+    private void tickPhysicsDrop(PhysicsDrop drop) {
+        Entity interaction = Bukkit.getEntity(drop.interactionId());
+        Entity display = Bukkit.getEntity(drop.displayId());
+        if (interaction == null || display == null) {
+            removePhysicsDrop(drop);
+            return;
+        }
+        Location next = drop.location().clone().add(drop.velocity());
+        if (isSolidAt(next.clone().add(0.0, -0.05, 0.0))) {
+            next.setY(Math.floor(next.getY()) + 0.12);
+            drop.velocity().setY(Math.max(0.0, -drop.velocity().getY() * 0.2));
+            drop.velocity().multiply(0.72);
+        } else {
+            drop.velocity().setY(Math.max(-0.55, drop.velocity().getY() - 0.04));
+            drop.velocity().multiply(new Vector(0.96, 0.98, 0.96));
+        }
+        drop.location().setX(next.getX());
+        drop.location().setY(next.getY());
+        drop.location().setZ(next.getZ());
+        display.teleport(next);
+        interaction.teleport(next.clone().add(0.0, -0.15, 0.0));
+    }
+
+    private boolean isSolidAt(Location location) {
+        return location.getBlock().getType().isSolid();
+    }
+
+    private int firstAvailableHotbarSlot(PlayerInventory inventory) {
+        for (int slot = 0; slot <= 8; slot++) {
+            ItemStack item = inventory.getItem(slot);
+            if (item == null || item.getType().isAir()) {
+                return slot;
+            }
+        }
+        return -1;
     }
 
     private ItemStack blueprintPlaceholder() {
@@ -1334,6 +1495,15 @@ public final class HallsSession {
     }
 
     private record BlockSnapshot(int x, int y, int z, BlockData blockData) {
+    }
+
+    private record PhysicsDrop(
+            UUID interactionId,
+            UUID displayId,
+            ItemStack stack,
+            Location location,
+            Vector velocity
+    ) {
     }
 
     private record RoomPlacement(HallsLayout layout, int startX, int startZ) {

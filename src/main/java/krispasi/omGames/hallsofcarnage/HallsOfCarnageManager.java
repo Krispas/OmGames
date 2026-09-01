@@ -192,6 +192,24 @@ public final class HallsOfCarnageManager {
         return false;
     }
 
+    public boolean handlePhysicsDropPickup(Player player, Entity entity) {
+        if (player == null || entity == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handlePhysicsDropPickup(player, entity);
+    }
+
+    public boolean handlePlayerDroppedItem(Player player, org.bukkit.entity.Item itemDrop) {
+        if (player == null || itemDrop == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handlePlayerDroppedItem(player, itemDrop);
+    }
+
     public boolean handleElevatorButton(Player player, org.bukkit.block.Block block) {
         if (player == null) {
             return false;

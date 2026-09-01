@@ -61,7 +61,7 @@ This is the first implementation slice. It focuses on:
 - Full multi-floor session runtime.
 - Real elevator transition animation/loading floor flow.
 - Ghost death state.
-- Physics-driven item drops.
+- Full configurable item/drop definitions beyond the current placeholder physics drops.
 - Scrap storage and camp building runtime.
 - Combat/exploration/camp floor gameplay.
 - Sculk, traps, modifiers, monster flood systems.
@@ -99,11 +99,13 @@ This is the first implementation slice. It focuses on:
 - Exploration corridors now use off-center room doors, sometimes on intentionally non-obvious room sides, plus randomized waypoint routing so paths are less direct and less grid-like.
 - Corridor rendering now builds a full shell around the union of path cells before carving the walkable route, which should keep 90-degree bends from missing wall sections.
 - Local validation note: `git diff --check` passed; full Maven packaging was not run because neither `mvn` nor a Maven wrapper is available in this shell, and the only visible `javac` is Java 18 while the project targets Java 25.
+- Tuned the randomized corridor pass back toward readable gameplay: room gaps/lateral offsets are smaller, preferred door sides are used more often, waypoint detours are shorter and capped, and connector paths are rejected unless every step is orthogonal/contiguous.
+- Added first-pass session-owned physics drops for Halls items. Breakable rewards and player-dropped session items now become an `ItemDisplay` visual plus `Interaction` pickup hitbox with simple gravity/friction movement.
+- Physics drops are picked up by right-clicking the hitbox with an empty main hand and are placed only into the hotbar. Session cleanup removes their display/hitbox entities and stops the physics task.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 - Make it so corridors can pass through rooms, however if they intersect, the corridor wont be generated, instead almost like if it were to create a new door.
 - My original idea was to have 2D array where the rooms and corridors were to be placed, but if your approach is better, keep it.
 But just to talk about it more, I was thinking of level as having masks, like room mask, corridor mask and so on, which are then put on top of each other. The game still knows where rooms and the doors are so traps can adjust. Anyways if you have a better approach, keep it.
-- Okay, so I think you've maybe overdone it with the corridor randomness. Try to keep it less chaotic, but still chaotic, we are closer to the intended behaviour now. Also some corridors are now leading diagonaly, which shouldnt happen.
-- Some corridors are way too long for it leading to good gameplay feel
-- For next slice, also try to add the physics for dropped items, as described in GDD and fix the generation
+- Item physics are almost fine, however they bury themselves deep into the floor before they stop falling
+- For the next slice, completely rework the generation and use my "carving" approach, it should ensure corridors won't cut through each other. Also try to fix the diagonal corridors, they are still present. Of course if you remake the whole generation, that will hopefully get fixed.

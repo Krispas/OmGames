@@ -1162,6 +1162,7 @@ SQLite tables:
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
 - Exploration corridor routing reserves the elevator shell and room shells, validates each planned path before adding room openings, and adds some extra room-to-room corridors after the main connected room network is built.
 - Exploration corridors use off-center door cells and randomized waypoint routing; corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
+- Halls floor loot/drop placeholders should use session-owned physics drops (`ItemDisplay` plus `Interaction`) instead of vanilla dropped item entities; players pick them up by right-clicking with an empty hand.
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
 - `HallsLayoutLoader` tolerates old copied room files by stripping a full `X` perimeter and treating non-`X` marker characters as open cells; this is runtime parsing tolerance, not file migration.
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
