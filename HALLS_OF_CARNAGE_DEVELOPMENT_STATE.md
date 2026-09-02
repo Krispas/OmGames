@@ -148,23 +148,24 @@ This is the first implementation slice. It focuses on:
 - Scenario exploration floors now parse `holes` separately from `traps`, so pit generation no longer consumes the normal weighted trap count.
 - Ceiling blade traps now choose a variable lane span from the open room terrain, render rails at that span, and damage players against the moving blade lane volume instead of relying on a small point-radius check.
 - Armor item files now support `armor-model`; Halls writes it through Paper's equippable component while preserving `item-model` for inventory/held item models.
-- Temporary playtest visualization now draws `END_ROD` particles around the active ceiling blade hitbox every other tick while the blade is dangerous.
 - Wall spike trap damage detection now uses a narrow lane width separate from poison dart detection, preventing hits on players merely standing next to the trap cell.
 - Hole generation now uses a room-interior mask that may carve through internal blocked cells/pillars instead of requiring a fully open square, while still avoiding corridors and outer room walls.
-- Hole masks near room doorway cells are rejected, preventing unbridged pits directly beside entrances.
 - Falling ice traps no longer spawn visible ceiling marker displays when their configured `ceiling-material` is `AIR`.
 - Poison dart traps now have separate trigger and shot lanes: players can bait them from a wider forward lane, but particles and damage stay in one narrow lane.
 - Hole placement may overlap internal room blockers when choosing a rectangular mask, but only open floor cells inside that mask are carved into the actual pit.
 - Swinging blades now damage throughout the whole swing cycle instead of only during the old active window.
-- Temporary swinging-blade hitbox visualization now uses the same thinner hitbox as damage, roughly 33% narrower than before.
 - Swinging blade item displays now apply the requested additional Euler rotation `(90, 0, 45)`, and wall spike blade displays apply `(0, -90, 45)`.
+- Swinging blade and wall spike blade item displays now also apply an additional `(0, 0, 180)` rotation.
+- Temporary swinging-blade hitbox particles and the extra swing blade CRIT particles are disabled.
+- Hole generation no longer avoids room doors; it uses doorway-inclusive hole candidates and tries center-out bridge rows/columns until it finds a wooden bridge that preserves reachability.
+- Bear traps are now one-time use: triggering one clears its block and removes it from the session trap runtime.
+- Poison dart trap triggering now reaches one block farther in the shooting direction while keeping render/damage to the narrow lane.
+- Normal trap placement now biases later traps in the same room toward the room's first trap type, with about a 10% chance to mix in a different type.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Next slice:
-- For swing blade trap, add aditional euler rotation to the blade model of degress (0,0,180)
-- For wall blade trap, add aditional euler rotation to the blade model of degress (0,0,180)
-- Disable the swing blade trap particles, they served their purpose
-- Holes should not avoid doors when generating, but should properly generate the wooden bridges
-- Make it so bear traps are one time use
-- Add the one more block trigger for poison darts also in the direction its shooting
-- Make it more probable for room to generate with same type of the trap (there should be only around 10% chance that a room will have more than 1 type)
+- Okay my previous blade trap rotations were wrong, I just dont know how to do it better anymore, a trap rides along Z axis, however the blade no points East, it should point down. Also after the rotation, scale the blade so its longer.
+- However if the blade slides along the X axis, the rotation is perfect the way it is! Almost perfect, it needs a 90 degree rotation what now after rotation are y axis.
+- I still have same floor layout generating, I said floor layout should not be dependent on anything unless its a camp (and those are not even implemented yet)
+- The wall blade trap is also almost perfect, but right now its pointing towards the trap and not out
+- Another change, traps in scenario file now indicate amount of trapped rooms and not traps, add another variables for min and max amount of traps in trapped rooms.
