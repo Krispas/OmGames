@@ -583,6 +583,41 @@ public final class HallsSession {
         }
     }
 
+    private void placeRoomCeilingLights(HallsLayout layout,
+                                        int startX,
+                                        int y,
+                                        int startZ,
+                                        HallsLevelType levelType,
+                                        Random random) {
+        List<Cell> cells = openInteriorCells(layout);
+        if (cells.isEmpty()) {
+            return;
+        }
+        java.util.Collections.shuffle(cells, random);
+        int targetLights = Math.max(1, Math.min(4, cells.size() / 36));
+        int placed = 0;
+        for (Cell cell : cells) {
+            if (placed >= targetLights) {
+                return;
+            }
+            if (isNearLayoutEdge(layout, cell)) {
+                continue;
+            }
+            setBlock(startX + cell.x(), y + ROOM_HEIGHT, startZ + cell.z(), levelType.light());
+            placed++;
+        }
+        if (placed == 0) {
+            Cell cell = cells.getFirst();
+            setBlock(startX + cell.x(), y + ROOM_HEIGHT, startZ + cell.z(), levelType.light());
+        }
+    }
+
+    private boolean isNearLayoutEdge(HallsLayout layout, Cell cell) {
+        return cell.x() <= 1 || cell.z() <= 1
+                || cell.x() >= layout.width() - 2
+                || cell.z() >= layout.depth() - 2;
+    }
+
     private void buildElevator() {
         Material corner = Material.REINFORCED_DEEPSLATE;
         Material side = Material.RED_NETHER_BRICKS;
@@ -657,6 +692,7 @@ public final class HallsSession {
                 }
             }
         }
+        placeRoomCeilingLights(layout, startX, y, startZ, levelType, random);
     }
 
     private boolean isRoomOpening(HallsLayout layout, int x, int z, Map<BlockFace, Integer> openings) {
@@ -876,8 +912,6 @@ public final class HallsSession {
         if (cells.isEmpty()) {
             return;
         }
-        Cell light = cells.get(Math.floorMod(roomIndex * 3 + floor, cells.size()));
-        setBlock(room.startX() + light.x(), origin.y() + ROOM_HEIGHT - 1, room.startZ() + light.z(), Material.SEA_LANTERN);
         int baseProps = Math.max(1, floorDefinition.breakables() / Math.max(1, floorDefinition.rooms()));
         int props = Math.min(cells.size(), baseProps + (roomIndex < floorDefinition.breakables() % Math.max(1, floorDefinition.rooms()) ? 1 : 0));
         for (int i = 0; i < props; i++) {
@@ -899,8 +933,6 @@ public final class HallsSession {
         if (cells.isEmpty()) {
             return;
         }
-        Cell light = cells.get(Math.floorMod(roomIndex * 3 + floor, cells.size()));
-        setBlock(room.startX() + light.x(), origin.y() + ROOM_HEIGHT - 1, room.startZ() + light.z(), levelType.light());
         int baseProps = Math.max(1, floorDefinition.breakables() / Math.max(1, floorDefinition.rooms()));
         int props = Math.min(cells.size(), baseProps + (roomIndex < floorDefinition.breakables() % Math.max(1, floorDefinition.rooms()) ? 1 : 0));
         Set<HallsExplorationGenerator.Cell> usedCells = new HashSet<>();
@@ -948,6 +980,18 @@ public final class HallsSession {
         for (int z = 1; z < room.layout().depth() - 1; z++) {
             for (int x = 1; x < room.layout().width() - 1; x++) {
                 if (room.layout().at(x, z) == 'O' && !isNearRoomExit(room, x, z)) {
+                    cells.add(new Cell(x, z));
+                }
+            }
+        }
+        return cells;
+    }
+
+    private List<Cell> openInteriorCells(HallsLayout layout) {
+        List<Cell> cells = new ArrayList<>();
+        for (int z = 1; z < layout.depth() - 1; z++) {
+            for (int x = 1; x < layout.width() - 1; x++) {
+                if (layout.at(x, z) == 'O') {
                     cells.add(new Cell(x, z));
                 }
             }

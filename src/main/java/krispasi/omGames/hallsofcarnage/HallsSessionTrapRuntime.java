@@ -134,7 +134,7 @@ final class HallsSessionTrapRuntime {
             if (holesPlaced >= targetHoles) {
                 break;
             }
-            if (holeType == null || isNearExistingTrap(cell, occupied)) {
+            if (holeType == null) {
                 continue;
             }
             if (placeHole(candidate, plan, random, holeType, occupied)) {
@@ -223,7 +223,7 @@ final class HallsSessionTrapRuntime {
                               HallsTrapType type,
                               Set<HallsExplorationGenerator.Cell> occupied) {
         Set<HallsExplorationGenerator.Cell> pitCells = pitMask(candidate, random, type);
-        if (pitCells.isEmpty() || anyNearExistingTrap(pitCells, occupied)) {
+        if (pitCells.isEmpty()) {
             return false;
         }
         Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(plan.walkableCells(), pitCells);
@@ -378,15 +378,6 @@ final class HallsSessionTrapRuntime {
         return pool.getFirst();
     }
 
-    private boolean anyNearExistingTrap(Set<HallsExplorationGenerator.Cell> cells, Set<HallsExplorationGenerator.Cell> occupied) {
-        for (HallsExplorationGenerator.Cell cell : cells) {
-            if (isNearExistingTrap(cell, occupied)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private Set<HallsExplorationGenerator.Cell> pitMask(TrapCandidate candidate, Random random, HallsTrapType type) {
         int minSize = Math.max(5, type.minSize());
         int maxSize = Math.max(minSize, type.maxSize());
@@ -396,38 +387,24 @@ final class HallsSessionTrapRuntime {
         }
         for (int currentSize = size; currentSize >= minSize; currentSize -= 2) {
             int radius = currentSize / 2;
-            Set<HallsExplorationGenerator.Cell> cells = new HashSet<>();
-            boolean complete = true;
-            for (int dx = -radius; dx <= radius && complete; dx++) {
+            Set<HallsExplorationGenerator.Cell> openPitCells = new HashSet<>();
+            int maskCells = currentSize * currentSize;
+            for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
                     HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(
                             candidate.cell().x() + dx,
                             candidate.cell().z() + dz
                     );
-                    if (!candidate.allRoomCells().contains(cell)) {
-                        complete = false;
-                        break;
+                    if (candidate.roomCells().contains(cell)) {
+                        openPitCells.add(cell);
                     }
-                    cells.add(cell);
                 }
             }
-            Set<HallsExplorationGenerator.Cell> openPitCells = intersection(cells, candidate.roomCells());
-            if (complete && openPitCells.size() >= Math.max(5, cells.size() / 3)) {
+            if (openPitCells.size() >= Math.max(5, maskCells / 3)) {
                 return openPitCells;
             }
         }
         return Set.of();
-    }
-
-    private Set<HallsExplorationGenerator.Cell> intersection(Set<HallsExplorationGenerator.Cell> first,
-                                                             Set<HallsExplorationGenerator.Cell> second) {
-        Set<HallsExplorationGenerator.Cell> result = new HashSet<>();
-        for (HallsExplorationGenerator.Cell cell : first) {
-            if (second.contains(cell)) {
-                result.add(cell);
-            }
-        }
-        return result;
     }
 
     private Set<HallsExplorationGenerator.Cell> bridgeCellsIfNeeded(Set<HallsExplorationGenerator.Cell> walkable,
@@ -911,18 +888,9 @@ final class HallsSessionTrapRuntime {
         Vector3f translation = trapModelTranslation(kind, face, laneOffset);
         Quaternionf rotation = new Quaternionf();
         if (kind == TrapKind.SWINGING_BLADE) {
-            rotation.rotateX((float) Math.toRadians(180.0));
-            if (face == BlockFace.EAST || face == BlockFace.WEST) {
-                rotation.rotateZ((float) Math.toRadians(90.0));
-                rotation.rotateX((float) Math.toRadians(90.0));
-                rotation.rotateZ((float) Math.toRadians(45.0));
-                rotation.rotateZ((float) Math.toRadians(180.0));
+            rotation.rotateZ((float) Math.toRadians(135.0));
+            if (face == BlockFace.NORTH || face == BlockFace.SOUTH) {
                 rotation.rotateY((float) Math.toRadians(90.0));
-            } else {
-                rotation.rotateY((float) Math.toRadians(90.0));
-                rotation.rotateX((float) Math.toRadians(90.0));
-                rotation.rotateZ((float) Math.toRadians(45.0));
-                rotation.rotateZ((float) Math.toRadians(180.0));
             }
         } else if (kind == TrapKind.WALL_SPIKES) {
             rotation.rotateY((float) Math.toRadians(yawDegrees(face.getOppositeFace())));
@@ -940,10 +908,7 @@ final class HallsSessionTrapRuntime {
 
     private Vector3f trapModelScale(TrapKind kind, BlockFace face, float scale) {
         if (kind == TrapKind.SWINGING_BLADE) {
-            float length = scale * 1.45f;
-            return face == BlockFace.EAST || face == BlockFace.WEST
-                    ? new Vector3f(scale, scale, length)
-                    : new Vector3f(length, scale, scale);
+            return new Vector3f(scale * 2.0f, scale * 4.0f, scale);
         }
         if (kind == TrapKind.WALL_SPIKES) {
             return new Vector3f(scale, scale, scale * 1.25f);

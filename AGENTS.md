@@ -1167,10 +1167,11 @@ SQLite tables:
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
 - `/hoc scenario <scenario>` is an OP-only debug command that prints the loaded parsed scenario data and the YAML view copied from the active server data folder.
 - `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `items`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
-- `HallsExplorationGenerator` owns deterministic-per-session exploration layout planning.
+- `HallsExplorationGenerator` owns per-rebuild exploration layout planning.
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.txt|*.yml|*.yaml`.
 - Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, and `pillar-palettes`; monster/modifier sections may exist in resource files for future systems.
 - Current exploration floors bake layered room, corridor, shell, and walkable masks in memory before rendering; Java then places room shells, corridor openings, lights, props, and normal corridors around interior-only `level/<level_type>/exploration_*.txt` room masks.
+- Room lighting should be embedded directly in generated room ceilings.
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
 - If a scenario floor is not explicitly configured but a prior exploration floor is configured, runtime reuses that prior exploration floor definition for the requested floor instead of falling back to the generic 8-room placeholder.
 - Exploration floors grow their per-session generation/cleanup radius from the configured room count and retry with larger radii if planning underfills.
@@ -1223,7 +1224,7 @@ SQLite tables:
 - Exploration floor generation uses a fresh random seed per floor rebuild/session attempt instead of replaying the same layout from scenario and floor id.
 - Trap placement reserves occupied cells before breakable placement; breakables should not spawn on trap footprints.
 - Hole traps choose a rectangular configurable 5x5-15x15 room-interior mask that may intersect internal blocked room cells/pillars, but only open room floor cells are carved into the actual pit; they may generate near doorway zones and must add a wooden bridge when the carved pit would break floor reachability.
-- Hole trap masks are rejected if any pit cell is near an already placed trap, so later full-mask holes should not overlap bear traps/mines/blades.
+- Hole trap masks may overlap prior hole masks, but normal traps should still avoid occupied pit cells and trap footprints.
 - Proximity mines trigger in a larger radius and reserve/validate a 3x3 obstacle footprint for traversal.
 - Swinging blade traps use a stretched ceiling `BlockDisplay` rail plus a moving vanilla iron-sword `ItemDisplay` blade by default, and should damage during the whole swing cycle without debug particles.
 - Wall spikes and poison darts mount from adjacent room walls as display-only fixtures instead of solid blocks, and wall-trap candidates should stay away from room entrances.
