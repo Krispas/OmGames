@@ -193,7 +193,7 @@ This is the first implementation slice. It focuses on:
 ## Reviewer note (Delete entries once done, but keep the header)
 For next slice:
 - Save the current frozen halls corridor generation as a new large_corridors generation
-- Rework frozen halls generation, make it so its more winding and natural, like cave tunnels
+- Rework frozen halls generation, instead of a grid locked generation, try to generate curves from one place to another, like cave tunnels
 - Save the current deep crypt corridor generation as a new open_halls generation
-- Rework deep-crypt generation to be more grid-locked, corridors still 3 blocks wide, but no diagonals, just straight grid-locked maze. Also make it so each room has as big entrances as possible (aka, if corridor is going around a room, fully open the wall)
-- The generation is quite taxing on the server, make it so once the elevator starts running, its starts generating asynchrnously over more ticks and wait until its finish to load it. Add a loading percentage to the UI above hotbar.
+- Rework deep-crypt generation to be more grid-locked, make it almost fully open, with some walls and pillars and make rooms generate a lot closer with lots of entrances
+- Look into all pathing except the original one, optimize it more so its less taxing on the server.
