@@ -147,14 +147,19 @@ This is the first implementation slice. It focuses on:
 - Critical trap clock fix: `HallsSessionTrapRuntime` now uses a session-local tick counter advanced by its own Bukkit task instead of `world.getFullTime()`. This fixes animated/timed traps freezing when the Halls world time is frozen or not advancing normally.
 - Scenario exploration floors now parse `holes` separately from `traps`, so pit generation no longer consumes the normal weighted trap count.
 - Ceiling blade traps now choose a variable lane span from the open room terrain, render rails at that span, and damage players against the moving blade lane volume instead of relying on a small point-radius check.
-- Poison dart traps now use a wider lane detection/damage width and render three visible dart particle lanes so players can bait the trap more reliably.
 - Armor item files now support `armor-model`; Halls writes it through Paper's equippable component while preserving `item-model` for inventory/held item models.
+- Temporary playtest visualization now draws `END_ROD` particles around the active ceiling blade hitbox every other tick while the blade is dangerous.
+- Wall spike trap damage detection now uses a narrow lane width separate from poison dart detection, preventing hits on players merely standing next to the trap cell.
+- Hole generation now uses a room-interior mask that may carve through internal blocked cells/pillars instead of requiring a fully open square, while still avoiding corridors and outer room walls.
+- Hole masks near room doorway cells are rejected, preventing unbridged pits directly beside entrances.
+- Falling ice traps no longer spawn visible ceiling marker displays when their configured `ceiling-material` is `AIR`.
+- Poison darts now trigger, render, and damage only along one narrow forward lane again.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Next slice:
-- The hitbox of the blade swinging trap is behaving weirdly, hitting only under certain parts of the track, can you somehow visualize it? Only temporarily, will be removed later
-- Wall spike trap damage detection is too wide, hitting players if they stand next to it
-- I found a floor hole which was right next to two entrances and no bridge generated, fix that
-- Holes right now seem to generate only in free spaces, the original intention was for the square to be intersected into walkable parts of a room (not corridors), fix that so more interesting holes can generate
-- Falling ice spots should not be visible, remove the pointed dripstone which represents their position
-- The dart trap should only fire in one lane into front of it
+- You got it wrong, posion darts should trigger more widely, but the damage and render should be only one lane.
+- By intersecting holes with walls, I meant it can be placed there, but the actual hole wont generate under the walls
+- The swing blade trap should do damage always, not just one way
+- Hitbox of the swing blade trap should be a little bit thinner
+- model blade of the swing blade trap should have aditional euler degree rotation of (90,0,45)
+- model wall blade trap should have aditional euler degree rotation of (0,-90,+45)
