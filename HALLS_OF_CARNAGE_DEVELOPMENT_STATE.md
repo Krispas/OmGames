@@ -160,6 +160,6 @@ Next slice:
 - You got it wrong, posion darts should trigger more widely, but the damage and render should be only one lane.
 - By intersecting holes with walls, I meant it can be placed there, but the actual hole wont generate under the walls
 - The swing blade trap should do damage always, not just one way
-- Hitbox of the swing blade trap should be a little bit thinner
+- Hitbox of the swing blade trap should be a little bit thinner (33%?)
 - model blade of the swing blade trap should have aditional euler degree rotation of (90,0,45)
 - model wall blade trap should have aditional euler degree rotation of (0,-90,+45)
