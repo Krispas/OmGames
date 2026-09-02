@@ -153,13 +153,18 @@ This is the first implementation slice. It focuses on:
 - Hole generation now uses a room-interior mask that may carve through internal blocked cells/pillars instead of requiring a fully open square, while still avoiding corridors and outer room walls.
 - Hole masks near room doorway cells are rejected, preventing unbridged pits directly beside entrances.
 - Falling ice traps no longer spawn visible ceiling marker displays when their configured `ceiling-material` is `AIR`.
-- Poison darts now trigger, render, and damage only along one narrow forward lane again.
+- Poison dart traps now have separate trigger and shot lanes: players can bait them from a wider forward lane, but particles and damage stay in one narrow lane.
+- Hole placement may overlap internal room blockers when choosing a rectangular mask, but only open floor cells inside that mask are carved into the actual pit.
+- Swinging blades now damage throughout the whole swing cycle instead of only during the old active window.
+- Temporary swinging-blade hitbox visualization now uses the same thinner hitbox as damage, roughly 33% narrower than before.
+- Swinging blade item displays now apply the requested additional Euler rotation `(90, 0, 45)`, and wall spike blade displays apply `(0, -90, 45)`.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Next slice:
-- You got it wrong, posion darts should trigger more widely, but the damage and render should be only one lane.
-- By intersecting holes with walls, I meant it can be placed there, but the actual hole wont generate under the walls
-- The swing blade trap should do damage always, not just one way
-- Hitbox of the swing blade trap should be a little bit thinner (33%?)
-- model blade of the swing blade trap should have aditional euler degree rotation of (90,0,45)
-- model wall blade trap should have aditional euler degree rotation of (0,-90,+45)
+- For swing blade trap, add aditional euler rotation to the blade model of degress (0,0,180)
+- For wall blade trap, add aditional euler rotation to the blade model of degress (0,0,180)
+- Disable the swing blade trap particles, they served their purpose
+- Holes should not avoid doors when generating, but should properly generate the wooden bridges
+- Make it so bear traps are one time use
+- Add the one more block trigger for poison darts also in the direction its shooting
+- Make it more probable for room to generate with same type of the trap (there should be only around 10% chance that a room will have more than 1 type)

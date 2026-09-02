@@ -357,23 +357,24 @@ final class HallsSessionTrapRuntime {
                     cells.add(cell);
                 }
             }
-            if (complete && pitOpenCellCount(cells, candidate.roomCells()) >= Math.max(5, cells.size() / 3)
+            Set<HallsExplorationGenerator.Cell> openPitCells = intersection(cells, candidate.roomCells());
+            if (complete && openPitCells.size() >= Math.max(5, cells.size() / 3)
                     && !pitNearDoorway(cells, candidate.doorwayCells())) {
-                return cells;
+                return openPitCells;
             }
         }
         return Set.of();
     }
 
-    private int pitOpenCellCount(Set<HallsExplorationGenerator.Cell> pitCells,
-                                 Set<HallsExplorationGenerator.Cell> openRoomCells) {
-        int count = 0;
-        for (HallsExplorationGenerator.Cell cell : pitCells) {
-            if (openRoomCells.contains(cell)) {
-                count++;
+    private Set<HallsExplorationGenerator.Cell> intersection(Set<HallsExplorationGenerator.Cell> first,
+                                                             Set<HallsExplorationGenerator.Cell> second) {
+        Set<HallsExplorationGenerator.Cell> result = new HashSet<>();
+        for (HallsExplorationGenerator.Cell cell : first) {
+            if (second.contains(cell)) {
+                result.add(cell);
             }
         }
-        return count;
+        return result;
     }
 
     private boolean pitNearDoorway(Set<HallsExplorationGenerator.Cell> pitCells,
@@ -653,17 +654,14 @@ final class HallsSessionTrapRuntime {
         Location center = new Location(world, trap.x() + 0.5, origin.y() + 1.0, trap.z() + 0.5);
         switch (trap.kind()) {
             case SWINGING_BLADE -> {
-                boolean active = age % trap.type().intervalTicks() < trap.type().activeTicks();
                 Location bladeCenter = moveTrapDisplay(trap, age).orElse(center.clone().add(0.0, 1.3, 0.0));
                 if (age % 5L == 0L) {
-                    world.spawnParticle(Particle.CRIT, bladeCenter, active ? 8 : 2, 0.35, 0.15, 0.35, 0.02);
+                    world.spawnParticle(Particle.CRIT, bladeCenter, 6, 0.3, 0.12, 0.3, 0.02);
                 }
-                if (active) {
-                    if (age % 2L == 0L) {
-                        visualizeSwingingBladeHitbox(trap, bladeCenter);
-                    }
-                    damagePlayersInSwingingBlade(trap, bladeCenter, "A swinging blade cuts you down.");
+                if (age % 2L == 0L) {
+                    visualizeSwingingBladeHitbox(trap, bladeCenter);
                 }
+                damagePlayersInSwingingBlade(trap, bladeCenter, "A swinging blade cuts you down.");
             }
             case WALL_SPIKES -> {
                 long activeAge = age % trap.type().intervalTicks();
@@ -808,9 +806,13 @@ final class HallsSessionTrapRuntime {
             if (face == BlockFace.EAST || face == BlockFace.WEST) {
                 rotation.rotateZ((float) Math.toRadians(90.0));
             }
+            rotation.rotateX((float) Math.toRadians(90.0));
+            rotation.rotateZ((float) Math.toRadians(45.0));
         } else if (kind == TrapKind.WALL_SPIKES) {
             rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
             rotation.rotateX((float) Math.toRadians(180.0));
+            rotation.rotateY((float) Math.toRadians(-90.0));
+            rotation.rotateZ((float) Math.toRadians(45.0));
         } else if (requiresWall(kind)) {
             rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
         } else {
@@ -892,7 +894,7 @@ final class HallsSessionTrapRuntime {
     }
 
     private boolean participantInDartLine(HallsTrap trap) {
-        return !participantsInLine(trap, wallTrapReach(trap, trap.type().radius()), 0.45).isEmpty();
+        return !participantsInLine(trap, wallTrapReach(trap, trap.type().radius()), 1.35).isEmpty();
     }
 
     private List<Player> participantsInLine(HallsTrap trap, double radius, double width) {
@@ -1147,7 +1149,7 @@ final class HallsSessionTrapRuntime {
             double feet = location.getY();
             double head = feet + Math.max(1.6, player.getHeight());
             boolean verticalOverlap = head >= origin.y() + 0.75 && feet <= origin.y() + 2.75;
-            if (verticalOverlap && along <= 0.85 && lateral <= Math.max(0.65, trap.type().radius())) {
+            if (verticalOverlap && along <= bladeHalfAlong() && lateral <= bladeHalfLateral(trap)) {
                 damagePlayerFromTrap(player, trap.type().damage(), message);
             }
         }
@@ -1155,8 +1157,8 @@ final class HallsSessionTrapRuntime {
 
     private void visualizeSwingingBladeHitbox(HallsTrap trap, Location bladeCenter) {
         boolean eastWest = trap.face() == BlockFace.EAST || trap.face() == BlockFace.WEST;
-        double halfAlong = 0.85;
-        double halfLateral = Math.max(0.65, trap.type().radius());
+        double halfAlong = bladeHalfAlong();
+        double halfLateral = bladeHalfLateral(trap);
         for (double along = -halfAlong; along <= halfAlong + 0.01; along += 0.35) {
             for (double lateral = -halfLateral; lateral <= halfLateral + 0.01; lateral += Math.max(0.35, halfLateral)) {
                 spawnBladeHitboxParticle(bladeCenter, eastWest, along, lateral, origin.y() + 0.95);
@@ -1175,6 +1177,14 @@ final class HallsSessionTrapRuntime {
                 y,
                 center.getZ() + (eastWest ? lateral : along));
         world.spawnParticle(Particle.END_ROD, point, 1, 0.0, 0.0, 0.0, 0.0);
+    }
+
+    private double bladeHalfAlong() {
+        return 0.55;
+    }
+
+    private double bladeHalfLateral(HallsTrap trap) {
+        return Math.max(0.45, trap.type().radius() * 0.67);
     }
 
     private record HallsTrap(TrapKind kind, int x, int z, int phase, HallsTrapType type, UUID movingDisplayId, List<UUID> displayIds, BlockFace face, int laneSpan) {

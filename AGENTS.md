@@ -1220,11 +1220,11 @@ SQLite tables:
 - Exploration floor layout templates are loaded with runtime rotations so repeated room files can appear in different orientations.
 - Exploration floor generation uses a fresh random seed per floor rebuild/session attempt instead of replaying the same layout from scenario and floor id.
 - Trap placement reserves occupied cells before breakable placement; breakables should not spawn on trap footprints.
-- Hole traps carve a rectangular configurable 5x5-15x15 room-interior mask that may intersect internal blocked room cells/pillars, build pit walls, avoid doorway zones, and clear down to the current maximum pit depth during floor rebuild cleanup.
+- Hole traps choose a rectangular configurable 5x5-15x15 room-interior mask that may intersect internal blocked room cells/pillars, but only open room floor cells are carved into the actual pit; they build pit walls, avoid doorway zones, and clear down to the current maximum pit depth during floor rebuild cleanup.
 - Hole trap masks are rejected if any pit cell is near an already placed trap, so later full-mask holes should not overlap bear traps/mines/blades.
 - Proximity mines trigger in a larger radius and reserve/validate a 3x3 obstacle footprint for traversal.
 - Swinging blade traps use a stretched ceiling `BlockDisplay` rail plus a moving vanilla iron-sword `ItemDisplay` blade by default.
 - Wall spikes and poison darts mount from adjacent room walls as display-only fixtures instead of solid blocks, and wall-trap candidates should stay away from room entrances.
 - Wall spikes animate a sword display inward from the wall and check a forward lane up to their configured radius, defaulting to 3 blocks and stopping at walls.
 - Falling ice traps may use display-only ceiling fixtures when configured, spawn temporary falling block-display shards around the trap cell, and must not place solid trap blocks; `ceiling-material: AIR` keeps the trap position hidden.
-- Poison darts trigger only when a player crosses the forward lane, defaulting to 5 blocks with a 3-second cooldown.
+- Poison darts trigger from a wider forward warning lane, but the rendered dart line and damage use one narrow forward lane, defaulting to 5 blocks with a 3-second cooldown.
