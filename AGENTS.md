@@ -1188,7 +1188,8 @@ SQLite tables:
 - Breakable files define `id`, `break-message`, `hitbox-height`, `particle-material`, `parts`, and weighted `loot` entries.
 - Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
-- Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, `lore`, an unused-for-now `recipe` scrap cost map, and an optional `stats` map.
+- Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, an unused-for-now `recipe` scrap cost map, and an optional `stats` map.
+- Armor `item-model` controls the item icon/model; armor `armor-model` is written to Paper's equippable component for the worn armor model.
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
 - Item recipes are parsed for future crafting stations but should not be rendered directly on item lore.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility.
@@ -1215,7 +1216,7 @@ SQLite tables:
 - Halls trap animation/cooldown logic must use `HallsSessionTrapRuntime`'s session-local scheduler tick, not world time, because the Halls dimension may have frozen or nonstandard time progression.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth.
-- Exploration floor trap counts come from scenario floor field `traps`.
+- Exploration floor trap counts come from scenario floor field `traps`; hole/pit generation is controlled separately by scenario floor field `holes`.
 - Exploration floor layout templates are loaded with runtime rotations so repeated room files can appear in different orientations.
 - Exploration floor generation uses a fresh random seed per floor rebuild/session attempt instead of replaying the same layout from scenario and floor id.
 - Trap placement reserves occupied cells before breakable placement; breakables should not spawn on trap footprints.

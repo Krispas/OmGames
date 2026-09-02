@@ -8,8 +8,10 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.components.EquippableComponent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -46,6 +48,7 @@ final class HallsItemFactory {
                     meta.setItemModel(modelKey);
                 }
             }
+            applyArmorModel(meta, type);
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING, type.id());
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_category"), PersistentDataType.STRING, type.category());
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_rarity"), PersistentDataType.STRING, type.rarity());
@@ -59,6 +62,42 @@ final class HallsItemFactory {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private static void applyArmorModel(ItemMeta meta, HallsItemType type) {
+        if (!type.category().equals("armor")) {
+            return;
+        }
+        EquipmentSlot slot = armorSlot(type.material());
+        if (slot == null) {
+            return;
+        }
+        EquippableComponent equippable = meta.getEquippable();
+        equippable.setSlot(slot);
+        if (type.armorModel() != null && !type.armorModel().isBlank()) {
+            NamespacedKey modelKey = NamespacedKey.fromString(type.armorModel());
+            if (modelKey != null) {
+                equippable.setModel(modelKey);
+            }
+        }
+        meta.setEquippable(equippable);
+    }
+
+    private static EquipmentSlot armorSlot(Material material) {
+        String name = material.name();
+        if (name.endsWith("_HELMET") || name.equals("TURTLE_HELMET")) {
+            return EquipmentSlot.HEAD;
+        }
+        if (name.endsWith("_CHESTPLATE") || name.equals("ELYTRA")) {
+            return EquipmentSlot.CHEST;
+        }
+        if (name.endsWith("_LEGGINGS")) {
+            return EquipmentSlot.LEGS;
+        }
+        if (name.endsWith("_BOOTS")) {
+            return EquipmentSlot.FEET;
+        }
+        return null;
     }
 
     private static NamedTextColor itemColor(HallsItemType type) {

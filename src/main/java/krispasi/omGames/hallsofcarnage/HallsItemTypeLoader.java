@@ -65,6 +65,7 @@ public final class HallsItemTypeLoader {
         String rarity = normalizeId(yaml.getString("rarity", "normal"));
         Material material = material(yaml.getString("material"), Material.PAPER);
         String itemModel = yaml.getString("item-model", "");
+        String armorModel = yaml.getString("armor-model", "");
         int maxStackSize = Math.max(1, yaml.getInt("max-stack-size", 1));
         List<String> lore = yaml.getStringList("lore");
         Map<String, Double> stats = stats(yaml.getConfigurationSection("stats"));
@@ -72,7 +73,7 @@ public final class HallsItemTypeLoader {
         if (id.isBlank()) {
             throw new IllegalArgumentException("id must not be blank");
         }
-        return new HallsItemType(id, name, category, rarity, material, itemModel, maxStackSize, lore, stats, recipe);
+        return new HallsItemType(id, name, category, rarity, material, itemModel, armorModel, maxStackSize, lore, stats, recipe);
     }
 
     private static Map<String, Double> stats(ConfigurationSection section) {

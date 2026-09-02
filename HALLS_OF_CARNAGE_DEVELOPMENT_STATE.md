@@ -145,12 +145,16 @@ This is the first implementation slice. It focuses on:
 - Swinging blade damage/particles now use the same computed visual position as the moving display transform.
 - Poison dart launcher displays no longer apply an extra entity yaw on top of directional block data, avoiding double-rotation of dispenser-like models.
 - Critical trap clock fix: `HallsSessionTrapRuntime` now uses a session-local tick counter advanced by its own Bukkit task instead of `world.getFullTime()`. This fixes animated/timed traps freezing when the Halls world time is frozen or not advancing normally.
+- Scenario exploration floors now parse `holes` separately from `traps`, so pit generation no longer consumes the normal weighted trap count.
+- Ceiling blade traps now choose a variable lane span from the open room terrain, render rails at that span, and damage players against the moving blade lane volume instead of relying on a small point-radius check.
+- Poison dart traps now use a wider lane detection/damage width and render three visible dart particle lanes so players can bait the trap more reliably.
+- Armor item files now support `armor-model`; Halls writes it through Paper's equippable component while preserving `item-model` for inventory/held item models.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Next slice:
-- Great the ceiling blade trap is finally moving, however its doing no damage on colission
-- Another ceiling blade trap got me, seems it only works sometimes
-- Make the ceiling blade traps have various widths which adjust to the surrounding terrain
-- Separate holes from traps as their own feature and add a hole amount to the scenario file for each level
-- Expand poison dart width range detection, so player can actually bait out the trap.
-- For armors, look into minecraft and paper documentation and add a support for armor model which appears on the player when they equip it
+- The hitbox of the blade swinging trap is behaving weirdly, hitting only under certain parts of the track, can you somehow visualize it? Only temporarily, will be removed later
+- Wall spike trap damage detection is too wide, hitting players if they stand next to it
+- I found a floor hole which was right next to two entrances and no bridge generated, fix that
+- Holes right now seem to generate only in free spaces, the original intention was for the square to be intersected into walkable parts of a room (not corridors), fix that so more interesting holes can generate
+- Falling ice spots should not be visible, remove the pointed dripstone which represents their position
+- The dart trap should only fire in one lane into front of it

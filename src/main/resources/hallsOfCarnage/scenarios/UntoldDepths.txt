@@ -86,7 +86,8 @@ floors:
     rooms: 16
     items: 8
     breakables: 24
-    traps: 50
+    traps: 45
+    holes: 5
   - number: 3
     kind: exploration
     level-type: frozen_halls
@@ -94,7 +95,8 @@ floors:
     rooms: 16
     items: 8
     breakables: 24
-    traps: 60
+    traps: 52
+    holes: 8
   - number: 4
     kind: exploration
     level-type: deep_crypt
@@ -102,7 +104,8 @@ floors:
     rooms: 16
     items: 8
     breakables: 24
-    traps: 60
+    traps: 52
+    holes: 8
   - number: 5
     kind: camp
     level-type: howling_corridors
@@ -119,6 +122,7 @@ floors:
     items: 10
     breakables: 32
     traps: 7
+    holes: 2
   - number: 10
     kind: camp
     level-type: frozen_halls
@@ -135,6 +139,7 @@ floors:
     items: 12
     breakables: 40
     traps: 9
+    holes: 3
     camp-every: 5
   - number: 50
     kind: combat
