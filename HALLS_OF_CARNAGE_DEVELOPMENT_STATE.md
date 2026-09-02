@@ -149,7 +149,8 @@ This is the first implementation slice. It focuses on:
 ## Reviewer note (Delete entries once done, but keep the header)
 Next slice:
 - Great the ceiling blade trap is finally moving, however its doing no damage on colission
+- Another ceiling blade trap got me, seems it only works sometimes
 - Make the ceiling blade traps have various widths which adjust to the surrounding terrain
 - Separate holes from traps as their own feature and add a hole amount to the scenario file for each level
-- Another ceiling blade trap got me, seems it only works sometimes
 - Expand poison dart width range detection, so player can actually bait out the trap.
+- For armors, look into minecraft and paper documentation and add a support for armor model which appears on the player when they equip it
