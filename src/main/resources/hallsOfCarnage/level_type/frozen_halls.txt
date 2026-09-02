@@ -1,6 +1,6 @@
 id: frozen_halls
 name: "Frozen Halls"
-corridor-generation: normal
+corridor-generation: cave
 materials:
   floor: PACKED_ICE
   ceiling: BLUE_ICE

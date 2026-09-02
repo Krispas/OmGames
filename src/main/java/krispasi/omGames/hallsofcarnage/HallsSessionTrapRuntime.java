@@ -395,7 +395,7 @@ final class HallsSessionTrapRuntime {
                             candidate.cell().x() + dx,
                             candidate.cell().z() + dz
                     );
-                    if (candidate.roomCells().contains(cell)) {
+                    if (candidate.allRoomCells().contains(cell)) {
                         openPitCells.add(cell);
                     }
                 }
@@ -447,15 +447,12 @@ final class HallsSessionTrapRuntime {
                                                                      Set<HallsExplorationGenerator.Cell> newPitCells,
                                                                      List<Set<HallsExplorationGenerator.Cell>> bridgeOptions) {
         for (Set<HallsExplorationGenerator.Cell> bridge : bridgeOptions) {
-            if (!bridge.isEmpty()
-                    && floorReachableWithout(walkable, difference(allPitCells, bridge))
-                    && roomEntrancesReachable(candidate, allPitCells, bridge)) {
-                return bridge;
+            Set<HallsExplorationGenerator.Cell> passableBridge = intersection(bridge, candidate.roomCells());
+            if (!passableBridge.isEmpty()
+                    && floorReachableWithout(walkable, difference(allPitCells, passableBridge))
+                    && roomEntrancesReachable(candidate, allPitCells, passableBridge)) {
+                return passableBridge;
             }
-        }
-        if (floorReachableWithout(walkable, difference(allPitCells, newPitCells))
-                && roomEntrancesReachable(candidate, allPitCells, newPitCells)) {
-            return newPitCells;
         }
         return null;
     }
@@ -590,6 +587,13 @@ final class HallsSessionTrapRuntime {
         return result;
     }
 
+    private Set<HallsExplorationGenerator.Cell> intersection(Set<HallsExplorationGenerator.Cell> cells,
+                                                             Set<HallsExplorationGenerator.Cell> retained) {
+        Set<HallsExplorationGenerator.Cell> result = new HashSet<>(cells);
+        result.retainAll(retained);
+        return result;
+    }
+
     private boolean floorReachableWithout(Set<HallsExplorationGenerator.Cell> walkable,
                                           Set<HallsExplorationGenerator.Cell> blocked) {
         HallsExplorationGenerator.Cell start = new HallsExplorationGenerator.Cell(origin.x(), origin.z() + ELEVATOR_OUTER_RADIUS + 1);
@@ -641,6 +645,9 @@ final class HallsSessionTrapRuntime {
                           Set<HallsExplorationGenerator.Cell> bridgeCells,
                           HallsTrapType type) {
         for (HallsExplorationGenerator.Cell cell : pitCells) {
+            for (int y = origin.y(); y < origin.y() + ROOM_HEIGHT; y++) {
+                setBlock(cell.x(), y, cell.z(), Material.AIR);
+            }
             setBlock(cell.x(), origin.y() - 1, cell.z(), Material.AIR);
             for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
                 HallsExplorationGenerator.Cell side = step(cell, face);
@@ -667,7 +674,7 @@ final class HallsSessionTrapRuntime {
     }
 
     private List<UUID> buildWallSpikes(HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type) {
-        UUID base = spawnWallBlockDisplay(cell, face, Material.BLACK_CONCRETE, 0.04f, 0.9f, 0.9f);
+        UUID base = spawnWallBlockDisplay(cell, face, Material.BLACK_CONCRETE, 0.04f, 0.45f, 0.45f);
         UUID spikes = spawnTrapItemDisplay(TrapKind.WALL_SPIKES, cell, face, type, Material.IRON_SWORD, 0.0);
         return List.of(base, spikes);
     }
@@ -922,7 +929,7 @@ final class HallsSessionTrapRuntime {
         double y = origin.y() + 0.08;
         double z = cell.z() + 0.5;
         if (kind == TrapKind.SWINGING_BLADE) {
-            y = origin.y() + 2.1;
+            y = origin.y() + 2.85;
             if (face == BlockFace.EAST || face == BlockFace.WEST) {
                 x += laneOffset;
             } else {
@@ -1210,7 +1217,8 @@ final class HallsSessionTrapRuntime {
     private int swingLaneHalfSpan(TrapCandidate candidate, BlockFace face) {
         boolean eastWest = face == BlockFace.EAST || face == BlockFace.WEST;
         int halfSpan = 0;
-        for (int offset = 1; offset <= 5; offset++) {
+        int maxSpan = eastWest ? candidate.room().layout().width() : candidate.room().layout().depth();
+        for (int offset = 1; offset <= maxSpan; offset++) {
             HallsExplorationGenerator.Cell negative = eastWest
                     ? new HallsExplorationGenerator.Cell(candidate.cell().x() - offset, candidate.cell().z())
                     : new HallsExplorationGenerator.Cell(candidate.cell().x(), candidate.cell().z() - offset);
@@ -1328,7 +1336,7 @@ final class HallsSessionTrapRuntime {
             double lateral = Math.abs(eastWest ? location.getZ() - bladeCenter.getZ() : location.getX() - bladeCenter.getX());
             double feet = location.getY();
             double head = feet + Math.max(1.6, player.getHeight());
-            boolean verticalOverlap = head >= origin.y() + 0.75 && feet <= origin.y() + 2.75;
+            boolean verticalOverlap = head >= origin.y() + 1.5 && feet <= origin.y() + 3.5;
             if (verticalOverlap && along <= bladeHalfAlong() && lateral <= bladeHalfLateral(trap)) {
                 damagePlayerFromTrap(player, trap.type().damage(), message);
             }

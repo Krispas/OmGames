@@ -469,6 +469,7 @@ public final class HallsSession {
                 ELEVATOR_OUTER_RADIUS,
                 layouts,
                 floorDefinition,
+                levelType.corridorGeneration(),
                 random
         );
         int targetRooms = activeTargetRooms;
@@ -485,6 +486,7 @@ public final class HallsSession {
                     ELEVATOR_OUTER_RADIUS,
                     layouts,
                     floorDefinition,
+                    levelType.corridorGeneration(),
                     random
             );
         }

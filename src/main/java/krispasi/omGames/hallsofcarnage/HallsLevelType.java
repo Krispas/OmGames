@@ -22,7 +22,7 @@ public record HallsLevelType(
             return new HallsLevelType(
                     normalizedId,
                     "Frozen Halls",
-                    "normal",
+                    "cave",
                     Material.PACKED_ICE,
                     Material.BLUE_ICE,
                     Material.PACKED_ICE,
@@ -39,7 +39,7 @@ public record HallsLevelType(
             return new HallsLevelType(
                     normalizedId,
                     "Deep Crypt",
-                    "normal",
+                    "maze",
                     Material.SMOOTH_SANDSTONE,
                     Material.CHISELED_SANDSTONE,
                     Material.CUT_SANDSTONE,

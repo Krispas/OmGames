@@ -28,6 +28,7 @@ final class HallsExplorationGenerator {
     private final int clearRadius;
     private final Bounds protectedElevator;
     private final Random random;
+    private final CorridorMode corridorMode;
     private final List<Room> rooms = new ArrayList<>();
     private final Set<Cell> corridorCells = new HashSet<>();
     private final Set<Cell> corridorShellCells = new HashSet<>();
@@ -35,11 +36,17 @@ final class HallsExplorationGenerator {
     private final Set<Cell> roomInteriorCells = new HashSet<>();
     private final Set<Cell> networkCells = new HashSet<>();
 
-    private HallsExplorationGenerator(int originX, int originZ, int clearRadius, Bounds protectedElevator, Random random) {
+    private HallsExplorationGenerator(int originX,
+                                      int originZ,
+                                      int clearRadius,
+                                      Bounds protectedElevator,
+                                      String corridorGeneration,
+                                      Random random) {
         this.originX = originX;
         this.originZ = originZ;
         this.clearRadius = clearRadius;
         this.protectedElevator = protectedElevator;
+        this.corridorMode = CorridorMode.from(corridorGeneration);
         this.random = random;
     }
 
@@ -49,6 +56,7 @@ final class HallsExplorationGenerator {
                          int elevatorOuterRadius,
                          List<HallsLayout> layouts,
                          HallsScenario.FloorDefinition floorDefinition,
+                         String corridorGeneration,
                          Random random) {
         Bounds elevatorBounds = new Bounds(
                 originX - elevatorOuterRadius,
@@ -61,6 +69,7 @@ final class HallsExplorationGenerator {
                 originZ,
                 clearRadius,
                 elevatorBounds,
+                corridorGeneration,
                 random
         );
         generator.generate(layouts, floorDefinition);
@@ -98,7 +107,11 @@ final class HallsExplorationGenerator {
         }
         addFirstRoomOnwardRoutes();
         addRoomToRoomLoops();
-        addMazeBranches(Math.max(rooms.size() / 2, 4));
+        if (corridorMode == CorridorMode.MAZE) {
+            addRoomLocalMaze();
+        } else {
+            addMazeBranches(Math.max(rooms.size() / 2, 4));
+        }
     }
 
     private void seedElevatorNetwork() {
@@ -424,15 +437,58 @@ final class HallsExplorationGenerator {
         if (path.isEmpty()) {
             return;
         }
-        corridorCells.addAll(path);
-        networkCells.addAll(path);
-        for (Cell point : path) {
+        Set<Cell> carved = corridorMode == CorridorMode.CAVE ? caveCorridorCells(path) : new HashSet<>(path);
+        corridorCells.addAll(carved);
+        networkCells.addAll(carved);
+        for (Cell point : carved) {
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     corridorShellCells.add(new Cell(point.x() + dx, point.z() + dz));
                 }
             }
         }
+    }
+
+    private Set<Cell> caveCorridorCells(List<Cell> path) {
+        Set<Cell> cells = new HashSet<>(path);
+        for (int i = 0; i < path.size(); i++) {
+            Cell current = path.get(i);
+            boolean eastWest = isEastWestSegment(path, i);
+            List<Cell> widened = eastWest
+                    ? List.of(new Cell(current.x(), current.z() - 1), new Cell(current.x(), current.z() + 1))
+                    : List.of(new Cell(current.x() - 1, current.z()), new Cell(current.x() + 1, current.z()));
+            for (Cell cell : widened) {
+                if (canWidenCorridorInto(cell)) {
+                    cells.add(cell);
+                }
+            }
+            if (random.nextInt(100) < 28) {
+                List<Cell> roughEdges = eastWest
+                        ? List.of(new Cell(current.x(), current.z() - 2), new Cell(current.x(), current.z() + 2))
+                        : List.of(new Cell(current.x() - 2, current.z()), new Cell(current.x() + 2, current.z()));
+                Collections.shuffle(roughEdges, random);
+                Cell rough = roughEdges.getFirst();
+                if (canWidenCorridorInto(rough)) {
+                    cells.add(rough);
+                }
+            }
+        }
+        return cells;
+    }
+
+    private boolean isEastWestSegment(List<Cell> path, int index) {
+        Cell current = path.get(index);
+        if (index > 0 && path.get(index - 1).z() == current.z() && path.get(index - 1).x() != current.x()) {
+            return true;
+        }
+        return index < path.size() - 1 && path.get(index + 1).z() == current.z() && path.get(index + 1).x() != current.x();
+    }
+
+    private boolean canWidenCorridorInto(Cell cell) {
+        return insideBuildArea(cell)
+                && !protectedElevator.contains(cell.x(), cell.z())
+                && !roomShellCells.contains(cell)
+                && !roomInteriorCells.contains(cell);
     }
 
     private void addFirstRoomOnwardRoutes() {
@@ -535,6 +591,119 @@ final class HallsExplorationGenerator {
             rememberCorridor(branch);
             starts.addAll(branch);
             added++;
+        }
+    }
+
+    private void addRoomLocalMaze() {
+        Set<Cell> mazeArea = mazeAreaCells();
+        if (mazeArea.isEmpty()) {
+            return;
+        }
+        List<Cell> starts = new ArrayList<>(networkCells.stream()
+                .filter(mazeArea::contains)
+                .toList());
+        if (starts.isEmpty()) {
+            starts = rooms.stream()
+                    .flatMap(room -> room.openings().entrySet().stream()
+                            .map(opening -> doorCell(room, opening.getKey(), opening.getValue())))
+                    .filter(mazeArea::contains)
+                    .toList();
+        }
+        if (starts.isEmpty()) {
+            return;
+        }
+        Set<Cell> mazeCells = new HashSet<>();
+        Cell start = starts.get(random.nextInt(starts.size()));
+        ArrayDeque<Cell> stack = new ArrayDeque<>();
+        stack.push(start);
+        mazeCells.add(start);
+        int targetCells = Math.min(mazeArea.size(), Math.max(80, rooms.size() * 28));
+        int attempts = 0;
+        while (!stack.isEmpty() && mazeCells.size() < targetCells && attempts++ < targetCells * 20) {
+            Cell current = stack.peek();
+            List<BlockFace> faces = new ArrayList<>(List.of(CARDINAL_FACES));
+            Collections.shuffle(faces, random);
+            Cell next = null;
+            for (BlockFace face : faces) {
+                Cell candidate = step(step(current, face), face);
+                Cell between = step(current, face);
+                if (mazeArea.contains(candidate) && mazeArea.contains(between)
+                        && !mazeCells.contains(candidate)
+                        && !mazeCells.contains(between)) {
+                    next = candidate;
+                    mazeCells.add(between);
+                    mazeCells.add(candidate);
+                    break;
+                }
+            }
+            if (next == null) {
+                stack.pop();
+            } else {
+                stack.push(next);
+            }
+        }
+        if (mazeCells.isEmpty()) {
+            return;
+        }
+        rememberCorridor(new ArrayList<>(mazeCells));
+        addMazeRoomOpenings(mazeCells);
+    }
+
+    private Set<Cell> mazeAreaCells() {
+        Set<Cell> area = new HashSet<>();
+        for (Room room : rooms) {
+            Bounds bounds = Bounds.of(room).inflate(10);
+            for (int x = bounds.minX(); x <= bounds.maxX(); x++) {
+                for (int z = bounds.minZ(); z <= bounds.maxZ(); z++) {
+                    Cell cell = new Cell(x, z);
+                    if (canWidenCorridorInto(cell) && roomWithin(cell, 10)) {
+                        area.add(cell);
+                    }
+                }
+            }
+        }
+        return area;
+    }
+
+    private boolean roomWithin(Cell cell, int distance) {
+        for (Room room : rooms) {
+            Bounds bounds = Bounds.of(room);
+            int dx = cell.x() < bounds.minX() ? bounds.minX() - cell.x()
+                    : cell.x() > bounds.maxX() ? cell.x() - bounds.maxX()
+                    : 0;
+            int dz = cell.z() < bounds.minZ() ? bounds.minZ() - cell.z()
+                    : cell.z() > bounds.maxZ() ? cell.z() - bounds.maxZ()
+                    : 0;
+            if (dx + dz <= distance) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void addMazeRoomOpenings(Set<Cell> mazeCells) {
+        for (Room room : rooms) {
+            List<DoorCandidate> doors = new ArrayList<>();
+            for (BlockFace face : CARDINAL_FACES) {
+                for (int offset : validDoorOffsets(room.layout(), face)) {
+                    Cell door = doorCell(room, face, offset);
+                    if (mazeCells.contains(door) || mazeCells.contains(step(door, face))) {
+                        doors.add(new DoorCandidate(face, offset));
+                    }
+                }
+            }
+            Collections.shuffle(doors, random);
+            int added = 0;
+            for (DoorCandidate door : doors) {
+                if (added >= 2) {
+                    break;
+                }
+                if (!room.openings().containsKey(door.face())) {
+                    room.openings().put(door.face(), door.offset());
+                    rememberCorridor(List.of(doorCell(room, door.face(), door.offset())));
+                    added++;
+                }
+            }
         }
     }
 
@@ -730,6 +899,26 @@ final class HallsExplorationGenerator {
                                   BlockFace roomFace,
                                   int anchorOffset,
                                   int roomOffset) {
+    }
+
+    private record DoorCandidate(BlockFace face, int offset) {
+    }
+
+    private enum CorridorMode {
+        NORMAL,
+        CAVE,
+        MAZE;
+
+        private static CorridorMode from(String value) {
+            if (value == null) {
+                return NORMAL;
+            }
+            return switch (value.trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_')) {
+                case "cave", "caves", "natural" -> CAVE;
+                case "maze", "mazelike" -> MAZE;
+                default -> NORMAL;
+            };
+        }
     }
 
     private record Bounds(int minX, int maxX, int minZ, int maxZ) {

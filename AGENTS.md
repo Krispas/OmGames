@@ -1171,6 +1171,7 @@ SQLite tables:
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.txt|*.yml|*.yaml`.
 - Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, and `pillar-palettes`; monster/modifier sections may exist in resource files for future systems.
 - Current exploration floors bake layered room, corridor, shell, and walkable masks in memory before rendering; Java then places room shells, corridor openings, lights, props, and normal corridors around interior-only `level/<level_type>/exploration_*.txt` room masks.
+- Level type `corridor-generation` is active for exploration floors: `normal` keeps one-block orthogonal corridors, `cave` widens connectors into rough three-block natural paths, and `maze` adds a connected one-block maze field near rooms with extra valid room wall openings.
 - Room lighting should be embedded directly in generated room ceilings.
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
 - If a scenario floor is not explicitly configured but a prior exploration floor is configured, runtime reuses that prior exploration floor definition for the requested floor instead of falling back to the generic 8-room placeholder.
@@ -1232,3 +1233,4 @@ SQLite tables:
 - Wall spikes animate a sword display inward from the wall and check a forward lane up to their configured radius, defaulting to 3 blocks and stopping at walls.
 - Falling ice traps may use display-only ceiling fixtures when configured, spawn temporary falling block-display shards around the trap cell, and must not place solid trap blocks; `ceiling-material: AIR` keeps the trap position hidden.
 - Poison darts trigger from a wider forward warning lane with one extra block of reach, but the rendered dart line and damage use one narrow forward lane, defaulting to 5 blocks with a 3-second cooldown.
+- Frozen Halls defaults to cave corridor generation, and Deep Crypt defaults to maze corridor generation.

@@ -1,6 +1,6 @@
 id: deep_crypt
 name: "Deep Crypt"
-corridor-generation: normal
+corridor-generation: maze
 materials:
   floor: SMOOTH_SANDSTONE
   ceiling: CHISELED_SANDSTONE
