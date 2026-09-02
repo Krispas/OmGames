@@ -161,11 +161,15 @@ This is the first implementation slice. It focuses on:
 - Bear traps are now one-time use: triggering one clears its block and removes it from the session trap runtime.
 - Poison dart trap triggering now reaches one block farther in the shooting direction while keeping render/damage to the narrow lane.
 - Normal trap placement now biases later traps in the same room toward the room's first trap type, with about a 10% chance to mix in a different type.
+- Scenario exploration floor `traps` now means target trapped rooms rather than raw trap count.
+- Scenario exploration floors now parse `traps-per-room.min` and `traps-per-room.max`, defaulting to 1-2 traps per trapped room.
+- Normal trap placement now groups candidates by room, chooses the configured number of trapped rooms, and then places the configured random trap count inside each chosen room.
+- Exploration floor rebuilds now use an unbound runtime seed instead of mixing in session id and floor id, so repeated `/hoc floor` rebuilds should not replay the same layout.
+- Swinging blade item displays now use separate transform paths for X-axis and Z-axis lanes, with longer non-uniform blade scaling.
+- Wall spike blade displays now face away from their mounted wall into the room.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-Next slice:
-- Okay my previous blade trap rotations were wrong, I just dont know how to do it better anymore, a trap rides along Z axis, however the blade no points East, it should point down. Also after the rotation, scale the blade so its longer.
-- However if the blade slides along the X axis, the rotation is perfect the way it is! Almost perfect, it needs a 90 degree rotation what now after rotation are y axis.
-- I still have same floor layout generating, I said floor layout should not be dependent on anything unless its a camp (and those are not even implemented yet)
-- The wall blade trap is also almost perfect, but right now its pointing towards the trap and not out
-- Another change, traps in scenario file now indicate amount of trapped rooms and not traps, add another variables for min and max amount of traps in trapped rooms.
+- make it so lamps are embedded in the ceilings in rooms
+- you borked the ceiling blades, reset their scale and rotation and set it to this what I will send you: first rotate it by 135 degrees, scale x axis by 2, if sliding along z axis, then add 90 to y axis, after rotation, scale it by 4 on y axis
+- congratulation on the wall spikes those are finally done
+- make it so two holes can intersect if not possible previously, also I still dont see holes with bridges generating near the walls/doors

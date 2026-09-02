@@ -1216,7 +1216,9 @@ SQLite tables:
 - Halls trap animation/cooldown logic must use `HallsSessionTrapRuntime`'s session-local scheduler tick, not world time, because the Halls dimension may have frozen or nonstandard time progression.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth.
-- Exploration floor trap counts come from scenario floor field `traps`; hole/pit generation is controlled separately by scenario floor field `holes`.
+- Exploration floor scenario field `traps` means the number of rooms that should receive traps, not the raw trap count.
+- Exploration floor scenario field `traps-per-room.min` / `traps-per-room.max` controls how many normal traps Java attempts inside each trapped room.
+- Hole/pit generation is controlled separately by scenario floor field `holes`.
 - Exploration floor layout templates are loaded with runtime rotations so repeated room files can appear in different orientations.
 - Exploration floor generation uses a fresh random seed per floor rebuild/session attempt instead of replaying the same layout from scenario and floor id.
 - Trap placement reserves occupied cells before breakable placement; breakables should not spawn on trap footprints.

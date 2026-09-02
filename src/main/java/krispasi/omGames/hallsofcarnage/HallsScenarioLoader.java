@@ -86,6 +86,7 @@ public final class HallsScenarioLoader {
             if (range.lastFloor() <= 0) {
                 continue;
             }
+            TrapRange trapRange = trapRange(map.get("traps-per-room"));
             floors.add(new HallsScenario.FloorDefinition(
                     range.firstFloor(),
                     range.lastFloor(),
@@ -96,6 +97,8 @@ public final class HallsScenarioLoader {
                     positiveInt(map.get("items"), 0),
                     positiveInt(map.get("breakables"), 16),
                     positiveInt(map.get("traps"), 5),
+                    trapRange.min(),
+                    trapRange.max(),
                     positiveInt(map.get("holes"), 1)
             ));
         }
@@ -120,7 +123,8 @@ public final class HallsScenarioLoader {
                         + " rooms=" + floor.rooms()
                         + " items=" + floor.items()
                         + " breakables=" + floor.breakables()
-                        + " traps=" + floor.traps()
+                        + " trapped-rooms=" + floor.trappedRooms()
+                        + " traps-per-room=" + floor.minTrapsPerRoom() + "-" + floor.maxTrapsPerRoom()
                         + " holes=" + floor.holes());
             }
         }
@@ -161,6 +165,30 @@ public final class HallsScenarioLoader {
         return parsePositiveInt(String.valueOf(value), fallback);
     }
 
+    private static TrapRange trapRange(Object value) {
+        if (value instanceof java.util.Map<?, ?> map) {
+            int min = positiveInt(map.get("min"), 1);
+            int max = positiveInt(map.get("max"), Math.max(min, 2));
+            return new TrapRange(min, Math.max(min, max));
+        }
+        if (value instanceof Number number) {
+            int amount = Math.max(0, number.intValue());
+            return new TrapRange(amount, amount);
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            String trimmed = text.trim();
+            int dash = trimmed.indexOf('-');
+            if (dash >= 0 && dash + 1 < trimmed.length()) {
+                int min = parsePositiveInt(trimmed.substring(0, dash), 1);
+                int max = parsePositiveInt(trimmed.substring(dash + 1), Math.max(min, 2));
+                return new TrapRange(min, Math.max(min, max));
+            }
+            int amount = parsePositiveInt(trimmed, 1);
+            return new TrapRange(amount, amount);
+        }
+        return new TrapRange(1, 2);
+    }
+
     private static int parsePositiveInt(String text, int fallback) {
         try {
             return Math.max(0, Integer.parseInt(text.trim()));
@@ -181,5 +209,8 @@ public final class HallsScenarioLoader {
     }
 
     private record FloorRange(int firstFloor, int lastFloor) {
+    }
+
+    private record TrapRange(int min, int max) {
     }
 }

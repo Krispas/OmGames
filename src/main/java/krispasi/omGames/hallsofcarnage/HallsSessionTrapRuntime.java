@@ -115,13 +115,15 @@ final class HallsSessionTrapRuntime {
             return Set.of();
         }
         int targetHoles = Math.min(holeCandidates.size(), Math.max(0, floorDefinition.holes()));
-        int targetTraps = Math.min(candidates.size(), Math.max(0, floorDefinition.traps()));
+        int targetTrappedRooms = Math.max(0, floorDefinition.trappedRooms());
+        int minTrapsPerRoom = Math.max(0, floorDefinition.minTrapsPerRoom());
+        int maxTrapsPerRoom = Math.max(minTrapsPerRoom, floorDefinition.maxTrapsPerRoom());
         List<HallsTrapType> pool = trapPool(levelType.id());
         HallsTrapType holeType = trapTypes.values().stream()
                 .filter(type -> type.kind().equals("hole") && type.weight() > 0 && type.allowedForLevelType(levelType.id()))
                 .findFirst()
                 .orElse(null);
-        if ((pool.isEmpty() || targetTraps <= 0) && (holeType == null || targetHoles <= 0)) {
+        if ((pool.isEmpty() || targetTrappedRooms <= 0 || maxTrapsPerRoom <= 0) && (holeType == null || targetHoles <= 0)) {
             return Set.of();
         }
         Collections.shuffle(holeCandidates, random);
@@ -139,39 +141,80 @@ final class HallsSessionTrapRuntime {
                 holesPlaced++;
             }
         }
-        int placed = 0;
-        Collections.shuffle(candidates, random);
-        Map<HallsExplorationGenerator.Room, HallsTrapType> roomTrapTypes = new IdentityHashMap<>();
-        for (TrapCandidate candidate : candidates) {
-            HallsExplorationGenerator.Cell cell = candidate.cell();
-            if (placed >= targetTraps || isNearExistingTrap(cell, occupied) || pool.isEmpty()) {
-                continue;
+        Map<HallsExplorationGenerator.Room, List<TrapCandidate>> candidatesByRoom = candidatesByRoom(candidates);
+        List<HallsExplorationGenerator.Room> trappedRooms = new ArrayList<>(candidatesByRoom.keySet());
+        Collections.shuffle(trappedRooms, random);
+        int roomsPlaced = 0;
+        for (HallsExplorationGenerator.Room room : trappedRooms) {
+            if (roomsPlaced >= targetTrappedRooms || pool.isEmpty()) {
+                break;
             }
-            HallsTrapType type = trapTypeForRoom(candidate, roomTrapTypes, pool, random);
-            TrapKind kind = trapKind(type.kind());
-            if (kind == null) {
-                continue;
+            List<TrapCandidate> roomCandidates = new ArrayList<>(candidatesByRoom.getOrDefault(room, List.of()));
+            Collections.shuffle(roomCandidates, random);
+            HallsTrapType roomType = weightedTrap(pool, random);
+            int targetRoomTraps = minTrapsPerRoom == maxTrapsPerRoom
+                    ? minTrapsPerRoom
+                    : minTrapsPerRoom + random.nextInt(maxTrapsPerRoom - minTrapsPerRoom + 1);
+            int placedInRoom = 0;
+            for (TrapCandidate candidate : roomCandidates) {
+                if (placedInRoom >= targetRoomTraps) {
+                    break;
+                }
+                HallsTrapType type = random.nextInt(100) < 10 ? weightedTrap(pool, random) : roomType;
+                if (tryPlaceTrap(candidate, plan, random, type, occupied)) {
+                    placedInRoom++;
+                }
             }
-            BlockFace face = trapFace(kind, candidate, random);
-            if ((requiresWall(kind) || kind == TrapKind.SWINGING_BLADE || kind == TrapKind.FALLING_ICE)
-                    && face == BlockFace.SELF) {
-                continue;
+            if (placedInRoom > 0) {
+                roomsPlaced++;
             }
-            int laneSpan = kind == TrapKind.SWINGING_BLADE ? swingLaneHalfSpan(candidate, face) : 0;
-            Set<HallsExplorationGenerator.Cell> footprint = trapFootprint(kind, cell, face, laneSpan);
-            if ((kind == TrapKind.PROXIMITY_MINE || requiresWall(kind))
-                    && !floorReachableWithout(plan.walkableCells(), footprint)) {
-                continue;
-            }
-            List<UUID> displayIds = buildTrap(kind, cell, face, type, laneSpan);
-            addTrap(new HallsTrap(kind, cell.x(), cell.z(), random.nextInt(80), type,
-                    movingDisplayId(kind, displayIds), displayIds, face, laneSpan), random);
-            occupied.addAll(footprint);
-            roomTrapTypes.putIfAbsent(candidate.room(), type);
-            placed++;
         }
         startTrapTask();
         return Set.copyOf(occupied);
+    }
+
+    private Map<HallsExplorationGenerator.Room, List<TrapCandidate>> candidatesByRoom(List<TrapCandidate> candidates) {
+        Map<HallsExplorationGenerator.Room, List<TrapCandidate>> byRoom = new IdentityHashMap<>();
+        for (TrapCandidate candidate : candidates) {
+            byRoom.computeIfAbsent(candidate.room(), ignored -> new ArrayList<>()).add(candidate);
+        }
+        return byRoom;
+    }
+
+    private boolean tryPlaceTrap(TrapCandidate candidate,
+                                 HallsExplorationGenerator.Plan plan,
+                                 Random random,
+                                 HallsTrapType type,
+                                 Set<HallsExplorationGenerator.Cell> occupied) {
+        HallsExplorationGenerator.Cell cell = candidate.cell();
+        if (isNearExistingTrap(cell, occupied)) {
+            return false;
+        }
+        TrapKind kind = trapKind(type.kind());
+        if (kind == null) {
+            return false;
+        }
+        BlockFace face = trapFace(kind, candidate, random);
+        if ((requiresWall(kind) || kind == TrapKind.SWINGING_BLADE || kind == TrapKind.FALLING_ICE)
+                && face == BlockFace.SELF) {
+            return false;
+        }
+        int laneSpan = kind == TrapKind.SWINGING_BLADE ? swingLaneHalfSpan(candidate, face) : 0;
+        Set<HallsExplorationGenerator.Cell> footprint = trapFootprint(kind, cell, face, laneSpan);
+        if ((kind == TrapKind.PROXIMITY_MINE || requiresWall(kind))
+                && !floorReachableWithout(plan.walkableCells(), footprint)) {
+            return false;
+        }
+        for (HallsExplorationGenerator.Cell footprintCell : footprint) {
+            if (isNearExistingTrap(footprintCell, occupied)) {
+                return false;
+            }
+        }
+        List<UUID> displayIds = buildTrap(kind, cell, face, type, laneSpan);
+        addTrap(new HallsTrap(kind, cell.x(), cell.z(), random.nextInt(80), type,
+                movingDisplayId(kind, displayIds), displayIds, face, laneSpan), random);
+        occupied.addAll(footprint);
+        return true;
     }
 
     private boolean placeHole(TrapCandidate candidate,
@@ -871,12 +914,18 @@ final class HallsSessionTrapRuntime {
             rotation.rotateX((float) Math.toRadians(180.0));
             if (face == BlockFace.EAST || face == BlockFace.WEST) {
                 rotation.rotateZ((float) Math.toRadians(90.0));
+                rotation.rotateX((float) Math.toRadians(90.0));
+                rotation.rotateZ((float) Math.toRadians(45.0));
+                rotation.rotateZ((float) Math.toRadians(180.0));
+                rotation.rotateY((float) Math.toRadians(90.0));
+            } else {
+                rotation.rotateY((float) Math.toRadians(90.0));
+                rotation.rotateX((float) Math.toRadians(90.0));
+                rotation.rotateZ((float) Math.toRadians(45.0));
+                rotation.rotateZ((float) Math.toRadians(180.0));
             }
-            rotation.rotateX((float) Math.toRadians(90.0));
-            rotation.rotateZ((float) Math.toRadians(45.0));
-            rotation.rotateZ((float) Math.toRadians(180.0));
         } else if (kind == TrapKind.WALL_SPIKES) {
-            rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
+            rotation.rotateY((float) Math.toRadians(yawDegrees(face.getOppositeFace())));
             rotation.rotateX((float) Math.toRadians(180.0));
             rotation.rotateY((float) Math.toRadians(-90.0));
             rotation.rotateZ((float) Math.toRadians(45.0));
@@ -886,7 +935,20 @@ final class HallsSessionTrapRuntime {
         } else {
             rotation.rotateX((float) Math.toRadians(90.0));
         }
-        return new Transformation(translation, rotation, new Vector3f(scale, scale, scale), new Quaternionf());
+        return new Transformation(translation, rotation, trapModelScale(kind, face, scale), new Quaternionf());
+    }
+
+    private Vector3f trapModelScale(TrapKind kind, BlockFace face, float scale) {
+        if (kind == TrapKind.SWINGING_BLADE) {
+            float length = scale * 1.45f;
+            return face == BlockFace.EAST || face == BlockFace.WEST
+                    ? new Vector3f(scale, scale, length)
+                    : new Vector3f(length, scale, scale);
+        }
+        if (kind == TrapKind.WALL_SPIKES) {
+            return new Vector3f(scale, scale, scale * 1.25f);
+        }
+        return new Vector3f(scale, scale, scale);
     }
 
     private Vector3f trapModelTranslation(TrapKind kind, BlockFace face, double laneOffset) {

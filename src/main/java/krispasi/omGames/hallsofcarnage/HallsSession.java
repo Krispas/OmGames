@@ -461,7 +461,7 @@ public final class HallsSession {
         activeTargetRooms = Math.max(1, floorDefinition.rooms());
         activeGeneratedRooms = 0;
         List<HallsLayout> layouts = loadExplorationLayouts(levelType);
-        Random random = new Random(System.nanoTime() ^ (((long) id) << 32) ^ ((long) floor << 12));
+        Random random = floorRandom();
         HallsExplorationGenerator.Plan plan = HallsExplorationGenerator.generate(
                 origin.x(),
                 origin.z(),
@@ -477,7 +477,7 @@ public final class HallsSession {
             activeClearRadius += 32;
             clearBuildVolume();
             buildElevator();
-            random = new Random(System.nanoTime() ^ ((((long) id) << 32) ^ floor) ^ (expansions * 9973L));
+            random = floorRandom();
             plan = HallsExplorationGenerator.generate(
                     origin.x(),
                     origin.z(),
@@ -501,6 +501,14 @@ public final class HallsSession {
         for (int i = 0; i < plan.rooms().size(); i++) {
             placeGeneratedRoomContents(plan.rooms().get(i), random, floor, i, floorDefinition, levelType, reservedCells);
         }
+    }
+
+    private Random floorRandom() {
+        long seed = java.util.concurrent.ThreadLocalRandom.current().nextLong()
+                ^ System.nanoTime()
+                ^ UUID.randomUUID().getMostSignificantBits()
+                ^ UUID.randomUUID().getLeastSignificantBits();
+        return new Random(seed);
     }
 
     private List<HallsLayout> loadExplorationLayouts(HallsLevelType levelType) {

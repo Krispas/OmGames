@@ -234,6 +234,11 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
             for (HallsScenario.FloorDefinition floor : scenario.floors()) {
                 sender.sendMessage(Component.text("  " + floorLabel(floor) + ": " + floor.kind()
                         + ", " + floor.levelType() + ", rooms " + floor.rooms(), NamedTextColor.GRAY));
+                if (floor.trappedRooms() > 0 || floor.holes() > 0) {
+                    sender.sendMessage(Component.text("    traps: " + floor.trappedRooms() + " rooms, "
+                            + floor.minTrapsPerRoom() + "-" + floor.maxTrapsPerRoom()
+                            + " per room; holes " + floor.holes(), NamedTextColor.DARK_GRAY));
+                }
             }
         }
     }

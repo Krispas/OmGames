@@ -86,7 +86,10 @@ floors:
     rooms: 16
     items: 8
     breakables: 24
-    traps: 45
+    traps: 7
+    traps-per-room:
+      min: 1
+      max: 7
     holes: 5
   - number: 3
     kind: exploration
@@ -95,7 +98,10 @@ floors:
     rooms: 16
     items: 8
     breakables: 24
-    traps: 52
+    traps: 8
+    traps-per-room:
+      min: 1
+      max: 7
     holes: 8
   - number: 4
     kind: exploration
@@ -104,7 +110,10 @@ floors:
     rooms: 16
     items: 8
     breakables: 24
-    traps: 52
+    traps: 8
+    traps-per-room:
+      min: 1
+      max: 7
     holes: 8
   - number: 5
     kind: camp
@@ -122,6 +131,9 @@ floors:
     items: 10
     breakables: 32
     traps: 7
+    traps-per-room:
+      min: 1
+      max: 7
     holes: 2
   - number: 10
     kind: camp
@@ -139,6 +151,9 @@ floors:
     items: 12
     breakables: 40
     traps: 9
+    traps-per-room:
+      min: 1
+      max: 7
     holes: 3
     camp-every: 5
   - number: 50
