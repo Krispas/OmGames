@@ -172,8 +172,18 @@ This is the first implementation slice. It focuses on:
 - Ceiling swinging blade item display scaling was reset to double X scale and quadruple Y scale after rotation.
 - Hole placement no longer rejects masks near or intersecting prior hole masks, allowing overlapping pit fields.
 - Hole masks no longer require the full square to fit inside the room interior; they carve only open room floor cells inside the mask, so edge and doorway-centered holes can generate and bridge when they would break reachability.
+- Hole bridge selection now checks room-local traversal from every generated room entrance to every non-hole open cell in that room, including previously carved pits in that room.
+- Existing pit bridges are treated as passable when validating later overlapping hole masks.
+- Wall spike blade facing keeps the working west/east behavior and flips only north/south displays.
+- Ceiling swinging blade item displays now use exact requested `Transformation` values: zero local translation, scale `(2, 4, 2)`, right rotation `(0, 0, -0.38268346, 0.9238795)`, and axis-specific left rotations for X/Z lanes.
+- Ceiling swinging blade movement now uses entity location updates so the exact local transform can keep zero translation.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- Bridges over holes are not generating, make it so that from each entrance of each room, you can get anywhere in the room (except the hole spots of course, that's why we build the bridges after all)
-- Okay, seems I was wrong, on the wall spike trap, the blade faces oposite direction if the trap is facing south or north, its okay on west and east
-- Okay, the ceiling blade trap is still wrong, now lets try a different way. If on X axis, it should have translation (0,0,0), right_rotation (0, 0, -0.38268346f, 0.9238795f), scale (2f, 4f, 2f), left_rotation(0,0,1f,0), for Z axis it should be translation (0,0,0), right_rotation (0,0,-0,38268346f,0.9238795f), scale (2f,4f,2f), left_rotation(-0.7071068f,0,0.7071068f,0)
+Next slice:
+- Make wall spike trap black conrete "hole" twice smaller
+- The ceiling blades are finally correct, but put the sword model 0.75 block higher
+- When generating ceiling blade trap, try to always stretch it accross the whole room (but not into corridors)
+- Bridge generation seems still borked as sometimes the whole hole is filled and sometimes I am finding walls IN the holes without the block which would normally be floor.
+- Add two new corridor generation types, refer to GDD:
+- - Natural/Caves - For frozen halls, winding cave-like paths, 3 blocks wide for better movement options
+- - Mazelike - For deep crypt, generate a basic maze with 1 wide paths and holes into rooms on entrances, don't generate the maze if there is no room in 10 blocks, make sure the maze is fully traverible and include additional holes so its easier to traverse

@@ -1225,6 +1225,7 @@ SQLite tables:
 - Trap placement reserves occupied cells before breakable placement; breakables should not spawn on trap footprints.
 - Hole traps choose a rectangular configurable 5x5-15x15 room-interior mask that may intersect internal blocked room cells/pillars, but only open room floor cells are carved into the actual pit; they may generate near doorway zones and must add a wooden bridge when the carved pit would break floor reachability.
 - Hole trap masks may overlap prior hole masks, but normal traps should still avoid occupied pit cells and trap footprints.
+- Hole bridge placement should preserve reachability from each generated room entrance to every non-hole open cell in that room, not only whole-floor reachability from the elevator.
 - Proximity mines trigger in a larger radius and reserve/validate a 3x3 obstacle footprint for traversal.
 - Swinging blade traps use a stretched ceiling `BlockDisplay` rail plus a moving vanilla iron-sword `ItemDisplay` blade by default, and should damage during the whole swing cycle without debug particles.
 - Wall spikes and poison darts mount from adjacent room walls as display-only fixtures instead of solid blocks, and wall-trap candidates should stay away from room entrances.

@@ -226,7 +226,7 @@ final class HallsSessionTrapRuntime {
         if (pitCells.isEmpty()) {
             return false;
         }
-        Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(plan.walkableCells(), pitCells);
+        Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(candidate, plan.walkableCells(), pitCells);
         if (bridgeCells == null) {
             return false;
         }
@@ -407,9 +407,13 @@ final class HallsSessionTrapRuntime {
         return Set.of();
     }
 
-    private Set<HallsExplorationGenerator.Cell> bridgeCellsIfNeeded(Set<HallsExplorationGenerator.Cell> walkable,
+    private Set<HallsExplorationGenerator.Cell> bridgeCellsIfNeeded(TrapCandidate candidate,
+                                                                    Set<HallsExplorationGenerator.Cell> walkable,
                                                                     Set<HallsExplorationGenerator.Cell> pitCells) {
-        if (floorReachableWithout(walkable, pitCells)) {
+        Set<HallsExplorationGenerator.Cell> existingPits = roomPitCells(candidate);
+        Set<HallsExplorationGenerator.Cell> allPitCells = new HashSet<>(existingPits);
+        allPitCells.addAll(pitCells);
+        if (floorReachableWithout(walkable, allPitCells) && roomEntrancesReachable(candidate, allPitCells, Set.of())) {
             return Set.of();
         }
         int minX = pitCells.stream().mapToInt(HallsExplorationGenerator.Cell::x).min().orElse(0);
@@ -419,33 +423,110 @@ final class HallsSessionTrapRuntime {
         int centerX = (minX + maxX) / 2;
         int centerZ = (minZ + maxZ) / 2;
         if ((maxX - minX) >= (maxZ - minZ)) {
-            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(walkable, pitCells,
+            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, walkable, allPitCells, pitCells,
                     horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ));
             if (bridge != null) {
                 return bridge;
             }
-            return firstReachableBridge(walkable, pitCells,
+            return firstReachableBridge(candidate, walkable, allPitCells, pitCells,
                     verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX));
         } else {
-            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(walkable, pitCells,
+            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, walkable, allPitCells, pitCells,
                     verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX));
             if (bridge != null) {
                 return bridge;
             }
-            return firstReachableBridge(walkable, pitCells,
+            return firstReachableBridge(candidate, walkable, allPitCells, pitCells,
                     horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ));
         }
     }
 
-    private Set<HallsExplorationGenerator.Cell> firstReachableBridge(Set<HallsExplorationGenerator.Cell> walkable,
-                                                                     Set<HallsExplorationGenerator.Cell> pitCells,
+    private Set<HallsExplorationGenerator.Cell> firstReachableBridge(TrapCandidate candidate,
+                                                                     Set<HallsExplorationGenerator.Cell> walkable,
+                                                                     Set<HallsExplorationGenerator.Cell> allPitCells,
+                                                                     Set<HallsExplorationGenerator.Cell> newPitCells,
                                                                      List<Set<HallsExplorationGenerator.Cell>> bridgeOptions) {
         for (Set<HallsExplorationGenerator.Cell> bridge : bridgeOptions) {
-            if (!bridge.isEmpty() && floorReachableWithout(walkable, difference(pitCells, bridge))) {
+            if (!bridge.isEmpty()
+                    && floorReachableWithout(walkable, difference(allPitCells, bridge))
+                    && roomEntrancesReachable(candidate, allPitCells, bridge)) {
                 return bridge;
             }
         }
+        if (floorReachableWithout(walkable, difference(allPitCells, newPitCells))
+                && roomEntrancesReachable(candidate, allPitCells, newPitCells)) {
+            return newPitCells;
+        }
         return null;
+    }
+
+    private Set<HallsExplorationGenerator.Cell> roomPitCells(TrapCandidate candidate) {
+        Set<HallsExplorationGenerator.Cell> result = new HashSet<>();
+        for (HallsTrap trap : traps) {
+            if (trap.kind() != TrapKind.HOLE && trap.kind() != TrapKind.HOLE_BRIDGE) {
+                continue;
+            }
+            HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(trap.x(), trap.z());
+            if (candidate.roomCells().contains(cell)) {
+                result.add(cell);
+            }
+        }
+        return result;
+    }
+
+    private boolean roomEntrancesReachable(TrapCandidate candidate,
+                                           Set<HallsExplorationGenerator.Cell> pitCells,
+                                           Set<HallsExplorationGenerator.Cell> bridgeCells) {
+        Set<HallsExplorationGenerator.Cell> blocked = difference(pitCells, bridgeCells);
+        Set<HallsExplorationGenerator.Cell> target = difference(candidate.roomCells(), blocked);
+        if (target.isEmpty()) {
+            return false;
+        }
+        List<HallsExplorationGenerator.Cell> entrances = roomEntranceCells(candidate.room());
+        if (entrances.isEmpty()) {
+            entrances = List.of(target.iterator().next());
+        }
+        for (HallsExplorationGenerator.Cell entrance : entrances) {
+            if (!target.contains(entrance) || !roomReachableFrom(entrance, target).containsAll(target)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private Set<HallsExplorationGenerator.Cell> roomReachableFrom(HallsExplorationGenerator.Cell start,
+                                                                  Set<HallsExplorationGenerator.Cell> walkable) {
+        Set<HallsExplorationGenerator.Cell> reachable = new HashSet<>();
+        java.util.ArrayDeque<HallsExplorationGenerator.Cell> queue = new java.util.ArrayDeque<>();
+        reachable.add(start);
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            HallsExplorationGenerator.Cell current = queue.remove();
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                HallsExplorationGenerator.Cell next = step(current, face);
+                if (walkable.contains(next) && reachable.add(next)) {
+                    queue.add(next);
+                }
+            }
+        }
+        return reachable;
+    }
+
+    private List<HallsExplorationGenerator.Cell> roomEntranceCells(HallsExplorationGenerator.Room room) {
+        List<HallsExplorationGenerator.Cell> entrances = new ArrayList<>();
+        for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
+            HallsExplorationGenerator.Cell cell = switch (opening.getKey()) {
+                case NORTH -> new HallsExplorationGenerator.Cell(room.startX() + opening.getValue(), room.startZ());
+                case SOUTH -> new HallsExplorationGenerator.Cell(room.startX() + opening.getValue(), room.startZ() + room.layout().depth() - 1);
+                case EAST -> new HallsExplorationGenerator.Cell(room.startX() + room.layout().width() - 1, room.startZ() + opening.getValue());
+                case WEST -> new HallsExplorationGenerator.Cell(room.startX(), room.startZ() + opening.getValue());
+                default -> null;
+            };
+            if (cell != null) {
+                entrances.add(cell);
+            }
+        }
+        return entrances;
     }
 
     private List<Set<HallsExplorationGenerator.Cell>> horizontalBridgeOptions(Set<HallsExplorationGenerator.Cell> pitCells,
@@ -830,6 +911,9 @@ final class HallsSessionTrapRuntime {
             offset = Math.sin(cycle * Math.PI * 2.0) * Math.max(1, trap.laneSpan());
         }
         itemDisplay.setTransformation(trapModelTransformation(trap.kind(), trap.face(), trap.type().modelScale(), offset));
+        if (trap.kind() == TrapKind.SWINGING_BLADE) {
+            itemDisplay.teleport(trapModelLocation(trap.kind(), new HallsExplorationGenerator.Cell(trap.x(), trap.z()), trap.face(), offset));
+        }
         return java.util.Optional.of(trapModelLocation(trap.kind(), new HallsExplorationGenerator.Cell(trap.x(), trap.z()), trap.face(), offset));
     }
 
@@ -886,14 +970,16 @@ final class HallsSessionTrapRuntime {
 
     private Transformation trapModelTransformation(TrapKind kind, BlockFace face, float scale, double laneOffset) {
         Vector3f translation = trapModelTranslation(kind, face, laneOffset);
-        Quaternionf rotation = new Quaternionf();
         if (kind == TrapKind.SWINGING_BLADE) {
-            rotation.rotateZ((float) Math.toRadians(135.0));
-            if (face == BlockFace.NORTH || face == BlockFace.SOUTH) {
-                rotation.rotateY((float) Math.toRadians(90.0));
-            }
-        } else if (kind == TrapKind.WALL_SPIKES) {
-            rotation.rotateY((float) Math.toRadians(yawDegrees(face.getOppositeFace())));
+            Quaternionf leftRotation = face == BlockFace.NORTH || face == BlockFace.SOUTH
+                    ? new Quaternionf(-0.7071068f, 0.0f, 0.7071068f, 0.0f)
+                    : new Quaternionf(0.0f, 0.0f, 1.0f, 0.0f);
+            Quaternionf rightRotation = new Quaternionf(0.0f, 0.0f, -0.38268346f, 0.9238795f);
+            return new Transformation(new Vector3f(), leftRotation, new Vector3f(2.0f, 4.0f, 2.0f), rightRotation);
+        }
+        Quaternionf rotation = new Quaternionf();
+        if (kind == TrapKind.WALL_SPIKES) {
+            rotation.rotateY((float) Math.toRadians(yawDegrees(wallSpikeBladeFace(face))));
             rotation.rotateX((float) Math.toRadians(180.0));
             rotation.rotateY((float) Math.toRadians(-90.0));
             rotation.rotateZ((float) Math.toRadians(45.0));
@@ -907,20 +993,19 @@ final class HallsSessionTrapRuntime {
     }
 
     private Vector3f trapModelScale(TrapKind kind, BlockFace face, float scale) {
-        if (kind == TrapKind.SWINGING_BLADE) {
-            return new Vector3f(scale * 2.0f, scale * 4.0f, scale);
-        }
         if (kind == TrapKind.WALL_SPIKES) {
             return new Vector3f(scale, scale, scale * 1.25f);
         }
         return new Vector3f(scale, scale, scale);
     }
 
+    private BlockFace wallSpikeBladeFace(BlockFace face) {
+        return face == BlockFace.NORTH || face == BlockFace.SOUTH ? face : face.getOppositeFace();
+    }
+
     private Vector3f trapModelTranslation(TrapKind kind, BlockFace face, double laneOffset) {
         if (kind == TrapKind.SWINGING_BLADE) {
-            return face == BlockFace.EAST || face == BlockFace.WEST
-                    ? new Vector3f((float) laneOffset, 0.0f, 0.0f)
-                    : new Vector3f(0.0f, 0.0f, (float) laneOffset);
+            return new Vector3f();
         }
         if (requiresWall(kind)) {
             return new Vector3f(
