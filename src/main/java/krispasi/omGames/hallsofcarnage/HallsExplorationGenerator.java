@@ -159,8 +159,9 @@ final class HallsExplorationGenerator {
         List<BlockFace> faces = availableFaces(anchor);
         Collections.shuffle(faces, random);
         BlockFace face = faces.getFirst();
-        int gap = 5 + random.nextInt(14);
-        int lateralRange = 10 + Math.max(anchor.layout().width(), anchor.layout().depth()) / 2
+        int gap = corridorMode == CorridorMode.MAZE ? 3 + random.nextInt(8) : 5 + random.nextInt(14);
+        int lateralBase = corridorMode == CorridorMode.MAZE ? 5 : 10;
+        int lateralRange = lateralBase + Math.max(anchor.layout().width(), anchor.layout().depth()) / 2
                 + Math.max(layout.width(), layout.depth()) / 2;
         int lateral = random.nextInt(lateralRange * 2 + 1) - lateralRange;
         Room room = switch (face) {
@@ -437,7 +438,11 @@ final class HallsExplorationGenerator {
         if (path.isEmpty()) {
             return;
         }
-        Set<Cell> carved = corridorMode == CorridorMode.CAVE ? caveCorridorCells(path) : new HashSet<>(path);
+        Set<Cell> carved = switch (corridorMode) {
+            case CAVE -> caveCorridorCells(path);
+            case MAZE -> mazeCorridorCells(path);
+            case NORMAL -> new HashSet<>(path);
+        };
         corridorCells.addAll(carved);
         networkCells.addAll(carved);
         for (Cell point : carved) {
@@ -463,13 +468,26 @@ final class HallsExplorationGenerator {
                 }
             }
             if (random.nextInt(100) < 28) {
-                List<Cell> roughEdges = eastWest
+                List<Cell> roughEdges = new ArrayList<>(eastWest
                         ? List.of(new Cell(current.x(), current.z() - 2), new Cell(current.x(), current.z() + 2))
-                        : List.of(new Cell(current.x() - 2, current.z()), new Cell(current.x() + 2, current.z()));
+                        : List.of(new Cell(current.x() - 2, current.z()), new Cell(current.x() + 2, current.z())));
                 Collections.shuffle(roughEdges, random);
                 Cell rough = roughEdges.getFirst();
                 if (canWidenCorridorInto(rough)) {
                     cells.add(rough);
+                }
+            }
+        }
+        return cells;
+    }
+
+    private Set<Cell> mazeCorridorCells(List<Cell> path) {
+        Set<Cell> cells = new HashSet<>(path);
+        for (Cell current : path) {
+            for (BlockFace face : CARDINAL_FACES) {
+                Cell cell = step(current, face);
+                if (canWidenCorridorInto(cell)) {
+                    cells.add(cell);
                 }
             }
         }
@@ -603,11 +621,7 @@ final class HallsExplorationGenerator {
                 .filter(mazeArea::contains)
                 .toList());
         if (starts.isEmpty()) {
-            starts = rooms.stream()
-                    .flatMap(room -> room.openings().entrySet().stream()
-                            .map(opening -> doorCell(room, opening.getKey(), opening.getValue())))
-                    .filter(mazeArea::contains)
-                    .toList();
+            starts = mazeStartsFromRoomDoors(mazeArea);
         }
         if (starts.isEmpty()) {
             return;
@@ -617,7 +631,7 @@ final class HallsExplorationGenerator {
         ArrayDeque<Cell> stack = new ArrayDeque<>();
         stack.push(start);
         mazeCells.add(start);
-        int targetCells = Math.min(mazeArea.size(), Math.max(80, rooms.size() * 28));
+        int targetCells = Math.min(mazeArea.size(), Math.max(160, rooms.size() * 80));
         int attempts = 0;
         while (!stack.isEmpty() && mazeCells.size() < targetCells && attempts++ < targetCells * 20) {
             Cell current = stack.peek();
@@ -663,6 +677,20 @@ final class HallsExplorationGenerator {
             }
         }
         return area;
+    }
+
+    private List<Cell> mazeStartsFromRoomDoors(Set<Cell> mazeArea) {
+        List<Cell> starts = new ArrayList<>();
+        for (Room room : rooms) {
+            for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
+                Cell door = doorCell(room, opening.getKey(), opening.getValue());
+                Cell outside = step(door, opening.getKey());
+                if (mazeArea.contains(outside)) {
+                    starts.add(outside);
+                }
+            }
+        }
+        return starts;
     }
 
     private boolean roomWithin(Cell cell, int distance) {

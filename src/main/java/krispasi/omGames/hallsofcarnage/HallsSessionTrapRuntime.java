@@ -331,8 +331,8 @@ final class HallsSessionTrapRuntime {
 
     private List<HallsExplorationGenerator.Cell> roomAllCells(HallsExplorationGenerator.Room room) {
         List<HallsExplorationGenerator.Cell> cells = new ArrayList<>();
-        for (int z = 1; z < room.layout().depth() - 1; z++) {
-            for (int x = 1; x < room.layout().width() - 1; x++) {
+        for (int z = 0; z < room.layout().depth(); z++) {
+            for (int x = 0; x < room.layout().width(); x++) {
                 cells.add(new HallsExplorationGenerator.Cell(room.startX() + x, room.startZ() + z));
             }
         }

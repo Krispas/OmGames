@@ -180,59 +180,20 @@ This is the first implementation slice. It focuses on:
 - Frozen Halls now uses `corridor-generation: cave` and Deep Crypt now uses `corridor-generation: maze` in bundled defaults and fallback level-type definitions.
 - Exploration generation now reads the level type's corridor generation mode when building a floor.
 - Cave corridor mode widens generated connector paths into rough 3-wide paths with occasional uneven edges while avoiding room interiors, room shells, and the protected elevator footprint.
-- Maze corridor mode adds a connected one-wide local maze field near generated rooms only, keeps it within 10 blocks of a room, and adds extra valid room openings where the maze reaches a room wall.
+- Maze corridor mode adds a connected three-wide local maze field near generated rooms only, keeps it within 10 blocks of a room, and adds extra valid room openings where the maze reaches a room wall.
 - Wall spike black-concrete fixture displays are now half-size.
 - Ceiling swinging blade item displays are positioned 0.75 block higher, and their vertical damage overlap moved up with the visual.
 - Swinging blade lane span now extends as far as the room's open cells allow instead of stopping at a fixed 5-block cap, so generated ceiling blades try to cover the whole room lane without entering corridors.
 - Hole trap masks now include internal room blocker cells in the carved pit volume, and pit building clears the room-height column so old wall/pillar columns do not remain standing inside holes.
 - Pit bridge selection now returns only passable open-room bridge cells and no longer falls back to filling the whole new pit mask as a bridge.
+- Fixed the Frozen Halls cave-generation crash caused by shuffling an immutable `List.of(...)` rough-edge candidate list.
+- Deep Crypt maze rooms now generate closer together, maze coverage is larger, and maze paths widen from the carved cells instead of relying on ordered-path orientation.
+- Hole trap masks once again include room-edge cells while still excluding the generated outer room shell; bridge validation remains based on open room cells so door/room blockage gets a real passable bridge or the pit is skipped.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-Next slice:
--Holes again dont generate on edge of the room, make it generate there again! And with proper bridges if part of the room or a door is blocked.
--The maze in deep crypts only generates around a few rooms, while at this also make the coridors of the maze 3 blocks wide and the rooms there generate a little closer to each other.
--Loading frozen hall fails
-org.bukkit.command.CommandException: Unhandled exception executing command 'hoc' in plugin OmGames v0.8.2
-at org.bukkit.command.PluginCommand.execute(PluginCommand.java:47) ~[paper-api-26.2.build.65-beta.jar:?]
-at io.papermc.paper.command.brigadier.bukkit.BukkitCommandNode$BukkitBrigCommand.run(BukkitCommandNode.java:83) ~[paper-26.2.jar:26.2-65-fc9375a]
-at com.mojang.brigadier.context.ContextChain.runExecutable(ContextChain.java:73) ~[brigadier-1.3.10.jar:?]
-at net.minecraft.commands.execution.tasks.ExecuteCommand.execute(ExecuteCommand.java:30) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.commands.execution.tasks.ExecuteCommand.execute(ExecuteCommand.java:13) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.commands.execution.UnboundEntryAction.lambda$bind$0(UnboundEntryAction.java:8) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.commands.execution.CommandQueueEntry.execute(CommandQueueEntry.java:5) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.commands.execution.ExecutionContext.runCommandQueue(ExecutionContext.java:104) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.commands.Commands.executeCommandInContext(Commands.java:470) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.commands.Commands.performCommand(Commands.java:378) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.commands.Commands.performCommand(Commands.java:366) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.network.ServerGamePacketListenerImpl.performUnsignedChatCommand(ServerGamePacketListenerImpl.java:2405) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.network.ServerGamePacketListenerImpl.lambda$handleChatCommand$0(ServerGamePacketListenerImpl.java:2378) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.TickTask.run(TickTask.java:18) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.util.thread.BlockableEventLoop.doRunTask(BlockableEventLoop.java:207) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.util.thread.ReentrantBlockableEventLoop.doRunTask(ReentrantBlockableEventLoop.java:24) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.doRunTask(MinecraftServer.java:1535) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.doRunTask(MinecraftServer.java:192) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.util.thread.BlockableEventLoop.pollTask(BlockableEventLoop.java:182) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.pollTaskInternal(MinecraftServer.java:1515) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.pollTask(MinecraftServer.java:1509) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.recordTaskExecutionTimeWhileWaiting(MinecraftServer.java:1239) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:1355) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.lambda$spin$0(MinecraftServer.java:303) ~[paper-26.2.jar:26.2-65-fc9375a]
-at java.base/java.lang.Thread.run(Thread.java:1474) ~[?:?]
-Caused by: java.lang.UnsupportedOperationException
-at java.base/java.util.ImmutableCollections.uoe(ImmutableCollections.java:159) ~[?:?]
-at java.base/java.util.ImmutableCollections$AbstractImmutableList.set(ImmutableCollections.java:281) ~[?:?]
-at java.base/java.util.Collections.swap(Collections.java:525) ~[?:?]
-at java.base/java.util.Collections.shuffle(Collections.java:486) ~[?:?]
-at java.base/java.util.Collections.shuffle(Collections.java:454) ~[?:?]
-at omgames-0.8.2.jar//krispasi.omGames.hallsofcarnage.HallsExplorationGenerator.caveCorridorCells(HallsExplorationGenerator.java:469) ~[?:?]
-at omgames-0.8.2.jar//krispasi.omGames.hallsofcarnage.HallsExplorationGenerator.rememberCorridor(HallsExplorationGenerator.java:440) ~[?:?]
-at omgames-0.8.2.jar//krispasi.omGames.hallsofcarnage.HallsExplorationGenerator.addFirstRoom(HallsExplorationGenerator.java:137) ~[?:?]
-at omgames-0.8.2.jar//krispasi.omGames.hallsofcarnage.HallsExplorationGenerator.generate(HallsExplorationGenerator.java:85) ~[?:?]
-at omgames-0.8.2.jar//krispasi.omGames.hallsofcarnage.HallsExplorationGenerator.generate(HallsExplorationGenerator.java:75) ~[?:?]
-at omgames-0.8.2.jar//krispasi.omGames.hallsofcarnage.HallsSession.buildExplorationRooms(HallsSession.java:465) ~[?:?]
-at omgames-0.8.2.jar//krispasi.omGames.hallsofcarnage.HallsSession.buildExplorationFloor(HallsSession.java:440) ~[?:?]
-at omgames-0.8.2.jar//krispasi.omGames.hallsofcarnage.HallsSession.forceBuildFloor(HallsSession.java:272) ~[?:?]
-at omgames-0.8.2.jar//krispasi.omGames.hallsofcarnage.HallsOfCarnageManager.forceSessionFloor(HallsOfCarnageManager.java:501) ~[?:?]
-at omgames-0.8.2.jar//krispasi.omGames.hallsofcarnage.HallsOfCarnageCommand.onCommand(HallsOfCarnageCommand.java:97) ~[?:?]
-at org.bukkit.command.PluginCommand.execute(PluginCommand.java:45) ~[paper-api-26.2.build.65-beta.jar:?]
-... 24 more
+For next slice:
+- Save the current frozen halls corridor generation as a new large_corridors generation
+- Rework frozen halls generation, make it so its more winding and natural, like cave tunnels
+- Save the current deep crypt corridor generation as a new open_halls generation
+- Rework deep-crypt generation to be more grid-locked, corridors still 3 blocks wide, but no diagonals, just straight grid-locked maze. Also make it so each room has as big entrances as possible (aka, if corridor is going around a room, fully open the wall)
+- The generation is quite taxing on the server, make it so once the elevator starts running, its starts generating asynchrnously over more ticks and wait until its finish to load it. Add a loading percentage to the UI above hotbar.
