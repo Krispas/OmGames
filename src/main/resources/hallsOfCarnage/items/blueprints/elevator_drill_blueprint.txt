@@ -1,0 +1,9 @@
+id: elevator_drill_blueprint
+name: "Rare Blueprint: Elevator Drill"
+category: blueprint
+rarity: rare
+material: PAPER
+item-model: om:hoc_rare_blueprint
+max-stack-size: 1
+lore:
+  - "Unlocks future floor-skip camp construction."

@@ -1,0 +1,9 @@
+id: grindstone_blueprint
+name: "Rare Blueprint: Grindstone"
+category: blueprint
+rarity: rare
+material: PAPER
+item-model: om:hoc_rare_blueprint
+max-stack-size: 1
+lore:
+  - "Unlocks future camp gear upgrading."

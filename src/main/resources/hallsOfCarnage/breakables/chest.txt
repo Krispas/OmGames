@@ -1,0 +1,27 @@
+id: chest
+break-message: "You smashed a rotting chest."
+hitbox-height: 1.0
+particle-material: CHEST
+parts:
+  - material: CHEST
+    offset: [0, 0, 0]
+loot:
+  - item: wood_scrap
+    weight: 30
+  - item: iron_scrap
+    weight: 20
+  - item: redstone_scrap
+    weight: 12
+  - item: diamond_scrap
+    weight: 8
+  - item: coin
+    weight: 25
+    amount: 1-4
+  - item: blueprint
+    weight: 8
+  - item: weapon
+    weight: 6
+  - item: armor
+    weight: 5
+  - item: utility
+    weight: 4

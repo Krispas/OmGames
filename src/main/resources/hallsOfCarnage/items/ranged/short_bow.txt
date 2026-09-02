@@ -1,0 +1,15 @@
+id: short_bow
+name: "Short Bow"
+category: ranged
+rarity: normal
+material: BOW
+max-stack-size: 1
+lore:
+  - "Compact, simple, and quick to draw."
+stats:
+  ranged-damage: 4
+  draw-speed: 1.1
+  durability: 50
+recipe:
+  wood_scrap: 6
+  iron_scrap: 2

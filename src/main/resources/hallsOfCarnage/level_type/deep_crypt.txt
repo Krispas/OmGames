@@ -1,0 +1,44 @@
+id: deep_crypt
+name: "Deep Crypt"
+corridor-generation: maze
+materials:
+  floor: SMOOTH_SANDSTONE
+  ceiling: CHISELED_SANDSTONE
+  corridor-floor: CUT_SANDSTONE
+  corridor-ceiling: CHISELED_SANDSTONE
+  light: OCHRE_FROGLIGHT
+wall-palettes:
+  sandstone:
+    block: SANDSTONE
+    special-block: CHISELED_SANDSTONE
+    special-chance: 0.08
+  red_sandstone:
+    block: RED_SANDSTONE
+    special-block: CHISELED_RED_SANDSTONE
+    special-chance: 0.06
+pillar-palettes:
+  cut_sandstone:
+    block: CUT_SANDSTONE
+    special-block: CHISELED_SANDSTONE
+    special-chance: 0.10
+monsters:
+  common:
+    - husk
+    - skeleton
+  special:
+    - breeze
+modifiers:
+  shared:
+    - free
+    - double_coins
+    - less_enemies
+    - more_enemies
+    - more_traps
+    - less_loot
+    - more_sculk
+    - special_enemy
+    - more_rooms
+    - longer_corridors
+    - death_fog
+  unique:
+    - poison_darts

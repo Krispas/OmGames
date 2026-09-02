@@ -1,0 +1,15 @@
+id: chair
+break-message: "You kicked apart a wooden chair."
+hitbox-height: 1.0
+particle-material: OAK_STAIRS
+parts:
+  - material: OAK_STAIRS
+    offset: [0, 0, 0]
+loot:
+  - item: wood_scrap
+    weight: 75
+  - item: iron_scrap
+    weight: 10
+  - item: coin
+    weight: 10
+    amount: 1-2

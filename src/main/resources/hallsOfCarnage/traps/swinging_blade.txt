@@ -1,0 +1,11 @@
+id: swinging_blade
+kind: swinging_blade
+weight: 3
+block-material: IRON_BARS
+model-material: IRON_SWORD
+item-model: ""
+model-scale: 1.4
+damage: 5
+radius: 1.15
+interval-ticks: 60
+active-ticks: 16

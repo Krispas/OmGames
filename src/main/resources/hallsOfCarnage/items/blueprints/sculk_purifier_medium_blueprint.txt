@@ -1,0 +1,9 @@
+id: sculk_purifier_medium_blueprint
+name: "Rare Blueprint: Medium Sculk Purifier"
+category: blueprint
+rarity: rare
+material: PAPER
+item-model: om:hoc_rare_blueprint
+max-stack-size: 1
+lore:
+  - "Unlocks future medium sculk suppression."

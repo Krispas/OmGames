@@ -1,0 +1,15 @@
+id: warding_totem
+name: "Warding Totem"
+category: utility
+rarity: rare
+material: TOTEM_OF_UNDYING
+item-model: om:hoc_warding_totem
+max-stack-size: 1
+lore:
+  - "A rare charm for future defensive systems."
+stats:
+  cooldown-seconds: 120
+  ward-strength: 2
+recipe:
+  diamond_scrap: 4
+  redstone_scrap: 8

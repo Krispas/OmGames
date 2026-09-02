@@ -1,0 +1,8 @@
+id: weapon_bench_blueprint
+name: "Blueprint: Weapon Bench"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Unlocks camp weapon crafting."

@@ -1,2 +1,41 @@
-Should contain stuff like what blocks are ont he walls, what are on corners. If there is a block pallete instead of a normal block.
-Monsters, and so on refer to the main doc
+id: howling_corridors
+name: "Howling Corridors"
+corridor-generation: normal
+materials:
+  floor: PACKED_MUD
+  ceiling: TUFF_BRICKS
+  corridor-floor: PACKED_MUD
+  corridor-ceiling: DEEPSLATE_BRICKS
+  light: SEA_LANTERN
+wall-palettes:
+  deepslate_bricks:
+    block: DEEPSLATE_BRICKS
+    special-block: DEEPSLATE
+    special-chance: 0.08
+  cobbled_deepslate:
+    block: COBBLED_DEEPSLATE
+    special-block: DEEPSLATE
+    special-chance: 0.08
+pillar-palettes:
+  reinforced_deepslate:
+    block: REINFORCED_DEEPSLATE
+    special-chance: 0.0
+monsters:
+  common:
+    - zombie
+    - skeleton
+  special:
+    - warden
+modifiers:
+  shared:
+    - free
+    - double_coins
+    - less_enemies
+    - more_enemies
+    - more_traps
+    - less_loot
+    - more_sculk
+    - special_enemy
+    - more_rooms
+    - longer_corridors
+    - death_fog

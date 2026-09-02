@@ -1,0 +1,17 @@
+id: table
+break-message: "You splintered an old table."
+hitbox-height: 1.0
+particle-material: OAK_PLANKS
+parts:
+  - material: OAK_FENCE
+    offset: [0, 0, 0]
+  - material: OAK_PRESSURE_PLATE
+    offset: [0, 1, 0]
+loot:
+  - item: wood_scrap
+    weight: 70
+  - item: iron_scrap
+    weight: 10
+  - item: coin
+    weight: 15
+    amount: 1-2

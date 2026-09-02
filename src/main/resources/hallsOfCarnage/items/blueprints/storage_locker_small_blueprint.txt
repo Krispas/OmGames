@@ -1,0 +1,8 @@
+id: storage_locker_small_blueprint
+name: "Blueprint: Small Storage Locker"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Unlocks future small camp storage."

@@ -1,0 +1,18 @@
+id: storm_crossbow
+name: "Storm Crossbow"
+category: ranged
+rarity: rare
+material: CROSSBOW
+item-model: om:hoc_storm_crossbow
+max-stack-size: 1
+lore:
+  - "A rare crossbow wired with restless charge."
+stats:
+  ranged-damage: 7
+  draw-speed: 0.9
+  durability: 70
+  shock-chance-percent: 15
+recipe:
+  wood_scrap: 8
+  iron_scrap: 8
+  redstone_scrap: 6

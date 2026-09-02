@@ -1,0 +1,14 @@
+id: padded_armor
+name: "Padded Armor"
+category: armor
+rarity: normal
+material: LEATHER_CHESTPLATE
+max-stack-size: 1
+lore:
+  - "Better than entering the halls in cloth."
+stats:
+  armor: 3
+  durability: 60
+recipe:
+  wood_scrap: 4
+  iron_scrap: 3

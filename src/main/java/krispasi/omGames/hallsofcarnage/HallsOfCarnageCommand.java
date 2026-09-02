@@ -45,6 +45,13 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                 sendScenarios(sender);
                 return true;
             }
+            case "scenario" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                sendScenarioDebug(sender, args);
+                return true;
+            }
             case "sessions" -> {
                 sendSessions(sender);
                 return true;
@@ -80,11 +87,33 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                     result = manager.stopSession(args[1]);
                 }
             }
+            case "floor" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                if (args.length != 3) {
+                    result = HallsOfCarnageManager.Result.fail("Usage: /hoc floor <session_id> <floor>");
+                } else {
+                    result = manager.forceSessionFloor(args[1], args[2]);
+                }
+            }
+            case "give" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                result = handleGive(sender, args);
+            }
             case "reload" -> {
                 if (!requireOp(sender)) {
                     return true;
                 }
                 result = manager.reload();
+            }
+            case "reset" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                result = manager.resetGameResources(args.length == 2 && args[1].equalsIgnoreCase("confirm"));
             }
             case "lobby" -> {
                 if (!requireOp(sender)) {
@@ -142,6 +171,24 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
         return manager.startScenario(initiator, args[1], players);
     }
 
+    private HallsOfCarnageManager.Result handleGive(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            return HallsOfCarnageManager.Result.fail("Only players can receive Halls items.");
+        }
+        if (args.length < 2 || args.length > 3) {
+            return HallsOfCarnageManager.Result.fail("Usage: /hoc give <item> [amount]");
+        }
+        int amount = 1;
+        if (args.length == 3) {
+            Integer parsed = parseInt(args[2]);
+            if (parsed == null || parsed <= 0) {
+                return HallsOfCarnageManager.Result.fail("Amount must be a positive whole number.");
+            }
+            amount = parsed;
+        }
+        return manager.giveItem(player, args[1], amount);
+    }
+
     private void handleShame(CommandSender sender, String[] args) {
         if (args.length == 1) {
             if (!(sender instanceof Player player)) {
@@ -184,7 +231,39 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
             sender.sendMessage(Component.text("- " + scenario.id() + " (" + scenario.name() + ", "
                     + scenario.floorCount() + " floors, " + scenario.minPlayers() + "-" + scenario.maxPlayers()
                     + " players)", NamedTextColor.YELLOW));
+            for (HallsScenario.FloorDefinition floor : scenario.floors()) {
+                sender.sendMessage(Component.text("  " + floorLabel(floor) + ": " + floor.kind()
+                        + ", " + floor.levelType() + ", rooms " + floor.rooms(), NamedTextColor.GRAY));
+                if (floor.trappedRooms() > 0 || floor.holes() > 0) {
+                    sender.sendMessage(Component.text("    traps: " + floor.trappedRooms() + " rooms, "
+                            + floor.minTrapsPerRoom() + "-" + floor.maxTrapsPerRoom()
+                            + " per room; holes " + floor.holes(), NamedTextColor.DARK_GRAY));
+                }
+            }
         }
+    }
+
+    private void sendScenarioDebug(CommandSender sender, String[] args) {
+        if (args.length != 2) {
+            sender.sendMessage(Component.text("Usage: /hoc scenario <scenario>", NamedTextColor.RED));
+            return;
+        }
+        HallsScenario scenario = manager.getScenario(args[1]);
+        if (scenario == null) {
+            sender.sendMessage(Component.text("Unknown Halls scenario: " + args[1] + ".", NamedTextColor.RED));
+            return;
+        }
+        sender.sendMessage(Component.text("Parsed Halls scenario debug: " + scenario.id(), NamedTextColor.GOLD));
+        for (String line : scenario.debugLines()) {
+            sender.sendMessage(Component.text(line, NamedTextColor.GRAY));
+        }
+    }
+
+    private String floorLabel(HallsScenario.FloorDefinition floor) {
+        if (floor.firstFloor() == floor.lastFloor()) {
+            return "floor " + floor.firstFloor();
+        }
+        return "floors " + floor.firstFloor() + "-" + floor.lastFloor();
     }
 
     private void sendLeaderboard(CommandSender sender) {
@@ -212,7 +291,9 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
         for (HallsSession session : sessions) {
             HallsConfig.BlockPoint origin = session.origin();
             sender.sendMessage(Component.text("- " + session.id() + ": " + session.scenario().name()
-                    + " (" + session.participants().size() + " players, origin "
+                    + " (floor " + session.currentFloor() + ", " + session.activeLevelTypeId()
+                    + ", rooms " + session.activeGeneratedRooms() + "/" + session.activeTargetRooms()
+                    + ", " + session.participants().size() + " players, origin "
                     + origin.x() + " " + origin.y() + " " + origin.z() + ")", NamedTextColor.YELLOW));
         }
     }
@@ -234,13 +315,22 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
     }
 
     private Component usage() {
-        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc sessions | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload", NamedTextColor.YELLOW);
+        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc give <item> [amount] | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload | /hoc reset confirm", NamedTextColor.YELLOW);
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(args[0], "menu", "scenarios", "sessions", "top", "shame", "tp", "start", "stop", "lobby", "reload");
+            return filter(args[0], "menu", "scenarios", "scenario", "sessions", "top", "shame", "tp", "start", "stop", "floor", "give", "lobby", "reload", "reset");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("give")) {
+            return filter(args[1], manager.getItemIds().toArray(String[]::new));
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
+            return filter(args[1], "confirm");
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("scenario")) {
+            return filter(args[1], manager.getScenarios().stream().map(HallsScenario::id).toArray(String[]::new));
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("start")) {
             return filter(args[1], manager.getScenarios().stream().map(HallsScenario::id).toArray(String[]::new));
@@ -259,6 +349,25 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
             options.add("*");
             options.addAll(manager.getActiveSessions().stream().map(session -> Integer.toString(session.id())).toList());
             return filter(args[1], options.toArray(String[]::new));
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("floor")) {
+            return filter(args[1], manager.getActiveSessions().stream()
+                    .map(session -> Integer.toString(session.id()))
+                    .toArray(String[]::new));
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("floor")) {
+            HallsSession session = manager.getActiveSessions().stream()
+                    .filter(candidate -> Integer.toString(candidate.id()).equals(args[1]))
+                    .findFirst()
+                    .orElse(null);
+            if (session == null) {
+                return List.of();
+            }
+            List<String> floors = new ArrayList<>();
+            for (int floor = 1; floor <= session.scenario().floorCount(); floor++) {
+                floors.add(Integer.toString(floor));
+            }
+            return filter(args[2], floors.toArray(String[]::new));
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("shame")) {
             return filter(args[1], "set", "add");

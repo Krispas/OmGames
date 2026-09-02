@@ -1,0 +1,8 @@
+id: storage_locker_medium_blueprint
+name: "Blueprint: Medium Storage Locker"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Unlocks future medium camp storage."

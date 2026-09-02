@@ -1,0 +1,44 @@
+id: frozen_halls
+name: "Frozen Halls"
+corridor-generation: cave
+materials:
+  floor: PACKED_ICE
+  ceiling: BLUE_ICE
+  corridor-floor: PACKED_ICE
+  corridor-ceiling: BLUE_ICE
+  light: PEARLESCENT_FROGLIGHT
+wall-palettes:
+  ice_bricks:
+    block: POLISHED_DIORITE
+    special-block: PRISMARINE
+    special-chance: 0.10
+  frozen_stone:
+    block: TUFF_BRICKS
+    special-block: BLUE_ICE
+    special-chance: 0.06
+pillar-palettes:
+  packed_ice:
+    block: PACKED_ICE
+    special-block: BLUE_ICE
+    special-chance: 0.12
+monsters:
+  common:
+    - stray
+    - zombie
+  special:
+    - bogged
+modifiers:
+  shared:
+    - free
+    - double_coins
+    - less_enemies
+    - more_enemies
+    - more_traps
+    - less_loot
+    - more_sculk
+    - special_enemy
+    - more_rooms
+    - longer_corridors
+    - death_fog
+  unique:
+    - falling_ice

@@ -13,11 +13,34 @@ allowed-items:
     - iron
     - diamond
     - redstone
-  gear:
+  weapon:
     - rusty_sword
     - miner_pick
+    - echo_blade
+  ranged:
     - short_bow
+    - storm_crossbow
+  armor:
     - padded_armor
+    - reinforced_chestplate
+  utility:
+    - smoke_bomb
+    - warding_totem
+  blueprint:
+    - cooking_pot_blueprint
+    - weapon_bench_blueprint
+    - armory_blueprint
+    - grindstone_blueprint
+    - storage_locker_small_blueprint
+    - storage_locker_medium_blueprint
+    - storage_locker_large_blueprint
+    - elevator_drill_blueprint
+    - scanner_blueprint
+    - bounty_board_blueprint
+    - mycelia_farm_blueprint
+    - sculk_purifier_small_blueprint
+    - sculk_purifier_medium_blueprint
+    - sculk_purifier_large_blueprint
   buildings:
     - cooking_pot
     - weapon_bench
@@ -33,19 +56,65 @@ allowed-items:
     - sculk_purifier_small
     - sculk_purifier_medium
     - sculk_purifier_large
+blueprint-pools:
+  normal:
+    - cooking_pot_blueprint
+    - weapon_bench_blueprint
+    - armory_blueprint
+    - storage_locker_small_blueprint
+    - storage_locker_medium_blueprint
+    - mycelia_farm_blueprint
+    - scanner_blueprint
+  rare:
+    - grindstone_blueprint
+    - storage_locker_large_blueprint
+    - elevator_drill_blueprint
+    - bounty_board_blueprint
+    - sculk_purifier_small_blueprint
+    - sculk_purifier_medium_blueprint
+    - sculk_purifier_large_blueprint
 floors:
   - number: 1
     kind: start
     level-type: howling_corridors
     difficulty: 5
     layout: special/start_floor.txt
-  - number: 2-4
+  - number: 2
     kind: exploration
     level-type: howling_corridors
     difficulty: 10
-    rooms: 8
+    rooms: 16
     items: 8
     breakables: 24
+    traps: 7
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 5
+  - number: 3
+    kind: exploration
+    level-type: frozen_halls
+    difficulty: 10
+    rooms: 16
+    items: 8
+    breakables: 24
+    traps: 8
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 8
+  - number: 4
+    kind: exploration
+    level-type: deep_crypt
+    difficulty: 10
+    rooms: 16
+    items: 8
+    breakables: 24
+    traps: 8
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 8
   - number: 5
     kind: camp
     level-type: howling_corridors
@@ -58,9 +127,14 @@ floors:
     kind: exploration
     level-type: howling_corridors
     difficulty: 18
-    rooms: 10
+    rooms: 20
     items: 10
     breakables: 32
+    traps: 7
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 2
   - number: 10
     kind: camp
     level-type: frozen_halls
@@ -73,9 +147,14 @@ floors:
     kind: exploration
     level-type: deep_crypt
     difficulty: "20 + floor"
-    rooms: 12
+    rooms: 24
     items: 12
     breakables: 40
+    traps: 9
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 3
     camp-every: 5
   - number: 50
     kind: combat

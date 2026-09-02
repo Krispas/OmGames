@@ -1,0 +1,8 @@
+id: mycelia_farm_blueprint
+name: "Blueprint: Mycelia Farm"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Unlocks future free food growth."

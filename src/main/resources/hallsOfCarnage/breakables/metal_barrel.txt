@@ -1,0 +1,29 @@
+id: metal_barrel
+break-message: "You dented open a metal barrel."
+hitbox-height: 1.0
+particle-material: CAULDRON
+parts:
+  - material: CAULDRON
+    offset: [0, 0, 0]
+  - material: HEAVY_WEIGHTED_PRESSURE_PLATE
+    offset: [0, 1, 0]
+loot:
+  - item: iron_scrap
+    weight: 35
+  - item: diamond_scrap
+    weight: 16
+  - item: redstone_scrap
+    weight: 22
+  - item: blueprint
+    weight: 10
+  - item: coin
+    weight: 22
+    amount: 2-5
+  - item: rare_weapon
+    weight: 4
+  - item: rare_armor
+    weight: 3
+  - item: rare_utility
+    weight: 3
+  - item: rare_blueprint
+    weight: 3

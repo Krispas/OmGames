@@ -1,0 +1,9 @@
+id: hole
+kind: hole
+weight: 3
+hole:
+  min-size: 5
+  max-size: 15
+  depth: 10
+bridge-material: SPRUCE_PLANKS
+damage: 200
