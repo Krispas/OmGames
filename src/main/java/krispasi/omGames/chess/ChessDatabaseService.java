@@ -98,10 +98,16 @@ public final class ChessDatabaseService {
               visualize_movement_check INTEGER NOT NULL,
               do_endgame_checks INTEGER NOT NULL,
               show_annotation INTEGER NOT NULL,
+              figure_style TEXT NOT NULL DEFAULT 'default',
               turn TEXT NOT NULL,
               move_count INTEGER NOT NULL,
               undo_count INTEGER NOT NULL,
               redo_count INTEGER NOT NULL,
+              timer_enabled INTEGER NOT NULL DEFAULT 0,
+              white_timer_millis INTEGER NOT NULL DEFAULT 0,
+              black_timer_millis INTEGER NOT NULL DEFAULT 0,
+              check_bonus_millis INTEGER NOT NULL DEFAULT 0,
+              turn_started_millis INTEGER NOT NULL DEFAULT 0,
               en_passant_square TEXT,
               en_passant_pawn_id TEXT,
               white_king_moved INTEGER NOT NULL,
@@ -148,7 +154,12 @@ public final class ChessDatabaseService {
             boolean blackKingsideRookMoved,
             boolean blackQueensideRookMoved,
             List<StoredPiece> pieces,
-            String pendingPromotion
+            String pendingPromotion,
+            boolean timerEnabled,
+            long whiteTimerMillis,
+            long blackTimerMillis,
+            long checkBonusMillis,
+            long turnStartedMillis
     ) {
     }
 
@@ -181,6 +192,12 @@ public final class ChessDatabaseService {
                 statement.execute(ACTIVE_MATCH_STATE_SQL);
             }
             ensureMatchColumn("show_annotation", "INTEGER NOT NULL DEFAULT 0");
+            ensureActiveMatchColumn("figure_style", "TEXT NOT NULL DEFAULT 'default'");
+            ensureActiveMatchColumn("timer_enabled", "INTEGER NOT NULL DEFAULT 0");
+            ensureActiveMatchColumn("white_timer_millis", "INTEGER NOT NULL DEFAULT 0");
+            ensureActiveMatchColumn("black_timer_millis", "INTEGER NOT NULL DEFAULT 0");
+            ensureActiveMatchColumn("check_bonus_millis", "INTEGER NOT NULL DEFAULT 0");
+            ensureActiveMatchColumn("turn_started_millis", "INTEGER NOT NULL DEFAULT 0");
         } catch (SQLException ex) {
             logger.log(Level.SEVERE, "Failed to load Chess database tables.", ex);
         }
@@ -300,10 +317,16 @@ public final class ChessDatabaseService {
                   visualize_movement_check,
                   do_endgame_checks,
                   show_annotation,
+                  figure_style,
                   turn,
                   move_count,
                   undo_count,
                   redo_count,
+                  timer_enabled,
+                  white_timer_millis,
+                  black_timer_millis,
+                  check_bonus_millis,
+                  turn_started_millis,
                   en_passant_square,
                   en_passant_pawn_id,
                   white_king_moved,
@@ -314,7 +337,7 @@ public final class ChessDatabaseService {
                   black_queenside_rook_moved,
                   pieces,
                   pending_promotion
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             ChessMatchRuntime.BoardContext board = state.board();
@@ -332,20 +355,26 @@ public final class ChessDatabaseService {
             statement.setInt(12, state.settings().visualizeMovementCheck() ? 1 : 0);
             statement.setInt(13, state.settings().doEndgameChecks() ? 1 : 0);
             statement.setInt(14, state.settings().showAnnotation() ? 1 : 0);
-            statement.setString(15, state.turn().key());
-            statement.setInt(16, state.moveCount());
-            statement.setInt(17, state.undoCount());
-            statement.setInt(18, state.redoCount());
-            statement.setString(19, state.enPassantSquare() == null ? null : state.enPassantSquare().notation());
-            statement.setString(20, state.enPassantPawnId() == null ? null : state.enPassantPawnId().toString());
-            statement.setInt(21, state.whiteKingMoved() ? 1 : 0);
-            statement.setInt(22, state.blackKingMoved() ? 1 : 0);
-            statement.setInt(23, state.whiteKingsideRookMoved() ? 1 : 0);
-            statement.setInt(24, state.whiteQueensideRookMoved() ? 1 : 0);
-            statement.setInt(25, state.blackKingsideRookMoved() ? 1 : 0);
-            statement.setInt(26, state.blackQueensideRookMoved() ? 1 : 0);
-            statement.setString(27, serializePieces(state.pieces()));
-            statement.setString(28, state.pendingPromotion());
+            statement.setString(15, state.settings().figureStyle().name().toLowerCase());
+            statement.setString(16, state.turn().key());
+            statement.setInt(17, state.moveCount());
+            statement.setInt(18, state.undoCount());
+            statement.setInt(19, state.redoCount());
+            statement.setInt(20, state.timerEnabled() ? 1 : 0);
+            statement.setLong(21, state.whiteTimerMillis());
+            statement.setLong(22, state.blackTimerMillis());
+            statement.setLong(23, state.checkBonusMillis());
+            statement.setLong(24, state.turnStartedMillis());
+            statement.setString(25, state.enPassantSquare() == null ? null : state.enPassantSquare().notation());
+            statement.setString(26, state.enPassantPawnId() == null ? null : state.enPassantPawnId().toString());
+            statement.setInt(27, state.whiteKingMoved() ? 1 : 0);
+            statement.setInt(28, state.blackKingMoved() ? 1 : 0);
+            statement.setInt(29, state.whiteKingsideRookMoved() ? 1 : 0);
+            statement.setInt(30, state.whiteQueensideRookMoved() ? 1 : 0);
+            statement.setInt(31, state.blackKingsideRookMoved() ? 1 : 0);
+            statement.setInt(32, state.blackQueensideRookMoved() ? 1 : 0);
+            statement.setString(33, serializePieces(state.pieces()));
+            statement.setString(34, state.pendingPromotion());
             statement.executeUpdate();
         } catch (SQLException ex) {
             logger.log(Level.WARNING, "Failed to save active Chess match state.", ex);
@@ -378,6 +407,7 @@ public final class ChessDatabaseService {
                 settings.setVisualizeMovementCheck(resultSet.getInt("visualize_movement_check") != 0);
                 settings.setDoEndgameChecks(resultSet.getInt("do_endgame_checks") != 0);
                 settings.setShowAnnotation(resultSet.getInt("show_annotation") != 0);
+                settings.setFigureStyle(parseFigureStyle(resultSet.getString("figure_style")));
                 String enPassantPawnText = resultSet.getString("en_passant_pawn_id");
                 states.add(new ActiveMatchState(
                         resultSet.getLong("match_id"),
@@ -405,7 +435,12 @@ public final class ChessDatabaseService {
                         resultSet.getInt("black_kingside_rook_moved") != 0,
                         resultSet.getInt("black_queenside_rook_moved") != 0,
                         parsePieces(resultSet.getString("pieces")),
-                        resultSet.getString("pending_promotion")
+                        resultSet.getString("pending_promotion"),
+                        resultSet.getInt("timer_enabled") != 0,
+                        resultSet.getLong("white_timer_millis"),
+                        resultSet.getLong("black_timer_millis"),
+                        resultSet.getLong("check_bonus_millis"),
+                        resultSet.getLong("turn_started_millis")
                 ));
             }
         } catch (SQLException | IllegalArgumentException ex) {
@@ -474,27 +509,38 @@ public final class ChessDatabaseService {
         return boards;
     }
 
-    public BoardRef getMostRecentBoard() {
-        if (connection == null) {
-            return null;
-        }
-        String sql = "SELECT board_timestamp, world_name, origin_x, origin_y, origin_z FROM chess_boards ORDER BY board_timestamp DESC LIMIT 1";
-        try (PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
-            if (!resultSet.next()) {
-                return null;
+    public String nextBoardName(String worldName) {
+        int max = 0;
+        for (BoardRef board : getBoards()) {
+            if (worldName != null && board.worldName() != null && !worldName.equals(board.worldName())) {
+                continue;
             }
-            return new BoardRef(
-                    resultSet.getString("board_timestamp"),
-                    resultSet.getString("world_name"),
-                    resultSet.getInt("origin_x"),
-                    resultSet.getInt("origin_y"),
-                    resultSet.getInt("origin_z")
-            );
-        } catch (SQLException ex) {
-            logger.log(Level.WARNING, "Failed to load most recent Chess board.", ex);
+            try {
+                max = Math.max(max, Integer.parseInt(board.timestamp()));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return Integer.toString(max + 1);
+    }
+
+    public BoardRef getMostRecentBoard() {
+        List<BoardRef> boards = getBoards();
+        if (boards.isEmpty()) {
             return null;
         }
+        BoardRef highestNumeric = null;
+        int highest = Integer.MIN_VALUE;
+        for (BoardRef board : boards) {
+            try {
+                int value = Integer.parseInt(board.timestamp());
+                if (value > highest) {
+                    highest = value;
+                    highestNumeric = board;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return highestNumeric == null ? boards.getLast() : highestNumeric;
     }
 
     public BoardRef getBoard(String timestamp) {
@@ -1015,6 +1061,17 @@ public final class ChessDatabaseService {
         return null;
     }
 
+    private ChessSettings.FigureStyle parseFigureStyle(String key) {
+        if (key == null || key.isBlank()) {
+            return ChessSettings.FigureStyle.DEFAULT;
+        }
+        try {
+            return ChessSettings.FigureStyle.valueOf(key.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return ChessSettings.FigureStyle.DEFAULT;
+        }
+    }
+
     private String booleanDigit(boolean value) {
         return value ? "1" : "0";
     }
@@ -1097,6 +1154,15 @@ public final class ChessDatabaseService {
         }
         try (Statement statement = connection.createStatement()) {
             statement.execute("ALTER TABLE chess_matches ADD COLUMN " + columnName + " " + definition);
+        }
+    }
+
+    private void ensureActiveMatchColumn(String columnName, String definition) throws SQLException {
+        if (hasColumn("chess_active_match_state", columnName)) {
+            return;
+        }
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE chess_active_match_state ADD COLUMN " + columnName + " " + definition);
         }
     }
 

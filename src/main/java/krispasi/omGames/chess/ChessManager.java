@@ -36,7 +36,7 @@ public final class ChessManager {
             runtime.openStorage();
             runtime.restoreActiveMatchState(state);
             if (runtime.isMatchActive()) {
-                activeMatches.put(runtime.activeMatchStartedAt(), runtime);
+                activeMatches.put(runtime.matchCommandName(), runtime);
             } else {
                 runtime.shutdown();
             }
@@ -56,7 +56,20 @@ public final class ChessManager {
     }
 
     public Result resetBoard() {
-        return setupRuntime.resetBoard();
+        return resetBoard(null, null);
+    }
+
+    public Result resetBoard(org.bukkit.command.CommandSender sender, String boardName) {
+        String resolved = resolveBoardName(sender, boardName);
+        if (resolved == null) {
+            return Result.fail("No chess board is available.");
+        }
+        ChessMatchRuntime runtime = activeMatchByBoard(resolved);
+        if (runtime != null) {
+            runtime.cancelMatch(runtime.matchCommandName());
+            activeMatches.remove(runtime.matchCommandName());
+        }
+        return setupRuntime.resetBoard(resolved);
     }
 
     public Result setPalette(Material lightBlock, Material darkBlock, Material highlightBlock) {
@@ -78,18 +91,20 @@ public final class ChessManager {
 
     public Result removeBoard(String timestamp) {
         if (timestamp == null || timestamp.isBlank()) {
-            return Result.fail("Usage: /chess board remove <timestamp|*>");
+            return Result.fail("Usage: /chess board remove <board|*>");
         }
         if (timestamp.equals("*")) {
             for (ChessMatchRuntime runtime : new ArrayList<>(activeMatches.values())) {
                 runtime.cancelMatch("*");
             }
             activeMatches.clear();
+            reapplyActivePlayerStates();
         } else {
-            ChessMatchRuntime runtime = activeMatchByBoard(timestamp);
+            ChessMatchRuntime runtime = activeMatchByIdentifier(timestamp);
             if (runtime != null) {
                 runtime.cancelMatch(timestamp);
-                activeMatches.remove(runtime.activeMatchStartedAt());
+                activeMatches.remove(runtime.matchCommandName());
+                reapplyActivePlayerStates();
             }
         }
         return setupRuntime.removeBoard(timestamp);
@@ -106,6 +121,10 @@ public final class ChessManager {
         return activeMatches.keySet().stream().toList();
     }
 
+    public List<String> getMatchLogTimestamps() {
+        return databaseService.getMatchLogTimestamps();
+    }
+
     public Result setTeam(ChessSide side, List<Player> players) {
         return setupRuntime.setTeam(side, players);
     }
@@ -114,21 +133,40 @@ public final class ChessManager {
         return startMatch(null);
     }
 
+    public Result startMatch(org.bukkit.command.CommandSender sender, String boardTimestamp) {
+        return startMatch(resolveBoardName(sender, boardTimestamp));
+    }
+
     public Result startMatch(String boardTimestamp) {
+        String resolvedBoardTimestamp = resolveBoardTimestamp(boardTimestamp);
+        if (resolvedBoardTimestamp == null) {
+            return Result.fail(boardTimestamp == null || boardTimestamp.isBlank()
+                    ? "No chess board is available. Build one with /chess board build <x> <y> <z>."
+                    : "No chess board exists for timestamp " + boardTimestamp + ".");
+        }
+        ChessMatchRuntime activeOnBoard = activeMatchByBoard(resolvedBoardTimestamp);
+        if (activeOnBoard != null) {
+            return Result.fail("Chess board " + resolvedBoardTimestamp + " already has active match "
+                    + activeOnBoard.activeMatchStartedAt() + ".");
+        }
         ChessMatchRuntime runtime = new ChessMatchRuntime(plugin);
         runtime.openStorage();
         copyPendingSetupTo(runtime);
-        Result result = runtime.startMatch(boardTimestamp);
+        Result result = runtime.startMatch(resolvedBoardTimestamp);
         if (!result.success()) {
             runtime.shutdown();
             return result;
         }
-        activeMatches.put(runtime.activeMatchStartedAt(), runtime);
-        return Result.ok(result.message() + " Timestamp: " + runtime.activeMatchStartedAt() + ".");
+        activeMatches.put(runtime.matchCommandName(), runtime);
+        return Result.ok(result.message() + " Log: " + runtime.activeMatchStartedAt() + ".");
     }
 
     public Result enableTestMode() {
-        ChessMatchRuntime runtime = mostRecentActiveMatch();
+        return enableTestMode(null, null);
+    }
+
+    public Result enableTestMode(org.bukkit.command.CommandSender sender, String target) {
+        ChessMatchRuntime runtime = activeMatchByTarget(sender, target);
         if (runtime != null) {
             return runtime.enableTestMode();
         }
@@ -136,27 +174,44 @@ public final class ChessManager {
     }
 
     public Result setSetting(String settingKey, boolean value) {
+        return setSetting(null, null, settingKey, value);
+    }
+
+    public Result setSetting(org.bukkit.command.CommandSender sender, String target, String settingKey, boolean value) {
         if (activeMatches.isEmpty()) {
             return setupRuntime.setSetting(settingKey, value);
         }
-        ChessMatchRuntime runtime = mostRecentActiveMatch();
+        ChessMatchRuntime runtime = activeMatchByTarget(sender, target);
         return runtime == null ? setupRuntime.setSetting(settingKey, value) : runtime.setSetting(settingKey, value);
     }
 
     public Result setFigureStyle(String style) {
+        return setFigureStyle(null, null, style);
+    }
+
+    public Result setFigureStyle(org.bukkit.command.CommandSender sender, String target, String style) {
         if (activeMatches.isEmpty()) {
             return setupRuntime.setFigureStyle(style);
         }
-        ChessMatchRuntime runtime = mostRecentActiveMatch();
+        ChessMatchRuntime runtime = activeMatchByTarget(sender, target);
         return runtime == null ? setupRuntime.setFigureStyle(style) : runtime.setFigureStyle(style);
     }
 
     public Result setTimer(ChessTimerConfig timerConfig) {
-        ChessMatchRuntime runtime = mostRecentActiveMatch();
+        return setTimer(null, null, timerConfig);
+    }
+
+    public Result setTimer(org.bukkit.command.CommandSender sender, String target, ChessTimerConfig timerConfig) {
+        ChessMatchRuntime runtime = activeMatchByTarget(sender, target);
         if (runtime != null) {
             return runtime.setTimer(timerConfig);
         }
         return setupRuntime.setTimer(timerConfig);
+    }
+
+    public Result togglePause(Player player, String target) {
+        ChessMatchRuntime runtime = activeMatchByTarget(player, target);
+        return runtime == null ? Result.fail("No chess match is active for you.") : runtime.togglePause();
     }
 
     public Result printLog(org.bukkit.command.CommandSender sender, String timestamp) {
@@ -216,8 +271,16 @@ public final class ChessManager {
     }
 
     public Result cancelMatch(String timestamp) {
+        return cancelMatch(null, timestamp);
+    }
+
+    public Result cancelMatch(org.bukkit.command.CommandSender sender, String timestamp) {
         if (timestamp == null || timestamp.isBlank()) {
-            return Result.fail("Usage: /chess match cancel <timestamp|*>");
+            ChessMatchRuntime targeted = activeMatchByTarget(sender, null);
+            if (targeted == null) {
+                return Result.fail("No active chess match matched.");
+            }
+            timestamp = targeted.matchCommandName();
         }
         int active = 0;
         if (timestamp.equals("*")) {
@@ -227,18 +290,16 @@ public final class ChessManager {
             }
             activeMatches.clear();
         } else {
-            ChessMatchRuntime runtime = activeMatches.get(timestamp);
-            if (runtime == null) {
-                runtime = activeMatchByBoard(timestamp);
-            }
+            ChessMatchRuntime runtime = activeMatchByIdentifier(timestamp);
             if (runtime != null) {
                 runtime.cancelMatch(timestamp);
-                activeMatches.remove(runtime.activeMatchStartedAt());
+                activeMatches.remove(runtime.matchCommandName());
                 active = 1;
             }
         }
+        reapplyActivePlayerStates();
         int stored = databaseService.cancelUnfinishedMatches(timestamp, java.time.format.DateTimeFormatter
-                .ofPattern("yyyy.dd.MM-HH.mm.ss", Locale.ROOT)
+                .ofPattern("yy.dd.MM-HH.mm.ss", Locale.ROOT)
                 .format(java.time.LocalDateTime.now()));
         if (active == 0 && stored == 0) {
             return Result.fail("No active or unfinished chess match matched " + timestamp + ".");
@@ -321,12 +382,12 @@ public final class ChessManager {
     }
 
     public boolean handlePromotionInventoryClick(Player player, org.bukkit.inventory.Inventory inventory, int slot) {
-        ChessMatchRuntime runtime = activeMatchForPlayer(player);
+        ChessMatchRuntime runtime = activeMatchForPromotionInventory(inventory);
         return runtime != null && runtime.handlePromotionInventoryClick(player, inventory, slot);
     }
 
     public boolean handlePromotionInventoryClose(Player player, org.bukkit.inventory.Inventory inventory) {
-        ChessMatchRuntime runtime = activeMatchForPlayer(player);
+        ChessMatchRuntime runtime = activeMatchForPromotionInventory(inventory);
         return runtime != null && runtime.handlePromotionInventoryClose(player, inventory);
     }
 
@@ -350,12 +411,31 @@ public final class ChessManager {
             return null;
         }
         UUID playerId = player.getUniqueId();
+        ChessMatchRuntime nearestForPlayer = null;
+        double nearestDistance = Double.MAX_VALUE;
         for (ChessMatchRuntime runtime : activeMatches.values()) {
             if (runtime.hasPlayer(playerId)) {
+                double distance = runtime.distanceSquaredToBoard(player);
+                if (distance < nearestDistance) {
+                    nearestDistance = distance;
+                    nearestForPlayer = runtime;
+                }
+            }
+        }
+        return nearestForPlayer == null ? mostRecentActiveMatch() : nearestForPlayer;
+    }
+
+    private ChessMatchRuntime activeMatchForPromotionInventory(org.bukkit.inventory.Inventory inventory) {
+        purgeInactiveMatches();
+        if (inventory == null) {
+            return null;
+        }
+        for (ChessMatchRuntime runtime : activeMatches.values()) {
+            if (runtime.ownsPromotionInventory(inventory)) {
                 return runtime;
             }
         }
-        return mostRecentActiveMatch();
+        return null;
     }
 
     private ChessMatchRuntime activeMatchByBoard(String boardTimestamp) {
@@ -368,6 +448,37 @@ public final class ChessManager {
         return null;
     }
 
+    private ChessMatchRuntime activeMatchByIdentifier(String identifier) {
+        purgeInactiveMatches();
+        if (identifier == null || identifier.isBlank()) {
+            return null;
+        }
+        ChessMatchRuntime runtime = activeMatches.get(identifier);
+        if (runtime != null) {
+            return runtime;
+        }
+        if (identifier.endsWith("ma")) {
+            runtime = activeMatches.get(identifier.substring(0, identifier.length() - 2) + "ma");
+            if (runtime != null) {
+                return runtime;
+            }
+            return activeMatchByBoard(identifier.substring(0, identifier.length() - 2));
+        }
+        return activeMatchByBoard(identifier);
+    }
+
+    private ChessMatchRuntime activeMatchByTarget(org.bukkit.command.CommandSender sender, String target) {
+        ChessMatchRuntime runtime = activeMatchByIdentifier(target);
+        if (runtime != null || target != null && !target.isBlank()) {
+            return runtime;
+        }
+        if (sender instanceof Player player && !sender.isOp()) {
+            return activeMatchForPlayer(player);
+        }
+        String boardName = resolveBoardName(sender, null);
+        return boardName == null ? mostRecentActiveMatch() : activeMatchByBoard(boardName);
+    }
+
     private ChessMatchRuntime mostRecentActiveMatch() {
         purgeInactiveMatches();
         ChessMatchRuntime last = null;
@@ -377,8 +488,71 @@ public final class ChessManager {
         return last;
     }
 
+    private String resolveBoardTimestamp(String boardTimestamp) {
+        if (boardTimestamp == null || boardTimestamp.isBlank()) {
+            ChessDatabaseService.BoardRef board = databaseService.getMostRecentBoard();
+            return board == null ? null : board.timestamp();
+        }
+        ChessDatabaseService.BoardRef board = databaseService.getBoard(boardTimestamp);
+        return board == null ? null : board.timestamp();
+    }
+
+    private String resolveBoardName(org.bukkit.command.CommandSender sender, String boardName) {
+        if (boardName != null && !boardName.isBlank()) {
+            return databaseService.getBoard(boardName) == null ? null : boardName;
+        }
+        if (sender instanceof Player player && sender.isOp()) {
+            ChessDatabaseService.BoardRef nearest = nearestBoard(player);
+            if (nearest != null) {
+                return nearest.timestamp();
+            }
+        }
+        ChessDatabaseService.BoardRef board = databaseService.getMostRecentBoard();
+        return board == null ? null : board.timestamp();
+    }
+
+    private ChessDatabaseService.BoardRef nearestBoard(Player player) {
+        ChessDatabaseService.BoardRef nearest = null;
+        double best = Double.MAX_VALUE;
+        for (ChessDatabaseService.BoardRef board : databaseService.getBoards()) {
+            if (player.getWorld() == null || !player.getWorld().getName().equals(board.worldName())) {
+                continue;
+            }
+            double dx = player.getLocation().getX() - (board.originX() + 8.0);
+            double dy = player.getLocation().getY() - board.originY();
+            double dz = player.getLocation().getZ() - (board.originZ() - 7.0);
+            double distance = dx * dx + dy * dy + dz * dz;
+            if (distance < best) {
+                best = distance;
+                nearest = board;
+            }
+        }
+        return nearest;
+    }
+
+    public boolean isOpponent(Player player) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerId = player.getUniqueId();
+        for (ChessMatchRuntime runtime : activeMatches.values()) {
+            if (runtime.hasPlayer(playerId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void purgeInactiveMatches() {
         activeMatches.entrySet().removeIf(entry -> !entry.getValue().isMatchActive());
+    }
+
+    private void reapplyActivePlayerStates() {
+        for (Player player : plugin.getServer().getOnlinePlayers()) {
+            for (ChessMatchRuntime runtime : activeMatches.values()) {
+                runtime.handleJoin(player);
+            }
+        }
     }
 
     private void copyPendingSetupTo(ChessMatchRuntime runtime) {

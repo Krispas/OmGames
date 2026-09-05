@@ -54,8 +54,7 @@ public final class ChessMatchRuntime {
     private static final float SQUARE_INTERACTION_WIDTH = 2.0f;
     private static final float SQUARE_INTERACTION_HEIGHT = 0.3f;
     private static final double CHESS_REACH = 16.0;
-    private static final DateTimeFormatter BOARD_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yy.dd.MM-HH.mm.ss", Locale.ROOT);
-    private static final DateTimeFormatter MATCH_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yyyy.dd.MM-HH.mm.ss", Locale.ROOT);
+    private static final DateTimeFormatter MATCH_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("yy.dd.MM-HH.mm.ss", Locale.ROOT);
     private static final DateTimeFormatter MOVE_TIMESTAMP_FORMAT = DateTimeFormatter.ofPattern("dd-HH.mm.ss", Locale.ROOT);
     private static final Transformation PIECE_TRANSFORMATION = new Transformation(
             new Vector3f(),
@@ -72,7 +71,7 @@ public final class ChessMatchRuntime {
     private static final Transformation FLAT_WHITE_TRANSFORMATION = new Transformation(
             new Vector3f(),
             new Quaternionf(0.0f, -0.7071068f, 0.7071068f, 0.0f),
-            new Vector3f(1.875f, 1.875f, 1.875f),
+            new Vector3f(1.8750004f, 1.875f, 1.8749976f),
             new Quaternionf()
     );
     private static final Transformation FLAT_BLACK_TRANSFORMATION = new Transformation(
@@ -126,6 +125,7 @@ public final class ChessMatchRuntime {
     private int timelineIndex = -1;
     private int captureSequence;
     private boolean reviewMode;
+    private boolean paused;
     private PendingPromotion pendingPromotion;
     private Inventory pendingPromotionInventory;
     private int timerTaskId = -1;
@@ -174,11 +174,15 @@ public final class ChessMatchRuntime {
         return boardContext == null ? null : boardContext.timestamp();
     }
 
+    public String matchCommandName() {
+        return boardContext == null ? null : boardContext.timestamp() + "ma";
+    }
+
     public boolean matchesIdentifier(String timestamp) {
         if (timestamp == null || timestamp.isBlank()) {
             return false;
         }
-        return timestamp.equals(activeMatchStartedAt) || timestamp.equals(boardTimestamp());
+        return timestamp.equals(activeMatchStartedAt) || timestamp.equals(matchCommandName()) || timestamp.equals(boardTimestamp());
     }
 
     public boolean hasPlayer(UUID playerId) {
@@ -187,6 +191,17 @@ public final class ChessMatchRuntime {
 
     public boolean hasEntityTimestamp(String timestamp) {
         return timestamp != null && timestamp.equals(boardTimestamp());
+    }
+
+    public double distanceSquaredToBoard(Player player) {
+        if (player == null || boardContext == null || player.getWorld() == null
+                || !player.getWorld().getName().equals(boardContext.worldName())) {
+            return Double.MAX_VALUE;
+        }
+        double dx = player.getLocation().getX() - (boardContext.originX() + 8.0);
+        double dy = player.getLocation().getY() - boardContext.originY();
+        double dz = player.getLocation().getZ() - (boardContext.originZ() - 7.0);
+        return dx * dx + dy * dy + dz * dz;
     }
 
     public void importSetupFrom(ChessMatchRuntime source) {
@@ -242,10 +257,32 @@ public final class ChessMatchRuntime {
         blackTimerMillis = timerConfig.initialMillis();
         checkBonusMillis = timerConfig.checkBonusMillis();
         turnStartedMillis = System.currentTimeMillis();
-        if (matchActive) {
+        if (matchActive && !paused) {
             startTimerTask();
         }
         return Result.ok("Chess timer set.");
+    }
+
+    public Result togglePause() {
+        if (!matchActive) {
+            return Result.fail("No chess match is active.");
+        }
+        paused = !paused;
+        if (paused) {
+            updateTimerBeforeTurnChange(turn);
+            stopTimerTask();
+            clearSelection();
+            setFigureDisplaysHidden(true);
+            saveActiveMatchState();
+            return Result.ok("Chess match " + matchCommandName() + " paused.");
+        }
+        turnStartedMillis = System.currentTimeMillis();
+        setFigureDisplaysHidden(false);
+        if (timerEnabled) {
+            startTimerTask();
+        }
+        saveActiveMatchState();
+        return Result.ok("Chess match " + matchCommandName() + " unpaused.");
     }
 
     public Result startMatch(String boardTimestamp) {
@@ -271,34 +308,46 @@ public final class ChessMatchRuntime {
         }
         clearSelection();
         clearBoardEntities();
-        boardContext = new BoardContext(currentBoardTimestamp(), world.getName(), x, y, z);
+        boardContext = new BoardContext(databaseService.nextBoardName(world.getName()), world.getName(), x, y, z);
         databaseService.saveBoard(boardContext);
         placeCheckerboard(List.of());
         spawnSquareInteractions();
         resetPiecesToStartingPosition(true);
         updateAnnotations();
-        return Result.ok("Chess board built at minecraft:" + BOARD_WORLD_NAME + " " + x + " " + y + " " + z
+        return Result.ok("Chess board " + boardContext.timestamp() + " built at minecraft:" + BOARD_WORLD_NAME + " " + x + " " + y + " " + z
                 + " with 64 board interactions, 32 piece interactions, and 32 item displays.");
     }
 
     public Result resetBoard() {
+        return resetBoard(null);
+    }
+
+    public Result resetBoard(String boardName) {
+        if (boardName != null && !boardName.isBlank()) {
+            ChessDatabaseService.BoardRef board = databaseService.getBoard(boardName);
+            if (board == null) {
+                return Result.fail("No chess board exists for name " + boardName + ".");
+            }
+            boardContext = new BoardContext(board.timestamp(), board.worldName(), board.originX(), board.originY(), board.originZ());
+        }
         if (boardContext == null) {
-            return Result.fail("Build a chess board first with /chess board build <x> <y> <z>.");
+            return Result.fail("Usage: /chess board reset <board>");
         }
         if (matchActive) {
             abortActiveMatch("Board reset");
         }
         clearSelection();
-        databaseService.deleteBoard(boardContext.timestamp());
+        loadBoardChunks(toBoardRef(boardContext));
+        clearBoardBlocks(toBoardRef(boardContext));
+        removeBoardEntities(boardContext.timestamp());
         clearBoardEntities();
-        boardContext = boardContext.withTimestamp(currentBoardTimestamp());
         databaseService.saveBoard(boardContext);
         placeCheckerboard(List.of());
         spawnSquareInteractions();
         resetPiecesToStartingPosition(true);
         updateAnnotations();
         clearMatchRuntime();
-        return Result.ok("Chess board reset to the starting position.");
+        return Result.ok("Chess board " + boardContext.timestamp() + " reset to the starting position.");
     }
 
     public Result setPalette(Material lightBlock, Material darkBlock, Material highlightBlock) {
@@ -369,10 +418,10 @@ public final class ChessMatchRuntime {
         applyPlayerRuntimeEffects();
         applyTurnGlow();
         turnStartedMillis = System.currentTimeMillis();
-        if (timerEnabled) {
+        if (timerEnabled && !paused) {
             startTimerTask();
         }
-        String startedAt = currentMatchTimestamp();
+        String startedAt = currentMatchLogName();
         activeMatchStartedAt = startedAt;
         matchId = databaseService.startMatch(
                 boardContext,
@@ -384,7 +433,7 @@ public final class ChessMatchRuntime {
         );
         saveActiveMatchState();
         String suffix = testMode ? " Test mode is active: logging is disabled and any player can move any piece." : "";
-        return Result.ok("Chess match started. White moves first." + suffix);
+        return Result.ok("Chess match " + matchCommandName() + " started. White moves first." + suffix);
     }
 
     public Result enableTestMode() {
@@ -433,7 +482,7 @@ public final class ChessMatchRuntime {
 
     public Result removeBoard(String timestamp) {
         if (timestamp == null || timestamp.isBlank()) {
-            return Result.fail("Usage: /chess board remove <timestamp|*>");
+            return Result.fail("Usage: /chess board remove <board|*>");
         }
         if (matchActive) {
             abortActiveMatch("Board removed");
@@ -668,15 +717,8 @@ public final class ChessMatchRuntime {
             player.sendMessage(Component.text("No chess match is active.", NamedTextColor.RED));
             return true;
         }
-        if (type.equals("promotion_choice")) {
-            String pieceIdText = container.get(pieceIdKey, PersistentDataType.STRING);
-            if (pieceIdText != null) {
-                try {
-                    handlePromotionChoiceClick(player, UUID.fromString(pieceIdText));
-                } catch (IllegalArgumentException ignored) {
-                    return true;
-                }
-            }
+        if (paused) {
+            player.sendMessage(Component.text("Chess match is paused.", NamedTextColor.RED));
             return true;
         }
         if (type.equals("piece")) {
@@ -709,7 +751,7 @@ public final class ChessMatchRuntime {
     }
 
     public boolean handleAirRightClick(Player player) {
-        if (player == null || selectedPieceId == null) {
+        if (player == null || selectedPieceId == null || paused) {
             return false;
         }
         ChessPiece selected = getPieceById(selectedPieceId);
@@ -725,6 +767,10 @@ public final class ChessMatchRuntime {
         return player != null && pendingPromotion != null && pendingPromotion.actorId().equals(player.getUniqueId());
     }
 
+    public boolean ownsPromotionInventory(Inventory inventory) {
+        return inventory != null && pendingPromotionInventory != null && inventory == pendingPromotionInventory;
+    }
+
     public boolean handlePromotionChat(Player player, String message) {
         if (!hasPendingPromotion(player)) {
             return false;
@@ -734,7 +780,7 @@ public final class ChessMatchRuntime {
             player.sendMessage(Component.text("Choose queen, rook, bishop, or horse for pawn promotion.", NamedTextColor.RED));
             return true;
         }
-        completePromotion(player, type, null);
+        completePromotion(player, type);
         return true;
     }
 
@@ -747,6 +793,9 @@ public final class ChessMatchRuntime {
                 applyPlayerRuntimeEffects(player);
             }
             applyTurnGlow();
+            if (paused) {
+                setFigureDisplaysHidden(true);
+            }
         }
     }
 
@@ -1234,6 +1283,7 @@ public final class ChessMatchRuntime {
             return;
         }
         clearSelection();
+        setFigureDisplaysHidden(false);
         matchActive = false;
         databaseService.finishMatch(
                 matchId,
@@ -1266,6 +1316,7 @@ public final class ChessMatchRuntime {
             return;
         }
         clearSelection();
+        setFigureDisplaysHidden(false);
         matchActive = false;
         if (!testMode) {
             databaseService.abortMatch(matchId, reason, currentMatchTimestamp());
@@ -1305,6 +1356,7 @@ public final class ChessMatchRuntime {
         reviewMode = false;
         pendingPromotion = null;
         pendingPromotionInventory = null;
+        paused = false;
         captureSequence = 0;
         drawVotes.clear();
         turn = ChessSide.WHITE;
@@ -1356,7 +1408,12 @@ public final class ChessMatchRuntime {
                 blackKingsideRookMoved,
                 blackQueensideRookMoved,
                 storedPieces(),
-                serializePendingPromotion()
+                serializePendingPromotion(),
+                timerEnabled,
+                whiteTimerMillis,
+                blackTimerMillis,
+                checkBonusMillis,
+                turnStartedMillis
         ));
     }
 
@@ -1407,9 +1464,15 @@ public final class ChessMatchRuntime {
         whiteQueensideRookMoved = state.whiteQueensideRookMoved();
         blackKingsideRookMoved = state.blackKingsideRookMoved();
         blackQueensideRookMoved = state.blackQueensideRookMoved();
+        timerEnabled = state.timerEnabled();
+        whiteTimerMillis = state.whiteTimerMillis();
+        blackTimerMillis = state.blackTimerMillis();
+        checkBonusMillis = state.checkBonusMillis();
+        turnStartedMillis = state.turnStartedMillis();
         matchActive = true;
         testMode = false;
         pendingTestMode = false;
+        paused = false;
         selectedPieceId = null;
         captureSequence = 0;
         for (ChessDatabaseService.StoredPiece storedPiece : state.pieces()) {
@@ -1451,6 +1514,13 @@ public final class ChessMatchRuntime {
             }
         }
         applyTurnGlow();
+        setFigureDisplaysHidden(paused);
+        if (timerEnabled) {
+            if (turnStartedMillis <= 0L) {
+                turnStartedMillis = System.currentTimeMillis();
+            }
+            startTimerTask();
+        }
         updateAnnotations();
         plugin.getLogger().info("Restored active Chess match " + activeMatchStartedAt + ".");
     }
@@ -1936,7 +2006,7 @@ public final class ChessMatchRuntime {
         if (settings.figureStyle() == ChessSettings.FigureStyle.FLAT) {
             return side.key() + "_" + type.key() + "_icon";
         }
-        return (side == ChessSide.BLACK ? "black_" : "") + type.key();
+        return (side == ChessSide.WHITE ? "white_" : "black_") + type.key();
     }
 
     private Transformation pieceTransformation(ChessPiece piece) {
@@ -2004,9 +2074,11 @@ public final class ChessMatchRuntime {
             entity.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
             entity.setShadowRadius(0.0f);
             entity.setShadowStrength(0.0f);
-            entity.setDisplayWidth(1.6f);
-            entity.setDisplayHeight(capturedDisplay.type().interactionHeight());
-            entity.setTransformation(CAPTURED_PIECE_TRANSFORMATION);
+            entity.setDisplayWidth(settings.figureStyle() == ChessSettings.FigureStyle.FLAT ? 2.0f : 1.6f);
+            entity.setDisplayHeight(settings.figureStyle() == ChessSettings.FigureStyle.FLAT
+                    ? 0.5f
+                    : capturedDisplay.type().interactionHeight());
+            entity.setTransformation(capturedPieceTransformation(capturedDisplay));
             entity.setItemStack(createPieceItem(capturedDisplay.side(), capturedDisplay.type(), false));
             entity.setRotation(yaw, 0.0f);
             tagEntity(entity, "captured_display", null, null);
@@ -2034,43 +2106,18 @@ public final class ChessMatchRuntime {
         World world = Bukkit.getWorld(boardContext.worldName());
         int column = index % BOARD_SIZE;
         int row = index / BOARD_SIZE;
-        double x = boardContext.originX() + 1.0 + column * 2.0;
+        double x = boardContext.originX() + 1.0 + column * 1.7;
         double z = side == ChessSide.WHITE
-                ? boardContext.originZ() + 6.0 + row * 2.0
-                : boardContext.originZ() - 20.0 - row * 2.0;
-        return new Location(world, x, boardContext.originY() + 1.875, z);
+                ? boardContext.originZ() + 6.0 + row * 1.7
+                : boardContext.originZ() - 20.0 - row * 1.7;
+        return new Location(world, x, boardContext.originY() + 1.75, z);
     }
 
-    private void spawnPromotionChoiceInteractions() {
-        removePromotionChoiceInteractions();
-        if (pendingPromotion == null || boardContext == null) {
-            return;
+    private Transformation capturedPieceTransformation(CapturedPieceDisplay capturedDisplay) {
+        if (settings.figureStyle() != ChessSettings.FigureStyle.FLAT) {
+            return CAPTURED_PIECE_TRANSFORMATION;
         }
-        World world = Bukkit.getWorld(boardContext.worldName());
-        if (world == null) {
-            return;
-        }
-        for (CapturedPieceDisplay capturedDisplay : capturedPieceDisplays) {
-            if (capturedDisplay.capturedBy() != pendingPromotion.side() || !isPromotionType(capturedDisplay.type())) {
-                continue;
-            }
-            int index = capturedDisplayIndex(capturedDisplay);
-            Location location = capturedDisplayLocation(capturedDisplay.capturedBy(), index);
-            Interaction interaction = world.spawn(location, Interaction.class, entity -> {
-                entity.setPersistent(true);
-                entity.setInvulnerable(true);
-                entity.setGravity(false);
-                entity.setInteractionWidth(capturedDisplay.type().interactionWidth());
-                entity.setInteractionHeight(capturedDisplay.type().interactionHeight());
-                entity.setResponsive(true);
-                tagEntity(entity, "promotion_choice", null, null);
-                entity.getPersistentDataContainer().set(pieceIdKey, PersistentDataType.STRING, capturedDisplay.sourcePieceId().toString());
-                entity.addScoreboardTag("promotion_choice");
-            });
-            capturedDisplay.setInteractionId(interaction.getUniqueId());
-            promotionChoiceInteractions.put(interaction.getUniqueId(), capturedDisplay);
-            boardEntityIds.add(interaction.getUniqueId());
-        }
+        return capturedDisplay.side() == ChessSide.WHITE ? FLAT_WHITE_TRANSFORMATION : FLAT_BLACK_TRANSFORMATION;
     }
 
     private void removePromotionChoiceInteractions() {
@@ -2083,29 +2130,7 @@ public final class ChessMatchRuntime {
         }
     }
 
-    private void handlePromotionChoiceClick(Player player, UUID sourcePieceId) {
-        if (pendingPromotion == null) {
-            return;
-        }
-        if (!hasPendingPromotion(player)) {
-            player.sendMessage(Component.text("Only the player promoting the pawn can choose the piece.", NamedTextColor.RED));
-            return;
-        }
-        CapturedPieceDisplay selected = null;
-        for (CapturedPieceDisplay capturedDisplay : capturedPieceDisplays) {
-            if (capturedDisplay.sourcePieceId().equals(sourcePieceId)) {
-                selected = capturedDisplay;
-                break;
-            }
-        }
-        if (selected == null || selected.capturedBy() != pendingPromotion.side() || !isPromotionType(selected.type())) {
-            player.sendMessage(Component.text("That captured display cannot be used for this promotion.", NamedTextColor.RED));
-            return;
-        }
-        completePromotion(player, selected.type(), selected);
-    }
-
-    private void completePromotion(Player player, ChessPieceType promotionType, CapturedPieceDisplay sourceDisplay) {
+    private void completePromotion(Player player, ChessPieceType promotionType) {
         if (pendingPromotion == null || player == null || promotionType == null) {
             return;
         }
@@ -2187,8 +2212,32 @@ public final class ChessMatchRuntime {
         for (CapturedPieceDisplay capturedDisplay : capturedPieceDisplays) {
             spawnCapturedDisplay(capturedDisplay);
         }
-        if (pendingPromotion != null) {
-            spawnPromotionChoiceInteractions();
+    }
+
+    private void setFigureDisplaysHidden(boolean hidden) {
+        List<UUID> displayIds = new ArrayList<>();
+        for (ChessPiece piece : pieces.values()) {
+            if (!piece.captured() && piece.displayId() != null) {
+                displayIds.add(piece.displayId());
+            }
+        }
+        for (CapturedPieceDisplay capturedDisplay : capturedPieceDisplays) {
+            if (capturedDisplay.displayId() != null) {
+                displayIds.add(capturedDisplay.displayId());
+            }
+        }
+        for (UUID displayId : displayIds) {
+            Entity entity = Bukkit.getEntity(displayId);
+            if (entity == null) {
+                continue;
+            }
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                if (hidden) {
+                    viewer.hideEntity(plugin, entity);
+                } else {
+                    viewer.showEntity(plugin, entity);
+                }
+            }
         }
     }
 
@@ -2302,7 +2351,7 @@ public final class ChessMatchRuntime {
             default -> null;
         };
         if (type != null) {
-            completePromotion(player, type, null);
+            completePromotion(player, type);
             player.closeInventory();
         }
         return true;
@@ -2370,7 +2419,7 @@ public final class ChessMatchRuntime {
     }
 
     private void tickTimer() {
-        if (!matchActive || !timerEnabled) {
+        if (!matchActive || !timerEnabled || paused) {
             stopTimerTask();
             return;
         }
@@ -2600,12 +2649,27 @@ public final class ChessMatchRuntime {
         return Bukkit.getWorld(BOARD_WORLD_NAME);
     }
 
-    private String currentBoardTimestamp() {
-        return BOARD_TIMESTAMP_FORMAT.format(LocalDateTime.now());
-    }
-
     private String currentMatchTimestamp() {
         return MATCH_TIMESTAMP_FORMAT.format(LocalDateTime.now());
+    }
+
+    private String currentMatchLogName() {
+        return currentMatchTimestamp() + " " + playerInitials(whitePlayers) + "-" + playerInitials(blackPlayers);
+    }
+
+    private String playerInitials(Map<UUID, String> players) {
+        if (players == null || players.isEmpty()) {
+            return "?";
+        }
+        List<String> initials = new ArrayList<>();
+        for (String name : players.values()) {
+            if (name == null || name.isBlank()) {
+                initials.add("?");
+            } else {
+                initials.add(name.substring(0, 1).toUpperCase(Locale.ROOT));
+            }
+        }
+        return String.join(".", initials);
     }
 
     private String currentMoveTimestamp() {
