@@ -283,6 +283,7 @@ BedWars runtime files live in:
 - `plugins/OmGames/Bedwars/`
 - `plugins/OmGames/Skins/`
 - `plugins/OmGames/OmGames.db`
+- `plugins/OmGames/backups/database/`
 
 Files:
 - `bedwars.yml`
@@ -292,6 +293,7 @@ Files:
 - `rotating-history.yml`
 - `../Skins/bedwars.yml`
 - `../OmGames.db`
+- `../backups/database/OmGames-YYYY-MM-DD.db`
 
 `rotating-history.yml`:
 - stores persistent pick counters for normal-match auto-rotation balancing
@@ -301,6 +303,13 @@ Files:
 
 SQLite data currently lives in:
 - `plugins/OmGames/OmGames.db`
+
+Daily SQLite backup behavior:
+- `OmGamesDatabaseBackupService` creates at most one backup per server-local date.
+- backups live in `plugins/OmGames/backups/database/` as `OmGames-YYYY-MM-DD.db`
+- retention keeps the latest `7` backup files plus the live `OmGames.db`
+- startup performs the first due backup before plugin services open their SQLite connections
+- the running plugin checks hourly for a new day and uses SQLite `VACUUM INTO` for a consistent live backup
 
 #### 2.7.1 `OmGames.db -> quick_buy`
 

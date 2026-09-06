@@ -19,6 +19,7 @@ import krispasi.omGames.hallsofcarnage.HallsOfCarnageManager;
 import krispasi.omGames.random.RandomCommand;
 import krispasi.omGames.random.RandomGifManager;
 import krispasi.omGames.random.RandomListener;
+import krispasi.omGames.storage.OmGamesDatabaseBackupService;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -52,10 +53,14 @@ public final class OmGames extends JavaPlugin {
     private FortunaManager fortunaManager;
     private RandomGifManager randomGifManager;
     private HallsOfCarnageManager hallsOfCarnageManager;
+    private OmGamesDatabaseBackupService databaseBackupService;
 
     @Override
     public void onEnable() {
         instance = this;
+
+        databaseBackupService = new OmGamesDatabaseBackupService(this);
+        databaseBackupService.start();
 
         synchronizeBedwarsConfigs();
 
@@ -151,6 +156,9 @@ public final class OmGames extends JavaPlugin {
         }
         if (bedwarsManager != null) {
             bedwarsManager.shutdown();
+        }
+        if (databaseBackupService != null) {
+            databaseBackupService.shutdown();
         }
     }
 
