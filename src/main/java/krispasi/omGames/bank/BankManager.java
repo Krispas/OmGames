@@ -1,10 +1,12 @@
 package krispasi.omGames.bank;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import krispasi.omGames.OmVeinsAPI;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -20,17 +22,30 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class BankManager {
+    private static final String CREDIT_CARD_ITEM_ID = "credit_card";
+    private static final String CASH_REGISTER_ITEM_ID = "cash_register";
+    private static final Map<String, Long> CREDIT_VALUES = Map.of(
+            "credit1", 1L,
+            "credit10", 10L,
+            "credit50", 50L,
+            "credit100", 100L,
+            "credit1000", 1000L,
+            "credit5000", 5000L
+    );
+
     private final JavaPlugin plugin;
     private final BankDatabaseService database;
     private final Map<UUID, BankPromptSession> prompts = new ConcurrentHashMap<>();
     private final NamespacedKey cardIdKey;
     private final NamespacedKey terminalIdKey;
+    private final NamespacedKey omCreditCardKey;
 
     public BankManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.database = new BankDatabaseService(plugin);
         this.cardIdKey = new NamespacedKey(plugin, "bank_card_id");
         this.terminalIdKey = new NamespacedKey(plugin, "bank_terminal_id");
+        this.omCreditCardKey = new NamespacedKey("om", "credit_card");
     }
 
     public void load() {
@@ -82,6 +97,13 @@ public final class BankManager {
             return;
         }
         new BankTerminalBuyerMenu(this, terminalId).open(player);
+    }
+
+    public void openAtm(Player player) {
+        if (player == null) {
+            return;
+        }
+        new BankAtmMenu(this, player.getUniqueId()).open(player);
     }
 
     public Result openTerminalForPlayer(Player player, String terminalId) {
@@ -162,7 +184,11 @@ public final class BankManager {
             return Result.fail("Failed to create credit card.");
         }
         if (receiver != null) {
-            giveOrDrop(receiver, createCardItem(card));
+            ItemStack item = createCardItem(card);
+            if (item == null) {
+                return Result.fail("OmVeins credit_card item is not available.");
+            }
+            giveOrDrop(receiver, item);
             receiver.playSound(receiver.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.1f);
         }
         return Result.ok("Created credit card for " + account.playerName() + ".");
@@ -179,10 +205,22 @@ public final class BankManager {
         return Result.fail("Failed to update credit card.");
     }
 
-    public Result createTerminal(UUID ownerId) {
+    public Result createTerminal(Player receiver, UUID ownerId) {
         BankAccount account = database.getAccount(ownerId);
         if (account == null) {
             return Result.fail("Bank account not found.");
+        }
+        if (receiver != null && !OmVeinsAPI.isInitialized()) {
+            return Result.fail("OmVeins API is not initialized.");
+        }
+        if (receiver != null) {
+            Result registration = registerOmVeinsItems();
+            if (!registration.success()) {
+                return registration;
+            }
+            if (createRegisteredCashRegisterBase() == null) {
+                return Result.fail("OmVeins cash_register item is not available.");
+            }
         }
         String terminalId = newId("terminal");
         int number = database.listTerminals(ownerId).size() + 1;
@@ -196,11 +234,32 @@ public final class BankManager {
         if (terminal == null) {
             return Result.fail("Failed to create terminal.");
         }
+        if (receiver != null) {
+            ItemStack item = createCashRegisterItem(terminal);
+            if (item == null) {
+                return Result.fail("OmVeins cash_register item is not available.");
+            }
+            giveOrDrop(receiver, item);
+            receiver.playSound(receiver.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.1f);
+        }
         return Result.ok("Created terminal " + terminal.name() + ".");
+    }
+
+    public Result createTerminal(UUID ownerId) {
+        return createTerminal(null, ownerId);
     }
 
     public BankAccount getAccount(UUID accountId) {
         return database.getAccount(accountId);
+    }
+
+    public long getBalance(UUID accountId) {
+        BankAccount account = database.getAccount(accountId);
+        return account == null ? 0L : account.balance();
+    }
+
+    public Map<String, Long> getStocks(UUID accountId) {
+        return database.getStocks(accountId);
     }
 
     public List<BankAccount> listAccounts() {
@@ -252,6 +311,9 @@ public final class BankManager {
         if (item == null || !item.hasItemMeta()) {
             return null;
         }
+        if (!isOmVeinsCreditCard(item)) {
+            return null;
+        }
         return item.getItemMeta().getPersistentDataContainer().get(cardIdKey, PersistentDataType.STRING);
     }
 
@@ -294,6 +356,56 @@ public final class BankManager {
         return Result.fail("Payment is prepared but disabled until the credit economy is connected.");
     }
 
+    public Result depositHeldCredits(Player player) {
+        if (player == null) {
+            return Result.fail("Only players can deposit credits.");
+        }
+        if (database.getAccount(player.getUniqueId()) == null) {
+            return Result.fail("You do not have a bank account.");
+        }
+        Map<String, ItemStack> templates = loadCreditTemplates();
+        if (templates.isEmpty()) {
+            return Result.fail("OmVeins credit items are not available.");
+        }
+        long total = 0L;
+        ItemStack[] contents = player.getInventory().getStorageContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            ItemStack item = contents[slot];
+            if (item == null || item.getType().isAir()) {
+                continue;
+            }
+            Long value = creditValue(item, templates);
+            if (value == null) {
+                continue;
+            }
+            total += value * item.getAmount();
+            contents[slot] = null;
+        }
+        if (total <= 0L) {
+            return Result.fail("No credit items found in your inventory.");
+        }
+        player.getInventory().setStorageContents(contents);
+        if (!database.deposit(player.getUniqueId(), total)) {
+            return Result.fail("Failed to deposit credits.");
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+        return Result.ok("Deposited " + total + " credits. Balance: " + getBalance(player.getUniqueId()) + ".");
+    }
+
+    public Result registerOmVeinsItems() {
+        if (!OmVeinsAPI.isInitialized()) {
+            return Result.fail("OmVeins API is not initialized.");
+        }
+        try {
+            boolean added = OmVeinsAPI.addItem(CASH_REGISTER_ITEM_ID, createCashRegisterTemplate());
+            return Result.ok(added ? "Registered cash_register in OmVeins ItemDatabase."
+                    : "cash_register is already registered in OmVeins ItemDatabase.");
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Failed to register Bank items in OmVeins: " + ex.getMessage());
+            return Result.fail("Failed to register Bank items in OmVeins.");
+        }
+    }
+
     private void createAccountFromPrompt(Player player, String input) {
         if (input.isBlank()) {
             sendPrompt(player, "Nick nesmi byt prazdny. Zadej nick znovu.");
@@ -307,8 +419,21 @@ public final class BankManager {
     }
 
     private ItemStack createCardItem(BankCard card) {
-        ItemStack item = new ItemStack(Material.PAPER);
+        if (!OmVeinsAPI.isInitialized()) {
+            return null;
+        }
+        ItemStack item;
+        try {
+            item = OmVeinsAPI.getItem(CREDIT_CARD_ITEM_ID);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Failed to get OmVeins credit_card item: " + ex.getMessage());
+            return null;
+        }
         ItemMeta meta = item.getItemMeta();
+        if (meta == null || !hasOmVeinsCreditCardMarker(meta)) {
+            plugin.getLogger().warning("OmVeins credit_card item is missing om:credit_card=true persistent data.");
+            return null;
+        }
         meta.displayName(Component.text("Credit Card - " + card.ownerName(), NamedTextColor.AQUA));
         meta.lore(List.of(
                 Component.text("Owner: " + card.ownerName(), NamedTextColor.GRAY),
@@ -318,7 +443,86 @@ public final class BankManager {
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
         meta.getPersistentDataContainer().set(cardIdKey, PersistentDataType.STRING, card.cardId());
         item.setItemMeta(meta);
+        if (!isOmVeinsCreditCard(item)) {
+            plugin.getLogger().warning("Bank credit card metadata update removed OmVeins credit_card marker.");
+            return null;
+        }
         return item;
+    }
+
+    private ItemStack createCashRegisterTemplate() {
+        ItemStack item = new ItemStack(Material.COMPARATOR);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(Component.text("Cash Register", NamedTextColor.GOLD));
+        meta.lore(List.of(Component.text("Bank terminal item.", NamedTextColor.GRAY)));
+        meta.setItemModel(new NamespacedKey("om", "cash_register"));
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack createCashRegisterItem(BankTerminal terminal) {
+        ItemStack item = createRegisteredCashRegisterBase();
+        if (item == null) {
+            return null;
+        }
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(Component.text(terminal.name(), NamedTextColor.GOLD));
+        meta.lore(List.of(
+                Component.text("Owner: " + terminal.ownerName(), NamedTextColor.GRAY),
+                Component.text("Terminal: " + shortId(terminal.terminalId()), NamedTextColor.DARK_GRAY)
+        ));
+        meta.getPersistentDataContainer().set(terminalIdKey, PersistentDataType.STRING, terminal.terminalId());
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack createRegisteredCashRegisterBase() {
+        if (OmVeinsAPI.isInitialized()) {
+            try {
+                return OmVeinsAPI.getItem(CASH_REGISTER_ITEM_ID);
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private boolean isOmVeinsCreditCard(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return false;
+        }
+        return hasOmVeinsCreditCardMarker(item.getItemMeta());
+    }
+
+    private boolean hasOmVeinsCreditCardMarker(ItemMeta meta) {
+        Boolean value = meta.getPersistentDataContainer().get(omCreditCardKey, PersistentDataType.BOOLEAN);
+        return Boolean.TRUE.equals(value);
+    }
+
+    private Map<String, ItemStack> loadCreditTemplates() {
+        Map<String, ItemStack> templates = new LinkedHashMap<>();
+        if (!OmVeinsAPI.isInitialized()) {
+            return templates;
+        }
+        for (String id : CREDIT_VALUES.keySet()) {
+            try {
+                templates.put(id, OmVeinsAPI.getItem(id));
+            } catch (Exception ex) {
+                plugin.getLogger().warning("Failed to get OmVeins credit item " + id + ": " + ex.getMessage());
+            }
+        }
+        return templates;
+    }
+
+    private Long creditValue(ItemStack item, Map<String, ItemStack> templates) {
+        for (Map.Entry<String, ItemStack> entry : templates.entrySet()) {
+            ItemStack template = entry.getValue();
+            if (template != null && template.isSimilar(item)) {
+                return CREDIT_VALUES.get(entry.getKey());
+            }
+        }
+        return null;
     }
 
     private void giveOrDrop(Player player, ItemStack item) {

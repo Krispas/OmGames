@@ -65,6 +65,14 @@ public final class BankDatabaseService {
               FOREIGN KEY(item_id) REFERENCES bank_terminal_items(item_id)
             )
             """;
+    private static final String STOCKS_SQL = """
+            CREATE TABLE IF NOT EXISTS bank_stocks (
+              player_uuid TEXT NOT NULL,
+              stock_id TEXT NOT NULL,
+              amount INTEGER NOT NULL,
+              PRIMARY KEY(player_uuid, stock_id)
+            )
+            """;
 
     private final File databaseFile;
     private final Logger logger;
@@ -84,6 +92,7 @@ public final class BankDatabaseService {
                 statement.execute(TERMINALS_SQL);
                 statement.execute(TERMINAL_ITEMS_SQL);
                 statement.execute(CART_LINES_SQL);
+                statement.execute(STOCKS_SQL);
             }
         } catch (SQLException ex) {
             logger.log(Level.SEVERE, "Failed to load Bank database tables.", ex);
@@ -156,6 +165,40 @@ public final class BankDatabaseService {
             logger.log(Level.WARNING, "Failed to list Bank accounts.", ex);
         }
         return accounts;
+    }
+
+    public boolean deposit(UUID playerId, long amount) {
+        if (connection == null || playerId == null || amount <= 0L) {
+            return false;
+        }
+        String sql = "UPDATE bank_accounts SET balance = balance + ? WHERE player_uuid = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, amount);
+            statement.setString(2, playerId.toString());
+            return statement.executeUpdate() > 0;
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to deposit Bank credits for " + playerId + ".", ex);
+            return false;
+        }
+    }
+
+    public java.util.Map<String, Long> getStocks(UUID playerId) {
+        java.util.Map<String, Long> stocks = new java.util.LinkedHashMap<>();
+        if (connection == null || playerId == null) {
+            return stocks;
+        }
+        String sql = "SELECT stock_id, amount FROM bank_stocks WHERE player_uuid = ? ORDER BY lower(stock_id)";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, playerId.toString());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    stocks.put(resultSet.getString("stock_id"), resultSet.getLong("amount"));
+                }
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load Bank stocks for " + playerId + ".", ex);
+        }
+        return stocks;
     }
 
     public BankCard createCard(UUID ownerId, String ownerName, String cardId, long createdAt) {

@@ -86,6 +86,7 @@ public final class OmGames extends JavaPlugin {
         chessManager.load();
         bankManager = new BankManager(this);
         bankManager.load();
+        OmGamesAPI.setBankManager(bankManager);
         fortunaManager = new FortunaManager(this);
         fortunaManager.load();
         randomGifManager = new RandomGifManager(this);
@@ -156,6 +157,7 @@ public final class OmGames extends JavaPlugin {
             fortunaManager.shutdown();
         }
         if (bankManager != null) {
+            OmGamesAPI.clearBankManager(bankManager);
             bankManager.shutdown();
         }
         if (randomGifManager != null) {

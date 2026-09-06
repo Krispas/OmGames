@@ -1032,7 +1032,12 @@ SQLite tables:
 - `src/main/java/krispasi/omGames/bank/*`
   - Bank account, credit card, terminal, cart, admin GUI, command, listener, and persistence implementation.
   - Keep core Bank logic in this package and keep Fortuna-specific betting logic in `bank/fortuna/*`.
-  - Current Bank implementation is logic-first only; do not wire real item/economy/terminal block behavior until explicitly requested.
+  - Current Bank implementation is logic-first for accounts/cards/terminals/ATM; do not wire terminal block placement, item-sale setup, or final checkout delivery until explicitly requested.
+
+- `src/main/java/krispasi/omGames/OmGamesAPI.java`
+  - Runtime bridge API exposed by OmGames for OmVeins integrations.
+  - Do not call it during server startup before OmGames has connected its runtime managers.
+  - Exposes ATM opening, player balance lookup by UUID, player stock lookup by UUID, Bank item registration, and the optional `boughtKrgStock(UUID)` consumer hook.
 
 ### 5.2 Runtime Data Layout
 
@@ -1048,6 +1053,7 @@ SQLite tables:
 - `bank_terminals`
 - `bank_terminal_items`
 - `bank_cart_lines`
+- `bank_stocks`
 
 `bank_accounts`:
 - `player_uuid TEXT PRIMARY KEY`
@@ -1083,6 +1089,12 @@ SQLite tables:
 - `amount INTEGER NOT NULL`
 - PK: `(player_uuid, terminal_id, item_id)`
 
+`bank_stocks`:
+- `player_uuid TEXT NOT NULL`
+- `stock_id TEXT NOT NULL`
+- `amount INTEGER NOT NULL`
+- PK: `(player_uuid, stock_id)`
+
 Files:
 - `fortuna.yml`
 
@@ -1100,7 +1112,9 @@ Fortuna betting commands are implemented in `FortunaCommand`.
 
 Operator subcommands:
 - `/bank admin`
+- `/bank atm`
 - `/bank fortuna`
+- `/bank register_items`
 
 Permissions declared in `plugin.yml`:
 - `omgames.bank.admin`
@@ -1113,6 +1127,10 @@ Permissions declared in `plugin.yml`:
 - Use lowercase Java package names, even though the runtime folder is `Bank`.
 - Keep Fortuna changes isolated from existing BedWars, Egg Hunt, and Chess behavior unless integration is explicitly requested.
 - Credit-card items store their card id in item persistent data, but real payment economy is not connected yet.
+- Credit-card items must come from OmVeins ItemDatabase id `credit_card`; OmVeins returns copies, so do not clone again.
+- Credit-card items carry OmVeins persistent data key `om:credit_card` as `BOOLEAN true`; Bank metadata changes must not remove that key.
+- Bank-owned cash register items use item model `om:cash_register` and should be registered into OmVeins ItemDatabase under id `cash_register` after OmVeins API initialization.
+- ATM deposits recognize OmVeins ItemDatabase ids `credit1`, `credit10`, `credit50`, `credit100`, `credit1000`, and `credit5000` by `ItemStack#isSimilar`.
 - Terminal item/block integration is intentionally pending; terminal owner and buyer menus are prepared for later hooks.
 
 ### 5.5 Fortuna Display Notes

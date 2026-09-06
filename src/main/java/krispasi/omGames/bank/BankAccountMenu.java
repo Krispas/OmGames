@@ -61,7 +61,7 @@ public final class BankAccountMenu implements BankInventoryMenu {
             return;
         }
         if (slot == CREATE_TERMINAL_SLOT) {
-            send(player, manager.createTerminal(accountId));
+            send(player, manager.createTerminal(player, accountId));
             refresh();
             return;
         }
