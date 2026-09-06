@@ -2,7 +2,7 @@ package krispasi.omGames.bank;
 
 public final class BankPromptSession {
     public enum Mode {
-        CREATE_ACCOUNT
+        CREATE_NON_PLAYER_ACCOUNT
     }
 
     private final Mode mode;
@@ -11,8 +11,8 @@ public final class BankPromptSession {
         this.mode = mode;
     }
 
-    public static BankPromptSession createAccount() {
-        return new BankPromptSession(Mode.CREATE_ACCOUNT);
+    public static BankPromptSession createNonPlayerAccount() {
+        return new BankPromptSession(Mode.CREATE_NON_PLAYER_ACCOUNT);
     }
 
     public Mode mode() {

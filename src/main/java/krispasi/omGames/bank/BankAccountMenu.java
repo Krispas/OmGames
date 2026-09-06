@@ -1,7 +1,6 @@
 package krispasi.omGames.bank;
 
 import java.util.List;
-import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -17,13 +16,14 @@ public final class BankAccountMenu implements BankInventoryMenu {
     private static final int CARDS_SLOT = 11;
     private static final int CREATE_TERMINAL_SLOT = 13;
     private static final int TERMINALS_SLOT = 14;
+    private static final int EDITORS_SLOT = 15;
     private static final int SUMMARY_SLOT = 16;
 
     private final BankManager manager;
-    private final UUID accountId;
+    private final String accountId;
     private final Inventory inventory;
 
-    public BankAccountMenu(BankManager manager, UUID accountId) {
+    public BankAccountMenu(BankManager manager, String accountId) {
         this.manager = manager;
         this.accountId = accountId;
         this.inventory = Bukkit.createInventory(this, SIZE, Component.text("Bank Account", NamedTextColor.GOLD));
@@ -67,6 +67,13 @@ public final class BankAccountMenu implements BankInventoryMenu {
         }
         if (slot == TERMINALS_SLOT) {
             manager.openTerminalsMenu(player, accountId);
+            return;
+        }
+        if (slot == EDITORS_SLOT) {
+            BankAccount account = manager.getAccount(accountId);
+            if (account != null && !account.playerAccount()) {
+                manager.openAccountEditorsMenu(player, accountId);
+            }
         }
     }
 
@@ -104,10 +111,20 @@ public final class BankAccountMenu implements BankInventoryMenu {
                 Component.text("Manage Terminals", NamedTextColor.AQUA),
                 List.of(Component.text("Terminals: " + manager.listTerminals(accountId).size(), NamedTextColor.GRAY))
         ));
+        if (!account.playerAccount()) {
+            inventory.setItem(EDITORS_SLOT, BankMenuItems.item(
+                    Material.NAME_TAG,
+                    Component.text("Manage Editors", NamedTextColor.AQUA),
+                    List.of(Component.text("Editors: " + manager.listEditors(accountId).size(), NamedTextColor.GRAY))
+            ));
+        }
         inventory.setItem(SUMMARY_SLOT, BankMenuItems.item(
                 Material.GOLD_INGOT,
-                Component.text(account.playerName(), NamedTextColor.GOLD),
-                List.of(Component.text("Balance: " + account.balance(), NamedTextColor.GRAY))
+                Component.text(account.displayName(), NamedTextColor.GOLD),
+                List.of(
+                        Component.text("Type: " + (account.playerAccount() ? "Player" : "Non-player"), NamedTextColor.GRAY),
+                        Component.text("Balance: " + account.balance(), NamedTextColor.GRAY)
+                )
         ));
         inventory.setItem(BACK_SLOT, BankMenuItems.item(
                 Material.ARROW,

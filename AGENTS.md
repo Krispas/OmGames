@@ -1049,6 +1049,8 @@ Bank may use shared plugin storage only when the schema is explicitly defined:
 
 SQLite tables:
 - `bank_accounts`
+- `bank_account_profiles`
+- `bank_account_editors`
 - `bank_cards`
 - `bank_terminals`
 - `bank_terminal_items`
@@ -1061,8 +1063,23 @@ SQLite tables:
 - `balance INTEGER NOT NULL DEFAULT 0`
 - `created_at INTEGER NOT NULL`
 
+`bank_account_profiles`:
+- `account_id TEXT PRIMARY KEY`
+- `account_type TEXT NOT NULL`
+- `display_name TEXT NOT NULL`
+- `player_uuid TEXT`
+- `balance INTEGER NOT NULL DEFAULT 0`
+- `created_at INTEGER NOT NULL`
+
+`bank_account_editors`:
+- `account_id TEXT NOT NULL`
+- `player_uuid TEXT NOT NULL`
+- `player_name TEXT NOT NULL`
+- PK: `(account_id, player_uuid)`
+
 `bank_cards`:
 - `card_id TEXT PRIMARY KEY`
+- `owner_account_id TEXT`
 - `owner_uuid TEXT NOT NULL`
 - `owner_name TEXT NOT NULL`
 - `frozen INTEGER NOT NULL DEFAULT 0`
@@ -1070,6 +1087,7 @@ SQLite tables:
 
 `bank_terminals`:
 - `terminal_id TEXT PRIMARY KEY`
+- `owner_account_id TEXT`
 - `owner_uuid TEXT NOT NULL`
 - `owner_name TEXT NOT NULL`
 - `name TEXT NOT NULL`
@@ -1126,12 +1144,20 @@ Permissions declared in `plugin.yml`:
 - Core Bank owns bank accounts, credit cards, terminals, terminal items, carts, admin GUI, and future payment flow.
 - Use lowercase Java package names, even though the runtime folder is `Bank`.
 - Keep Fortuna changes isolated from existing BedWars, Egg Hunt, and Chess behavior unless integration is explicitly requested.
+- New Bank accounts are created only for currently online players selected through the `/bank admin` GUI; do not use offline-name chat prompts for account creation.
+- Non-player Bank accounts are named accounts created from `/bank admin`; their editor access is managed by toggling currently online players in the account editor GUI.
 - Credit-card items store their card id in item persistent data, but real payment economy is not connected yet.
 - Credit-card items must come from OmVeins ItemDatabase id `credit_card`; OmVeins returns copies, so do not clone again.
 - Credit-card items carry OmVeins persistent data key `om:credit_card` as `BOOLEAN true`; Bank metadata changes must not remove that key.
 - Bank-owned cash register items use item model `om:cash_register` and should be registered into OmVeins ItemDatabase under id `cash_register` after OmVeins API initialization.
+- Right-clicking a block with a Bank cash register item places persistent terminal display/interaction entities and consumes one item, including in Creative mode.
+- Clicking a placed terminal entity opens the owner menu for account owners/editors and the buyer menu for normal players.
 - ATM deposits recognize OmVeins ItemDatabase ids `credit1`, `credit10`, `credit50`, `credit100`, `credit1000`, and `credit5000` by `ItemStack#isSimilar`.
-- Terminal item/block integration is intentionally pending; terminal owner and buyer menus are prepared for later hooks.
+- ATM deposit opens a selection GUI so players can deposit all recognized credits or only one chosen credit denomination.
+- Terminal deletion is available from the terminal detail GUI through a confirmation menu and removes terminal items and carts for that terminal id.
+- Terminal deconstruction is available from the owner menu; it removes placed terminal entities without deleting terminal data and returns the terminal item.
+- Giving a terminal item without deconstruction is available only from the admin-opened terminal detail menu, not from the placed-terminal owner menu.
+- Terminal sale-item setup, click-to-cart regions, final checkout, and delivery integration are intentionally pending.
 
 ### 5.5 Fortuna Display Notes
 

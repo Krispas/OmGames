@@ -9,9 +9,13 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.event.block.Action;
+import org.bukkit.inventory.EquipmentSlot;
 
 public final class BankListener implements Listener {
     private final BankManager bankManager;
@@ -42,6 +46,40 @@ public final class BankListener implements Listener {
         safeHandle("onInventoryDrag", () -> {
             Inventory topInventory = event.getView().getTopInventory();
             if (topInventory.getHolder() instanceof BankInventoryMenu) {
+                event.setCancelled(true);
+            }
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        safeHandle("onPlayerInteract", () -> {
+            if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null) {
+                return;
+            }
+            EquipmentSlot hand = event.getHand();
+            if (hand != EquipmentSlot.HAND) {
+                return;
+            }
+            if (bankManager.getPlacementService().place(
+                    event.getPlayer(),
+                    event.getClickedBlock(),
+                    event.getBlockFace(),
+                    hand,
+                    event.getItem()
+            )) {
+                event.setCancelled(true);
+            }
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
+        safeHandle("onPlayerInteractEntity", () -> {
+            if (event.getHand() != EquipmentSlot.HAND) {
+                return;
+            }
+            if (bankManager.getPlacementService().interact(event.getPlayer(), event.getRightClicked())) {
                 event.setCancelled(true);
             }
         });

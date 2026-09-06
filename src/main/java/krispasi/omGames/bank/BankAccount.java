@@ -2,5 +2,5 @@ package krispasi.omGames.bank;
 
 import java.util.UUID;
 
-public record BankAccount(UUID playerId, String playerName, long balance, long createdAt) {
+public record BankAccount(String accountId, UUID playerId, String displayName, boolean playerAccount, long balance, long createdAt) {
 }

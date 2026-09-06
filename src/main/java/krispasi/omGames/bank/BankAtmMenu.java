@@ -43,29 +43,27 @@ public final class BankAtmMenu implements BankInventoryMenu {
             return;
         }
         if (event.getRawSlot() == DEPOSIT_SLOT) {
-            BankManager.Result result = manager.depositHeldCredits(player);
-            player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
-            refresh();
+            manager.openAtmDepositMenu(player);
         }
     }
 
     private void refresh() {
         inventory.clear();
-        BankAccount account = manager.getAccount(playerId);
+        BankAccount account = manager.getPlayerAccount(playerId);
         long balance = account == null ? 0L : account.balance();
         inventory.setItem(DEPOSIT_SLOT, BankMenuItems.item(
                 Material.HOPPER,
                 Component.text("Deposit Credits", NamedTextColor.GREEN),
                 List.of(
                         Component.text("Deposits OmVeins credit items from inventory.", NamedTextColor.GRAY),
-                        Component.text("Recognized: credit1, credit10, credit50, credit100, credit1000, credit5000.", NamedTextColor.DARK_GRAY)
+                        Component.text("Choose which credit type to deposit.", NamedTextColor.DARK_GRAY)
                 )
         ));
         inventory.setItem(BALANCE_SLOT, BankMenuItems.item(
                 Material.GOLD_INGOT,
                 Component.text("Balance", NamedTextColor.GOLD),
                 List.of(
-                        Component.text("Account: " + (account == null ? "missing" : account.playerName()), account == null ? NamedTextColor.RED : NamedTextColor.GRAY),
+                        Component.text("Account: " + (account == null ? "missing" : account.displayName()), account == null ? NamedTextColor.RED : NamedTextColor.GRAY),
                         Component.text("Credits: " + balance, NamedTextColor.GRAY)
                 )
         ));

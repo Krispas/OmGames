@@ -2,17 +2,17 @@ package krispasi.omGames.bank;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import krispasi.omGames.OmVeinsAPI;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemFlag;
@@ -24,6 +24,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class BankManager {
     private static final String CREDIT_CARD_ITEM_ID = "credit_card";
     private static final String CASH_REGISTER_ITEM_ID = "cash_register";
+    private static final List<String> CREDIT_IDS = List.of("credit1", "credit10", "credit50", "credit100", "credit1000", "credit5000");
     private static final Map<String, Long> CREDIT_VALUES = Map.of(
             "credit1", 1L,
             "credit10", 10L,
@@ -35,6 +36,7 @@ public final class BankManager {
 
     private final JavaPlugin plugin;
     private final BankDatabaseService database;
+    private final BankTerminalPlacementService placementService;
     private final Map<UUID, BankPromptSession> prompts = new ConcurrentHashMap<>();
     private final NamespacedKey cardIdKey;
     private final NamespacedKey terminalIdKey;
@@ -43,6 +45,7 @@ public final class BankManager {
     public BankManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.database = new BankDatabaseService(plugin);
+        this.placementService = new BankTerminalPlacementService(this, plugin);
         this.cardIdKey = new NamespacedKey(plugin, "bank_card_id");
         this.terminalIdKey = new NamespacedKey(plugin, "bank_terminal_id");
         this.omCreditCardKey = new NamespacedKey("om", "credit_card");
@@ -64,25 +67,46 @@ public final class BankManager {
         new BankAdminMenu(this).open(player);
     }
 
-    public void openAccountMenu(Player player, UUID accountId) {
+    public void openAccountMenu(Player player, String accountId) {
         if (player == null || accountId == null) {
             return;
         }
         new BankAccountMenu(this, accountId).open(player);
     }
 
-    public void openCardsMenu(Player player, UUID accountId) {
+    public void openOnlinePlayerMenu(Player player) {
+        if (player == null) {
+            return;
+        }
+        new BankOnlinePlayerMenu(this).open(player);
+    }
+
+    public void openNonPlayerAccountEditorMenu(Player player) {
+        if (player == null) {
+            return;
+        }
+        new BankNonPlayerAccountEditorMenu(this).open(player);
+    }
+
+    public void openCardsMenu(Player player, String accountId) {
         if (player == null || accountId == null) {
             return;
         }
         new BankCardsMenu(this, accountId).open(player);
     }
 
-    public void openTerminalsMenu(Player player, UUID accountId) {
+    public void openTerminalsMenu(Player player, String accountId) {
         if (player == null || accountId == null) {
             return;
         }
         new BankTerminalsMenu(this, accountId).open(player);
+    }
+
+    public void openAccountEditorsMenu(Player player, String accountId) {
+        if (player == null || accountId == null) {
+            return;
+        }
+        new BankAccountEditorsMenu(this, accountId).open(player);
     }
 
     public void openTerminalOwnerMenu(Player player, String terminalId) {
@@ -106,26 +130,20 @@ public final class BankManager {
         new BankAtmMenu(this, player.getUniqueId()).open(player);
     }
 
-    public Result openTerminalForPlayer(Player player, String terminalId) {
-        BankTerminal terminal = getTerminal(terminalId);
-        if (terminal == null) {
-            return Result.fail("Terminal not found.");
-        }
-        if (ownsTerminal(player, terminal)) {
-            openTerminalOwnerMenu(player, terminalId);
-        } else {
-            openTerminalBuyerMenu(player, terminalId);
-        }
-        return Result.ok("Opened terminal " + terminal.name() + ".");
-    }
-
-    public void beginCreateAccountPrompt(Player player) {
+    public void openAtmDepositMenu(Player player) {
         if (player == null) {
             return;
         }
-        prompts.put(player.getUniqueId(), BankPromptSession.createAccount());
+        new BankAtmDepositMenu(this).open(player);
+    }
+
+    public void beginCreateNonPlayerAccountPrompt(Player player) {
+        if (player == null) {
+            return;
+        }
+        prompts.put(player.getUniqueId(), BankPromptSession.createNonPlayerAccount());
         player.closeInventory();
-        sendPrompt(player, "Napis nick hrace, kteremu chces zalozit ucet. Napis cancel pro zruseni.");
+        sendPrompt(player, "Napis nazev non-player uctu. Napis cancel pro zruseni.");
     }
 
     public boolean hasPrompt(Player player) {
@@ -153,33 +171,79 @@ public final class BankManager {
             openAdminMenu(player);
             return;
         }
-        if (session.mode() == BankPromptSession.Mode.CREATE_ACCOUNT) {
-            createAccountFromPrompt(player, input);
+        if (session.mode() == BankPromptSession.Mode.CREATE_NON_PLAYER_ACCOUNT) {
+            Result result = createNonPlayerAccount(input);
+            prompts.remove(player.getUniqueId());
+            player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+            if (result.success()) {
+                BankAccount account = getAccountByName(input);
+                if (account != null) {
+                    openAccountMenu(player, account.accountId());
+                    return;
+                }
+            }
+            openAdminMenu(player);
         }
     }
 
-    public Result createAccount(OfflinePlayer target) {
+    public Result openTerminalForPlayer(Player player, String terminalId) {
+        return openTerminalForPlayer(player, terminalId, null);
+    }
+
+    public Result openTerminalForPlayer(Player player, String terminalId, String placementId) {
+        BankTerminal terminal = getTerminal(terminalId);
+        if (terminal == null) {
+            return Result.fail("Terminal not found.");
+        }
+        if (ownsTerminal(player, terminal)) {
+            new BankTerminalOwnerMenu(this, terminalId, placementId).open(player);
+        } else {
+            openTerminalBuyerMenu(player, terminalId);
+        }
+        return Result.ok("Opened terminal " + terminal.name() + ".");
+    }
+
+    public BankTerminalPlacementService getPlacementService() {
+        return placementService;
+    }
+
+    public Result createAccount(Player target) {
         if (target == null || target.getUniqueId() == null) {
-            return Result.fail("Player not found.");
+            return Result.fail("Player must be online.");
         }
         String name = target.getName();
         if (name == null || name.isBlank()) {
             name = target.getUniqueId().toString();
         }
-        BankAccount account = database.createAccount(target.getUniqueId(), name, System.currentTimeMillis());
+        BankAccount account = database.createPlayerAccount(target.getUniqueId(), name, System.currentTimeMillis());
         if (account == null) {
             return Result.fail("Failed to create bank account.");
         }
-        return Result.ok("Bank account ready for " + account.playerName() + ".");
+        return Result.ok("Bank account ready for " + account.displayName() + ".");
     }
 
-    public Result createCard(Player receiver, UUID ownerId) {
-        BankAccount account = database.getAccount(ownerId);
+    public Result createNonPlayerAccount(String displayName) {
+        String name = displayName == null ? "" : displayName.trim();
+        if (name.isBlank() || name.length() > 32) {
+            return Result.fail("Account name must have 1-32 characters.");
+        }
+        if (getAccountByName(name) != null) {
+            return Result.fail("A bank account with that name already exists.");
+        }
+        BankAccount account = database.createNonPlayerAccount(newId("account"), name, System.currentTimeMillis());
+        if (account == null) {
+            return Result.fail("Failed to create non-player account.");
+        }
+        return Result.ok("Created non-player account " + account.displayName() + ".");
+    }
+
+    public Result createCard(Player receiver, String accountId) {
+        BankAccount account = database.getAccount(accountId);
         if (account == null) {
             return Result.fail("Bank account not found.");
         }
         String cardId = newId("card");
-        BankCard card = database.createCard(account.playerId(), account.playerName(), cardId, System.currentTimeMillis());
+        BankCard card = database.createCard(account.accountId(), account.playerId(), account.displayName(), cardId, System.currentTimeMillis());
         if (card == null) {
             return Result.fail("Failed to create credit card.");
         }
@@ -191,7 +255,7 @@ public final class BankManager {
             giveOrDrop(receiver, item);
             receiver.playSound(receiver.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.1f);
         }
-        return Result.ok("Created credit card for " + account.playerName() + ".");
+        return Result.ok("Created credit card for " + account.displayName() + ".");
     }
 
     public Result setCardFrozen(String cardId, boolean frozen) {
@@ -205,8 +269,8 @@ public final class BankManager {
         return Result.fail("Failed to update credit card.");
     }
 
-    public Result createTerminal(Player receiver, UUID ownerId) {
-        BankAccount account = database.getAccount(ownerId);
+    public Result createTerminal(Player receiver, String accountId) {
+        BankAccount account = database.getAccount(accountId);
         if (account == null) {
             return Result.fail("Bank account not found.");
         }
@@ -223,12 +287,13 @@ public final class BankManager {
             }
         }
         String terminalId = newId("terminal");
-        int number = database.listTerminals(ownerId).size() + 1;
+        int number = database.listTerminals(account.accountId()).size() + 1;
         BankTerminal terminal = database.createTerminal(
+                account.accountId(),
                 account.playerId(),
-                account.playerName(),
+                account.displayName(),
                 terminalId,
-                account.playerName() + " Terminal " + number,
+                account.displayName() + " Terminal " + number,
                 System.currentTimeMillis()
         );
         if (terminal == null) {
@@ -245,16 +310,24 @@ public final class BankManager {
         return Result.ok("Created terminal " + terminal.name() + ".");
     }
 
-    public Result createTerminal(UUID ownerId) {
-        return createTerminal(null, ownerId);
+    public Result createTerminal(String accountId) {
+        return createTerminal(null, accountId);
     }
 
-    public BankAccount getAccount(UUID accountId) {
+    public BankAccount getAccount(String accountId) {
         return database.getAccount(accountId);
     }
 
+    public BankAccount getPlayerAccount(UUID playerId) {
+        return database.getPlayerAccount(playerId);
+    }
+
+    public String playerAccountId(UUID playerId) {
+        return playerId == null ? null : "player:" + playerId;
+    }
+
     public long getBalance(UUID accountId) {
-        BankAccount account = database.getAccount(accountId);
+        BankAccount account = database.getPlayerAccount(accountId);
         return account == null ? 0L : account.balance();
     }
 
@@ -266,20 +339,48 @@ public final class BankManager {
         return database.listAccounts();
     }
 
-    public List<BankCard> listCards(UUID ownerId) {
-        return database.listCards(ownerId);
+    public List<BankCard> listCards(String accountId) {
+        return database.listCards(accountId);
     }
 
     public BankCard getCard(String cardId) {
         return database.getCard(cardId);
     }
 
-    public List<BankTerminal> listTerminals(UUID ownerId) {
-        return database.listTerminals(ownerId);
+    public List<BankTerminal> listTerminals(String accountId) {
+        return database.listTerminals(accountId);
     }
 
     public BankTerminal getTerminal(String terminalId) {
         return database.getTerminal(terminalId);
+    }
+
+    public Result deleteTerminal(String terminalId) {
+        BankTerminal terminal = database.getTerminal(terminalId);
+        if (terminal == null) {
+            return Result.fail("Terminal not found.");
+        }
+        if (database.deleteTerminal(terminalId)) {
+            return Result.ok("Deleted terminal " + terminal.name() + ".");
+        }
+        return Result.fail("Failed to delete terminal.");
+    }
+
+    public Result giveTerminalItem(Player player, String terminalId) {
+        if (player == null) {
+            return Result.fail("Only players can receive terminal items.");
+        }
+        BankTerminal terminal = database.getTerminal(terminalId);
+        if (terminal == null) {
+            return Result.fail("Terminal not found.");
+        }
+        ItemStack item = createCashRegisterItem(terminal);
+        if (item == null) {
+            return Result.fail("OmVeins cash_register item is not available.");
+        }
+        giveOrDrop(player, item);
+        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.1f);
+        return Result.ok("Gave terminal item for " + terminal.name() + ".");
     }
 
     public List<BankTerminalItem> listTerminalItems(String terminalId) {
@@ -304,7 +405,50 @@ public final class BankManager {
     }
 
     public boolean ownsTerminal(Player player, BankTerminal terminal) {
-        return player != null && terminal != null && player.getUniqueId().equals(terminal.ownerId());
+        return canEditAccount(player, terminal.accountId());
+    }
+
+    public boolean canEditAccount(Player player, String accountId) {
+        if (player == null || accountId == null) {
+            return false;
+        }
+        BankAccount account = database.getAccount(accountId);
+        if (account == null) {
+            return false;
+        }
+        if (account.playerId() != null && account.playerId().equals(player.getUniqueId())) {
+            return true;
+        }
+        return database.isEditor(accountId, player.getUniqueId());
+    }
+
+    public List<BankAccountEditor> listEditors(String accountId) {
+        return database.listEditors(accountId);
+    }
+
+    public boolean isEditor(String accountId, UUID playerId) {
+        return database.isEditor(accountId, playerId);
+    }
+
+    public Result toggleEditor(String accountId, Player target) {
+        BankAccount account = database.getAccount(accountId);
+        if (account == null) {
+            return Result.fail("Bank account not found.");
+        }
+        if (account.playerAccount()) {
+            return Result.fail("Player accounts do not use editor lists.");
+        }
+        if (target == null || !target.isOnline()) {
+            return Result.fail("Player must be online.");
+        }
+        if (database.isEditor(accountId, target.getUniqueId())) {
+            return database.removeEditor(accountId, target.getUniqueId())
+                    ? Result.ok("Removed " + target.getName() + " from account editors.")
+                    : Result.fail("Failed to remove account editor.");
+        }
+        return database.addEditor(accountId, target.getUniqueId(), target.getName())
+                ? Result.ok("Added " + target.getName() + " as account editor.")
+                : Result.fail("Failed to add account editor.");
     }
 
     public String readCardId(ItemStack item) {
@@ -357,10 +501,53 @@ public final class BankManager {
     }
 
     public Result depositHeldCredits(Player player) {
+        return depositCredits(player, null);
+    }
+
+    public Result depositCreditType(Player player, String creditId) {
+        if (creditId == null || !CREDIT_VALUES.containsKey(creditId)) {
+            return Result.fail("Unknown credit type.");
+        }
+        return depositCredits(player, creditId);
+    }
+
+    public List<CreditDepositOption> getDepositOptions(Player player) {
+        List<CreditDepositOption> options = new ArrayList<>();
+        if (player == null) {
+            return options;
+        }
+        Map<String, ItemStack> templates = loadCreditTemplates();
+        if (templates.isEmpty()) {
+            return options;
+        }
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (String id : CREDIT_IDS) {
+            counts.put(id, 0);
+        }
+        for (ItemStack item : player.getInventory().getStorageContents()) {
+            if (item == null || item.getType().isAir()) {
+                continue;
+            }
+            String creditId = creditId(item, templates);
+            if (creditId != null) {
+                counts.put(creditId, counts.getOrDefault(creditId, 0) + item.getAmount());
+            }
+        }
+        for (String id : CREDIT_IDS) {
+            int amount = counts.getOrDefault(id, 0);
+            if (amount > 0) {
+                options.add(new CreditDepositOption(id, CREDIT_VALUES.get(id), amount));
+            }
+        }
+        return options;
+    }
+
+    private Result depositCredits(Player player, String selectedCreditId) {
         if (player == null) {
             return Result.fail("Only players can deposit credits.");
         }
-        if (database.getAccount(player.getUniqueId()) == null) {
+        BankAccount playerAccount = database.getPlayerAccount(player.getUniqueId());
+        if (playerAccount == null) {
             return Result.fail("You do not have a bank account.");
         }
         Map<String, ItemStack> templates = loadCreditTemplates();
@@ -369,27 +556,42 @@ public final class BankManager {
         }
         long total = 0L;
         ItemStack[] contents = player.getInventory().getStorageContents();
+        Set<Integer> matchedSlots = new LinkedHashSet<>();
         for (int slot = 0; slot < contents.length; slot++) {
             ItemStack item = contents[slot];
             if (item == null || item.getType().isAir()) {
                 continue;
             }
-            Long value = creditValue(item, templates);
-            if (value == null) {
+            String creditId = creditId(item, templates);
+            if (creditId == null || (selectedCreditId != null && !selectedCreditId.equals(creditId))) {
                 continue;
             }
+            Long value = CREDIT_VALUES.get(creditId);
             total += value * item.getAmount();
-            contents[slot] = null;
+            matchedSlots.add(slot);
         }
         if (total <= 0L) {
-            return Result.fail("No credit items found in your inventory.");
+            return Result.fail(selectedCreditId == null ? "No credit items found in your inventory."
+                    : "No " + selectedCreditId + " items found in your inventory.");
         }
-        player.getInventory().setStorageContents(contents);
-        if (!database.deposit(player.getUniqueId(), total)) {
+        if (!database.deposit(playerAccount.accountId(), total)) {
             return Result.fail("Failed to deposit credits.");
         }
+        for (Integer slot : matchedSlots) {
+            contents[slot] = null;
+        }
+        player.getInventory().setStorageContents(contents);
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
         return Result.ok("Deposited " + total + " credits. Balance: " + getBalance(player.getUniqueId()) + ".");
+    }
+
+    private BankAccount getAccountByName(String name) {
+        for (BankAccount account : listAccounts()) {
+            if (account.displayName().equalsIgnoreCase(name.trim())) {
+                return account;
+            }
+        }
+        return null;
     }
 
     public Result registerOmVeinsItems() {
@@ -404,18 +606,6 @@ public final class BankManager {
             plugin.getLogger().warning("Failed to register Bank items in OmVeins: " + ex.getMessage());
             return Result.fail("Failed to register Bank items in OmVeins.");
         }
-    }
-
-    private void createAccountFromPrompt(Player player, String input) {
-        if (input.isBlank()) {
-            sendPrompt(player, "Nick nesmi byt prazdny. Zadej nick znovu.");
-            return;
-        }
-        OfflinePlayer target = Bukkit.getOfflinePlayer(input);
-        Result result = createAccount(target);
-        prompts.remove(player.getUniqueId());
-        player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
-        openAdminMenu(player);
     }
 
     private ItemStack createCardItem(BankCard card) {
@@ -461,7 +651,7 @@ public final class BankManager {
         return item;
     }
 
-    private ItemStack createCashRegisterItem(BankTerminal terminal) {
+    ItemStack createCashRegisterItem(BankTerminal terminal) {
         ItemStack item = createRegisteredCashRegisterBase();
         if (item == null) {
             return null;
@@ -469,7 +659,7 @@ public final class BankManager {
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text(terminal.name(), NamedTextColor.GOLD));
         meta.lore(List.of(
-                Component.text("Owner: " + terminal.ownerName(), NamedTextColor.GRAY),
+                Component.text("Account: " + terminal.ownerName(), NamedTextColor.GRAY),
                 Component.text("Terminal: " + shortId(terminal.terminalId()), NamedTextColor.DARK_GRAY)
         ));
         meta.getPersistentDataContainer().set(terminalIdKey, PersistentDataType.STRING, terminal.terminalId());
@@ -505,7 +695,7 @@ public final class BankManager {
         if (!OmVeinsAPI.isInitialized()) {
             return templates;
         }
-        for (String id : CREDIT_VALUES.keySet()) {
+        for (String id : CREDIT_IDS) {
             try {
                 templates.put(id, OmVeinsAPI.getItem(id));
             } catch (Exception ex) {
@@ -515,17 +705,17 @@ public final class BankManager {
         return templates;
     }
 
-    private Long creditValue(ItemStack item, Map<String, ItemStack> templates) {
+    private String creditId(ItemStack item, Map<String, ItemStack> templates) {
         for (Map.Entry<String, ItemStack> entry : templates.entrySet()) {
             ItemStack template = entry.getValue();
             if (template != null && template.isSimilar(item)) {
-                return CREDIT_VALUES.get(entry.getKey());
+                return entry.getKey();
             }
         }
         return null;
     }
 
-    private void giveOrDrop(Player player, ItemStack item) {
+    void giveOrDrop(Player player, ItemStack item) {
         Map<Integer, ItemStack> leftovers = player.getInventory().addItem(item);
         for (ItemStack leftover : leftovers.values()) {
             if (leftover != null) {
@@ -556,6 +746,12 @@ public final class BankManager {
 
         public static Result fail(String message) {
             return new Result(false, message);
+        }
+    }
+
+    public record CreditDepositOption(String creditId, long value, int amount) {
+        public long total() {
+            return value * amount;
         }
     }
 }

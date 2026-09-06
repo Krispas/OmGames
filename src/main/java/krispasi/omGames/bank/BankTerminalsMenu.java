@@ -3,7 +3,6 @@ package krispasi.omGames.bank;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -19,11 +18,11 @@ public final class BankTerminalsMenu implements BankInventoryMenu {
     private static final int TERMINAL_START_SLOT = 18;
 
     private final BankManager manager;
-    private final UUID accountId;
+    private final String accountId;
     private final Inventory inventory;
     private final Map<Integer, String> terminalSlots = new HashMap<>();
 
-    public BankTerminalsMenu(BankManager manager, UUID accountId) {
+    public BankTerminalsMenu(BankManager manager, String accountId) {
         this.manager = manager;
         this.accountId = accountId;
         this.inventory = Bukkit.createInventory(this, SIZE, Component.text("Bank Terminals", NamedTextColor.GOLD));
