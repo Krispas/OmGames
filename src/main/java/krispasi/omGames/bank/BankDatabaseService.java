@@ -245,6 +245,22 @@ public final class BankDatabaseService {
         }
     }
 
+    public boolean withdraw(String accountId, long amount) {
+        if (connection == null || accountId == null || accountId.isBlank() || amount <= 0L) {
+            return false;
+        }
+        String sql = "UPDATE bank_account_profiles SET balance = balance - ? WHERE account_id = ? AND balance >= ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, amount);
+            statement.setString(2, accountId);
+            statement.setLong(3, amount);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to withdraw Bank credits for " + accountId + ".", ex);
+            return false;
+        }
+    }
+
     public Map<String, Long> getStocks(UUID playerId) {
         Map<String, Long> stocks = new LinkedHashMap<>();
         if (connection == null || playerId == null) {

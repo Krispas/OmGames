@@ -13,7 +13,8 @@ public final class BankAtmMenu implements BankInventoryMenu {
     private static final int SIZE = 27;
     private static final int CARD_SLOT = 11;
     private static final int DEPOSIT_SLOT = 13;
-    private static final int BALANCE_SLOT = 15;
+    private static final int WITHDRAW_SLOT = 15;
+    private static final int BALANCE_SLOT = 17;
 
     private final BankManager manager;
     private final Inventory inventory;
@@ -67,6 +68,15 @@ public final class BankAtmMenu implements BankInventoryMenu {
                 return;
             }
             manager.openAtmDepositMenu(player, cardId);
+            return;
+        }
+        if (slot == WITHDRAW_SLOT) {
+            BankManager.Result result = manager.validateAtmCard(cardId);
+            if (!result.success()) {
+                player.sendMessage(Component.text(result.message(), NamedTextColor.RED));
+                return;
+            }
+            manager.openAtmWithdrawMenu(player, cardId);
         }
     }
 
@@ -105,6 +115,16 @@ public final class BankAtmMenu implements BankInventoryMenu {
                         Component.text("Account: " + (account == null ? "missing" : account.displayName()), account == null ? NamedTextColor.RED : NamedTextColor.GRAY),
                         Component.text("Credits: " + balance, NamedTextColor.GRAY)
                 )
+        ));
+        inventory.setItem(WITHDRAW_SLOT, BankMenuItems.item(
+                card == null ? Material.BARRIER : Material.DISPENSER,
+                Component.text("Withdraw Credits", card == null ? NamedTextColor.RED : NamedTextColor.GREEN),
+                card == null
+                        ? List.of(Component.text("Insert a credit card first.", NamedTextColor.GRAY))
+                        : List.of(
+                                Component.text("Withdraws OmVeins credit items from this card account.", NamedTextColor.GRAY),
+                                Component.text("Choose which credit type to receive.", NamedTextColor.DARK_GRAY)
+                        )
         ));
     }
 

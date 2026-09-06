@@ -151,6 +151,13 @@ public final class BankManager {
         new BankAtmDepositMenu(this, cardId).open(player);
     }
 
+    public void openAtmWithdrawMenu(Player player, String cardId) {
+        if (player == null) {
+            return;
+        }
+        new BankAtmWithdrawMenu(this, cardId).open(player);
+    }
+
     public void beginCreateNonPlayerAccountPrompt(Player player) {
         if (player == null) {
             return;
@@ -533,6 +540,13 @@ public final class BankManager {
         return depositCredits(player, cardId, creditId);
     }
 
+    public Result withdrawCreditType(Player player, String cardId, String creditId, int itemAmount) {
+        if (creditId == null || !CREDIT_VALUES.containsKey(creditId)) {
+            return Result.fail("Unknown credit type.");
+        }
+        return withdrawCredits(player, cardId, creditId, itemAmount);
+    }
+
     public List<CreditDepositOption> getDepositOptions(Player player) {
         List<CreditDepositOption> options = new ArrayList<>();
         if (player == null) {
@@ -559,6 +573,36 @@ public final class BankManager {
             int amount = counts.getOrDefault(id, 0);
             if (amount > 0) {
                 options.add(new CreditDepositOption(id, CREDIT_VALUES.get(id), amount));
+            }
+        }
+        return options;
+    }
+
+    public List<CreditWithdrawalOption> getWithdrawalOptions(String cardId) {
+        List<CreditWithdrawalOption> options = new ArrayList<>();
+        BankCard card = database.getCard(cardId);
+        if (card == null || card.frozen()) {
+            return options;
+        }
+        BankAccount account = database.getAccount(card.accountId());
+        if (account == null || account.balance() <= 0L) {
+            return options;
+        }
+        Map<String, ItemStack> templates = loadCreditTemplates();
+        if (templates.isEmpty()) {
+            return options;
+        }
+        for (String id : CREDIT_IDS) {
+            ItemStack template = templates.get(id);
+            Long value = CREDIT_VALUES.get(id);
+            if (template == null || template.getType().isAir() || value == null || value > account.balance()) {
+                continue;
+            }
+            int maxStack = Math.max(1, template.getMaxStackSize());
+            long affordable = account.balance() / value;
+            int maxSingleWithdrawAmount = (int) Math.min(affordable, maxStack);
+            if (maxSingleWithdrawAmount > 0) {
+                options.add(new CreditWithdrawalOption(id, value, affordable, maxSingleWithdrawAmount));
             }
         }
         return options;
@@ -612,6 +656,43 @@ public final class BankManager {
         player.getInventory().setStorageContents(contents);
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
         return Result.ok("Deposited " + total + " credits. Balance: " + accountBalance(account.accountId()) + ".");
+    }
+
+    private Result withdrawCredits(Player player, String cardId, String creditId, int requestedItemAmount) {
+        if (player == null) {
+            return Result.fail("Only players can withdraw credits.");
+        }
+        BankCard card = database.getCard(cardId);
+        if (card == null) {
+            return Result.fail("Insert a valid credit card first.");
+        }
+        if (card.frozen()) {
+            return Result.fail("This credit card is frozen.");
+        }
+        BankAccount account = database.getAccount(card.accountId());
+        if (account == null) {
+            return Result.fail("Card account not found.");
+        }
+        if (requestedItemAmount <= 0) {
+            return Result.fail("Withdraw amount must be positive.");
+        }
+        ItemStack item = createCreditItem(creditId);
+        if (item == null) {
+            return Result.fail("OmVeins " + creditId + " item is not available.");
+        }
+        Long value = CREDIT_VALUES.get(creditId);
+        int itemAmount = Math.min(requestedItemAmount, Math.max(1, item.getMaxStackSize()));
+        long total = value * itemAmount;
+        if (account.balance() < total) {
+            return Result.fail("Insufficient balance.");
+        }
+        item.setAmount(itemAmount);
+        if (!database.withdraw(account.accountId(), total)) {
+            return Result.fail("Failed to withdraw credits.");
+        }
+        giveOrDrop(player, item);
+        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.1f);
+        return Result.ok("Withdrew " + total + " credits. Balance: " + accountBalance(account.accountId()) + ".");
     }
 
     public Result validateAtmCard(String cardId) {
@@ -756,6 +837,18 @@ public final class BankManager {
         return templates;
     }
 
+    private ItemStack createCreditItem(String creditId) {
+        if (!OmVeinsAPI.isInitialized()) {
+            return null;
+        }
+        try {
+            return OmVeinsAPI.getItem(creditId);
+        } catch (Exception ex) {
+            plugin.getLogger().warning("Failed to get OmVeins credit item " + creditId + ": " + ex.getMessage());
+            return null;
+        }
+    }
+
     private String creditId(ItemStack item, Map<String, ItemStack> templates) {
         for (Map.Entry<String, ItemStack> entry : templates.entrySet()) {
             ItemStack template = entry.getValue();
@@ -804,5 +897,8 @@ public final class BankManager {
         public long total() {
             return value * amount;
         }
+    }
+
+    public record CreditWithdrawalOption(String creditId, long value, long affordableAmount, int maxSingleWithdrawAmount) {
     }
 }

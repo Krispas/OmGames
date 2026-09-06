@@ -1155,6 +1155,7 @@ Permissions declared in `plugin.yml`:
 - ATM deposits recognize OmVeins ItemDatabase ids `credit1`, `credit10`, `credit50`, `credit100`, `credit1000`, and `credit5000` by `ItemStack#isSimilar`.
 - ATM requires inserting/selecting a valid unfrozen Bank credit card before deposits; deposited credits are credited to that card's owning account.
 - ATM deposit opens a selection GUI so players can deposit all recognized credits or only one chosen credit denomination.
+- ATM withdrawals require the same valid unfrozen Bank credit card, atomically debit the card account balance, and return OmVeins ItemDatabase credit items for the selected denomination.
 - Terminal deletion is admin-only, available from the admin-opened terminal detail GUI through a confirmation menu, and removes terminal items and carts for that terminal id.
 - Terminal deconstruction is available from the owner menu; it removes placed terminal entities without deleting terminal data and returns the terminal item.
 - Giving a terminal item without deconstruction is available only from the admin-opened terminal detail menu, not from the placed-terminal owner menu.
