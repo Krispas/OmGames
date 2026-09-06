@@ -18,11 +18,13 @@ public final class BankAtmDepositMenu implements BankInventoryMenu {
     private static final int OPTION_START_SLOT = 11;
 
     private final BankManager manager;
+    private final String cardId;
     private final Inventory inventory;
     private final Map<Integer, String> creditSlots = new HashMap<>();
 
-    public BankAtmDepositMenu(BankManager manager) {
+    public BankAtmDepositMenu(BankManager manager, String cardId) {
         this.manager = manager;
+        this.cardId = cardId;
         this.inventory = Bukkit.createInventory(this, SIZE, Component.text("ATM Deposit", NamedTextColor.GOLD));
         refresh(null);
     }
@@ -45,22 +47,22 @@ public final class BankAtmDepositMenu implements BankInventoryMenu {
         }
         int slot = event.getRawSlot();
         if (slot == BACK_SLOT) {
-            manager.openAtm(player);
+            manager.openAtm(player, cardId);
             return;
         }
         BankManager.Result result = null;
         if (slot == ALL_SLOT) {
-            result = manager.depositHeldCredits(player);
+            result = manager.depositHeldCredits(player, cardId);
         } else {
             String creditId = creditSlots.get(slot);
             if (creditId != null) {
-                result = manager.depositCreditType(player, creditId);
+                result = manager.depositCreditType(player, cardId, creditId);
             }
         }
         if (result != null) {
             player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
             if (result.success()) {
-                manager.openAtm(player);
+                manager.openAtm(player, cardId);
             } else {
                 refresh(player);
             }

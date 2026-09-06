@@ -1,7 +1,6 @@
 package krispasi.omGames.bank;
 
 import java.util.List;
-import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -12,16 +11,17 @@ import org.bukkit.inventory.Inventory;
 
 public final class BankAtmMenu implements BankInventoryMenu {
     private static final int SIZE = 27;
-    private static final int DEPOSIT_SLOT = 11;
+    private static final int CARD_SLOT = 11;
+    private static final int DEPOSIT_SLOT = 13;
     private static final int BALANCE_SLOT = 15;
 
     private final BankManager manager;
-    private final UUID playerId;
     private final Inventory inventory;
+    private String cardId;
 
-    public BankAtmMenu(BankManager manager, UUID playerId) {
+    public BankAtmMenu(BankManager manager, String cardId) {
         this.manager = manager;
-        this.playerId = playerId;
+        this.cardId = cardId;
         this.inventory = Bukkit.createInventory(this, SIZE, Component.text("ATM", NamedTextColor.GOLD));
         refresh();
     }
@@ -37,27 +37,66 @@ public final class BankAtmMenu implements BankInventoryMenu {
     }
 
     @Override
+    public boolean handlesPlayerInventoryClick() {
+        return true;
+    }
+
+    @Override
     public void handleClick(InventoryClickEvent event) {
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
-        if (event.getRawSlot() == DEPOSIT_SLOT) {
-            manager.openAtmDepositMenu(player);
+        if (event.getRawSlot() >= inventory.getSize()) {
+            loadCard(player, event.getCurrentItem());
+            return;
+        }
+        int slot = event.getRawSlot();
+        if (slot == CARD_SLOT) {
+            if (!loadCard(player, event.getCursor())) {
+                cardId = null;
+                player.sendMessage(Component.text("Credit card removed from ATM.", NamedTextColor.YELLOW));
+                refresh();
+            }
+            return;
+        }
+        if (slot == DEPOSIT_SLOT) {
+            BankManager.Result result = manager.validateAtmCard(cardId);
+            if (!result.success()) {
+                player.sendMessage(Component.text(result.message(), NamedTextColor.RED));
+                return;
+            }
+            manager.openAtmDepositMenu(player, cardId);
         }
     }
 
     private void refresh() {
         inventory.clear();
-        BankAccount account = manager.getPlayerAccount(playerId);
+        BankCard card = cardId == null ? null : manager.getCard(cardId);
+        BankAccount account = card == null ? null : manager.getAccount(card.accountId());
         long balance = account == null ? 0L : account.balance();
+        inventory.setItem(CARD_SLOT, BankMenuItems.item(
+                card == null ? Material.PAPER : Material.LIME_CONCRETE,
+                Component.text(card == null ? "Insert Credit Card" : "Card: " + card.ownerName(), card == null ? NamedTextColor.YELLOW : NamedTextColor.GREEN),
+                card == null
+                        ? List.of(
+                                Component.text("Click this slot with a credit card.", NamedTextColor.GRAY),
+                                Component.text("You can also click a card in your inventory.", NamedTextColor.DARK_GRAY)
+                        )
+                        : List.of(
+                                Component.text("Owner: " + card.ownerName(), NamedTextColor.GRAY),
+                                Component.text("Click with empty cursor to remove.", NamedTextColor.DARK_GRAY)
+                        )
+        ));
         inventory.setItem(DEPOSIT_SLOT, BankMenuItems.item(
-                Material.HOPPER,
-                Component.text("Deposit Credits", NamedTextColor.GREEN),
-                List.of(
-                        Component.text("Deposits OmVeins credit items from inventory.", NamedTextColor.GRAY),
-                        Component.text("Choose which credit type to deposit.", NamedTextColor.DARK_GRAY)
-                )
+                card == null ? Material.BARRIER : Material.HOPPER,
+                Component.text("Deposit Credits", card == null ? NamedTextColor.RED : NamedTextColor.GREEN),
+                card == null
+                        ? List.of(Component.text("Insert a credit card first.", NamedTextColor.GRAY))
+                        : List.of(
+                                Component.text("Deposits OmVeins credit items to this card account.", NamedTextColor.GRAY),
+                                Component.text("Choose which credit type to deposit.", NamedTextColor.DARK_GRAY)
+                        )
         ));
         inventory.setItem(BALANCE_SLOT, BankMenuItems.item(
                 Material.GOLD_INGOT,
@@ -67,5 +106,21 @@ public final class BankAtmMenu implements BankInventoryMenu {
                         Component.text("Credits: " + balance, NamedTextColor.GRAY)
                 )
         ));
+    }
+
+    private boolean loadCard(Player player, org.bukkit.inventory.ItemStack item) {
+        String newCardId = manager.readCardId(item);
+        if (newCardId == null) {
+            return false;
+        }
+        BankManager.Result result = manager.validateAtmCard(newCardId);
+        if (!result.success()) {
+            player.sendMessage(Component.text(result.message(), NamedTextColor.RED));
+            return true;
+        }
+        cardId = newCardId;
+        player.sendMessage(Component.text(result.message(), NamedTextColor.GREEN));
+        refresh();
+        return true;
     }
 }

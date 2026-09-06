@@ -5,4 +5,8 @@ import org.bukkit.inventory.InventoryHolder;
 
 interface BankInventoryMenu extends InventoryHolder {
     void handleClick(InventoryClickEvent event);
+
+    default boolean handlesPlayerInventoryClick() {
+        return false;
+    }
 }

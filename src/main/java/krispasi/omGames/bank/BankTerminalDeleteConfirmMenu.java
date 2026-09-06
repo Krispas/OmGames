@@ -46,7 +46,7 @@ public final class BankTerminalDeleteConfirmMenu implements BankInventoryMenu {
         }
         int slot = event.getRawSlot();
         if (slot == CANCEL_SLOT) {
-            manager.openTerminalOwnerMenu(player, terminalId);
+            manager.openTerminalAdminMenu(player, terminalId);
             return;
         }
         if (slot == CONFIRM_SLOT) {
@@ -55,7 +55,7 @@ public final class BankTerminalDeleteConfirmMenu implements BankInventoryMenu {
             if (result.success()) {
                 manager.openTerminalsMenu(player, accountId);
             } else {
-                manager.openTerminalOwnerMenu(player, terminalId);
+                manager.openTerminalAdminMenu(player, terminalId);
             }
         }
     }

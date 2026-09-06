@@ -34,6 +34,10 @@ public final class BankListener implements Listener {
                 return;
             }
             if (event.getRawSlot() >= topInventory.getSize()) {
+                if (menu.handlesPlayerInventoryClick()) {
+                    menu.handleClick(event);
+                    return;
+                }
                 event.setCancelled(true);
                 return;
             }

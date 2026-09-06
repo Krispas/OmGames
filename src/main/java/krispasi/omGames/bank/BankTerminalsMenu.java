@@ -57,7 +57,7 @@ public final class BankTerminalsMenu implements BankInventoryMenu {
         }
         String terminalId = terminalSlots.get(slot);
         if (terminalId != null) {
-            manager.openTerminalOwnerMenu(player, terminalId);
+            manager.openTerminalAdminMenu(player, terminalId);
         }
     }
 

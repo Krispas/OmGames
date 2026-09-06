@@ -116,6 +116,13 @@ public final class BankManager {
         new BankTerminalOwnerMenu(this, terminalId).open(player);
     }
 
+    public void openTerminalAdminMenu(Player player, String terminalId) {
+        if (player == null || terminalId == null) {
+            return;
+        }
+        new BankTerminalAdminMenu(this, terminalId).open(player);
+    }
+
     public void openTerminalBuyerMenu(Player player, String terminalId) {
         if (player == null || terminalId == null) {
             return;
@@ -127,14 +134,21 @@ public final class BankManager {
         if (player == null) {
             return;
         }
-        new BankAtmMenu(this, player.getUniqueId()).open(player);
+        new BankAtmMenu(this, null).open(player);
     }
 
-    public void openAtmDepositMenu(Player player) {
+    public void openAtm(Player player, String cardId) {
         if (player == null) {
             return;
         }
-        new BankAtmDepositMenu(this).open(player);
+        new BankAtmMenu(this, cardId).open(player);
+    }
+
+    public void openAtmDepositMenu(Player player, String cardId) {
+        if (player == null) {
+            return;
+        }
+        new BankAtmDepositMenu(this, cardId).open(player);
     }
 
     public void beginCreateNonPlayerAccountPrompt(Player player) {
@@ -501,14 +515,22 @@ public final class BankManager {
     }
 
     public Result depositHeldCredits(Player player) {
-        return depositCredits(player, null);
+        return Result.fail("Insert a credit card first.");
+    }
+
+    public Result depositHeldCredits(Player player, String cardId) {
+        return depositCredits(player, cardId, null);
     }
 
     public Result depositCreditType(Player player, String creditId) {
+        return Result.fail("Insert a credit card first.");
+    }
+
+    public Result depositCreditType(Player player, String cardId, String creditId) {
         if (creditId == null || !CREDIT_VALUES.containsKey(creditId)) {
             return Result.fail("Unknown credit type.");
         }
-        return depositCredits(player, creditId);
+        return depositCredits(player, cardId, creditId);
     }
 
     public List<CreditDepositOption> getDepositOptions(Player player) {
@@ -542,13 +564,20 @@ public final class BankManager {
         return options;
     }
 
-    private Result depositCredits(Player player, String selectedCreditId) {
+    private Result depositCredits(Player player, String cardId, String selectedCreditId) {
         if (player == null) {
             return Result.fail("Only players can deposit credits.");
         }
-        BankAccount playerAccount = database.getPlayerAccount(player.getUniqueId());
-        if (playerAccount == null) {
-            return Result.fail("You do not have a bank account.");
+        BankCard card = database.getCard(cardId);
+        if (card == null) {
+            return Result.fail("Insert a valid credit card first.");
+        }
+        if (card.frozen()) {
+            return Result.fail("This credit card is frozen.");
+        }
+        BankAccount account = database.getAccount(card.accountId());
+        if (account == null) {
+            return Result.fail("Card account not found.");
         }
         Map<String, ItemStack> templates = loadCreditTemplates();
         if (templates.isEmpty()) {
@@ -574,7 +603,7 @@ public final class BankManager {
             return Result.fail(selectedCreditId == null ? "No credit items found in your inventory."
                     : "No " + selectedCreditId + " items found in your inventory.");
         }
-        if (!database.deposit(playerAccount.accountId(), total)) {
+        if (!database.deposit(account.accountId(), total)) {
             return Result.fail("Failed to deposit credits.");
         }
         for (Integer slot : matchedSlots) {
@@ -582,7 +611,29 @@ public final class BankManager {
         }
         player.getInventory().setStorageContents(contents);
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
-        return Result.ok("Deposited " + total + " credits. Balance: " + getBalance(player.getUniqueId()) + ".");
+        return Result.ok("Deposited " + total + " credits. Balance: " + accountBalance(account.accountId()) + ".");
+    }
+
+    public Result validateAtmCard(String cardId) {
+        if (cardId == null || cardId.isBlank()) {
+            return Result.fail("Insert a credit card first.");
+        }
+        BankCard card = database.getCard(cardId);
+        if (card == null) {
+            return Result.fail("Credit card not found.");
+        }
+        if (card.frozen()) {
+            return Result.fail("This credit card is frozen.");
+        }
+        if (database.getAccount(card.accountId()) == null) {
+            return Result.fail("Card account not found.");
+        }
+        return Result.ok("Credit card accepted.");
+    }
+
+    public long accountBalance(String accountId) {
+        BankAccount account = database.getAccount(accountId);
+        return account == null ? 0L : account.balance();
     }
 
     private BankAccount getAccountByName(String name) {
