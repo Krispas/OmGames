@@ -84,6 +84,19 @@ public final class BankManager {
         new BankTerminalBuyerMenu(this, terminalId).open(player);
     }
 
+    public Result openTerminalForPlayer(Player player, String terminalId) {
+        BankTerminal terminal = getTerminal(terminalId);
+        if (terminal == null) {
+            return Result.fail("Terminal not found.");
+        }
+        if (ownsTerminal(player, terminal)) {
+            openTerminalOwnerMenu(player, terminalId);
+        } else {
+            openTerminalBuyerMenu(player, terminalId);
+        }
+        return Result.ok("Opened terminal " + terminal.name() + ".");
+    }
+
     public void beginCreateAccountPrompt(Player player) {
         if (player == null) {
             return;

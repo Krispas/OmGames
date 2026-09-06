@@ -13,8 +13,8 @@ commands:
     description: Chess game commands
     usage: /chess board build <x> <y> <z> | /chess board reset [board] | /chess board remove <board|*> | /chess board blocks <b1> <b2> <b3> | /chess match <white|black|start|timer|settings|test|cancel> | /chess log <print|delete|search> | /chess pause | /chess resign | /chess draw | /chess undo | /chess redo | /chess checkmate
   bank:
-    description: Fortuna betting commands
-    usage: /bank fortuna
+    description: Bank and Fortuna commands
+    usage: /bank admin | /bank fortuna
   omgames:
     description: OmGames utility commands
     usage: /omgames gif
@@ -39,6 +39,9 @@ permissions:
     default: op
   omgames.fortuna.manage:
     description: Allows managing Fortuna matches via /bank fortuna
+    default: op
+  omgames.bank.admin:
+    description: Allows managing Bank accounts, credit cards, and terminals via /bank admin
     default: op
   omgames.random.gif:
     description: Allows managing Random GIF map displays via /omgames gif

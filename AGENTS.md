@@ -1029,6 +1029,11 @@ SQLite tables:
   - Keep Fortuna logic inside this package; do not push Fortuna rules into BedWars, Egg Hunt, or Chess classes.
   - Only use `OmGames` for plugin lifecycle wiring, command registration, and listener registration.
 
+- `src/main/java/krispasi/omGames/bank/*`
+  - Bank account, credit card, terminal, cart, admin GUI, command, listener, and persistence implementation.
+  - Keep core Bank logic in this package and keep Fortuna-specific betting logic in `bank/fortuna/*`.
+  - Current Bank implementation is logic-first only; do not wire real item/economy/terminal block behavior until explicitly requested.
+
 ### 5.2 Runtime Data Layout
 
 Fortuna runtime files live in:
@@ -1036,6 +1041,47 @@ Fortuna runtime files live in:
 
 Bank may use shared plugin storage only when the schema is explicitly defined:
 - `plugins/OmGames/OmGames.db`
+
+SQLite tables:
+- `bank_accounts`
+- `bank_cards`
+- `bank_terminals`
+- `bank_terminal_items`
+- `bank_cart_lines`
+
+`bank_accounts`:
+- `player_uuid TEXT PRIMARY KEY`
+- `player_name TEXT NOT NULL`
+- `balance INTEGER NOT NULL DEFAULT 0`
+- `created_at INTEGER NOT NULL`
+
+`bank_cards`:
+- `card_id TEXT PRIMARY KEY`
+- `owner_uuid TEXT NOT NULL`
+- `owner_name TEXT NOT NULL`
+- `frozen INTEGER NOT NULL DEFAULT 0`
+- `created_at INTEGER NOT NULL`
+
+`bank_terminals`:
+- `terminal_id TEXT PRIMARY KEY`
+- `owner_uuid TEXT NOT NULL`
+- `owner_name TEXT NOT NULL`
+- `name TEXT NOT NULL`
+- `created_at INTEGER NOT NULL`
+
+`bank_terminal_items`:
+- `item_id TEXT PRIMARY KEY`
+- `terminal_id TEXT NOT NULL`
+- `display_name TEXT NOT NULL`
+- `price INTEGER NOT NULL`
+- `sort_order INTEGER NOT NULL DEFAULT 0`
+
+`bank_cart_lines`:
+- `player_uuid TEXT NOT NULL`
+- `terminal_id TEXT NOT NULL`
+- `item_id TEXT NOT NULL`
+- `amount INTEGER NOT NULL`
+- PK: `(player_uuid, terminal_id, item_id)`
 
 Files:
 - `fortuna.yml`
@@ -1049,19 +1095,25 @@ Files:
 
 ### 5.3 Command Surface
 
-Implemented in `FortunaCommand`.
+Bank root routing is implemented in `BankCommand`.
+Fortuna betting commands are implemented in `FortunaCommand`.
 
 Operator subcommands:
+- `/bank admin`
 - `/bank fortuna`
 
 Permissions declared in `plugin.yml`:
+- `omgames.bank.admin`
 - `omgames.fortuna.manage`
 
 ### 5.4 Ownership Rules
 
 - Fortuna should own its own commands, listeners, services, config loading, and persistence helpers.
+- Core Bank owns bank accounts, credit cards, terminals, terminal items, carts, admin GUI, and future payment flow.
 - Use lowercase Java package names, even though the runtime folder is `Bank`.
 - Keep Fortuna changes isolated from existing BedWars, Egg Hunt, and Chess behavior unless integration is explicitly requested.
+- Credit-card items store their card id in item persistent data, but real payment economy is not connected yet.
+- Terminal item/block integration is intentionally pending; terminal owner and buyer menus are prepared for later hooks.
 
 ### 5.5 Fortuna Display Notes
 
