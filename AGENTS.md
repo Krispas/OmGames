@@ -1152,6 +1152,12 @@ Permissions declared in `plugin.yml`:
 - Bank-owned cash register items use item model `om:cash_register` and should be registered into OmVeins ItemDatabase under id `cash_register` after OmVeins API initialization.
 - Right-clicking a block with a Bank cash register item places persistent terminal display/interaction entities and consumes one item, including in Creative mode.
 - Clicking a placed terminal entity opens the owner menu for account owners/editors and the buyer menu for normal players.
+- Terminal editing gives the account owner/editor or Bank admin an enchanted stick editor item tagged with the terminal id.
+- Left-clicking with a terminal editor opens that terminal's sellable item list; dropping the editor item despawns it, and End Edit removes editor items from the player inventory.
+- Terminal sellable items store display name, price, icon material, sort order, and an optional exact block click location.
+- Setting a terminal item click location is a two-step editor flow: choose Set Click Block in the item menu, then right-click the target block with the editor stick.
+- Right-clicking a registered terminal item click block with a valid Bank credit card in either hand adds that sellable item to the player's cart.
+- The terminal buyer GUI also lists sellable items and can add them directly to the player's cart; checkout debits the selected card account, credits the terminal owner account, and clears the cart.
 - ATM deposits recognize OmVeins ItemDatabase ids `credit1`, `credit10`, `credit50`, `credit100`, `credit1000`, and `credit5000` by `ItemStack#isSimilar`.
 - ATM requires inserting/selecting a valid unfrozen Bank credit card before deposits; deposited credits are credited to that card's owning account.
 - ATM deposit opens a selection GUI so players can deposit all recognized credits or only one chosen credit denomination.
@@ -1159,7 +1165,7 @@ Permissions declared in `plugin.yml`:
 - Terminal deletion is admin-only, available from the admin-opened terminal detail GUI through a confirmation menu, and removes terminal items and carts for that terminal id.
 - Terminal deconstruction is available from the owner menu; it removes placed terminal entities without deleting terminal data and returns the terminal item.
 - Giving a terminal item without deconstruction is available only from the admin-opened terminal detail menu, not from the placed-terminal owner menu.
-- Terminal sale-item setup, click-to-cart regions, final checkout, and delivery integration are intentionally pending.
+- Terminal checkout currently transfers credits only; physical delivery/inventory integration for purchased goods is intentionally pending.
 
 ### 5.5 Fortuna Display Notes
 

@@ -104,7 +104,7 @@ public final class BankAtmMenu implements BankInventoryMenu {
                 card == null
                         ? List.of(Component.text("Insert a credit card first.", NamedTextColor.GRAY))
                         : List.of(
-                                Component.text("Deposits OmVeins credit items to this card account.", NamedTextColor.GRAY),
+                                Component.text("Deposits credits to this card account.", NamedTextColor.GRAY),
                                 Component.text("Choose which credit type to deposit.", NamedTextColor.DARK_GRAY)
                         )
         ));
@@ -122,7 +122,7 @@ public final class BankAtmMenu implements BankInventoryMenu {
                 card == null
                         ? List.of(Component.text("Insert a credit card first.", NamedTextColor.GRAY))
                         : List.of(
-                                Component.text("Withdraws OmVeins credit items from this card account.", NamedTextColor.GRAY),
+                                Component.text("Withdraws credit from this card account.", NamedTextColor.GRAY),
                                 Component.text("Choose which credit type to receive.", NamedTextColor.DARK_GRAY)
                         )
         ));

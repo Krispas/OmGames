@@ -9,6 +9,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -58,11 +59,25 @@ public final class BankListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent event) {
         safeHandle("onPlayerInteract", () -> {
+            EquipmentSlot hand = event.getHand();
+            if (hand != EquipmentSlot.HAND) {
+                return;
+            }
+            if (bankManager.handleTerminalEditorInteract(
+                    event.getPlayer(),
+                    event.getAction(),
+                    event.getClickedBlock(),
+                    hand,
+                    event.getItem()
+            )) {
+                event.setCancelled(true);
+                return;
+            }
             if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null) {
                 return;
             }
-            EquipmentSlot hand = event.getHand();
-            if (hand != EquipmentSlot.HAND) {
+            if (bankManager.handleTerminalItemBlockClick(event.getPlayer(), event.getClickedBlock())) {
+                event.setCancelled(true);
                 return;
             }
             if (bankManager.getPlacementService().place(
@@ -73,6 +88,15 @@ public final class BankListener implements Listener {
                     event.getItem()
             )) {
                 event.setCancelled(true);
+            }
+        });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerDropItem(PlayerDropItemEvent event) {
+        safeHandle("onPlayerDropItem", () -> {
+            if (bankManager.handleTerminalEditorDrop(event.getPlayer(), event.getItemDrop().getItemStack())) {
+                event.getItemDrop().remove();
             }
         });
     }

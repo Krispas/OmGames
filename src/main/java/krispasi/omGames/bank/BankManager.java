@@ -14,7 +14,9 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -38,8 +40,10 @@ public final class BankManager {
     private final BankDatabaseService database;
     private final BankTerminalPlacementService placementService;
     private final Map<UUID, BankPromptSession> prompts = new ConcurrentHashMap<>();
+    private final Map<UUID, String> pendingTerminalItemClickLocations = new ConcurrentHashMap<>();
     private final NamespacedKey cardIdKey;
     private final NamespacedKey terminalIdKey;
+    private final NamespacedKey terminalEditorKey;
     private final NamespacedKey omCreditCardKey;
 
     public BankManager(JavaPlugin plugin) {
@@ -48,6 +52,7 @@ public final class BankManager {
         this.placementService = new BankTerminalPlacementService(this, plugin);
         this.cardIdKey = new NamespacedKey(plugin, "bank_card_id");
         this.terminalIdKey = new NamespacedKey(plugin, "bank_terminal_id");
+        this.terminalEditorKey = new NamespacedKey(plugin, "bank_terminal_editor");
         this.omCreditCardKey = new NamespacedKey("om", "credit_card");
     }
 
@@ -57,6 +62,7 @@ public final class BankManager {
 
     public void shutdown() {
         prompts.clear();
+        pendingTerminalItemClickLocations.clear();
         database.shutdown();
     }
 
@@ -130,6 +136,27 @@ public final class BankManager {
         new BankTerminalBuyerMenu(this, terminalId).open(player);
     }
 
+    public void openTerminalEditorMenu(Player player, String terminalId) {
+        if (player == null || terminalId == null) {
+            return;
+        }
+        new BankTerminalEditorMenu(this, terminalId).open(player);
+    }
+
+    public void openTerminalItemEditMenu(Player player, String itemId) {
+        if (player == null || itemId == null) {
+            return;
+        }
+        new BankTerminalItemEditMenu(this, itemId).open(player);
+    }
+
+    public void openTerminalIconMenu(Player player, String itemId, int page) {
+        if (player == null || itemId == null) {
+            return;
+        }
+        new BankTerminalIconMenu(this, itemId, page).open(player);
+    }
+
     public void openAtm(Player player) {
         if (player == null) {
             return;
@@ -174,6 +201,7 @@ public final class BankManager {
     public void cancelPrompt(Player player) {
         if (player != null) {
             prompts.remove(player.getUniqueId());
+            pendingTerminalItemClickLocations.remove(player.getUniqueId());
         }
     }
 
@@ -189,6 +217,11 @@ public final class BankManager {
         if (input.equalsIgnoreCase("cancel") || input.equalsIgnoreCase("zrusit")) {
             prompts.remove(player.getUniqueId());
             player.sendMessage(Component.text("Bank input cancelled.", NamedTextColor.YELLOW));
+            if (session.mode() == BankPromptSession.Mode.TERMINAL_ITEM_NAME
+                    || session.mode() == BankPromptSession.Mode.TERMINAL_ITEM_PRICE) {
+                openTerminalItemEditMenu(player, session.itemId());
+                return;
+            }
             openAdminMenu(player);
             return;
         }
@@ -204,6 +237,27 @@ public final class BankManager {
                 }
             }
             openAdminMenu(player);
+            return;
+        }
+        if (session.mode() == BankPromptSession.Mode.TERMINAL_ITEM_NAME) {
+            Result result = updateTerminalItemName(player, session.itemId(), input);
+            prompts.remove(player.getUniqueId());
+            player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+            openTerminalItemEditMenu(player, session.itemId());
+            return;
+        }
+        if (session.mode() == BankPromptSession.Mode.TERMINAL_ITEM_PRICE) {
+            long price;
+            try {
+                price = Long.parseLong(input);
+            } catch (NumberFormatException ex) {
+                player.sendMessage(Component.text("Price must be a whole positive number.", NamedTextColor.RED));
+                return;
+            }
+            Result result = updateTerminalItemPrice(player, session.itemId(), price);
+            prompts.remove(player.getUniqueId());
+            player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+            openTerminalItemEditMenu(player, session.itemId());
         }
     }
 
@@ -408,6 +462,265 @@ public final class BankManager {
         return database.listTerminalItems(terminalId);
     }
 
+    public BankTerminalItem getTerminalItem(String itemId) {
+        return database.getTerminalItem(itemId);
+    }
+
+    public Result createTerminalItem(Player player, String terminalId) {
+        BankTerminal terminal = database.getTerminal(terminalId);
+        if (terminal == null) {
+            return Result.fail("Terminal not found.");
+        }
+        if (!canEditAccount(player, terminal.accountId())) {
+            return Result.fail("You cannot edit this terminal.");
+        }
+        int number = database.listTerminalItems(terminalId).size() + 1;
+        BankTerminalItem item = database.createTerminalItem(
+                newId("terminal_item"),
+                terminalId,
+                "Item " + number,
+                1L,
+                Material.CHEST,
+                number
+        );
+        if (item == null) {
+            return Result.fail("Failed to create terminal item.");
+        }
+        return Result.ok("Created terminal item " + item.displayName() + ".");
+    }
+
+    public Result updateTerminalItemName(Player player, String itemId, String displayName) {
+        BankTerminalItem item = database.getTerminalItem(itemId);
+        if (item == null) {
+            return Result.fail("Terminal item not found.");
+        }
+        BankTerminal terminal = database.getTerminal(item.terminalId());
+        if (terminal == null) {
+            return Result.fail("Terminal not found.");
+        }
+        if (!canEditAccount(player, terminal.accountId())) {
+            return Result.fail("You cannot edit this terminal.");
+        }
+        String name = displayName == null ? "" : displayName.trim();
+        if (name.isBlank() || name.length() > 48) {
+            return Result.fail("Item name must have 1-48 characters.");
+        }
+        return database.updateTerminalItemName(itemId, name)
+                ? Result.ok("Updated terminal item name.")
+                : Result.fail("Failed to update terminal item name.");
+    }
+
+    public Result updateTerminalItemPrice(Player player, String itemId, long price) {
+        BankTerminalItem item = database.getTerminalItem(itemId);
+        if (item == null) {
+            return Result.fail("Terminal item not found.");
+        }
+        BankTerminal terminal = database.getTerminal(item.terminalId());
+        if (terminal == null) {
+            return Result.fail("Terminal not found.");
+        }
+        if (!canEditAccount(player, terminal.accountId())) {
+            return Result.fail("You cannot edit this terminal.");
+        }
+        if (price <= 0L) {
+            return Result.fail("Price must be positive.");
+        }
+        return database.updateTerminalItemPrice(itemId, price)
+                ? Result.ok("Updated terminal item price.")
+                : Result.fail("Failed to update terminal item price.");
+    }
+
+    public Result updateTerminalItemIcon(Player player, String itemId, Material iconMaterial) {
+        BankTerminalItem item = database.getTerminalItem(itemId);
+        if (item == null) {
+            return Result.fail("Terminal item not found.");
+        }
+        BankTerminal terminal = database.getTerminal(item.terminalId());
+        if (terminal == null) {
+            return Result.fail("Terminal not found.");
+        }
+        if (!canEditAccount(player, terminal.accountId())) {
+            return Result.fail("You cannot edit this terminal.");
+        }
+        if (iconMaterial == null || iconMaterial.isAir() || !iconMaterial.isItem()) {
+            return Result.fail("Choose a valid item icon.");
+        }
+        return database.updateTerminalItemIcon(itemId, iconMaterial)
+                ? Result.ok("Updated terminal item icon.")
+                : Result.fail("Failed to update terminal item icon.");
+    }
+
+    public Result deleteTerminalItem(Player player, String itemId) {
+        BankTerminalItem item = database.getTerminalItem(itemId);
+        if (item == null) {
+            return Result.fail("Terminal item not found.");
+        }
+        BankTerminal terminal = database.getTerminal(item.terminalId());
+        if (terminal == null) {
+            return Result.fail("Terminal not found.");
+        }
+        if (!canEditAccount(player, terminal.accountId())) {
+            return Result.fail("You cannot edit this terminal.");
+        }
+        return database.deleteTerminalItem(itemId)
+                ? Result.ok("Deleted terminal item " + item.displayName() + ".")
+                : Result.fail("Failed to delete terminal item.");
+    }
+
+    public void beginTerminalItemNamePrompt(Player player, String itemId) {
+        BankTerminalItem item = database.getTerminalItem(itemId);
+        if (!canEditTerminalItem(player, item)) {
+            player.sendMessage(Component.text("You cannot edit this terminal item.", NamedTextColor.RED));
+            return;
+        }
+        prompts.put(player.getUniqueId(), BankPromptSession.terminalItemName(item.terminalId(), item.itemId()));
+        player.closeInventory();
+        sendPrompt(player, "Napis novy nazev terminal itemu. Napis cancel pro zruseni.");
+    }
+
+    public void beginTerminalItemPricePrompt(Player player, String itemId) {
+        BankTerminalItem item = database.getTerminalItem(itemId);
+        if (!canEditTerminalItem(player, item)) {
+            player.sendMessage(Component.text("You cannot edit this terminal item.", NamedTextColor.RED));
+            return;
+        }
+        prompts.put(player.getUniqueId(), BankPromptSession.terminalItemPrice(item.terminalId(), item.itemId()));
+        player.closeInventory();
+        sendPrompt(player, "Napis cenu v kreditech. Napis cancel pro zruseni.");
+    }
+
+    public Result beginTerminalItemClickLocation(Player player, String itemId) {
+        BankTerminalItem item = database.getTerminalItem(itemId);
+        if (!canEditTerminalItem(player, item)) {
+            return Result.fail("You cannot edit this terminal item.");
+        }
+        pendingTerminalItemClickLocations.put(player.getUniqueId(), item.itemId());
+        player.closeInventory();
+        return Result.ok("Right-click a block with the terminal editor to bind this item.");
+    }
+
+    public Result startTerminalEditing(Player player, String terminalId) {
+        BankTerminal terminal = database.getTerminal(terminalId);
+        if (terminal == null) {
+            return Result.fail("Terminal not found.");
+        }
+        if (!canEditAccount(player, terminal.accountId())) {
+            return Result.fail("You cannot edit this terminal.");
+        }
+        removeTerminalEditorItems(player, terminalId);
+        ItemStack editor = createTerminalEditorItem(terminal);
+        if (player.getInventory().getItemInMainHand().getType().isAir()) {
+            player.getInventory().setItemInMainHand(editor);
+        } else {
+            giveOrDrop(player, editor);
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.25f);
+        return Result.ok("Terminal editor ready. Left-click with it to open the item list.");
+    }
+
+    public Result stopTerminalEditing(Player player, String terminalId) {
+        if (player == null) {
+            return Result.fail("Only players can edit terminals.");
+        }
+        int removed = removeTerminalEditorItems(player, terminalId);
+        pendingTerminalItemClickLocations.remove(player.getUniqueId());
+        return Result.ok("Terminal editing ended. Removed " + removed + " editor item" + (removed == 1 ? "" : "s") + ".");
+    }
+
+    public Result addTerminalItemToCart(Player player, String itemId, int amount) {
+        if (player == null) {
+            return Result.fail("Only players can use terminal carts.");
+        }
+        BankTerminalItem item = database.getTerminalItem(itemId);
+        if (item == null) {
+            return Result.fail("Terminal item not found.");
+        }
+        if (!database.addCartItem(player.getUniqueId(), item.itemId(), Math.max(1, amount))) {
+            return Result.fail("Failed to add item to cart.");
+        }
+        return Result.ok("Added " + item.displayName() + " to cart for " + item.price() + " credits.");
+    }
+
+    public boolean handleTerminalEditorInteract(Player player, org.bukkit.event.block.Action action, Block clickedBlock, EquipmentSlot hand, ItemStack item) {
+        if (player == null || hand != EquipmentSlot.HAND || !isTerminalEditorItem(item)) {
+            return false;
+        }
+        String terminalId = readTerminalEditorId(item);
+        BankTerminal terminal = database.getTerminal(terminalId);
+        if (terminal == null || !canEditAccount(player, terminal.accountId())) {
+            player.sendMessage(Component.text("You cannot use this terminal editor.", NamedTextColor.RED));
+            return true;
+        }
+        if (action == org.bukkit.event.block.Action.LEFT_CLICK_AIR || action == org.bukkit.event.block.Action.LEFT_CLICK_BLOCK) {
+            openTerminalEditorMenu(player, terminalId);
+            return true;
+        }
+        if (action == org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK && clickedBlock != null) {
+            String itemId = pendingTerminalItemClickLocations.remove(player.getUniqueId());
+            if (itemId == null) {
+                player.sendMessage(Component.text("Choose Set Click Block in an item menu first.", NamedTextColor.YELLOW));
+                return true;
+            }
+            BankTerminalItem terminalItem = database.getTerminalItem(itemId);
+            if (terminalItem == null || !terminalItem.terminalId().equals(terminalId)) {
+                player.sendMessage(Component.text("Terminal item not found for this editor.", NamedTextColor.RED));
+                return true;
+            }
+            boolean updated = database.updateTerminalItemClickLocation(
+                    terminalItem.itemId(),
+                    clickedBlock.getWorld().getName(),
+                    clickedBlock.getX(),
+                    clickedBlock.getY(),
+                    clickedBlock.getZ()
+            );
+            player.sendMessage(Component.text(updated
+                    ? "Click block set for " + terminalItem.displayName() + "."
+                    : "Failed to set click block.", updated ? NamedTextColor.GREEN : NamedTextColor.RED));
+            if (updated) {
+                openTerminalItemEditMenu(player, terminalItem.itemId());
+            }
+            return true;
+        }
+        return true;
+    }
+
+    public boolean handleTerminalItemBlockClick(Player player, Block clickedBlock) {
+        if (player == null || clickedBlock == null) {
+            return false;
+        }
+        BankTerminalItem item = database.getTerminalItemAt(
+                clickedBlock.getWorld().getName(),
+                clickedBlock.getX(),
+                clickedBlock.getY(),
+                clickedBlock.getZ()
+        );
+        if (item == null) {
+            return false;
+        }
+        String cardId = firstCardId(player, null);
+        if (cardId == null) {
+            player.sendMessage(Component.text("Hold a credit card to add terminal items to your cart.", NamedTextColor.YELLOW));
+            return true;
+        }
+        Result validation = validateAtmCard(cardId);
+        if (!validation.success()) {
+            player.sendMessage(Component.text(validation.message(), NamedTextColor.RED));
+            return true;
+        }
+        Result result = addTerminalItemToCart(player, item.itemId(), 1);
+        player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+        return true;
+    }
+
+    public boolean handleTerminalEditorDrop(Player player, ItemStack item) {
+        if (player == null || !isTerminalEditorItem(item)) {
+            return false;
+        }
+        pendingTerminalItemClickLocations.remove(player.getUniqueId());
+        player.sendMessage(Component.text("Terminal editor removed.", NamedTextColor.YELLOW));
+        return true;
+    }
+
     public List<BankCartLine> listCart(Player player, String terminalId) {
         if (player == null) {
             return List.of();
@@ -432,6 +745,9 @@ public final class BankManager {
     public boolean canEditAccount(Player player, String accountId) {
         if (player == null || accountId == null) {
             return false;
+        }
+        if (player.hasPermission("omgames.bank.admin")) {
+            return true;
         }
         BankAccount account = database.getAccount(accountId);
         if (account == null) {
@@ -489,6 +805,18 @@ public final class BankManager {
         return item.getItemMeta().getPersistentDataContainer().get(terminalIdKey, PersistentDataType.STRING);
     }
 
+    public String readTerminalEditorId(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return null;
+        }
+        ItemMeta meta = item.getItemMeta();
+        Boolean editor = meta.getPersistentDataContainer().get(terminalEditorKey, PersistentDataType.BOOLEAN);
+        if (!Boolean.TRUE.equals(editor)) {
+            return null;
+        }
+        return meta.getPersistentDataContainer().get(terminalIdKey, PersistentDataType.STRING);
+    }
+
     public Result previewCardCheckout(Player player, String terminalId, String cardId) {
         BankTerminal terminal = getTerminal(terminalId);
         BankCard card = getCard(cardId);
@@ -518,7 +846,27 @@ public final class BankManager {
         if (!preview.success()) {
             return preview;
         }
-        return Result.fail("Payment is prepared but disabled until the credit economy is connected.");
+        BankTerminal terminal = getTerminal(terminalId);
+        BankCard card = getCard(cardId);
+        List<BankCartLine> lines = listCart(player, terminalId);
+        long total = cartTotal(lines);
+        if (terminal == null || card == null || total <= 0L) {
+            return Result.fail("Checkout is no longer valid.");
+        }
+        if (!database.transferAndClearCart(card.accountId(), terminal.accountId(), player.getUniqueId(), terminalId, total)) {
+            return Result.fail("Payment failed. Check your card balance.");
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+        return Result.ok("Paid " + total + " credits to " + terminal.name()
+                + ". Balance: " + accountBalance(card.accountId()) + ".");
+    }
+
+    public Result payCartWithCardInput(Player player, String terminalId, ItemStack cursorItem) {
+        String cardId = firstCardId(player, cursorItem);
+        if (cardId == null) {
+            return Result.fail("Hold a credit card or click Pay with a card on your cursor.");
+        }
+        return payCart(player, terminalId, cardId);
     }
 
     public Result depositHeldCredits(Player player) {
@@ -799,6 +1147,23 @@ public final class BankManager {
         return item;
     }
 
+    private ItemStack createTerminalEditorItem(BankTerminal terminal) {
+        ItemStack item = new ItemStack(Material.STICK);
+        ItemMeta meta = item.getItemMeta();
+        meta.displayName(Component.text("Terminal Editor - " + terminal.name(), NamedTextColor.LIGHT_PURPLE));
+        meta.lore(List.of(
+                Component.text("Left-click: terminal item list", NamedTextColor.GRAY),
+                Component.text("Right-click selected block: bind pending item", NamedTextColor.GRAY),
+                Component.text("Drop or End Edit to remove.", NamedTextColor.YELLOW)
+        ));
+        meta.setEnchantmentGlintOverride(true);
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+        meta.getPersistentDataContainer().set(terminalIdKey, PersistentDataType.STRING, terminal.terminalId());
+        meta.getPersistentDataContainer().set(terminalEditorKey, PersistentDataType.BOOLEAN, true);
+        item.setItemMeta(meta);
+        return item;
+    }
+
     private ItemStack createRegisteredCashRegisterBase() {
         if (OmVeinsAPI.isInitialized()) {
             try {
@@ -810,11 +1175,23 @@ public final class BankManager {
         return null;
     }
 
+    private boolean canEditTerminalItem(Player player, BankTerminalItem item) {
+        if (player == null || item == null) {
+            return false;
+        }
+        BankTerminal terminal = database.getTerminal(item.terminalId());
+        return terminal != null && canEditAccount(player, terminal.accountId());
+    }
+
     private boolean isOmVeinsCreditCard(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return false;
         }
         return hasOmVeinsCreditCardMarker(item.getItemMeta());
+    }
+
+    private boolean isTerminalEditorItem(ItemStack item) {
+        return readTerminalEditorId(item) != null;
     }
 
     private boolean hasOmVeinsCreditCardMarker(ItemMeta meta) {
@@ -849,6 +1226,21 @@ public final class BankManager {
         }
     }
 
+    private String firstCardId(Player player, ItemStack cursorItem) {
+        String cardId = readCardId(cursorItem);
+        if (cardId != null) {
+            return cardId;
+        }
+        if (player == null) {
+            return null;
+        }
+        cardId = readCardId(player.getInventory().getItemInMainHand());
+        if (cardId != null) {
+            return cardId;
+        }
+        return readCardId(player.getInventory().getItemInOffHand());
+    }
+
     private String creditId(ItemStack item, Map<String, ItemStack> templates) {
         for (Map.Entry<String, ItemStack> entry : templates.entrySet()) {
             ItemStack template = entry.getValue();
@@ -866,6 +1258,24 @@ public final class BankManager {
                 player.getWorld().dropItemNaturally(player.getLocation(), leftover);
             }
         }
+    }
+
+    private int removeTerminalEditorItems(Player player, String terminalId) {
+        int removed = 0;
+        ItemStack[] contents = player.getInventory().getContents();
+        for (int slot = 0; slot < contents.length; slot++) {
+            ItemStack item = contents[slot];
+            String editorTerminalId = readTerminalEditorId(item);
+            if (editorTerminalId == null) {
+                continue;
+            }
+            if (terminalId == null || terminalId.equals(editorTerminalId)) {
+                contents[slot] = null;
+                removed++;
+            }
+        }
+        player.getInventory().setContents(contents);
+        return removed;
     }
 
     private String newId(String prefix) {

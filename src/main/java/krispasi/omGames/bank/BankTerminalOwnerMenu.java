@@ -56,7 +56,11 @@ public final class BankTerminalOwnerMenu implements BankInventoryMenu {
             return;
         }
         if (slot == EDIT_SLOT) {
-            player.sendMessage(Component.text("Terminal editing is prepared; item/pricing setup will be added later.", NamedTextColor.YELLOW));
+            BankManager.Result result = manager.startTerminalEditing(player, terminalId);
+            player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+            if (result.success()) {
+                manager.openTerminalEditorMenu(player, terminalId);
+            }
             return;
         }
         if (slot == DECONSTRUCT_SLOT && terminal != null) {
@@ -79,11 +83,11 @@ public final class BankTerminalOwnerMenu implements BankInventoryMenu {
             return;
         }
         inventory.setItem(EDIT_SLOT, BankMenuItems.item(
-                Material.ANVIL,
+                Material.STICK,
                 Component.text("Edit Terminal", NamedTextColor.YELLOW),
                 List.of(
-                        Component.text("Prepared for future item and price setup.", NamedTextColor.GRAY),
-                        Component.text("No item logic is connected yet.", NamedTextColor.DARK_GRAY)
+                        Component.text("Gives you a terminal editor.", NamedTextColor.GRAY),
+                        Component.text("Owners, editors, and admins can edit.", NamedTextColor.DARK_GRAY)
                 )
         ));
         inventory.setItem(BUYER_VIEW_SLOT, BankMenuItems.item(

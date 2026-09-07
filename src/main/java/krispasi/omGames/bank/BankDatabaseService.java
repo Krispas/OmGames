@@ -15,6 +15,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import krispasi.omGames.storage.OmGamesDatabaseFiles;
+import org.bukkit.Material;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class BankDatabaseService {
@@ -74,6 +75,11 @@ public final class BankDatabaseService {
               display_name TEXT NOT NULL,
               price INTEGER NOT NULL,
               sort_order INTEGER NOT NULL DEFAULT 0,
+              icon_material TEXT NOT NULL DEFAULT 'CHEST',
+              click_world TEXT,
+              click_x INTEGER,
+              click_y INTEGER,
+              click_z INTEGER,
               FOREIGN KEY(terminal_id) REFERENCES bank_terminals(terminal_id)
             )
             """;
@@ -121,6 +127,11 @@ public final class BankDatabaseService {
             }
             ensureColumn("bank_cards", "owner_account_id", "TEXT");
             ensureColumn("bank_terminals", "owner_account_id", "TEXT");
+            ensureColumn("bank_terminal_items", "icon_material", "TEXT NOT NULL DEFAULT 'CHEST'");
+            ensureColumn("bank_terminal_items", "click_world", "TEXT");
+            ensureColumn("bank_terminal_items", "click_x", "INTEGER");
+            ensureColumn("bank_terminal_items", "click_y", "INTEGER");
+            ensureColumn("bank_terminal_items", "click_z", "INTEGER");
         } catch (SQLException ex) {
             logger.log(Level.SEVERE, "Failed to load Bank database tables.", ex);
         }
@@ -501,6 +512,170 @@ public final class BankDatabaseService {
         return items;
     }
 
+    public BankTerminalItem getTerminalItem(String itemId) {
+        if (connection == null || itemId == null || itemId.isBlank()) {
+            return null;
+        }
+        String sql = "SELECT * FROM bank_terminal_items WHERE item_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, itemId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return parseTerminalItem(resultSet);
+                }
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load Bank terminal item " + itemId + ".", ex);
+        }
+        return null;
+    }
+
+    public BankTerminalItem getTerminalItemAt(String worldName, int x, int y, int z) {
+        if (connection == null || worldName == null || worldName.isBlank()) {
+            return null;
+        }
+        String sql = """
+                SELECT * FROM bank_terminal_items
+                WHERE click_world = ? AND click_x = ? AND click_y = ? AND click_z = ?
+                ORDER BY sort_order, lower(display_name)
+                LIMIT 1
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, worldName);
+            statement.setInt(2, x);
+            statement.setInt(3, y);
+            statement.setInt(4, z);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    return parseTerminalItem(resultSet);
+                }
+            }
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load Bank terminal item click location.", ex);
+        }
+        return null;
+    }
+
+    public BankTerminalItem createTerminalItem(String itemId, String terminalId, String displayName, long price, Material iconMaterial, int sortOrder) {
+        if (connection == null || itemId == null || itemId.isBlank() || terminalId == null || terminalId.isBlank()
+                || displayName == null || displayName.isBlank() || price <= 0L) {
+            return null;
+        }
+        String sql = """
+                INSERT INTO bank_terminal_items (item_id, terminal_id, display_name, price, sort_order, icon_material)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, itemId);
+            statement.setString(2, terminalId);
+            statement.setString(3, displayName);
+            statement.setLong(4, price);
+            statement.setInt(5, sortOrder);
+            statement.setString(6, safeIcon(iconMaterial).name());
+            statement.executeUpdate();
+            return getTerminalItem(itemId);
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to create Bank terminal item for " + terminalId + ".", ex);
+            return null;
+        }
+    }
+
+    public boolean updateTerminalItemName(String itemId, String displayName) {
+        if (connection == null || itemId == null || itemId.isBlank() || displayName == null || displayName.isBlank()) {
+            return false;
+        }
+        return updateTerminalItemField(itemId, "display_name", displayName);
+    }
+
+    public boolean updateTerminalItemPrice(String itemId, long price) {
+        if (connection == null || itemId == null || itemId.isBlank() || price <= 0L) {
+            return false;
+        }
+        String sql = "UPDATE bank_terminal_items SET price = ? WHERE item_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, price);
+            statement.setString(2, itemId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to update Bank terminal item price " + itemId + ".", ex);
+            return false;
+        }
+    }
+
+    public boolean updateTerminalItemIcon(String itemId, Material iconMaterial) {
+        if (connection == null || itemId == null || itemId.isBlank()) {
+            return false;
+        }
+        return updateTerminalItemField(itemId, "icon_material", safeIcon(iconMaterial).name());
+    }
+
+    public boolean updateTerminalItemClickLocation(String itemId, String worldName, int x, int y, int z) {
+        if (connection == null || itemId == null || itemId.isBlank() || worldName == null || worldName.isBlank()) {
+            return false;
+        }
+        boolean previousAutoCommit = true;
+        try {
+            previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try (PreparedStatement clear = connection.prepareStatement("""
+                         UPDATE bank_terminal_items
+                         SET click_world = NULL, click_x = NULL, click_y = NULL, click_z = NULL
+                         WHERE click_world = ? AND click_x = ? AND click_y = ? AND click_z = ?
+                         """);
+                 PreparedStatement update = connection.prepareStatement("""
+                         UPDATE bank_terminal_items
+                         SET click_world = ?, click_x = ?, click_y = ?, click_z = ?
+                         WHERE item_id = ?
+                         """)) {
+                clear.setString(1, worldName);
+                clear.setInt(2, x);
+                clear.setInt(3, y);
+                clear.setInt(4, z);
+                clear.executeUpdate();
+                update.setString(1, worldName);
+                update.setInt(2, x);
+                update.setInt(3, y);
+                update.setInt(4, z);
+                update.setString(5, itemId);
+                int changed = update.executeUpdate();
+                connection.commit();
+                return changed > 0;
+            }
+        } catch (SQLException ex) {
+            rollbackQuietly("terminal item click location");
+            logger.log(Level.WARNING, "Failed to update Bank terminal item click location " + itemId + ".", ex);
+            return false;
+        } finally {
+            restoreAutoCommit(previousAutoCommit);
+        }
+    }
+
+    public boolean deleteTerminalItem(String itemId) {
+        if (connection == null || itemId == null || itemId.isBlank()) {
+            return false;
+        }
+        boolean previousAutoCommit = true;
+        try {
+            previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try (PreparedStatement deleteCart = connection.prepareStatement("DELETE FROM bank_cart_lines WHERE item_id = ?");
+                 PreparedStatement deleteItem = connection.prepareStatement("DELETE FROM bank_terminal_items WHERE item_id = ?")) {
+                deleteCart.setString(1, itemId);
+                deleteCart.executeUpdate();
+                deleteItem.setString(1, itemId);
+                int deleted = deleteItem.executeUpdate();
+                connection.commit();
+                return deleted > 0;
+            }
+        } catch (SQLException ex) {
+            rollbackQuietly("terminal item deletion");
+            logger.log(Level.WARNING, "Failed to delete Bank terminal item " + itemId + ".", ex);
+            return false;
+        } finally {
+            restoreAutoCommit(previousAutoCommit);
+        }
+    }
+
     public boolean deleteTerminal(String terminalId) {
         if (connection == null || terminalId == null || terminalId.isBlank()) {
             return false;
@@ -571,6 +746,91 @@ public final class BankDatabaseService {
         return lines;
     }
 
+    public boolean addCartItem(UUID playerId, String itemId, int amount) {
+        if (connection == null || playerId == null || itemId == null || itemId.isBlank() || amount <= 0) {
+            return false;
+        }
+        BankTerminalItem item = getTerminalItem(itemId);
+        if (item == null) {
+            return false;
+        }
+        String sql = """
+                INSERT INTO bank_cart_lines (player_uuid, terminal_id, item_id, amount)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(player_uuid, terminal_id, item_id) DO UPDATE SET amount = amount + excluded.amount
+                """;
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, playerId.toString());
+            statement.setString(2, item.terminalId());
+            statement.setString(3, item.itemId());
+            statement.setInt(4, amount);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to add Bank cart item " + itemId + " for " + playerId + ".", ex);
+            return false;
+        }
+    }
+
+    public boolean clearCart(UUID playerId, String terminalId) {
+        if (connection == null || playerId == null || terminalId == null || terminalId.isBlank()) {
+            return false;
+        }
+        String sql = "DELETE FROM bank_cart_lines WHERE player_uuid = ? AND terminal_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, playerId.toString());
+            statement.setString(2, terminalId);
+            statement.executeUpdate();
+            return true;
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to clear Bank cart for " + playerId + ".", ex);
+            return false;
+        }
+    }
+
+    public boolean transferAndClearCart(String fromAccountId, String toAccountId, UUID playerId, String terminalId, long amount) {
+        if (connection == null || fromAccountId == null || fromAccountId.isBlank()
+                || toAccountId == null || toAccountId.isBlank() || playerId == null
+                || terminalId == null || terminalId.isBlank() || amount <= 0L) {
+            return false;
+        }
+        boolean previousAutoCommit = true;
+        try {
+            previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try (PreparedStatement withdraw = connection.prepareStatement(
+                         "UPDATE bank_account_profiles SET balance = balance - ? WHERE account_id = ? AND balance >= ?");
+                 PreparedStatement deposit = connection.prepareStatement(
+                         "UPDATE bank_account_profiles SET balance = balance + ? WHERE account_id = ?");
+                 PreparedStatement clear = connection.prepareStatement(
+                         "DELETE FROM bank_cart_lines WHERE player_uuid = ? AND terminal_id = ?")) {
+                withdraw.setLong(1, amount);
+                withdraw.setString(2, fromAccountId);
+                withdraw.setLong(3, amount);
+                if (withdraw.executeUpdate() <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+                deposit.setLong(1, amount);
+                deposit.setString(2, toAccountId);
+                if (deposit.executeUpdate() <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+                clear.setString(1, playerId.toString());
+                clear.setString(2, terminalId);
+                clear.executeUpdate();
+                connection.commit();
+                return true;
+            }
+        } catch (SQLException ex) {
+            rollbackQuietly("Bank cart checkout");
+            logger.log(Level.WARNING, "Failed to complete Bank cart checkout for " + playerId + ".", ex);
+            return false;
+        } finally {
+            restoreAutoCommit(previousAutoCommit);
+        }
+    }
+
     private BankAccount parseAccount(ResultSet resultSet) throws SQLException {
         String playerUuid = resultSet.getString("player_uuid");
         return new BankAccount(
@@ -611,8 +871,48 @@ public final class BankDatabaseService {
                 resultSet.getString("terminal_id"),
                 resultSet.getString("display_name"),
                 resultSet.getLong("price"),
-                resultSet.getInt("sort_order")
+                resultSet.getInt("sort_order"),
+                parseMaterial(resultSet.getString("icon_material")),
+                resultSet.getString("click_world"),
+                nullableInteger(resultSet, "click_x"),
+                nullableInteger(resultSet, "click_y"),
+                nullableInteger(resultSet, "click_z")
         );
+    }
+
+    private boolean updateTerminalItemField(String itemId, String columnName, String value) {
+        String sql = "UPDATE bank_terminal_items SET " + columnName + " = ? WHERE item_id = ?";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, value);
+            statement.setString(2, itemId);
+            return statement.executeUpdate() > 0;
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to update Bank terminal item " + itemId + ".", ex);
+            return false;
+        }
+    }
+
+    private Material parseMaterial(String value) {
+        if (value != null && !value.isBlank()) {
+            try {
+                Material material = Material.valueOf(value);
+                return safeIcon(material);
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return Material.CHEST;
+    }
+
+    private Material safeIcon(Material material) {
+        if (material == null || material.isAir() || !material.isItem()) {
+            return Material.CHEST;
+        }
+        return material;
+    }
+
+    private Integer nullableInteger(ResultSet resultSet, String columnName) throws SQLException {
+        int value = resultSet.getInt(columnName);
+        return resultSet.wasNull() ? null : value;
     }
 
     private void openConnection() throws SQLException {
@@ -635,6 +935,22 @@ public final class BankDatabaseService {
         }
         try (Statement statement = connection.createStatement()) {
             statement.execute("ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + definition);
+        }
+    }
+
+    private void rollbackQuietly(String context) {
+        try {
+            connection.rollback();
+        } catch (SQLException rollbackEx) {
+            logger.log(Level.WARNING, "Failed to roll back Bank " + context + ".", rollbackEx);
+        }
+    }
+
+    private void restoreAutoCommit(boolean previousAutoCommit) {
+        try {
+            connection.setAutoCommit(previousAutoCommit);
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to restore Bank database autocommit.", ex);
         }
     }
 
