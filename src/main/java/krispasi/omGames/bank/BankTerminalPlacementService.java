@@ -1,5 +1,6 @@
 package krispasi.omGames.bank;
 
+import java.util.Collection;
 import java.util.UUID;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -126,6 +127,23 @@ public final class BankTerminalPlacementService {
         }
         player.playSound(soundLocation == null ? player.getLocation() : soundLocation, Sound.BLOCK_COPPER_BREAK, 0.8f, 1.0f);
         return BankManager.Result.ok("Deconstructed terminal " + terminal.name() + " and returned " + itemCount + " item" + (itemCount == 1 ? "" : "s") + ".");
+    }
+
+    public int removeTerminalEntities(Collection<String> terminalIds) {
+        if (terminalIds == null || terminalIds.isEmpty()) {
+            return 0;
+        }
+        int removed = 0;
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : world.getEntities()) {
+                String entityTerminalId = terminalId(entity);
+                if (entityTerminalId != null && terminalIds.contains(entityTerminalId)) {
+                    entity.remove();
+                    removed++;
+                }
+            }
+        }
+        return removed;
     }
 
     private void spawnTerminalEntities(Location base, BankTerminal terminal, String placementId, ItemStack displayItem) {
