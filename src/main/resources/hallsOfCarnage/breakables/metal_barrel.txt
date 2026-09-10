@@ -9,21 +9,25 @@ parts:
     offset: [0, 1, 0]
 loot:
   - item: iron_scrap
-    weight: 35
+    weight: 200
   - item: diamond_scrap
-    weight: 16
-  - item: redstone_scrap
-    weight: 22
-  - item: blueprint
-    weight: 10
+    weight: 200
   - item: coin
-    weight: 22
-    amount: 2-5
+    weight: 60
+    amount: 1-3
+  - item: blueprint
+    weight: 9
+  - item: utility
+    weight: 9
+  - item: weapon
+    weight: 9
+  - item: armor
+    weight: 9
   - item: rare_weapon
-    weight: 4
+    weight: 1
   - item: rare_armor
-    weight: 3
+    weight: 1
   - item: rare_utility
-    weight: 3
+    weight: 1
   - item: rare_blueprint
-    weight: 3
+    weight: 1
