@@ -31,6 +31,7 @@ Primary goal: keep BedWars stable while allowing fast config-first iteration.
 - If defaults need to change, update the resource files in `src/main/resources/`.
 - If an existing server config needs the new defaults, the expected workflow is to delete that file and let the plugin recreate it.
 - Target Paper `26.2` only; do not keep backward-compatibility shims for older Minecraft/Paper versions.
+- When verifying Halls of Carnage work, run Maven compile with tests skipped unless the user specifically asks for tests; the current environment is not set up for Maven test runs.
 - Preserve saved data compatibility (configs/SQLite/player data) so existing servers can be updated without data loss.
 - Prefer native Bukkit/Paper APIs; only use reflection when no public API exists and the cost is justified.
 - Do not touch `OmVeinsAPI`.
@@ -1296,6 +1297,8 @@ SQLite tables:
 - Generated corridors use ceiling-embedded light blocks so the walkable corridor remains 3 blocks tall, and the elevator has a ceiling light.
 - The elevator exterior vestibule is generated as a sealed mini-tunnel outside the door; opening the door clears only the passage while preserving the vestibule floor, side walls, and ceiling.
 - Elevator transitions rebuild exploration floors through a staged session-local main-thread build job: plan, clear old columns, elevator shell, room batches, corridor batches, traps, content batches, chest restore, and door opening.
+- Staged Halls floor clears must not clear the protected elevator footprint while players are inside it.
+- Active Halls participants should have their respawn location set to the session elevator; normal session exit should restore their respawn location to the configured Halls lobby spawn.
 - Halls physics item displays use a 1-tick interpolation delay and short teleport duration for smoother falling/pickup visuals.
 - Halls floor loot/drop placeholders should use session-owned physics drops (`ItemDisplay` plus `Interaction`) instead of vanilla dropped item entities; players pick them up by right-clicking with an empty hand.
 - Halls physics item displays are fixed, flat item displays with randomized yaw so dropped items read as lying on the floor instead of upright.

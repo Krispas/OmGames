@@ -52,6 +52,7 @@ public final class HallsSession {
     private static final int ELEVATOR_OUTER_RADIUS = 3;
     private static final int CLEAR_COLUMNS_PER_TICK = 3;
     private static final int CORRIDOR_CELLS_PER_TICK = 96;
+    private static final int MIN_ELEVATOR_TRANSITION_TICKS = 100;
     private static final int DISPLAY_INTERPOLATION_DELAY_TICKS = 1;
     private static final int DISPLAY_TELEPORT_DURATION_TICKS = 2;
     private static final double DROP_DISPLAY_SUPPORT_OFFSET = 0.08;
@@ -301,6 +302,7 @@ public final class HallsSession {
         if (player == null || !running || !participants.contains(player.getUniqueId())) {
             return;
         }
+        setPlayerElevatorRespawn(player);
         applyInventoryLimit(player);
     }
 
@@ -346,7 +348,7 @@ public final class HallsSession {
         running = true;
         startedAtMillis = System.currentTimeMillis();
         startHudTask();
-        Location spawn = new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5, 180.0f, 0.0f);
+        Location spawn = elevatorSpawnLocation();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player == null) {
@@ -356,7 +358,7 @@ public final class HallsSession {
             player.setGameMode(GameMode.ADVENTURE);
             player.setFoodLevel(20);
             player.setSaturation(20.0f);
-            player.setRespawnLocation(spawn, true);
+            setPlayerElevatorRespawn(player);
             player.getInventory().clear();
             applyInventoryLimit(player);
             player.sendMessage(Component.text("Entering " + scenario.name() + " floor 1.", NamedTextColor.DARK_RED));
@@ -373,10 +375,14 @@ public final class HallsSession {
             if (player != null && fallback != null && player.getWorld().equals(world)) {
                 restoreInventoryLimit(player);
                 player.getInventory().clear();
+                player.setRespawnLocation(fallback, true);
                 player.teleport(fallback);
             } else if (player != null) {
                 restoreInventoryLimit(player);
                 player.getInventory().clear();
+                if (fallback != null) {
+                    player.setRespawnLocation(fallback, true);
+                }
             }
         }
         restoreBlocks();
@@ -457,13 +463,24 @@ public final class HallsSession {
     }
 
     private void teleportParticipantsToElevator(String title, String subtitle) {
-        Location spawn = new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5, 180.0f, 0.0f);
+        Location spawn = elevatorSpawnLocation();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
+                setPlayerElevatorRespawn(player);
                 player.teleport(spawn);
                 player.sendTitle(title, subtitle, 10, 45, 15);
             }
+        }
+    }
+
+    private Location elevatorSpawnLocation() {
+        return new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5, 180.0f, 0.0f);
+    }
+
+    private void setPlayerElevatorRespawn(Player player) {
+        if (player != null) {
+            player.setRespawnLocation(elevatorSpawnLocation(), true);
         }
     }
 
@@ -622,6 +639,9 @@ public final class HallsSession {
         for (int x = minX; x <= maxX; x++) {
             for (int y = origin.y() - 16; y <= origin.y() + CLEAR_HEIGHT; y++) {
                 for (int z = origin.z() - radius; z <= origin.z() + radius; z++) {
+                    if (isProtectedElevatorCell(x, z)) {
+                        continue;
+                    }
                     setBlock(x, y, z, Material.AIR);
                 }
             }
@@ -1830,6 +1850,7 @@ public final class HallsSession {
         private int roomIndex;
         private int corridorIndex;
         private int contentRoomIndex;
+        private int ticksElapsed;
         private ExplorationBuild build;
         private List<HallsExplorationGenerator.Cell> corridorShellCells = List.of();
         private Set<HallsExplorationGenerator.Cell> reservedCells = Set.of();
@@ -1844,6 +1865,7 @@ public final class HallsSession {
                 cancelFloorBuildTask();
                 return;
             }
+            ticksElapsed++;
             switch (stage) {
                 case 0 -> plan();
                 case 1 -> clearNextColumns();
@@ -1918,6 +1940,9 @@ public final class HallsSession {
         }
 
         private void finish() {
+            if (ticksElapsed < MIN_ELEVATOR_TRANSITION_TICKS) {
+                return;
+            }
             restoreElevatorChestContents();
             closeElevatorDoors();
             teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
