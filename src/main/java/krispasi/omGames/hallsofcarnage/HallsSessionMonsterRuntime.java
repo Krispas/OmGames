@@ -44,7 +44,7 @@ final class HallsSessionMonsterRuntime {
     private final Set<UUID> spawnedMonsters = new HashSet<>();
     private List<HallsExplorationGenerator.Cell> spawnCells = List.of();
     private List<HallsMonsterType> commonPool = List.of();
-    private List<HallsMonsterType> specialPool = List.of();
+    private HallsMonsterType activeSpecialType;
     private Random random = new Random();
     private BukkitTask spawnTask;
     private int maxAlive;
@@ -73,15 +73,20 @@ final class HallsSessionMonsterRuntime {
     void startExplorationFloor(HallsExplorationGenerator.Plan plan,
                                HallsScenario.FloorDefinition floor,
                                HallsLevelType levelType,
+                               HallsFloorModifiers modifiers,
                                Random random) {
         clear();
         this.random = random == null ? new Random() : random;
         this.spawnCells = spawnCells(plan);
         this.commonPool = monsterPool(levelType == null ? List.of() : levelType.commonMonsters());
-        this.specialPool = monsterPool(levelType == null ? List.of() : levelType.specialMonsters());
+        List<HallsMonsterType> specialPool = monsterPool(levelType == null ? List.of() : levelType.specialMonsters());
+        this.activeSpecialType = modifiers != null && modifiers.useSpecialEnemy() && !specialPool.isEmpty()
+                ? specialPool.get(this.random.nextInt(specialPool.size()))
+                : null;
         int difficulty = parseDifficulty(floor == null ? "0" : floor.difficulty(), floor == null ? 1 : floor.firstFloor());
         int rooms = Math.max(1, floor == null ? 1 : floor.rooms());
-        this.baseMaxAlive = Math.max(2, Math.min(16, participants.size() + rooms / 4 + difficulty / 15));
+        double enemyMultiplier = modifiers == null ? 1.0 : modifiers.enemySpawnMultiplier();
+        this.baseMaxAlive = Math.max(2, Math.min(24, (int) Math.round((participants.size() + rooms / 4 + difficulty / 15) * enemyMultiplier)));
         this.maxAlive = baseMaxAlive;
         this.capExtensionIntervalTicks = capExtensionIntervalTicks(difficulty);
         this.capExtensionCooldownTicks = capExtensionIntervalTicks;
@@ -107,6 +112,7 @@ final class HallsSessionMonsterRuntime {
         spawnedMonsters.clear();
         spawnCells = List.of();
         spawnedThisFloor = 0;
+        activeSpecialType = null;
         spawnCooldownTicks = 0;
         baseMaxAlive = 0;
         maxAlive = 0;
@@ -216,7 +222,7 @@ final class HallsSessionMonsterRuntime {
         }
         applyEquipment(living.getEquipment(), type);
         if (living instanceof Creature creature) {
-            creature.setTarget(nearestParticipant(living.getLocation(), 96.0));
+            creature.setTarget(nearestParticipant(living.getLocation(), 18.0));
         }
     }
 
@@ -292,8 +298,8 @@ final class HallsSessionMonsterRuntime {
         if (warden != null) {
             return warden;
         }
-        if (!specialPool.isEmpty() && spawnedThisFloor > 0 && spawnedThisFloor % 7 == 0) {
-            return specialPool.get(random.nextInt(specialPool.size()));
+        if (activeSpecialType != null && random.nextInt(6) == 0) {
+            return activeSpecialType;
         }
         return commonPool.get(random.nextInt(commonPool.size()));
     }
@@ -375,12 +381,19 @@ final class HallsSessionMonsterRuntime {
                     && aliveParticipantPredicate.test(player.getUniqueId())) {
                 continue;
             }
-            creature.setTarget(nearestParticipant(creature.getLocation(), 96.0));
+            creature.setTarget(nearestParticipant(creature.getLocation(), 18.0));
         }
     }
 
     private int capExtensionIntervalTicks(int difficulty) {
-        int seconds = Math.max(20, Math.min(120, 120 - difficulty));
+        int seconds;
+        if (difficulty <= 10) {
+            seconds = 60;
+        } else if (difficulty >= 80) {
+            seconds = 20;
+        } else {
+            seconds = (int) Math.round(60.0 - ((difficulty - 10) * (40.0 / 70.0)));
+        }
         return seconds * 20;
     }
 

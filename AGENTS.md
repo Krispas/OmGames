@@ -1224,6 +1224,7 @@ Behavior notes:
   - Keep Halls logic isolated from BedWars, Egg Hunt, Chess, Bank, and Random classes.
 - `HallsSession` owns active session state; `HallsSessionTrapRuntime` is its session-owned trap placement/ticking helper.
 - `HallsSessionMonsterRuntime` is the session-owned first-pass monster flood helper; keep monster spawning/alert cleanup routed through `HallsSession`.
+- `HallsModifierTypeLoader` loads configurable exploration modifiers; `HallsFloorModifiers` owns the active floor's stacked modifier effects.
 
 ### 7.2 Command Surface
 
@@ -1342,8 +1343,16 @@ SQLite tables:
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth.
 - Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults.
 - Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
+- Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
+- Modifier files define `modifiers.<id>.type`, `display-name`, `icon`, `weight`, and `effects`.
+- Shared modifiers live in `modifiers/shared.yml`; level-specific modifier files such as `frozen_halls.yml` and `deep_crypt.yml` are restricted to that level type by filename.
+- Exploration floors roll three modifiers. Each slot has `max(0, min(100, 50 - difficulty))%` chance to roll from the good pool; otherwise it rolls from the bad pool.
+- Duplicate modifiers are allowed and their effects stack or multiply.
+- Implemented modifier effects include coin/enemy/trap/loot/sculk multipliers, special enemy pool inclusion, extra rooms, longer corridors, death fog, trap-kind boosts, and Compass.
+- Compass once grants an elevator compass, twice adds exact elevator block distance to the HUD, and three times emits an elevator trail every 5 seconds.
 - Session monster spawning clears native/random equipment first, then applies only gear explicitly defined in the monster resource file. Session monsters that fall into generated holes are killed.
 - Session monsters are persistent, have far-away removal disabled, and should prioritize alive participants over ghost players as targets.
+- Session monsters normally acquire targets only at close range; breakable destruction and elevator scrap deposits alert nearby spawned monsters at long range.
 - Exploration monster spawning has no finite total spawn budget. It fills to a live cap, extends that cap periodically based on floor difficulty, reduces the cap by one when an alive participant kills a session monster, and adds one cap slot for each session slime created by slime splitting.
 - Level type `monsters.common` and `monsters.special` are parsed into runtime pools; exploration floors spawn a first-pass session-local monster flood from the active level type.
 - Breaking Halls props and depositing elevator scrap alert nearby spawned monsters toward the nearest participant.

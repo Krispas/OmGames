@@ -73,6 +73,7 @@ public final class HallsSession {
     private final Map<String, HallsItemType> itemTypes;
     private final Map<String, HallsTrapType> trapTypes;
     private final Map<String, HallsMonsterType> monsterTypes;
+    private final Map<String, HallsModifierType> modifierTypes;
     private final Set<UUID> participants;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
@@ -100,6 +101,9 @@ public final class HallsSession {
     private boolean transitioning;
     private boolean running;
     private Location startRoomSpawn;
+    private long floorStartedAtMillis;
+    private HallsFloorModifiers activeFloorModifiers = HallsFloorModifiers.none();
+    private int compassTrailCountdown;
 
     public HallsSession(JavaPlugin plugin,
                         int id,
@@ -112,6 +116,7 @@ public final class HallsSession {
                         Map<String, HallsItemType> itemTypes,
                         Map<String, HallsTrapType> trapTypes,
                         Map<String, HallsMonsterType> monsterTypes,
+                        Map<String, HallsModifierType> modifierTypes,
                         List<Player> players) {
         this.plugin = plugin;
         this.id = id;
@@ -124,6 +129,7 @@ public final class HallsSession {
         this.itemTypes = itemTypes == null ? Map.of() : Map.copyOf(itemTypes);
         this.trapTypes = trapTypes == null ? Map.of() : Map.copyOf(trapTypes);
         this.monsterTypes = monsterTypes == null ? Map.of() : Map.copyOf(monsterTypes);
+        this.modifierTypes = modifierTypes == null ? Map.of() : Map.copyOf(modifierTypes);
         this.participants = new HashSet<>();
         for (Player player : players) {
             participants.add(player.getUniqueId());
@@ -208,7 +214,7 @@ public final class HallsSession {
             return false;
         }
         if (isCoinItem(drop.stack())) {
-            coins += Math.max(1, drop.stack().getAmount());
+            coins += multipliedCoins(Math.max(1, drop.stack().getAmount()));
             removePhysicsDrop(drop);
             world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.8f);
             return true;
@@ -365,7 +371,7 @@ public final class HallsSession {
             player.sendActionBar(Component.text("No scrap to deposit.", NamedTextColor.GRAY));
             return true;
         }
-        coins += deposited;
+        coins += multipliedCoins(deposited);
         world.playSound(block.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8f, 0.7f);
         monsterRuntime.alert(block.getLocation());
         player.sendActionBar(Component.text("Deposited " + deposited + " scrap.", NamedTextColor.GOLD));
@@ -477,6 +483,7 @@ public final class HallsSession {
         openElevatorDoors();
         running = true;
         startedAtMillis = System.currentTimeMillis();
+        floorStartedAtMillis = startedAtMillis;
         startHudTask();
         resetRunState();
         Location spawn = startRoomSpawn == null ? elevatorSpawnLocation() : startRoomSpawn;
@@ -533,6 +540,8 @@ public final class HallsSession {
 
     private void buildStartArea() throws IOException {
         currentFloor = 1;
+        activeFloorModifiers = HallsFloorModifiers.none();
+        floorStartedAtMillis = System.currentTimeMillis();
         HallsScenario.FloorDefinition floorDefinition = scenario.floor(1);
         HallsLevelType levelType = levelTypeFor(floorDefinition);
         activeLevelTypeId = levelType.id();
@@ -598,6 +607,7 @@ public final class HallsSession {
         clearBuildVolume();
         buildElevator();
         currentFloor = floor;
+        floorStartedAtMillis = System.currentTimeMillis();
         renderExplorationRooms(build);
         renderExplorationCorridors(build);
         Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build);
@@ -607,6 +617,7 @@ public final class HallsSession {
         restoreElevatorChestContents();
         closeElevatorDoors();
         teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
+        applyCompassModifier();
     }
 
     private void startStagedExplorationFloorBuild(int floor) {
@@ -688,13 +699,15 @@ public final class HallsSession {
     }
 
     private ExplorationBuild planExplorationBuild(int floor) {
-        HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
-        HallsLevelType levelType = levelTypeFor(floorDefinition);
+        HallsScenario.FloorDefinition rawFloorDefinition = scenario.floor(floor);
+        HallsLevelType levelType = levelTypeFor(rawFloorDefinition);
+        Random random = floorRandom();
+        activeFloorModifiers = selectFloorModifiers(rawFloorDefinition, levelType, random);
+        HallsScenario.FloorDefinition floorDefinition = activeFloorModifiers.adjustFloor(rawFloorDefinition, random);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = Math.max(1, floorDefinition.rooms());
         activeGeneratedRooms = 0;
         List<HallsLayout> layouts = loadExplorationLayouts(levelType);
-        Random random = floorRandom();
         HallsExplorationGenerator.Plan plan = HallsExplorationGenerator.generate(
                 origin.x(),
                 origin.z(),
@@ -703,6 +716,7 @@ public final class HallsSession {
                 layouts,
                 floorDefinition,
                 levelType.corridorGeneration(),
+                activeFloorModifiers.corridorDistanceMultiplier(levelType.corridorGeneration()),
                 random
         );
         int targetRooms = activeTargetRooms;
@@ -718,6 +732,7 @@ public final class HallsSession {
                     layouts,
                     floorDefinition,
                     levelType.corridorGeneration(),
+                    activeFloorModifiers.corridorDistanceMultiplier(levelType.corridorGeneration()),
                     random
             );
         }
@@ -754,7 +769,7 @@ public final class HallsSession {
         if (build.plan().rooms().isEmpty()) {
             return Set.of();
         }
-        return trapRuntime.placeGeneratedTraps(build.plan(), build.random(), build.floorDefinition(), build.levelType());
+        return trapRuntime.placeGeneratedTraps(build.plan(), build.random(), build.floorDefinition(), build.levelType(), activeFloorModifiers);
     }
 
     private void renderExplorationContents(ExplorationBuild build, Set<HallsExplorationGenerator.Cell> reservedCells) {
@@ -769,7 +784,7 @@ public final class HallsSession {
             monsterRuntime.clear();
             return;
         }
-        monsterRuntime.startExplorationFloor(build.plan(), build.floorDefinition(), build.levelType(), build.random());
+        monsterRuntime.startExplorationFloor(build.plan(), build.floorDefinition(), build.levelType(), activeFloorModifiers, build.random());
     }
 
     private void renderExplorationSculk(ExplorationBuild build) {
@@ -786,6 +801,109 @@ public final class HallsSession {
                 ^ UUID.randomUUID().getMostSignificantBits()
                 ^ UUID.randomUUID().getLeastSignificantBits();
         return new Random(seed);
+    }
+
+    private HallsFloorModifiers selectFloorModifiers(HallsScenario.FloorDefinition floorDefinition,
+                                                     HallsLevelType levelType,
+                                                     Random random) {
+        if (floorDefinition == null || !"exploration".equalsIgnoreCase(floorDefinition.kind()) || modifierTypes.isEmpty()) {
+            return HallsFloorModifiers.none();
+        }
+        int difficulty = parseDifficulty(floorDefinition.difficulty(), floorDefinition.firstFloor());
+        int goodChance = Math.max(0, Math.min(100, 50 - difficulty));
+        List<HallsModifierType> good = applicableModifiers(levelType, true);
+        List<HallsModifierType> bad = applicableModifiers(levelType, false);
+        List<HallsModifierType> selected = new ArrayList<>();
+        for (int slot = 0; slot < 3; slot++) {
+            boolean wantGood = random.nextInt(100) < goodChance;
+            HallsModifierType modifier = weightedModifier(wantGood ? good : bad, random);
+            if (modifier == null) {
+                modifier = weightedModifier(wantGood ? bad : good, random);
+            }
+            if (modifier != null) {
+                selected.add(modifier);
+            }
+        }
+        HallsFloorModifiers modifiers = new HallsFloorModifiers(selected);
+        revealFloorModifiers(modifiers);
+        return modifiers;
+    }
+
+    private List<HallsModifierType> applicableModifiers(HallsLevelType levelType, boolean good) {
+        String levelTypeId = levelType == null ? "" : levelType.id();
+        return modifierTypes.values().stream()
+                .filter(modifier -> modifier.weight() > 0 && modifier.good() == good)
+                .filter(modifier -> {
+                    Object restricted = modifier.effects().get("level_type");
+                    return restricted == null || normalizeId(String.valueOf(restricted)).equals(levelTypeId);
+                })
+                .sorted(Comparator.comparing(HallsModifierType::id))
+                .toList();
+    }
+
+    private HallsModifierType weightedModifier(List<HallsModifierType> pool, Random random) {
+        if (pool == null || pool.isEmpty()) {
+            return null;
+        }
+        int totalWeight = pool.stream().mapToInt(HallsModifierType::weight).sum();
+        int roll = random.nextInt(Math.max(1, totalWeight));
+        for (HallsModifierType modifier : pool) {
+            roll -= modifier.weight();
+            if (roll < 0) {
+                return modifier;
+            }
+        }
+        return pool.getFirst();
+    }
+
+    private void revealFloorModifiers(HallsFloorModifiers modifiers) {
+        if (modifiers == null || modifiers.empty()) {
+            return;
+        }
+        List<HallsModifierType> selected = modifiers.selected();
+        for (int i = 0; i < selected.size(); i++) {
+            HallsModifierType modifier = selected.get(i);
+            int delay = 12 + i * 16;
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!running) {
+                    return;
+                }
+                for (UUID playerId : participants) {
+                    Player player = Bukkit.getPlayer(playerId);
+                    if (player != null && player.getWorld().equals(world)) {
+                        player.sendTitle("Modifier", modifier.icon() + " " + modifier.displayName(), 0, 24, 8);
+                        player.playSound(player.getLocation(),
+                                modifier.good() ? Sound.BLOCK_NOTE_BLOCK_CHIME : Sound.BLOCK_NOTE_BLOCK_BASS,
+                                0.8f,
+                                modifier.good() ? 1.6f : 0.65f);
+                    }
+                }
+            }, delay);
+        }
+    }
+
+    private int parseDifficulty(String difficulty, int floor) {
+        if (difficulty == null || difficulty.isBlank()) {
+            return 0;
+        }
+        String normalized = difficulty.replace("floor", Integer.toString(floor)).replace(" ", "");
+        int plus = normalized.indexOf('+');
+        if (plus > 0) {
+            return parseInt(normalized.substring(0, plus), 0) + parseInt(normalized.substring(plus + 1), 0);
+        }
+        return parseInt(normalized, 0);
+    }
+
+    private int parseInt(String value, int fallback) {
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private String normalizeId(String value) {
+        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_').replace(' ', '_');
     }
 
     private List<HallsLayout> loadExplorationLayouts(HallsLevelType levelType) {
@@ -1350,17 +1468,80 @@ public final class HallsSession {
                 .append(Component.text("Coins " + coins + "/" + currentCoinQuota(), NamedTextColor.YELLOW))
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                 .append(Component.text("Sculk " + maxParticipantSculk() + "%", NamedTextColor.AQUA));
+        if (!activeFloorModifiers.empty()) {
+            shared = shared.append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                    .append(activeFloorModifiers.hudComponent());
+        }
+        tickDeathFog();
+        tickCompassTrail();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
+                String elevatorDistance = elevatorDistanceLabel(player);
+                if (activeFloorModifiers.compassLevel() >= 2) {
+                    elevatorDistance += " " + Math.round(player.getLocation().distance(elevatorSpawnLocation())) + "b";
+                }
                 Component message = shared
                         .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                        .append(Component.text("Elevator " + elevatorDistanceLabel(player), NamedTextColor.LIGHT_PURPLE));
+                        .append(Component.text("Elevator " + elevatorDistance, NamedTextColor.LIGHT_PURPLE));
                 player.sendActionBar(message);
                 if (ghostPlayers.contains(playerId)) {
                     world.spawnParticle(Particle.SOUL_FIRE_FLAME, player.getLocation().add(0.0, 0.9, 0.0),
                             8, 0.35, 0.45, 0.35, 0.01);
                 }
+            }
+        }
+    }
+
+    private void tickDeathFog() {
+        int witherAfterSeconds = activeFloorModifiers.witherAfterSeconds();
+        if (witherAfterSeconds <= 0 || currentFloor <= 1) {
+            return;
+        }
+        long floorSeconds = Math.max(0L, (System.currentTimeMillis() - floorStartedAtMillis) / 1000L);
+        if (floorSeconds == witherAfterSeconds - 60 || floorSeconds == witherAfterSeconds - 10) {
+            for (UUID playerId : participants) {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null && player.getWorld().equals(world)) {
+                    player.sendTitle("Death Fog", "The air is turning poisonous.", 5, 35, 10);
+                    player.playSound(player.getLocation(), Sound.ENTITY_WITHER_AMBIENT, 0.65f, 0.7f);
+                }
+            }
+        }
+        if (floorSeconds >= witherAfterSeconds) {
+            for (UUID playerId : participants) {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null && player.getWorld().equals(world) && !ghostPlayers.contains(playerId)) {
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 45, 0, true, false, true));
+                }
+            }
+        }
+    }
+
+    private void tickCompassTrail() {
+        if (activeFloorModifiers.compassLevel() < 3 || currentFloor <= 1 || transitioning) {
+            return;
+        }
+        if (compassTrailCountdown-- > 0) {
+            return;
+        }
+        compassTrailCountdown = 5;
+        Location target = elevatorSpawnLocation();
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.getWorld().equals(world) || ghostPlayers.contains(playerId)) {
+                continue;
+            }
+            Location start = player.getLocation().clone().add(0.0, 0.25, 0.0);
+            Vector direction = target.toVector().subtract(start.toVector());
+            double length = direction.length();
+            if (length < 1.0) {
+                continue;
+            }
+            direction.normalize();
+            for (double distance = 1.0; distance < Math.min(length, 18.0); distance += 1.5) {
+                Location point = start.clone().add(direction.clone().multiply(distance));
+                world.spawnParticle(Particle.END_ROD, point, 1, 0.03, 0.03, 0.03, 0.0);
             }
         }
     }
@@ -1381,6 +1562,40 @@ public final class HallsSession {
 
     private int currentCoinQuota() {
         return scenario.floor(currentFloor).coinQuota();
+    }
+
+    private int multipliedCoins(int amount) {
+        return Math.max(1, (int) Math.round(amount * activeFloorModifiers.coinMultiplier()));
+    }
+
+    private void applyCompassModifier() {
+        if (activeFloorModifiers.compassLevel() <= 0 || currentFloor <= 1) {
+            return;
+        }
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.getWorld().equals(world) || ghostPlayers.contains(playerId)) {
+                continue;
+            }
+            player.setCompassTarget(elevatorSpawnLocation());
+            if (!hasCompass(player.getInventory())) {
+                int slot = firstAvailableHotbarSlot(player.getInventory());
+                if (slot >= 0) {
+                    ItemStack compass = namedItem(Material.COMPASS, "Elevator Compass", NamedTextColor.GREEN);
+                    player.getInventory().setItem(slot, compass);
+                }
+            }
+        }
+    }
+
+    private boolean hasCompass(PlayerInventory inventory) {
+        for (int slot = 0; slot <= 8; slot++) {
+            ItemStack item = inventory.getItem(slot);
+            if (item != null && item.getType() == Material.COMPASS) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private int maxParticipantSculk() {
@@ -1927,6 +2142,8 @@ public final class HallsSession {
         diamondScrap = 0;
         redstoneScrap = 0;
         coins = 0;
+        activeFloorModifiers = HallsFloorModifiers.none();
+        compassTrailCountdown = 0;
         sculkRuntime.clearAll();
     }
 
@@ -2378,7 +2595,9 @@ public final class HallsSession {
             }
             restoreElevatorChestContents();
             closeElevatorDoors();
+            floorStartedAtMillis = System.currentTimeMillis();
             teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
+            applyCompassModifier();
             openElevatorDoors();
             transitioning = false;
             world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),

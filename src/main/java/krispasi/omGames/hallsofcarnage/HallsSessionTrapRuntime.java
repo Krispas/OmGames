@@ -107,7 +107,8 @@ final class HallsSessionTrapRuntime {
     Set<HallsExplorationGenerator.Cell> placeGeneratedTraps(HallsExplorationGenerator.Plan plan,
                                                             Random random,
                                                             HallsScenario.FloorDefinition floorDefinition,
-                                                            HallsLevelType levelType) {
+                                                            HallsLevelType levelType,
+                                                            HallsFloorModifiers modifiers) {
         clear();
         List<TrapCandidate> candidates = trapCandidates(plan);
         List<TrapCandidate> holeCandidates = holeCandidates(plan);
@@ -152,7 +153,7 @@ final class HallsSessionTrapRuntime {
             }
             List<TrapCandidate> roomCandidates = new ArrayList<>(candidatesByRoom.getOrDefault(room, List.of()));
             Collections.shuffle(roomCandidates, random);
-            HallsTrapType roomType = weightedTrap(pool, random);
+            HallsTrapType roomType = weightedTrap(pool, random, modifiers);
             if (trapKind(roomType.kind()) == TrapKind.SWINGING_BLADE) {
                 roomCandidates.sort((first, second) -> Integer.compare(bestSwingLaneHalfSpan(second), bestSwingLaneHalfSpan(first)));
             }
@@ -164,7 +165,7 @@ final class HallsSessionTrapRuntime {
                 if (placedInRoom >= targetRoomTraps) {
                     break;
                 }
-                HallsTrapType type = random.nextInt(100) < 10 ? weightedTrap(pool, random) : roomType;
+                HallsTrapType type = random.nextInt(100) < 10 ? weightedTrap(pool, random, modifiers) : roomType;
                 if (tryPlaceTrap(candidate, plan, random, type, occupied, globalReachabilityChecks)) {
                     placedInRoom++;
                 }
@@ -292,7 +293,7 @@ final class HallsSessionTrapRuntime {
         if (existing != null && random.nextInt(100) >= 10) {
             return existing;
         }
-        return weightedTrap(pool, random);
+        return weightedTrap(pool, random, null);
     }
 
     private List<HallsExplorationGenerator.Cell> roomTrapCandidateCells(HallsExplorationGenerator.Room room) {
@@ -377,16 +378,25 @@ final class HallsSessionTrapRuntime {
         return pool;
     }
 
-    private HallsTrapType weightedTrap(List<HallsTrapType> pool, Random random) {
-        int totalWeight = pool.stream().mapToInt(HallsTrapType::weight).sum();
+    private HallsTrapType weightedTrap(List<HallsTrapType> pool, Random random, HallsFloorModifiers modifiers) {
+        List<String> boostedKinds = modifiers == null ? List.of() : modifiers.trapBoostKinds();
+        int totalWeight = pool.stream().mapToInt(type -> adjustedTrapWeight(type, boostedKinds)).sum();
         int roll = random.nextInt(Math.max(1, totalWeight));
         for (HallsTrapType type : pool) {
-            roll -= type.weight();
+            roll -= adjustedTrapWeight(type, boostedKinds);
             if (roll < 0) {
                 return type;
             }
         }
         return pool.getFirst();
+    }
+
+    private int adjustedTrapWeight(HallsTrapType type, List<String> boostedKinds) {
+        int weight = type.weight();
+        if (boostedKinds.contains(type.id()) || boostedKinds.contains(type.kind())) {
+            weight *= 2;
+        }
+        return Math.max(0, weight);
     }
 
     private Set<HallsExplorationGenerator.Cell> pitMask(TrapCandidate candidate, Random random, HallsTrapType type) {

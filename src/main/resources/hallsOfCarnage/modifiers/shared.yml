@@ -2,53 +2,69 @@ modifiers:
   free:
     type: good
     display-name: "Free"
+    icon: "☺"
     weight: 10
     effects: []
   double_coins:
     type: good
     display-name: "Double Coins"
+    icon: "♦"
     weight: 4
     effects:
       coin-multiplier: 2.0
   less_enemies:
     type: good
     display-name: "Less Enemies"
+    icon: "♡"
     weight: 5
     effects:
       enemy-spawn-multiplier: 0.75
+  compass:
+    type: good
+    display-name: "Compass"
+    icon: "⌖"
+    weight: 4
+    effects:
+      compass: true
   more_enemies:
     type: bad
     display-name: "More Enemies"
+    icon: "☠"
     weight: 8
     effects:
       enemy-spawn-multiplier: 1.25
   more_traps:
     type: bad
     display-name: "More Traps"
+    icon: "♠"
     weight: 7
     effects:
       trap-multiplier: 1.5
   less_loot:
     type: bad
     display-name: "Less Loot"
+    icon: "♣"
     weight: 7
     effects:
       loot-multiplier: 0.75
   more_sculk:
     type: bad
     display-name: "More Sculk"
+    icon: "☻"
     weight: 6
     effects:
       sculk-multiplier: 3.0
   special_enemy:
     type: bad
     display-name: "Special Enemy"
+    icon: "★"
     weight: 5
     effects:
       special-enemy: true
   more_rooms:
     type: bad
     display-name: "More Rooms"
+    icon: "▦"
     weight: 5
     effects:
       extra-rooms-min: 3
@@ -56,6 +72,7 @@ modifiers:
   longer_corridors:
     type: bad
     display-name: "Longer Corridors"
+    icon: "↔"
     weight: 5
     effects:
       corridor-distance-multiplier: 1.35
@@ -63,6 +80,7 @@ modifiers:
   death_fog:
     type: bad
     display-name: "Death Fog"
+    icon: "☁"
     weight: 3
     effects:
       wither-after-seconds: 600

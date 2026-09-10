@@ -158,6 +158,7 @@ public final class HallsOfCarnageManager {
     private Map<String, HallsItemType> itemTypes = Map.of();
     private Map<String, HallsTrapType> trapTypes = Map.of();
     private Map<String, HallsMonsterType> monsterTypes = Map.of();
+    private Map<String, HallsModifierType> modifierTypes = Map.of();
     private int nextSessionId = 1;
 
     public HallsOfCarnageManager(JavaPlugin plugin) {
@@ -175,13 +176,14 @@ public final class HallsOfCarnageManager {
         itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
         trapTypes = HallsTrapTypeLoader.loadTrapTypes(plugin, getTrapsFolder());
         monsterTypes = HallsMonsterTypeLoader.loadMonsterTypes(plugin, getMonstersFolder());
+        modifierTypes = HallsModifierTypeLoader.loadModifierTypes(plugin, getModifiersFolder());
         shameService.load();
         applyWorldRules();
         spawnConfiguredMenuVillager();
         plugin.getLogger().info("Loaded " + scenarios.size() + " Halls of Carnage scenarios and "
                 + levelTypes.size() + " level types, " + breakableTypes.size() + " breakable types, "
                 + itemTypes.size() + " item types, " + trapTypes.size() + " trap types, "
-                + monsterTypes.size() + " monster types.");
+                + monsterTypes.size() + " monster types, " + modifierTypes.size() + " modifiers.");
     }
 
     public void shutdown() {
@@ -198,12 +200,13 @@ public final class HallsOfCarnageManager {
         itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
         trapTypes = HallsTrapTypeLoader.loadTrapTypes(plugin, getTrapsFolder());
         monsterTypes = HallsMonsterTypeLoader.loadMonsterTypes(plugin, getMonstersFolder());
+        modifierTypes = HallsModifierTypeLoader.loadModifierTypes(plugin, getModifiersFolder());
         applyWorldRules();
         spawnConfiguredMenuVillager();
         return Result.ok("Reloaded Halls of Carnage. Scenarios: " + scenarios.size()
                 + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size()
                 + ", items: " + itemTypes.size() + ", traps: " + trapTypes.size()
-                + ", monsters: " + monsterTypes.size() + ".");
+                + ", monsters: " + monsterTypes.size() + ", modifiers: " + modifierTypes.size() + ".");
     }
 
     public Result resetGameResources(boolean confirmed) {
@@ -235,10 +238,11 @@ public final class HallsOfCarnageManager {
         itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
         trapTypes = HallsTrapTypeLoader.loadTrapTypes(plugin, getTrapsFolder());
         monsterTypes = HallsMonsterTypeLoader.loadMonsterTypes(plugin, getMonstersFolder());
+        modifierTypes = HallsModifierTypeLoader.loadModifierTypes(plugin, getModifiersFolder());
         return Result.ok("Reset Halls game resources from bundled defaults. Scenarios: " + scenarios.size()
                 + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size()
                 + ", items: " + itemTypes.size() + ", traps: " + trapTypes.size()
-                + ", monsters: " + monsterTypes.size() + ".");
+                + ", monsters: " + monsterTypes.size() + ", modifiers: " + modifierTypes.size() + ".");
     }
 
     public List<HallsScenario> getScenarios() {
@@ -533,7 +537,7 @@ public final class HallsOfCarnageManager {
         int sessionId = nextSessionId++;
         int slot = firstFreeSessionSlot();
         HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot),
-                getDataFolder(), levelTypes, breakableTypes, itemTypes, trapTypes, monsterTypes, players);
+                getDataFolder(), levelTypes, breakableTypes, itemTypes, trapTypes, monsterTypes, modifierTypes, players);
         try {
             session.start();
         } catch (IOException ex) {
@@ -863,6 +867,10 @@ public final class HallsOfCarnageManager {
 
     private File getMonstersFolder() {
         return new File(getDataFolder(), "monsters");
+    }
+
+    private File getModifiersFolder() {
+        return new File(getDataFolder(), "modifiers");
     }
 
     private String normalizeId(String value) {

@@ -2,6 +2,7 @@ modifiers:
   poison_darts:
     type: bad
     display-name: "Poison Darts"
+    icon: "➶"
     weight: 6
     effects:
       trap: poison_darts

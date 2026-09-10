@@ -29,6 +29,7 @@ final class HallsExplorationGenerator {
     private final Bounds protectedElevator;
     private final Random random;
     private final CorridorMode corridorMode;
+    private final double corridorDistanceMultiplier;
     private final List<Room> rooms = new ArrayList<>();
     private final Set<Cell> corridorCells = new HashSet<>();
     private final Set<Cell> corridorShellCells = new HashSet<>();
@@ -41,12 +42,14 @@ final class HallsExplorationGenerator {
                                       int clearRadius,
                                       Bounds protectedElevator,
                                       String corridorGeneration,
+                                      double corridorDistanceMultiplier,
                                       Random random) {
         this.originX = originX;
         this.originZ = originZ;
         this.clearRadius = clearRadius;
         this.protectedElevator = protectedElevator;
         this.corridorMode = CorridorMode.from(corridorGeneration);
+        this.corridorDistanceMultiplier = Math.max(0.5, corridorDistanceMultiplier);
         this.random = random;
     }
 
@@ -57,6 +60,7 @@ final class HallsExplorationGenerator {
                          List<HallsLayout> layouts,
                          HallsScenario.FloorDefinition floorDefinition,
                          String corridorGeneration,
+                         double corridorDistanceMultiplier,
                          Random random) {
         Bounds elevatorBounds = new Bounds(
                 originX - elevatorOuterRadius,
@@ -70,6 +74,7 @@ final class HallsExplorationGenerator {
                 clearRadius,
                 elevatorBounds,
                 corridorGeneration,
+                corridorDistanceMultiplier,
                 random
         );
         generator.generate(layouts, floorDefinition);
@@ -161,8 +166,9 @@ final class HallsExplorationGenerator {
         List<BlockFace> faces = availableFaces(anchor);
         Collections.shuffle(faces, random);
         BlockFace face = faces.getFirst();
-        int gap = corridorMode == CorridorMode.MAZE ? 2 + random.nextInt(5) : 5 + random.nextInt(14);
-        int lateralBase = corridorMode == CorridorMode.MAZE ? 3 : 10;
+        int baseGap = corridorMode == CorridorMode.MAZE ? 2 + random.nextInt(5) : 5 + random.nextInt(14);
+        int gap = Math.max(1, (int) Math.round(baseGap * corridorDistanceMultiplier));
+        int lateralBase = Math.max(2, (int) Math.round((corridorMode == CorridorMode.MAZE ? 3 : 10) * corridorDistanceMultiplier));
         int lateralRange = lateralBase + Math.max(anchor.layout().width(), anchor.layout().depth()) / 2
                 + Math.max(layout.width(), layout.depth()) / 2;
         int lateral = random.nextInt(lateralRange * 2 + 1) - lateralRange;

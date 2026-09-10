@@ -9,9 +9,9 @@ parts:
     offset: [0, 0.9, 0]
 loot:
   - item: wood_scrap
-    weight: 200
+    weight: 100
   - item: iron_scrap
-    weight: 200
+    weight: 100
   - item: coin
     weight: 60
     amount: 1-3
