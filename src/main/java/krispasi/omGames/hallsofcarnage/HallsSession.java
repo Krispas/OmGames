@@ -224,13 +224,9 @@ public final class HallsSession {
             player.sendActionBar(Component.text("Use an empty hand to pick up Halls items.", NamedTextColor.RED));
             return true;
         }
-        if (tryEquipEmptyArmorSlot(player.getInventory(), drop.stack().clone())) {
-            removePhysicsDrop(drop);
-            world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.4f);
-            return true;
-        }
-        int slot = firstAvailableHotbarSlot(player.getInventory());
-        if (slot < 0) {
+        int slot = player.getInventory().getHeldItemSlot();
+        ItemStack held = player.getInventory().getItem(slot);
+        if (held != null && !held.getType().isAir()) {
             player.sendActionBar(Component.text("Your hotbar is full.", NamedTextColor.RED));
             return true;
         }
@@ -659,8 +655,10 @@ public final class HallsSession {
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
+                boolean wasGhost = ghostPlayers.contains(playerId);
                 setPlayerElevatorRespawn(player);
                 clearGhostState(player);
+                healForElevatorArrival(player, wasGhost);
                 if (!isInsideElevator(player.getLocation())) {
                     teleportSessionPlayer(player, spawn);
                 }
@@ -804,7 +802,7 @@ public final class HallsSession {
     private void renderExplorationContents(ExplorationBuild build, Set<HallsExplorationGenerator.Cell> reservedCells) {
         for (int i = 0; i < build.plan().rooms().size(); i++) {
             placeGeneratedRoomContents(build.plan().rooms().get(i), build.random(), build.floor(), i,
-                    build.floorDefinition(), build.levelType(), reservedCells);
+                    build.floorDefinition(), build.levelType(), reservedCells, i == 0);
         }
     }
 
@@ -892,7 +890,7 @@ public final class HallsSession {
         List<HallsModifierType> selected = modifiers.selected();
         for (int i = 0; i < selected.size(); i++) {
             HallsModifierType modifier = selected.get(i);
-            int delay = 12 + i * 16;
+            int delay = 24 + i * 32;
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (!running) {
                     return;
@@ -900,7 +898,7 @@ public final class HallsSession {
                 for (UUID playerId : participants) {
                     Player player = Bukkit.getPlayer(playerId);
                     if (player != null && player.getWorld().equals(world)) {
-                        player.sendTitle("Modifier", modifier.icon() + " " + modifier.displayName(), 0, 24, 8);
+                        player.sendTitle("Modifier", modifier.icon() + " " + modifier.displayName(), 0, 48, 16);
                         player.playSound(player.getLocation(),
                                 modifier.good() ? Sound.BLOCK_NOTE_BLOCK_CHIME : Sound.BLOCK_NOTE_BLOCK_BASS,
                                 0.8f,
@@ -1110,9 +1108,10 @@ public final class HallsSession {
                 int blockX = startX + x;
                 int blockZ = startZ + z;
                 Material wall = roomWallMaterial(levelType, layout, x, z, blockX, blockZ);
-                setBlock(blockX, y - 1, blockZ, floor);
+                boolean wallColumn = !opening && (border || cell == 'X');
+                setBlock(blockX, y - 1, blockZ, wallColumn ? wall : floor);
                 setBlock(blockX, y + ROOM_HEIGHT, blockZ, ceiling);
-                if (!opening && (border || cell == 'X')) {
+                if (wallColumn) {
                     for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
                         setBlock(blockX, y + dy, blockZ, wall);
                     }
@@ -1183,12 +1182,11 @@ public final class HallsSession {
                 continue;
             }
             boolean path = offset >= pathMin && offset <= pathMax;
-            setBlock(blockX, y - 1, blockZ, floor);
+            Material wall = corridorWallMaterial(levelType, new HallsExplorationGenerator.Cell(blockX, blockZ), openCells);
+            setBlock(blockX, y - 1, blockZ, path ? floor : wall);
             setBlock(blockX, y + 3, blockZ, path && isCorridorLightCell(blockX, blockZ) ? levelType.light() : ceiling);
             for (int dy = 0; dy < 3; dy++) {
-                HallsExplorationGenerator.Cell point = new HallsExplorationGenerator.Cell(blockX, blockZ);
-                setBlock(blockX, y + dy, blockZ,
-                        path ? Material.AIR : corridorWallMaterial(levelType, point, openCells));
+                setBlock(blockX, y + dy, blockZ, path ? Material.AIR : wall);
             }
         }
     }
@@ -1252,14 +1250,14 @@ public final class HallsSession {
         if (!open && insideRoomShell) {
             return;
         }
-        setBlock(point.x(), origin.y() - 1, point.z(), levelType.corridorFloor());
+        Material wall = corridorWallMaterial(levelType, point, openCells);
+        setBlock(point.x(), origin.y() - 1, point.z(), open ? levelType.corridorFloor() : wall);
         if (!insideRoomShell) {
             setBlock(point.x(), origin.y() + 3, point.z(),
                     open && isCorridorLightCell(point.x(), point.z()) ? levelType.light() : levelType.corridorCeiling());
         }
         for (int dy = 0; dy < 3; dy++) {
-            setBlock(point.x(), origin.y() + dy, point.z(),
-                    open ? Material.AIR : corridorWallMaterial(levelType, point, openCells));
+            setBlock(point.x(), origin.y() + dy, point.z(), open ? Material.AIR : wall);
         }
     }
 
@@ -1370,7 +1368,8 @@ public final class HallsSession {
                                             int roomIndex,
                                             HallsScenario.FloorDefinition floorDefinition,
                                             HallsLevelType levelType,
-                                            Set<HallsExplorationGenerator.Cell> reservedCells) {
+                                            Set<HallsExplorationGenerator.Cell> reservedCells,
+                                            boolean forceRareBreakable) {
         List<Cell> cells = openInteriorCells(room);
         if (cells.isEmpty()) {
             return;
@@ -1378,6 +1377,16 @@ public final class HallsSession {
         int baseProps = Math.max(1, floorDefinition.breakables() / Math.max(1, floorDefinition.rooms()));
         int props = Math.min(cells.size(), baseProps + (roomIndex < floorDefinition.breakables() % Math.max(1, floorDefinition.rooms()) ? 1 : 0));
         Set<HallsExplorationGenerator.Cell> usedCells = new HashSet<>();
+        if (forceRareBreakable) {
+            Cell cell = randomFreeContentCell(cells, room, random, reservedCells, usedCells);
+            if (cell == null) {
+                return;
+            }
+            usedCells.add(new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()));
+            spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
+                    rarePropArchetype(levelType), propHealth(0));
+            props--;
+        }
         for (int i = 0; i < props; i++) {
             Cell cell = randomFreeContentCell(cells, room, random, reservedCells, usedCells);
             if (cell == null) {
@@ -1385,7 +1394,7 @@ public final class HallsSession {
             }
             usedCells.add(new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()));
             spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
-                    propArchetype(i, roomIndex, levelType), propHealth(i));
+                    commonPropArchetype(i, roomIndex, levelType), propHealth(i));
         }
     }
 
@@ -1450,9 +1459,31 @@ public final class HallsSession {
     }
 
     private HallsBreakableType propArchetype(int index, int roomIndex, HallsLevelType levelType) {
+        return propArchetype(index, roomIndex, levelType, null);
+    }
+
+    private HallsBreakableType commonPropArchetype(int index, int roomIndex, HallsLevelType levelType) {
+        HallsBreakableType type = propArchetype(index, roomIndex, levelType, "common");
+        return type == null ? propArchetype(index, roomIndex, levelType, null) : type;
+    }
+
+    private HallsBreakableType rarePropArchetype(HallsLevelType levelType) {
+        HallsBreakableType type = propArchetype(0, 0, levelType, "rare");
+        return type == null ? propArchetype(0, 0, levelType, null) : type;
+    }
+
+    private HallsBreakableType propArchetype(int index, int roomIndex, HallsLevelType levelType, String rarity) {
         List<HallsBreakableType> archetypes = new ArrayList<>(breakableTypes.values());
         if (archetypes.isEmpty()) {
             archetypes = new ArrayList<>(HallsBreakableTypeLoader.loadBreakableTypes(plugin, null).values());
+        }
+        if (rarity != null) {
+            archetypes = new ArrayList<>(archetypes.stream()
+                    .filter(type -> type.rarity().equals(rarity))
+                    .toList());
+        }
+        if (archetypes.isEmpty()) {
+            return null;
         }
         archetypes.sort(Comparator.comparing(HallsBreakableType::id));
         int salt = levelType == null ? 0 : levelType.id().hashCode();
@@ -2129,6 +2160,14 @@ public final class HallsSession {
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
     }
 
+    private void healForElevatorArrival(Player player, boolean wasGhost) {
+        double maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH) == null
+                ? player.getMaxHealth()
+                : player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
+        double targetHealth = wasGhost ? 10.0 : player.getHealth() + 6.0;
+        player.setHealth(Math.min(maxHealth, Math.max(1.0, targetHealth)));
+    }
+
     private void dropPlayerSessionInventory(Player player) {
         Location location = player.getLocation().clone().add(0.0, 0.4, 0.0);
         PlayerInventory inventory = player.getInventory();
@@ -2664,7 +2703,7 @@ public final class HallsSession {
                 return;
             }
             placeGeneratedRoomContents(build.plan().rooms().get(contentRoomIndex), build.random(), build.floor(),
-                    contentRoomIndex, build.floorDefinition(), build.levelType(), reservedCells);
+                    contentRoomIndex, build.floorDefinition(), build.levelType(), reservedCells, contentRoomIndex == 0);
             contentRoomIndex++;
         }
 

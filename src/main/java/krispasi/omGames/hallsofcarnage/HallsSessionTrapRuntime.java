@@ -41,6 +41,7 @@ import org.joml.Vector3f;
 final class HallsSessionTrapRuntime {
     private static final int ROOM_HEIGHT = 5;
     private static final int ELEVATOR_OUTER_RADIUS = 3;
+    private static final double MONSTER_TRAP_PLAYER_RADIUS = 20.0;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -847,7 +848,9 @@ final class HallsSessionTrapRuntime {
             }
         }
         for (LivingEntity monster : sessionMonsters()) {
-            checkMonsterTrapContact(monster);
+            if (canTrapAffectMonsters(monster.getLocation())) {
+                checkMonsterTrapContact(monster);
+            }
         }
     }
 
@@ -1235,6 +1238,9 @@ final class HallsSessionTrapRuntime {
     }
 
     private void damageMonstersNear(Location center, double radius, double damage) {
+        if (!canTrapAffectMonsters(center)) {
+            return;
+        }
         double radiusSquared = radius * radius;
         for (LivingEntity monster : sessionMonsters()) {
             if (monster.getLocation().distanceSquared(center) <= radiusSquared) {
@@ -1278,6 +1284,10 @@ final class HallsSessionTrapRuntime {
         }
         trapDamageCooldowns.put(monster.getUniqueId(), now + 350L);
         monster.damage(damage);
+    }
+
+    private boolean canTrapAffectMonsters(Location center) {
+        return center != null && !nearbyParticipants(center, MONSTER_TRAP_PLAYER_RADIUS).isEmpty();
     }
 
     private void teleportPlayerToElevator(Player player) {
@@ -1463,6 +1473,9 @@ final class HallsSessionTrapRuntime {
     }
 
     private void damageMonstersInSwingingBlade(HallsTrap trap, Location bladeCenter) {
+        if (!canTrapAffectMonsters(bladeCenter)) {
+            return;
+        }
         boolean eastWest = trap.face() == BlockFace.EAST || trap.face() == BlockFace.WEST;
         for (LivingEntity monster : sessionMonsters()) {
             Location location = monster.getLocation();
@@ -1478,6 +1491,10 @@ final class HallsSessionTrapRuntime {
     }
 
     private List<LivingEntity> monstersInLine(HallsTrap trap, double radius, double width) {
+        Location center = new Location(world, trap.x() + 0.5, origin.y() + 1.0, trap.z() + 0.5);
+        if (!canTrapAffectMonsters(center)) {
+            return List.of();
+        }
         List<LivingEntity> monsters = new ArrayList<>();
         for (LivingEntity monster : sessionMonsters()) {
             if (isLocationInLine(trap, monster.getLocation(), radius, width)) {

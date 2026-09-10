@@ -247,11 +247,15 @@ This is the first implementation slice. It focuses on:
 - Smoke Bomb and Warding Totem utility behavior is implemented. Smoke Bomb clears nearby session monster targets, emits smoke particles, grants temporary invisibility, and consumes the item. Warding Totem grants nearby alive participants Resistance II for 10 seconds and consumes the item.
 - Exploration monster cap scaling now treats each extra participant after the first as +33% to the base live cap and cap-extension speed before modifier multipliers apply.
 - Breakable loot was centralized into new `breakable_loot_pools/common.yml` and `rare.yml` resources. Breakable files now declare `rarity` and two `scrap-drops`; generic `scrap`/`random_scrap` loot entries pick between those configured scrap drops. Existing per-breakable `loot` remains parser-compatible and overrides the rarity pool.
+- Next development slice applied: trap effects only affect session monsters while a participant is within 20 blocks of the trap effect/contact area; generated room and corridor wall columns now use wall material under the walls instead of floor material; elevator floor arrival heals living players by 6 HP and revives ghosts at 10 HP; right-click physics-drop pickup now inserts into the currently selected empty hand slot; modifier reveal timing and title duration are doubled; exploration content generation now forces exactly one rare breakable per floor and keeps other generated props common; bundled `ender_chest` is registered as its own rare breakable resource.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- Make it so monsters get affected by trap only if player is in a 20 block radius
-- Dont generate floor material under walls, generate wall material there
-- Make it so when descending through elevator, players heal 6 hp. Dead players will have 10 hp after reviving.
-- When picking up item, pick it into the currently selected hand slot
-- When selecting modifiers, make selecting each take twice as long so players can read it better
-- I added ender chest, rare breakable, make it so each floor always spawns 1 rare breakable, but never more than 1, exactly 1
+For the next slice (do not remove this line):
+It is time to finaly implement the camp floors as per GDD. I have added camp_1.txt and designated a camp floor in untold_depths.txt scenario
+I've also added layout property for the camps, to choose a file. 
+Except for normal generation of X and O, there is also C and N,S,W,E. Those are for the build spots. C is there to make the plot bigger (3x3 or 5x5 , medium/large). N,S,W,E defines which way the plot is oriented and the plot itself in case of 1x1 (small) plots.
+Build spots have floor made out of oak planks and they have a interaction entity hitbox. Right clicking with a blueprint builds the designated building.
+Developed buildings based on their section within GDD and implement only some for now (and mark in notes those which are not done yet/ are done).
+There should be the abillity to upgrade them up to level 3. Just read the GDD, everything needed is there.
+Each level of the building should have its model in the files. While there also look into stool, it uses 0.9 for offset and I swear the decimal number doesnt work.
+Buildings should be fully configurable from the files.

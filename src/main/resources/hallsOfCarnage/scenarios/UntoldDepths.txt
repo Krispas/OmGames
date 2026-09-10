@@ -17,6 +17,7 @@ allowed-items:
     - vagabonds_club
     - rusty_sword
     - miner_pick
+    - poking_stick
     - echo_blade
   ranged:
     - short_bow
@@ -130,11 +131,7 @@ floors:
   - number: 5
     kind: camp
     level-type: howling_corridors
-    difficulty: 10
-    build-spots:
-      small: 3
-      medium: 2
-      large: 1
+    layout: camps/camp_1.txt
   - number: 6-9
     kind: exploration
     level-type: howling_corridors
@@ -152,11 +149,7 @@ floors:
   - number: 10
     kind: camp
     level-type: frozen_halls
-    difficulty: 18
-    build-spots:
-      small: 4
-      medium: 2
-      large: 1
+    layout: camps/camp_1.txt
   - number: 11-49
     kind: exploration
     level-type: deep_crypt

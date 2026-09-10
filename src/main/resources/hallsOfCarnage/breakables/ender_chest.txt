@@ -1,4 +1,4 @@
-id: chest
+id: ender_chest
 rarity: rare
 break-message: "You smashed a glorious chest."
 hitbox-height: 1.0

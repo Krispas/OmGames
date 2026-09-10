@@ -76,6 +76,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/modifiers/deep_crypt.yml",
             "hallsOfCarnage/breakables/barrel.txt",
             "hallsOfCarnage/breakables/chest.txt",
+            "hallsOfCarnage/breakables/ender_chest.txt",
             "hallsOfCarnage/breakables/table.txt",
             "hallsOfCarnage/breakables/chair.txt",
             "hallsOfCarnage/breakables/stool.txt",
