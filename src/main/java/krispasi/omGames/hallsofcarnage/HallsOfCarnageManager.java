@@ -81,6 +81,8 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/breakables/stool.txt",
             "hallsOfCarnage/breakables/radiator.txt",
             "hallsOfCarnage/breakables/metal_barrel.txt",
+            "hallsOfCarnage/breakable_loot_pools/common.yml",
+            "hallsOfCarnage/breakable_loot_pools/rare.yml",
             "hallsOfCarnage/traps/hole.txt",
             "hallsOfCarnage/traps/bear_trap.txt",
             "hallsOfCarnage/traps/proximity_mine.txt",
@@ -211,7 +213,7 @@ public final class HallsOfCarnageManager {
 
     public Result resetGameResources(boolean confirmed) {
         if (!confirmed) {
-            return Result.fail("This deletes Halls scenario/level/level_type/modifier/breakable/trap/item files and recopies bundled defaults. Use /hoc reset confirm.");
+            return Result.fail("This deletes Halls scenario/level/level_type/modifier/breakable/trap/monster/item files and recopies bundled defaults. Use /hoc reset confirm.");
         }
         if (!activeSessions.isEmpty()) {
             return Result.fail("Stop active Halls sessions before resetting game resources.");
@@ -223,6 +225,7 @@ public final class HallsOfCarnageManager {
             deleteGameResourceFolder(new File(folder, "level_type"));
             deleteGameResourceFolder(new File(folder, "modifiers"));
             deleteGameResourceFolder(new File(folder, "breakables"));
+            deleteGameResourceFolder(new File(folder, "breakable_loot_pools"));
             deleteGameResourceFolder(new File(folder, "traps"));
             deleteGameResourceFolder(new File(folder, "monsters"));
             deleteGameResourceFolder(new File(folder, "items"));
@@ -399,6 +402,15 @@ public final class HallsOfCarnageManager {
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         return session != null && session.handleItemConsume(player, item);
+    }
+
+    public boolean handleUtilityUse(Player player, org.bukkit.inventory.ItemStack item) {
+        if (player == null || item == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleUtilityUse(player, item);
     }
 
     public boolean handleElevatorButton(Player player, org.bukkit.block.Block block) {

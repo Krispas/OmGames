@@ -25,6 +25,7 @@ import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -845,6 +846,9 @@ final class HallsSessionTrapRuntime {
                 checkPlayerTrapContact(player);
             }
         }
+        for (LivingEntity monster : sessionMonsters()) {
+            checkMonsterTrapContact(monster);
+        }
     }
 
     private void tickTrap(HallsTrap trap, long tick) {
@@ -856,6 +860,7 @@ final class HallsSessionTrapRuntime {
                 if (age % 20L == 0L) {
                     world.playSound(bladeCenter, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.55f, 0.65f);
                     damagePlayersInSwingingBlade(trap, bladeCenter, "A swinging blade cuts you down.");
+                    damageMonstersInSwingingBlade(trap, bladeCenter);
                 }
             }
             case WALL_SPIKES -> {
@@ -868,6 +873,7 @@ final class HallsSessionTrapRuntime {
                     }
                     spawnWallSpikeParticles(trap);
                     damagePlayersInLine(trap, trap.type().radius(), 0.4, trap.type().damage(), "Wall spikes pierce you.");
+                    damageMonstersInLine(trap, trap.type().radius(), 0.4, trap.type().damage());
                 }
             }
             case FALLING_ICE -> {
@@ -884,6 +890,10 @@ final class HallsSessionTrapRuntime {
                     for (Player player : participantsInLine(trap, trap.type().radius(), 0.45)) {
                         player.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 100, 1));
                         damagePlayerFromTrap(player, trap.type().damage(), "Poison darts strike from the wall.");
+                    }
+                    for (LivingEntity monster : monstersInLine(trap, trap.type().radius(), 0.45)) {
+                        monster.addPotionEffect(new PotionEffect(PotionEffectType.POISON, 100, 1));
+                        damageMonsterFromTrap(monster, trap.type().damage());
                     }
                     trapNextTriggerTicks.put(trap, tick + Math.max(60L, trap.type().intervalTicks()));
                 }
@@ -917,20 +927,48 @@ final class HallsSessionTrapRuntime {
         }
     }
 
-    private void triggerProximityMine(HallsTrap trap, Player player) {
+    private void checkMonsterTrapContact(LivingEntity monster) {
+        int x = monster.getLocation().getBlockX();
+        int z = monster.getLocation().getBlockZ();
+        for (HallsTrap trap : List.copyOf(traps)) {
+            if (trap.x() != x || trap.z() != z) {
+                if (!(trap.kind() == TrapKind.PROXIMITY_MINE && Math.abs(trap.x() - x) <= 1 && Math.abs(trap.z() - z) <= 1)) {
+                    continue;
+                }
+            }
+            switch (trap.kind()) {
+                case BEAR_TRAP -> triggerBearTrap(trap, monster);
+                case PROXIMITY_MINE -> triggerProximityMine(trap, monster);
+                case HOLE -> {
+                    if (monster.getLocation().getY() <= origin.y() - Math.max(3, trap.type().depth() - 2)) {
+                        damageMonsterFromTrap(monster, 200.0);
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+    }
+
+    private void triggerProximityMine(HallsTrap trap, LivingEntity trigger) {
         Location location = new Location(world, trap.x() + 0.5, origin.y(), trap.z() + 0.5);
         world.playSound(location, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.2f);
         world.createExplosion(location, trap.type().explosionPower(), false, false);
         damagePlayersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage(), "A proximity mine detonates.");
+        damageMonstersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage());
         setBlock(trap.x(), origin.y(), trap.z(), Material.AIR);
         traps.removeIf(candidate -> candidate == trap);
     }
 
-    private void triggerBearTrap(HallsTrap trap, Player player) {
+    private void triggerBearTrap(HallsTrap trap, LivingEntity trigger) {
         Location location = new Location(world, trap.x() + 0.5, origin.y() + 0.1, trap.z() + 0.5);
         world.spawnParticle(Particle.CRIT, location, 12, 0.25, 0.08, 0.25, 0.02);
         world.playSound(location, Sound.BLOCK_IRON_TRAPDOOR_CLOSE, 0.8f, 1.4f);
-        damagePlayerFromTrap(player, trap.type().damage(), "A bear trap snaps shut.");
+        if (trigger instanceof Player player) {
+            damagePlayerFromTrap(player, trap.type().damage(), "A bear trap snaps shut.");
+        } else {
+            damageMonsterFromTrap(trigger, trap.type().damage());
+        }
         setBlock(trap.x(), origin.y(), trap.z(), Material.AIR);
         traps.removeIf(candidate -> candidate == trap);
     }
@@ -1091,6 +1129,7 @@ final class HallsSessionTrapRuntime {
                     world.spawnParticle(Particle.BLOCK, next, 24, 0.35, 0.3, 0.35, Material.PACKED_ICE.createBlockData());
                     world.playSound(next, Sound.BLOCK_GLASS_BREAK, 0.8f, 0.6f);
                     damagePlayersNear(next, trap.type().radius(), trap.type().damage(), "Falling ice shatters above you.");
+                    damageMonstersNear(next, trap.type().radius(), trap.type().damage());
                     display.remove();
                     transientTrapDisplays.remove(display.getUniqueId());
                     cancel();
@@ -1148,6 +1187,12 @@ final class HallsSessionTrapRuntime {
         }
     }
 
+    private void damageMonstersInLine(HallsTrap trap, double radius, double width, double damage) {
+        for (LivingEntity monster : monstersInLine(trap, wallTrapReach(trap, radius), width)) {
+            damageMonsterFromTrap(monster, damage);
+        }
+    }
+
     private boolean isLocationInLine(HallsTrap trap, Location location, double radius, double width) {
         double dx = location.getX() - (trap.x() + 0.5);
         double dz = location.getZ() - (trap.z() + 0.5);
@@ -1189,6 +1234,15 @@ final class HallsSessionTrapRuntime {
         }
     }
 
+    private void damageMonstersNear(Location center, double radius, double damage) {
+        double radiusSquared = radius * radius;
+        for (LivingEntity monster : sessionMonsters()) {
+            if (monster.getLocation().distanceSquared(center) <= radiusSquared) {
+                damageMonsterFromTrap(monster, damage);
+            }
+        }
+    }
+
     private List<Player> nearbyParticipants(Location center, double radius) {
         double radiusSquared = radius * radius;
         List<Player> players = new ArrayList<>();
@@ -1211,6 +1265,19 @@ final class HallsSessionTrapRuntime {
         trapDamageCooldowns.put(player.getUniqueId(), now + 900L);
         player.sendActionBar(Component.text(message, NamedTextColor.RED));
         player.damage(damage);
+    }
+
+    private void damageMonsterFromTrap(LivingEntity monster, double damage) {
+        if (monster == null || monster.isDead() || !monster.isValid()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        long nextAllowed = trapDamageCooldowns.getOrDefault(monster.getUniqueId(), 0L);
+        if (now < nextAllowed) {
+            return;
+        }
+        trapDamageCooldowns.put(monster.getUniqueId(), now + 350L);
+        monster.damage(damage);
     }
 
     private void teleportPlayerToElevator(Player player) {
@@ -1393,6 +1460,37 @@ final class HallsSessionTrapRuntime {
                 damagePlayerFromTrap(player, trap.type().damage(), message);
             }
         }
+    }
+
+    private void damageMonstersInSwingingBlade(HallsTrap trap, Location bladeCenter) {
+        boolean eastWest = trap.face() == BlockFace.EAST || trap.face() == BlockFace.WEST;
+        for (LivingEntity monster : sessionMonsters()) {
+            Location location = monster.getLocation();
+            double along = Math.abs(eastWest ? location.getX() - bladeCenter.getX() : location.getZ() - bladeCenter.getZ());
+            double lateral = Math.abs(eastWest ? location.getZ() - bladeCenter.getZ() : location.getX() - bladeCenter.getX());
+            double feet = location.getY();
+            double head = feet + Math.max(1.0, monster.getHeight());
+            boolean verticalOverlap = head >= origin.y() + 1.5 && feet <= origin.y() + 3.5;
+            if (verticalOverlap && along <= bladeHalfAlong() && lateral <= bladeHalfLateral(trap)) {
+                damageMonsterFromTrap(monster, trap.type().damage());
+            }
+        }
+    }
+
+    private List<LivingEntity> monstersInLine(HallsTrap trap, double radius, double width) {
+        List<LivingEntity> monsters = new ArrayList<>();
+        for (LivingEntity monster : sessionMonsters()) {
+            if (isLocationInLine(trap, monster.getLocation(), radius, width)) {
+                monsters.add(monster);
+            }
+        }
+        return monsters;
+    }
+
+    private List<LivingEntity> sessionMonsters() {
+        return world.getLivingEntities().stream()
+                .filter(entity -> entity.getScoreboardTags().contains("omgames_hoc_monster"))
+                .toList();
     }
 
     private double bladeHalfAlong() {

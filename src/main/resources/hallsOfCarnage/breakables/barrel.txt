@@ -1,35 +1,11 @@
 id: barrel
+rarity: common
 break-message: "You broke open a dusty barrel."
 hitbox-height: 1.0
 particle-material: BARREL
+scrap-drops:
+  - redstone_scrap
+  - diamond_scrap
 parts:
   - material: BARREL
     offset: [0, 0, 0]
-loot:
-  - item: redstone_scrap
-    weight: 200
-  - item: diamond_scrap
-    weight: 200
-  - item: coin
-    weight: 10
-    amount: 1-3
-  - item: food
-    weight: 18
-  - item: rare_food
-    weight: 2
-  - item: blueprint
-    weight: 9
-  - item: utility
-    weight: 9
-  - item: weapon
-    weight: 9
-  - item: armor
-    weight: 9
-  - item: rare_weapon
-    weight: 1
-  - item: rare_armor
-    weight: 1
-  - item: rare_utility
-    weight: 1
-  - item: rare_blueprint
-    weight: 1

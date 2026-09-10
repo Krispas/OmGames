@@ -1,0 +1,27 @@
+rarity: common
+loot:
+  - item: scrap
+    weight: 180
+  - item: coin
+    weight: 50
+    amount: 1-3
+  - item: food
+    weight: 18
+  - item: rare_food
+    weight: 2
+  - item: blueprint
+    weight: 9
+  - item: utility
+    weight: 9
+  - item: weapon
+    weight: 9
+  - item: armor
+    weight: 9
+  - item: rare_weapon
+    weight: 1
+  - item: rare_armor
+    weight: 1
+  - item: rare_utility
+    weight: 1
+  - item: rare_blueprint
+    weight: 1

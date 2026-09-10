@@ -160,14 +160,22 @@ public final class HallsOfCarnageListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent event) {
-        if (!manager.isHallsWorld(event.getPlayer().getWorld()) || event.getClickedBlock() == null) {
+        if (!manager.isHallsWorld(event.getPlayer().getWorld())) {
+            return;
+        }
+        if (event.getHand() != EquipmentSlot.HAND) {
+            return;
+        }
+        if ((event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK)
+                && manager.handleUtilityUse(event.getPlayer(), event.getItem())) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getClickedBlock() == null) {
             return;
         }
         if (event.getClickedBlock().getType() == Material.SMITHING_TABLE) {
             event.setCancelled(true);
-            return;
-        }
-        if (event.getHand() != EquipmentSlot.HAND) {
             return;
         }
         if (event.getAction() == Action.RIGHT_CLICK_BLOCK

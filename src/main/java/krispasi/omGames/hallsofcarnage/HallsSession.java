@@ -61,6 +61,7 @@ public final class HallsSession {
     private static final double DROP_DISPLAY_SUPPORT_OFFSET = 0.08;
     private static final double DROP_SETTLE_VELOCITY_SQUARED = 0.0016;
     private static final String STARTER_ITEM_ID = "vagabonds_club";
+    private static final long LEFT_BEHIND_MODIFIER_DELAY_TICKS = 100L;
 
     private final JavaPlugin plugin;
     private final int id;
@@ -302,12 +303,12 @@ public final class HallsSession {
                 }
                 coins = Math.max(0, coins - quota);
             }
-            markLeftBehindPlayersAsGhosts();
+            boolean leftBehind = markLeftBehindPlayersAsGhosts();
             transitioning = true;
             openElevatorDoors();
             world.playSound(block.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
             player.sendMessage(Component.text("The elevator begins its descent.", NamedTextColor.DARK_RED));
-            startElevatorTransition(currentFloor + 1);
+            startElevatorTransition(currentFloor + 1, leftBehind);
         } else {
             player.sendMessage(Component.text("No deeper placeholder floor is available.", NamedTextColor.YELLOW));
         }
@@ -475,6 +476,30 @@ public final class HallsSession {
         return true;
     }
 
+    public boolean handleUtilityUse(Player player, ItemStack item) {
+        if (player == null || item == null || !running || !participants.contains(player.getUniqueId())
+                || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())) {
+            return false;
+        }
+        HallsItemType type = itemType(item);
+        if (type == null || !type.category().equals("utility")) {
+            return false;
+        }
+        return switch (type.id()) {
+            case "smoke_bomb" -> {
+                activateSmokeBomb(player, type);
+                consumeOneHeldItem(player);
+                yield true;
+            }
+            case "warding_totem" -> {
+                activateWardingTotem(player, type);
+                consumeOneHeldItem(player);
+                yield true;
+            }
+            default -> false;
+        };
+    }
+
     public void start() throws IOException {
         if (running) {
             return;
@@ -576,7 +601,7 @@ public final class HallsSession {
         return new Cell(layout.width() / 2, layout.depth() / 2);
     }
 
-    private void startElevatorTransition(int destinationFloor) {
+    private void startElevatorTransition(int destinationFloor, boolean delayModifierReveal) {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!running) {
                 return;
@@ -591,12 +616,13 @@ public final class HallsSession {
                 }
             }
         }, 8L);
+        long buildDelay = delayModifierReveal ? 20L + LEFT_BEHIND_MODIFIER_DELAY_TICKS : 20L;
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!running) {
                 return;
             }
             startStagedExplorationFloorBuild(destinationFloor);
-        }, 20L);
+        }, buildDelay);
     }
 
     private void buildExplorationFloor(int floor) {
@@ -676,10 +702,11 @@ public final class HallsSession {
                 && y <= origin.y() + 3;
     }
 
-    private void markLeftBehindPlayersAsGhosts() {
+    private boolean markLeftBehindPlayersAsGhosts() {
         if (participants.size() <= 1) {
-            return;
+            return false;
         }
+        boolean leftBehind = false;
         for (UUID playerId : participants) {
             if (ghostPlayers.contains(playerId)) {
                 continue;
@@ -695,7 +722,9 @@ public final class HallsSession {
             player.sendTitle("Left Behind", "The elevator descended without you.", 10, 70, 20);
             player.sendMessage(Component.text("You were left behind and became a ghost.", NamedTextColor.DARK_RED));
             world.playSound(player.getLocation(), Sound.ENTITY_WITHER_HURT, 0.7f, 0.6f);
+            leftBehind = true;
         }
+        return leftBehind;
     }
 
     private ExplorationBuild planExplorationBuild(int floor) {
@@ -1686,7 +1715,7 @@ public final class HallsSession {
             entity.addScoreboardTag("omgames_hoc_breakable");
         });
         BreakableProp prop = new BreakableProp(interaction.getUniqueId(), displayIds, x, y, z, health,
-                archetype.particleMaterial(), loot, archetype.breakMessage());
+                archetype.particleMaterial(), archetype.scrapDrops(), loot, archetype.breakMessage());
         breakableProps.put(interaction.getUniqueId(), prop);
         for (UUID displayId : displayIds) {
             breakableProps.put(displayId, prop);
@@ -1715,11 +1744,11 @@ public final class HallsSession {
         if (dropLocation != null) {
             world.playSound(dropLocation, Sound.BLOCK_WOOD_BREAK, 0.8f, 1.0f);
             monsterRuntime.alert(dropLocation);
-            applyLoot(prop.loot(), dropLocation);
+            applyLoot(prop.loot(), prop.scrapDrops(), dropLocation);
         }
     }
 
-    private void applyLoot(List<HallsBreakableType.LootEntry> loot, Location dropLocation) {
+    private void applyLoot(List<HallsBreakableType.LootEntry> loot, List<String> scrapDrops, Location dropLocation) {
         HallsBreakableType.LootEntry entry = rollLoot(loot);
         if (entry == null) {
             return;
@@ -1728,7 +1757,17 @@ public final class HallsSession {
         if (entry.maxAmount() > entry.minAmount()) {
             amount += new Random().nextInt(entry.maxAmount() - entry.minAmount() + 1);
         }
-        applyReward(entry.item(), amount, dropLocation);
+        applyReward(resolveBreakableReward(entry.item(), scrapDrops), amount, dropLocation);
+    }
+
+    private String resolveBreakableReward(String reward, List<String> scrapDrops) {
+        if (!reward.equals("scrap") && !reward.equals("random_scrap")) {
+            return reward;
+        }
+        List<String> configured = scrapDrops == null || scrapDrops.isEmpty()
+                ? List.of("wood_scrap", "iron_scrap")
+                : scrapDrops;
+        return configured.get(new Random().nextInt(configured.size()));
     }
 
     private HallsBreakableType.LootEntry rollLoot(List<HallsBreakableType.LootEntry> loot) {
@@ -1825,6 +1864,46 @@ public final class HallsSession {
 
     private ItemStack definedItem(HallsItemType type, int amount) {
         return HallsItemFactory.create(plugin, type, amount);
+    }
+
+    private void activateSmokeBomb(Player player, HallsItemType type) {
+        double radius = Math.max(6.0, type.stats().getOrDefault("radius", 10.0));
+        int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("duration_seconds", 6.0) * 20.0));
+        monsterRuntime.clearTargetsNear(player.getLocation(), radius);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, durationTicks, 0, true, false, true));
+        world.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, player.getLocation().add(0.0, 1.0, 0.0),
+                70, radius * 0.25, 0.8, radius * 0.25, 0.03);
+        world.spawnParticle(Particle.SMOKE, player.getLocation().add(0.0, 0.8, 0.0),
+                100, radius * 0.28, 0.45, radius * 0.28, 0.02);
+        world.playSound(player.getLocation(), Sound.ENTITY_BREEZE_WIND_BURST, 0.9f, 0.65f);
+        player.sendActionBar(Component.text("Smoke covers your escape.", NamedTextColor.GRAY));
+    }
+
+    private void activateWardingTotem(Player player, HallsItemType type) {
+        double radius = Math.max(4.0, type.stats().getOrDefault("radius", 8.0));
+        int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("duration_seconds", 10.0) * 20.0));
+        for (UUID playerId : participants) {
+            Player target = Bukkit.getPlayer(playerId);
+            if (target == null || !target.getWorld().equals(world) || ghostPlayers.contains(playerId)
+                    || target.getLocation().distanceSquared(player.getLocation()) > radius * radius) {
+                continue;
+            }
+            target.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, 1, true, true, true));
+            target.sendActionBar(Component.text("Warding magic hardens your skin.", NamedTextColor.GOLD));
+        }
+        world.spawnParticle(Particle.TOTEM_OF_UNDYING, player.getLocation().add(0.0, 1.0, 0.0),
+                80, radius * 0.22, 0.9, radius * 0.22, 0.08);
+        world.playSound(player.getLocation(), Sound.ITEM_TOTEM_USE, 0.85f, 1.15f);
+    }
+
+    private void consumeOneHeldItem(Player player) {
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held.getAmount() <= 1) {
+            player.getInventory().setItemInMainHand(null);
+            return;
+        }
+        held.setAmount(held.getAmount() - 1);
+        player.getInventory().setItemInMainHand(held);
     }
 
     private HallsItemType itemType(ItemStack item) {
@@ -2716,6 +2795,7 @@ public final class HallsSession {
         private final int y;
         private final int z;
         private final Material material;
+        private final List<String> scrapDrops;
         private final List<HallsBreakableType.LootEntry> loot;
         private final String breakMessage;
         private int health;
@@ -2727,6 +2807,7 @@ public final class HallsSession {
                               int z,
                               int health,
                               Material material,
+                              List<String> scrapDrops,
                               List<HallsBreakableType.LootEntry> loot,
                               String breakMessage) {
             this.interactionId = interactionId;
@@ -2736,6 +2817,7 @@ public final class HallsSession {
             this.z = z;
             this.health = health;
             this.material = material;
+            this.scrapDrops = List.copyOf(scrapDrops);
             this.loot = List.copyOf(loot);
             this.breakMessage = breakMessage;
         }
@@ -2766,6 +2848,10 @@ public final class HallsSession {
 
         private Material material() {
             return material;
+        }
+
+        private List<String> scrapDrops() {
+            return scrapDrops;
         }
 
         private List<HallsBreakableType.LootEntry> loot() {

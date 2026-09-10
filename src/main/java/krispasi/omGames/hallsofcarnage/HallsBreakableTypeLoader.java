@@ -26,10 +26,11 @@ public final class HallsBreakableTypeLoader {
         if (files == null || files.length == 0) {
             return fallbackTypes();
         }
+        Map<String, List<HallsBreakableType.LootEntry>> lootPools = loadLootPools(plugin, new File(folder.getParentFile(), "breakable_loot_pools"));
         Map<String, HallsBreakableType> types = new LinkedHashMap<>();
         for (File file : java.util.Arrays.stream(files).sorted(Comparator.comparing(File::getName)).toList()) {
             try {
-                HallsBreakableType type = loadType(file);
+                HallsBreakableType type = loadType(file, lootPools);
                 types.put(type.id(), type);
             } catch (IllegalArgumentException ex) {
                 if (plugin != null) {
@@ -40,21 +41,26 @@ public final class HallsBreakableTypeLoader {
         return types.isEmpty() ? fallbackTypes() : Map.copyOf(types);
     }
 
-    private static HallsBreakableType loadType(File file) {
+    private static HallsBreakableType loadType(File file, Map<String, List<HallsBreakableType.LootEntry>> lootPools) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         String id = normalizeId(yaml.getString("id", stripExtension(file.getName())));
+        String rarity = normalizeId(yaml.getString("rarity", "common"));
         String breakMessage = yaml.getString("break-message", "You broke " + id + ".");
         float hitboxHeight = (float) yaml.getDouble("hitbox-height", 1.0);
         Material particleMaterial = material(yaml.getString("particle-material"), Material.BARREL);
+        List<String> scrapDrops = parseScrapDrops(yaml);
         List<HallsBreakableType.Part> parts = parseParts(yaml);
         List<HallsBreakableType.LootEntry> loot = parseLoot(yaml);
+        if (loot.isEmpty()) {
+            loot = lootPools.getOrDefault(rarity, lootPools.getOrDefault("common", List.of()));
+        }
         if (parts.isEmpty()) {
             throw new IllegalArgumentException("parts must not be empty");
         }
         if (loot.isEmpty()) {
             throw new IllegalArgumentException("loot must not be empty");
         }
-        return new HallsBreakableType(id, breakMessage, hitboxHeight, particleMaterial, parts, loot);
+        return new HallsBreakableType(id, rarity, breakMessage, hitboxHeight, particleMaterial, scrapDrops, parts, loot);
     }
 
     private static List<HallsBreakableType.Part> parseParts(YamlConfiguration yaml) {
@@ -68,6 +74,17 @@ public final class HallsBreakableTypeLoader {
             parts.add(new HallsBreakableType.Part(x, y, z, material));
         }
         return parts;
+    }
+
+    private static List<String> parseScrapDrops(YamlConfiguration yaml) {
+        List<String> values = yaml.getStringList("scrap-drops").stream()
+                .map(HallsBreakableTypeLoader::normalizeId)
+                .filter(value -> !value.isBlank())
+                .toList();
+        if (values.isEmpty()) {
+            values = List.of("wood_scrap", "iron_scrap");
+        }
+        return values.stream().limit(2).toList();
     }
 
     private static List<HallsBreakableType.LootEntry> parseLoot(YamlConfiguration yaml) {
@@ -86,6 +103,37 @@ public final class HallsBreakableTypeLoader {
             }
         }
         return loot;
+    }
+
+    private static Map<String, List<HallsBreakableType.LootEntry>> loadLootPools(JavaPlugin plugin, File folder) {
+        if (folder == null || !folder.isDirectory()) {
+            return fallbackLootPools();
+        }
+        File[] files = folder.listFiles((dir, name) -> name.endsWith(".txt")
+                || name.endsWith(".yml")
+                || name.endsWith(".yaml"));
+        if (files == null || files.length == 0) {
+            return fallbackLootPools();
+        }
+        Map<String, List<HallsBreakableType.LootEntry>> pools = new LinkedHashMap<>();
+        for (File file : java.util.Arrays.stream(files).sorted(Comparator.comparing(File::getName)).toList()) {
+            try {
+                YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+                String rarity = normalizeId(yaml.getString("rarity", stripExtension(file.getName())));
+                List<HallsBreakableType.LootEntry> loot = parseLoot(yaml);
+                if (!rarity.isBlank() && !loot.isEmpty()) {
+                    pools.put(rarity, List.copyOf(loot));
+                }
+            } catch (RuntimeException ex) {
+                if (plugin != null) {
+                    plugin.getLogger().warning("Failed to load Halls breakable loot pool " + file + ": " + ex.getMessage());
+                }
+            }
+        }
+        if (!pools.containsKey("common")) {
+            pools.putAll(fallbackLootPools());
+        }
+        return Map.copyOf(pools);
     }
 
     private static int[] amountRange(Object value) {
@@ -150,11 +198,11 @@ public final class HallsBreakableTypeLoader {
         Map<String, HallsBreakableType> types = new LinkedHashMap<>();
         addFallback(types, "barrel", "You broke open a dusty barrel.", 1.0f, Material.BARREL,
                 List.of(new HallsBreakableType.Part(0, 0, 0, Material.BARREL)),
-                List.of(loot("wood_scrap", 4), loot("iron_scrap", 2), loot("coin", 2)));
+                List.of("wood_scrap", "iron_scrap"), fallbackLootPools().get("common"));
         addFallback(types, "chair", "You kicked apart a wooden chair.", 1.0f, Material.OAK_STAIRS,
                 List.of(new HallsBreakableType.Part(0, 0, 0, Material.OAK_STAIRS),
                         new HallsBreakableType.Part(0, 1, 0, Material.OAK_TRAPDOOR)),
-                List.of(loot("wood_scrap", 5), loot("iron_scrap", 1), loot("coin", 1)));
+                List.of("wood_scrap", "iron_scrap"), fallbackLootPools().get("common"));
         return Map.copyOf(types);
     }
 
@@ -164,11 +212,45 @@ public final class HallsBreakableTypeLoader {
                                     float hitboxHeight,
                                     Material particleMaterial,
                                     List<HallsBreakableType.Part> parts,
+                                    List<String> scrapDrops,
                                     List<HallsBreakableType.LootEntry> loot) {
-        types.put(id, new HallsBreakableType(id, breakMessage, hitboxHeight, particleMaterial, parts, loot));
+        types.put(id, new HallsBreakableType(id, "common", breakMessage, hitboxHeight, particleMaterial, scrapDrops, parts, loot));
     }
 
     private static HallsBreakableType.LootEntry loot(String item, int weight) {
         return new HallsBreakableType.LootEntry(item, weight, 1, 1);
+    }
+
+    private static Map<String, List<HallsBreakableType.LootEntry>> fallbackLootPools() {
+        Map<String, List<HallsBreakableType.LootEntry>> pools = new LinkedHashMap<>();
+        pools.put("common", List.of(
+                loot("scrap", 200),
+                loot("coin", 20),
+                loot("food", 18),
+                loot("utility", 8),
+                loot("weapon", 7),
+                loot("armor", 7),
+                loot("blueprint", 6),
+                loot("rare_food", 2),
+                loot("rare_utility", 1),
+                loot("rare_weapon", 1),
+                loot("rare_armor", 1),
+                loot("rare_blueprint", 1)
+        ));
+        pools.put("rare", List.of(
+                loot("scrap", 160),
+                loot("coin", 35),
+                loot("food", 14),
+                loot("utility", 14),
+                loot("weapon", 12),
+                loot("armor", 12),
+                loot("blueprint", 10),
+                loot("rare_food", 6),
+                loot("rare_utility", 4),
+                loot("rare_weapon", 4),
+                loot("rare_armor", 4),
+                loot("rare_blueprint", 3)
+        ));
+        return pools;
     }
 }

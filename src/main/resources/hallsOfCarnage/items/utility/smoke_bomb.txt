@@ -5,10 +5,11 @@ rarity: normal
 material: FIREWORK_STAR
 max-stack-size: 1
 lore:
-  - "A future utility item for breaking pursuit."
+  - "Breaks nearby monster pursuit and hides you briefly."
 stats:
   cooldown-seconds: 25
   duration-seconds: 6
+  radius: 10
 recipe:
   redstone_scrap: 3
   wood_scrap: 2

@@ -86,9 +86,10 @@ final class HallsSessionMonsterRuntime {
         int difficulty = parseDifficulty(floor == null ? "0" : floor.difficulty(), floor == null ? 1 : floor.firstFloor());
         int rooms = Math.max(1, floor == null ? 1 : floor.rooms());
         double enemyMultiplier = modifiers == null ? 1.0 : modifiers.enemySpawnMultiplier();
-        this.baseMaxAlive = Math.max(2, Math.min(24, (int) Math.round((participants.size() + rooms / 4 + difficulty / 15) * enemyMultiplier)));
+        double playerStack = participantStackMultiplier();
+        this.baseMaxAlive = Math.max(2, Math.min(36, (int) Math.round((1 + rooms / 4.0 + difficulty / 15.0) * playerStack * enemyMultiplier)));
         this.maxAlive = baseMaxAlive;
-        this.capExtensionIntervalTicks = capExtensionIntervalTicks(difficulty);
+        this.capExtensionIntervalTicks = Math.max(20, (int) Math.round(capExtensionIntervalTicks(difficulty) / playerStack));
         this.capExtensionCooldownTicks = capExtensionIntervalTicks;
         if (spawnCells.isEmpty() || commonPool.isEmpty()) {
             return;
@@ -162,6 +163,20 @@ final class HallsSessionMonsterRuntime {
             if (entity instanceof Creature creature && creature.getWorld().equals(world)
                     && creature.getLocation().distanceSquared(location) <= 96.0 * 96.0) {
                 creature.setTarget(target);
+            }
+        }
+    }
+
+    void clearTargetsNear(Location location, double radius) {
+        if (location == null || !world.equals(location.getWorld())) {
+            return;
+        }
+        double radiusSquared = radius * radius;
+        for (UUID entityId : Set.copyOf(spawnedMonsters)) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity instanceof Creature creature && creature.getWorld().equals(world)
+                    && creature.getLocation().distanceSquared(location) <= radiusSquared) {
+                creature.setTarget(null);
             }
         }
     }
@@ -306,11 +321,11 @@ final class HallsSessionMonsterRuntime {
 
     private HallsMonsterType rollWarden() {
         int sculk = maxSculkSupplier.getAsInt();
-        if (sculk <= 50) {
+        if (sculk < 65) {
             return null;
         }
-        int chance = Math.min(sculk - 40, 35);
-        if (random.nextInt(100) >= chance) {
+        double chance = Math.min(sculk - 55, 35) / 10.0;
+        if (random.nextDouble() * 100.0 >= chance) {
             return null;
         }
         HallsMonsterType configured = monsterTypes.get("warden");
@@ -395,6 +410,10 @@ final class HallsSessionMonsterRuntime {
             seconds = (int) Math.round(60.0 - ((difficulty - 10) * (40.0 / 70.0)));
         }
         return seconds * 20;
+    }
+
+    private double participantStackMultiplier() {
+        return 1.0 + Math.max(0, participants.size() - 1) * 0.33;
     }
 
     private Player nearestParticipant(Location location, double radius) {

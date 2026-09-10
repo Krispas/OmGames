@@ -1265,6 +1265,7 @@ Files:
 - `level_type/**`
 - `modifiers/**`
 - `breakables/*.txt|*.yml|*.yaml`
+- `breakable_loot_pools/*.txt|*.yml|*.yaml`
 - `traps/*.txt|*.yml|*.yaml`
 - `monsters/*.txt|*.yml|*.yaml`
 - `items/**/*.txt|*.yml|*.yaml`
@@ -1283,7 +1284,7 @@ SQLite tables:
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
 - `/hoc scenario <scenario>` is an OP-only debug command that prints the loaded parsed scenario data and the YAML view copied from the active server data folder.
-- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `traps`, `monsters`, `items`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
+- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `breakable_loot_pools`, `traps`, `monsters`, `items`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
 - `HallsExplorationGenerator` owns per-rebuild exploration layout planning.
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.txt|*.yml|*.yaml`.
 - Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, and `pillar-palettes`; monster/modifier sections may exist in resource files for future systems.
@@ -1308,7 +1309,9 @@ SQLite tables:
 - Halls physics item displays and breakable prop block displays use tiny random per-axis scale jitter to reduce display z-fighting.
 - Halls breakable props are session-owned display/interactions and may be multi-part prop archetypes such as barrels, chests, tables, chairs, stools, radiators, and metal barrels; keep cleanup routed through `HallsSession`.
 - Halls breakable prop archetypes are loaded from `plugins/OmGames/HallsOfCarnage/breakables/` and seeded from bundled defaults.
-- Breakable files define `id`, `break-message`, `hitbox-height`, `particle-material`, `parts`, and weighted `loot` entries.
+- Breakable files define `id`, `rarity`, `break-message`, `hitbox-height`, `particle-material`, `scrap-drops`, and `parts`.
+- Breakable loot pools live in `breakable_loot_pools/` by rarity; existing per-breakable `loot` entries are still parsed for compatibility and override the rarity pool for that breakable.
+- Generic breakable loot entries `scrap` / `random_scrap` choose randomly from that breakable's configured `scrap-drops`.
 - Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, an unused-for-now `recipe` scrap cost map, and an optional `stats` map.
@@ -1327,6 +1330,8 @@ SQLite tables:
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
 - Halls food items are catalog items with category `food`; `stats.heal` restores health when consumed while hunger remains locked full.
+- Halls utility `smoke_bomb` clears nearby session monster targets, emits smoke, applies temporary invisibility, and consumes the item on right-click.
+- Halls utility `warding_totem` gives nearby alive participants Resistance II for 10 seconds and consumes the item on right-click.
 - Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.
 - Elevator scrap deposit consumes only the currently selected hotbar stack, not every scrap item in the player hotbar/offhand.
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
@@ -1339,6 +1344,7 @@ SQLite tables:
 - Exploration floors have first-pass session-owned trap generation/runtime for holes, bridged holes, bear traps, proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, and Deep Crypt poison darts.
 - Trap placement uses the generated walkable mask and BFS reachability before accepting an unbridged pit; pits that would disconnect traversal receive a spruce bridge.
 - Halls trap animation/cooldown logic must use `HallsSessionTrapRuntime`'s session-local scheduler tick, not world time, because the Halls dimension may have frozen or nonstandard time progression.
+- Halls traps should damage session monsters as well as players when monsters enter their contact, radius, or lane checks.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth.
 - Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults.
@@ -1354,17 +1360,18 @@ SQLite tables:
 - Session monsters are persistent, have far-away removal disabled, and should prioritize alive participants over ghost players as targets.
 - Session monsters normally acquire targets only at close range; breakable destruction and elevator scrap deposits alert nearby spawned monsters at long range.
 - Exploration monster spawning has no finite total spawn budget. It fills to a live cap, extends that cap periodically based on floor difficulty, reduces the cap by one when an alive participant kills a session monster, and adds one cap slot for each session slime created by slime splitting.
+- Each extra participant after the first adds 33% to the exploration monster live cap and cap-extension speed before modifier multipliers apply.
 - Level type `monsters.common` and `monsters.special` are parsed into runtime pools; exploration floors spawn a first-pass session-local monster flood from the active level type.
 - Breaking Halls props and depositing elevator scrap alert nearby spawned monsters toward the nearest participant.
 - Exploration monsters avoid first-person-visible spawn cells, drop no loot/XP, and increase their live spawn cap by 5% for every minute spent on the floor.
-- When any active participant's sculk is above 50%, each monster spawn has `min(sculk - 40, 35)%` chance to spawn a warden instead.
+- When any active participant's sculk is at least 65%, each monster spawn has `min(sculk - 55, 35) / 10%` chance to spawn a warden instead.
 - Exploration floor scenario field `traps` means the number of rooms that should receive traps, not the raw trap count.
 - Exploration floor scenario field `traps-per-room.min` / `traps-per-room.max` controls how many normal traps Java attempts inside each trapped room.
 - Hole/pit generation is controlled separately by scenario floor field `holes`.
 - Sculk patch generation is controlled separately by scenario floor field `sculk-patches`.
 - Sculk patches convert floor blocks to sculk and place sculk veins in air; participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/eating-block/darkness thresholds.
 - Sculk pressure should rise gradually, not spike during short crossings; generated sculk patches may attach veins to floors, walls, and ceilings, but sculk veins must only enable faces attached to solid neighbor blocks and must stay inside generated walkable floor bounds.
-- Sculk pressure at the eating threshold blocks consumption directly; it should not lower the player's hunger bar.
+- Sculk pressure at 50% applies Weakness I, at 90% applies Slowness I and blocks consumption directly, and at 100% applies Darkness I; it should not lower the player's hunger bar.
 - Halls ghost mode is Adventure-mode invisible player state, not spectator mode. A lethal hit drops the player's carried gear as session physics drops, blocks inventory/pickup interactions, and revives the player on the next floor.
 - If all online session participants are ghosts, the run restarts from floor 1 after 10 seconds.
 - Exploration floor layout templates are loaded with runtime rotations so repeated room files can appear in different orientations.

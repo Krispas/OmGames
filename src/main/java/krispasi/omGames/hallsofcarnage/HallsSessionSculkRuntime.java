@@ -196,10 +196,10 @@ final class HallsSessionSculkRuntime {
             player.playSound(player.getLocation(), Sound.BLOCK_SCULK_SENSOR_CLICKING, 0.45f, 0.7f);
             world.spawnParticle(Particle.SCULK_SOUL, player.getLocation().add(0.0, 0.15, 0.0), 3, 0.35, 0.1, 0.35, 0.0);
         }
-        if (sculk > 35.0) {
+        if (sculk >= 50.0) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 45, 0, true, false, true));
         }
-        if (sculk > 80.0) {
+        if (sculk >= 90.0) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 45, 0, true, false, true));
         }
         player.setFoodLevel(20);

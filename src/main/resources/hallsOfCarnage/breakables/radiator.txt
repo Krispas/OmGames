@@ -1,7 +1,11 @@
 id: radiator
+rarity: common
 break-message: "You tore scrap from a dead radiator."
 hitbox-height: 1.0
 particle-material: IRON_BARS
+scrap-drops:
+  - iron_scrap
+  - redstone_scrap
 parts:
   - material: IRON_BARS
     offset: [0, 0, 0]
@@ -9,31 +13,3 @@ parts:
     offset: [0, 0.0, 0]
   - material: SMOOTH_QUARTZ_SLAB
     offset: [0, 1.0, 0]
-loot:
-  - item: iron_scrap
-    weight: 100
-  - item: redstone_scrap
-    weight: 100
-  - item: coin
-    weight: 60
-    amount: 1-3
-  - item: food
-    weight: 18
-  - item: rare_food
-    weight: 2
-  - item: blueprint
-    weight: 9
-  - item: utility
-    weight: 9
-  - item: weapon
-    weight: 9
-  - item: armor
-    weight: 9
-  - item: rare_weapon
-    weight: 1
-  - item: rare_armor
-    weight: 1
-  - item: rare_utility
-    weight: 1
-  - item: rare_blueprint
-    weight: 1

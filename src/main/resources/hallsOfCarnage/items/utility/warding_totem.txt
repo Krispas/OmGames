@@ -6,9 +6,11 @@ material: TOTEM_OF_UNDYING
 item-model: om:hoc_warding_totem
 max-stack-size: 1
 lore:
-  - "A rare charm for future defensive systems."
+  - "Grants nearby players Resistance II for 10 seconds."
 stats:
   cooldown-seconds: 120
+  duration-seconds: 10
+  radius: 8
   ward-strength: 2
 recipe:
   diamond_scrap: 4

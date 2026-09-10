@@ -241,14 +241,17 @@ This is the first implementation slice. It focuses on:
 - Monster spawning now uses only level-type common monsters unless the special enemy modifier is active; when active, one special monster is selected and added to the spawn roll at a lower effective weight. Spawned monsters no longer target players from long range by default; quiet players should only attract nearby monsters, while breakable destruction and elevator scrap deposits still alert monsters in the existing long radius.
 - Monster live-cap growth now reaches the requested pacing targets: difficulty 10 extends about every 60 seconds, difficulty 80 extends about every 20 seconds, with interpolation between.
 - Trap modifiers now double the weighted chance of their configured trap kind and multiply trap-room count by 1.33; this stacks with the generic more-traps multiplier.
+- Next development slice applied: traps now damage session monsters as well as players through contact, radius, and lane checks for bear traps, proximity mines, swinging blades, wall spikes, falling ice, poison darts, and pit contact.
+- Warden spawning was pushed back and reduced: wardens now begin rolling at 65% max participant sculk, with `min(sculk - 55, 35) / 10%` spawn chance. Sculk punishments now apply Weakness at 50%, Slowness/eating block at 90%, and Darkness at 100%.
+- Elevator descent now delays the destination build/modifier reveal by an extra 5 seconds when multiplayer players are left behind and converted to ghosts, giving them time to read the left-behind message after the doors close.
+- Smoke Bomb and Warding Totem utility behavior is implemented. Smoke Bomb clears nearby session monster targets, emits smoke particles, grants temporary invisibility, and consumes the item. Warding Totem grants nearby alive participants Resistance II for 10 seconds and consumes the item.
+- Exploration monster cap scaling now treats each extra participant after the first as +33% to the base live cap and cap-extension speed before modifier multipliers apply.
+- Breakable loot was centralized into new `breakable_loot_pools/common.yml` and `rare.yml` resources. Breakable files now declare `rarity` and two `scrap-drops`; generic `scrap`/`random_scrap` loot entries pick between those configured scrap drops. Existing per-breakable `loot` remains parser-compatible and overrides the rarity pool.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-Do all for the next slice (keep this line):
-- Make it so traps can damage monsters
-- Reduce warden spawn chance 10 times
-- Push around the sculk punishments, Wardens start spawning at 65, weakness takes hold at 50, slowness at 90
-- When in multiplayer and player is left behind when descending via elevator, after closing the elevator door, wait 5 seconds so the left behind player can see the message without immidietly getting the modifiers message
-- Implement smoke bomb, it will work by clearing targets of all nearby monsters, creating a bunch of particles and making player invisible for some time.
-- Implement warding totem, it will work by giving players in a radius resistance II for 10 seconds
-- Make it so each player increases monster spawn cap and the addition speed to the spawn cap by 33% stacking (by adding, not multiplying, however if for example modifier then gets applied, it multiplies the stacked value)
-- If you look at the breakables file, there is a lot of repetition in drops. Instead add rarity to breakables, normal and rare. Then add a new folder to resources called breakables loot pool. On top of this, each breakable must have 2 types of scrap it drops on top of the loot table. So lets say loot table has scrap with weight 200, then it picks 50/50 chance one of the two scraps in the breakable file. For now make all breakables common, but add a rare loot table I can use in the future.
+- Make it so monsters get affected by trap only if player is in a 20 block radius
+- Dont generate floor material under walls, generate wall material there
+- Make it so when descending through elevator, players heal 6 hp. Dead players will have 10 hp after reviving.
+- When picking up item, pick it into the currently selected hand slot
+- When selecting modifiers, make selecting each take twice as long so players can read it better
+- I added ender chest, rare breakable, make it so each floor always spawns 1 rare breakable, but never more than 1, exactly 1
