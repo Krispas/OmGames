@@ -91,6 +91,7 @@ floors:
       min: 1
       max: 7
     holes: 5
+    sculk-patches: 3
   - number: 3
     kind: exploration
     level-type: frozen_halls
@@ -103,6 +104,7 @@ floors:
       min: 1
       max: 7
     holes: 8
+    sculk-patches: 4
   - number: 4
     kind: exploration
     level-type: deep_crypt
@@ -115,6 +117,7 @@ floors:
       min: 1
       max: 7
     holes: 8
+    sculk-patches: 5
   - number: 5
     kind: camp
     level-type: howling_corridors
@@ -135,6 +138,7 @@ floors:
       min: 1
       max: 7
     holes: 2
+    sculk-patches: 4
   - number: 10
     kind: camp
     level-type: frozen_halls
@@ -155,6 +159,7 @@ floors:
       min: 1
       max: 7
     holes: 3
+    sculk-patches: 6
     camp-every: 5
   - number: 50
     kind: combat

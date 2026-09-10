@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.IntSupplier;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -19,6 +20,7 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Ageable;
 import org.bukkit.entity.Creature;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Slime;
@@ -36,6 +38,7 @@ final class HallsSessionMonsterRuntime {
     private final HallsConfig.BlockPoint origin;
     private final Set<UUID> participants;
     private final Map<String, HallsMonsterType> monsterTypes;
+    private final IntSupplier maxSculkSupplier;
     private final Set<UUID> spawnedMonsters = new HashSet<>();
     private List<HallsExplorationGenerator.Cell> spawnCells = List.of();
     private List<HallsMonsterType> commonPool = List.of();
@@ -43,19 +46,23 @@ final class HallsSessionMonsterRuntime {
     private Random random = new Random();
     private BukkitTask spawnTask;
     private int maxAlive;
+    private int baseMaxAlive;
     private int totalSpawnBudget;
     private int spawnedThisFloor;
+    private long floorStartedAtMillis;
 
     HallsSessionMonsterRuntime(JavaPlugin plugin,
                                World world,
                                HallsConfig.BlockPoint origin,
                                Set<UUID> participants,
-                               Map<String, HallsMonsterType> monsterTypes) {
+                               Map<String, HallsMonsterType> monsterTypes,
+                               IntSupplier maxSculkSupplier) {
         this.plugin = plugin;
         this.world = world;
         this.origin = origin;
         this.participants = participants;
         this.monsterTypes = monsterTypes == null ? Map.of() : Map.copyOf(monsterTypes);
+        this.maxSculkSupplier = maxSculkSupplier == null ? () -> 0 : maxSculkSupplier;
     }
 
     void startExplorationFloor(HallsExplorationGenerator.Plan plan,
@@ -69,8 +76,10 @@ final class HallsSessionMonsterRuntime {
         this.specialPool = monsterPool(levelType == null ? List.of() : levelType.specialMonsters());
         int difficulty = parseDifficulty(floor == null ? "0" : floor.difficulty(), floor == null ? 1 : floor.firstFloor());
         int rooms = Math.max(1, floor == null ? 1 : floor.rooms());
-        this.maxAlive = Math.max(2, Math.min(16, participants.size() + rooms / 4 + difficulty / 15));
+        this.baseMaxAlive = Math.max(2, Math.min(16, participants.size() + rooms / 4 + difficulty / 15));
+        this.maxAlive = baseMaxAlive;
         this.totalSpawnBudget = Math.max(maxAlive, rooms + difficulty / 3);
+        this.floorStartedAtMillis = System.currentTimeMillis();
         if (spawnCells.isEmpty() || commonPool.isEmpty()) {
             return;
         }
@@ -98,14 +107,14 @@ final class HallsSessionMonsterRuntime {
         if (location == null || !world.equals(location.getWorld())) {
             return;
         }
-        Player target = nearestParticipant(location, 48.0);
+        Player target = nearestParticipant(location, 96.0);
         if (target == null) {
             return;
         }
         for (UUID entityId : Set.copyOf(spawnedMonsters)) {
             Entity entity = Bukkit.getEntity(entityId);
             if (entity instanceof Creature creature && creature.getWorld().equals(world)
-                    && creature.getLocation().distanceSquared(location) <= 48.0 * 48.0) {
+                    && creature.getLocation().distanceSquared(location) <= 96.0 * 96.0) {
                 creature.setTarget(target);
             }
         }
@@ -117,6 +126,7 @@ final class HallsSessionMonsterRuntime {
             Entity entity = Bukkit.getEntity(entityId);
             return entity == null || entity.isDead() || !entity.isValid();
         });
+        updateSpawnLimit();
         if (spawnedThisFloor >= totalSpawnBudget) {
             if (spawnedMonsters.isEmpty() && spawnTask != null) {
                 spawnTask.cancel();
@@ -186,6 +196,11 @@ final class HallsSessionMonsterRuntime {
         equipment.setBootsDropChance(0.0f);
     }
 
+    boolean isSessionMonster(Entity entity) {
+        return entity != null && (spawnedMonsters.contains(entity.getUniqueId())
+                || entity.getScoreboardTags().contains("omgames_hoc_monster"));
+    }
+
     private void setArmor(EntityEquipment equipment, String slot, Material material) {
         if (material == null || material.isAir()) {
             return;
@@ -202,10 +217,30 @@ final class HallsSessionMonsterRuntime {
     }
 
     private HallsMonsterType rollMonsterType() {
+        HallsMonsterType warden = rollWarden();
+        if (warden != null) {
+            return warden;
+        }
         if (!specialPool.isEmpty() && spawnedThisFloor > 0 && spawnedThisFloor % 7 == 0) {
             return specialPool.get(random.nextInt(specialPool.size()));
         }
         return commonPool.get(random.nextInt(commonPool.size()));
+    }
+
+    private HallsMonsterType rollWarden() {
+        int sculk = maxSculkSupplier.getAsInt();
+        if (sculk <= 50) {
+            return null;
+        }
+        int chance = Math.min(sculk - 40, 35);
+        if (random.nextInt(100) >= chance) {
+            return null;
+        }
+        HallsMonsterType configured = monsterTypes.get("warden");
+        if (configured != null) {
+            return configured;
+        }
+        return new HallsMonsterType("warden", "Warden", EntityType.WARDEN, 500.0, false, 0, Material.AIR, Map.of());
     }
 
     private HallsExplorationGenerator.Cell spawnCellAwayFromPlayers() {
@@ -213,11 +248,42 @@ final class HallsSessionMonsterRuntime {
         java.util.Collections.shuffle(shuffled, random);
         for (HallsExplorationGenerator.Cell cell : shuffled) {
             Location location = new Location(world, cell.x() + 0.5, origin.y(), cell.z() + 0.5);
-            if (nearestParticipant(location, 14.0) == null) {
+            if (nearestParticipant(location, 14.0) == null && !isVisibleToParticipant(location)) {
                 return cell;
             }
         }
-        return shuffled.isEmpty() ? null : shuffled.getFirst();
+        return null;
+    }
+
+    private boolean isVisibleToParticipant(Location location) {
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.getWorld().equals(world)) {
+                continue;
+            }
+            Location eye = player.getEyeLocation();
+            if (eye.distanceSquared(location) > 32.0 * 32.0) {
+                continue;
+            }
+            org.bukkit.util.Vector toSpawn = location.clone().add(0.0, 1.0, 0.0).toVector().subtract(eye.toVector());
+            org.bukkit.util.Vector look = eye.getDirection().normalize();
+            org.bukkit.util.Vector direction = toSpawn.clone().normalize();
+            if (look.dot(direction) < 0.58) {
+                continue;
+            }
+            double distance = eye.distance(location);
+            if (world.rayTraceBlocks(eye, direction, distance) == null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void updateSpawnLimit() {
+        long minutes = Math.max(0L, (System.currentTimeMillis() - floorStartedAtMillis) / 60_000L);
+        int scaled = (int) Math.ceil(baseMaxAlive * (1.0 + minutes * 0.05));
+        maxAlive = Math.max(baseMaxAlive, Math.min(40, scaled));
+        totalSpawnBudget = Math.max(totalSpawnBudget, maxAlive + (int) minutes);
     }
 
     private Player nearestParticipant(Location location, double radius) {

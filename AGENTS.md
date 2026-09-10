@@ -1282,7 +1282,7 @@ SQLite tables:
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
 - `/hoc scenario <scenario>` is an OP-only debug command that prints the loaded parsed scenario data and the YAML view copied from the active server data folder.
-- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `items`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
+- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `traps`, `monsters`, `items`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
 - `HallsExplorationGenerator` owns per-rebuild exploration layout planning.
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.txt|*.yml|*.yaml`.
 - Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, and `pillar-palettes`; monster/modifier sections may exist in resource files for future systems.
@@ -1329,7 +1329,7 @@ SQLite tables:
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
 - `HallsLayoutLoader` tolerates old copied room files by stripping a full `X` perimeter and treating non-`X` marker characters as open cells; this is runtime parsing tolerance, not file migration.
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
-- Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, ghost state, full item definitions, scrap storage, camps, polished trap visuals/config, sculk, and monsters are pending.
+- Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, full item definitions, scrap storage, camps, polished trap visuals/config, persisted sculk state, and polished monster AI/combat are pending.
 - Exploration doorway selection must reject side offsets where the room mask has `X` at the edge or first inward cell.
 - Howling Corridors room resources are seeded from all bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`.
 - Frozen Halls and Deep Crypt room resources are also seeded from their bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`; use `/hoc reset confirm` to copy newly bundled resource files into an existing server data folder.
@@ -1342,9 +1342,15 @@ SQLite tables:
 - Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
 - Level type `monsters.common` and `monsters.special` are parsed into runtime pools; exploration floors spawn a first-pass session-local monster flood from the active level type.
 - Breaking Halls props and depositing elevator scrap alert nearby spawned monsters toward the nearest participant.
+- Exploration monsters avoid first-person-visible spawn cells, drop no loot/XP, and increase their live spawn cap by 5% for every minute spent on the floor.
+- When any active participant's sculk is above 50%, each monster spawn has `min(sculk - 40, 35)%` chance to spawn a warden instead.
 - Exploration floor scenario field `traps` means the number of rooms that should receive traps, not the raw trap count.
 - Exploration floor scenario field `traps-per-room.min` / `traps-per-room.max` controls how many normal traps Java attempts inside each trapped room.
 - Hole/pit generation is controlled separately by scenario floor field `holes`.
+- Sculk patch generation is controlled separately by scenario floor field `sculk-patches`.
+- Sculk patches convert floor blocks to sculk and place sculk veins in air; participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/hunger/darkness thresholds.
+- Halls ghost mode is Adventure-mode invisible player state, not spectator mode. A lethal hit drops the player's carried gear as session physics drops, blocks inventory/pickup interactions, and revives the player on the next floor.
+- If all online session participants are ghosts, the run restarts from floor 1 after 10 seconds.
 - Exploration floor layout templates are loaded with runtime rotations so repeated room files can appear in different orientations.
 - Exploration floor generation uses a fresh random seed per floor rebuild/session attempt instead of replaying the same layout from scenario and floor id.
 - Trap placement reserves occupied cells before breakable placement; breakables should not spawn on trap footprints.

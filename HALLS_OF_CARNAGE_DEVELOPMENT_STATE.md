@@ -108,11 +108,11 @@ This is the first implementation slice. It focuses on:
 - Full dungeon generation beyond the current first-pass randomized normal-corridor Howling Corridors exploration floor.
 - Full multi-floor session runtime.
 - Real elevator transition animation/loading floor flow.
-- Ghost death state.
+- Polished ghost visuals and ghost-monster interaction rules beyond the first-pass invisible Adventure-mode state.
 - Full item behavior beyond current catalog-defined placeholder drops.
 - Scrap storage and camp building runtime.
 - Combat/exploration/camp floor gameplay.
-- Sculk, modifiers, monster flood systems, and polished trap visuals/config.
+- Persistent sculk, modifiers, polished monster flood behavior, and polished trap visuals/config.
 - Real item effects, equipment stats, crafting/building recipe consumers, and persisted unlock/storage systems.
 - Dedicated elevator transfer chest inventory and item persistence rules.
 - Scenario-aware randomized template-driven exploration room selection from `resources/hallsOfCarnage/level/<level_type>/`.
@@ -217,19 +217,35 @@ This is the first implementation slice. It focuses on:
 - Falling ice shards now compute the actual support floor below their chosen cell and continue falling until that impact height instead of shattering early at a fixed offset.
 - Swinging blade sweep sounds now pulse every 20 ticks instead of once per configured movement loop.
 - Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, poison dart firing, and first-pass monster alert.
-- Halls sound-pending features: future ghost state, future monster attacks/deaths, future combat floor wave terminals, future camp building placement/upgrades/demolition, future crafting/cooking/storage interactions, future sculk growth/warden warning, and future modifier reveal/selection.
+- Halls monster alert radius is now 96 blocks.
+- Exploration monster spawning now continues gradually while spawn budget and live cap allow; the live cap increases by 5% per minute spent on the floor, capped defensively.
+- Monster spawn candidates reject nearby player positions and first-person-visible line-of-sight cells instead of falling back to visible cells.
+- Session monsters now drop no loot or XP on death, with equipment drop chances also forced to zero on spawn.
+- First-pass ghost mode is implemented: lethal player damage in a Halls session is cancelled, the player becomes an invisible Adventure-mode ghost, carried gear is dropped as session physics drops, inventory/pickup/elevator/scrap interactions are blocked, and particles mark their location.
+- Ghost players revive automatically on the next floor transfer. If every online participant is a ghost, the run shows a 10-second game-over countdown and rebuilds floor 1.
+- Session start, game-over restart, floor-transfer teleports, and normal Halls exit now apply a 3-second blindness fade with teleport after roughly 1 second.
+- Scenario exploration floors now parse `sculk-patches`, which controls first-pass sculk patch generation separately from holes and traps.
+- Sculk patches are generated from spherical-ish randomized masks, convert about 80% of affected floor blocks to sculk, and attempt nearby sculk veins in air with about 60% chance.
+- Participants standing in sculk patches or on/inside sculk blocks/veins gain personal sculk pressure; pressure decays slowly when away from sculk.
+- Sculk pressure above 35% applies Weakness I, above 80% applies Slowness I, above 90% clamps food to 16 with zero saturation and blocks eating, and at 100% applies Darkness I.
+- Standing in sculk plays a sculk sensor sound and emits sculk soul particles.
+- Monster spawns now check max participant sculk; above 50%, each spawn has `min(sculk - 40, 35)%` chance to spawn a warden.
+- Bundled scenario defaults now include `sculk-patches` on exploration floors, and bundled monster defaults include `warden`.
+- Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, poison dart firing, first-pass monster alert, and sculk standing feedback.
+- Halls sound-pending features: future monster attacks/deaths, future combat floor wave terminals, future camp building placement/upgrades/demolition, future crafting/cooking/storage interactions, future warden warning, and future modifier reveal/selection.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-Do all for the next slice:
-- Expand the radius of alerting the mobs
-- Make it so gradually, more monsters spawn in the dungeon if spawn limit allows (aka for example if monsters were killed) and each minute spent on the floor, the floors spawn limit extends by 5%. Don't forget you shouldnt spawn mobs where player can see them from first person.
-- Make it so monsters don't drop their loot.
-- Implement the ghost mode as described in GDD. Use adventure mode for it, no spectator. If all players are ghosts. Game will end in 10 seconds, sending them back to the first floor.
-- When game begins / restarts / ends, give players 3 seconds of blindness, 1 second should overlap before the teleport, almost like fade out/in loading
-- Implement the sculk system as described in GDD. Do it like holes, and by that I mean that scenario file should specify amount of sculk patches per floor. Patches are randomized a little bit, converting 80% of blocks within them to sculk and if air space is available, generating sculk veis with 60% chance arond (even if the block is not sculked). Patches are around simillar sizes as holes, but the mask should be spherical with some small y offset, but not big enough for floor not to be affected. If player's position (or position +1 on y level) is within a sculk patch, the sculk level of the player will start rising.
-- Once sculk of a player is above 50%, with each monster spawn, add a chance to spawn warden, the chance is calculated like following min(sculk - 40, 35).
-- Play a sound while player is standing in the sculk
-- When sculk of a player is above 35%, apply weakness I to the player
-- When sculk of a player is above 80%, apply slowness I to the player
-- When sculk of a player is above 90%, set players food to 16 and saturation to 0, player will be unable to eat
-- When sculk of a player is at 100%, they will receive the darkness I effect
+- Make sculk raise more slowly
+- Make sculk generate also on ceilings and walls if the spherical radius allows
+- Make sculk veins have blockstates active only on the sides where solid block is, if there is no solid block, just dont place it there
+- Putting stuff into the chest while elevator is running still deletes the item, fix this
+- Do not use the blindness fadeout transition on level changes
+- When monster falls into a hole, kill it
+- Disable the sound that plays when monsters are alerted
+- Make it so monsters cant spawn with gear or special properties without it being specified
+- Make it so sculk veins dont generate out of bounds
+- Add a new item called "Vagabond's club" it is a wooden sword with less damage than regular wooden sword. it has 32000 durability and all players start with it
+- When starting on start floor, make it so players dont spawn in the elevator, but in the start room
+- The start room guaranteed bluepirnt drop breakable is only spawning sometimes, fix it, tip: all start floors will always be the same, so use that to your advantage.
+- When the game restarts or ends, players take fall damage becouse elevator vanishes before they get teleported, fix that
+- If a game over happens and players are send back to floor one, make it as if a new game started, clearing their inventories, stats and chest.

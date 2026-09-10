@@ -99,6 +99,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/monsters/bogged.txt",
             "hallsOfCarnage/monsters/husk.txt",
             "hallsOfCarnage/monsters/breeze.txt",
+            "hallsOfCarnage/monsters/warden.txt",
             "hallsOfCarnage/items/weapons/rusty_sword.txt",
             "hallsOfCarnage/items/weapons/echo_blade.txt",
             "hallsOfCarnage/items/weapons/miner_pick.txt",
@@ -312,6 +313,10 @@ public final class HallsOfCarnageManager {
         return entity != null && activeSessions.values().stream().anyMatch(session -> session.isSessionEntity(entity));
     }
 
+    public boolean isSessionMonster(Entity entity) {
+        return entity != null && activeSessions.values().stream().anyMatch(session -> session.isSessionMonster(entity));
+    }
+
     public boolean isActiveSessionParticipant(Player player) {
         if (player == null) {
             return false;
@@ -387,6 +392,27 @@ public final class HallsOfCarnageManager {
         if (session != null) {
             session.handlePlayerMove(player);
         }
+    }
+
+    public boolean handlePlayerDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handlePlayerDamage(event);
+    }
+
+    public boolean blocksEating(Player player) {
+        Integer sessionId = player == null ? null : playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.blocksEating(player);
+    }
+
+    public int forcedFoodLevel(Player player) {
+        Integer sessionId = player == null ? null : playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session == null ? 20 : session.forcedFoodLevel(player);
     }
 
     public boolean isHallsWorld(World world) {

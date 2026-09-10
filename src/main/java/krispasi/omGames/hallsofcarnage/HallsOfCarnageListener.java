@@ -8,6 +8,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.block.Action;
@@ -17,6 +18,7 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -67,8 +69,16 @@ public final class HallsOfCarnageListener implements Listener {
     public void onFoodLevelChange(FoodLevelChangeEvent event) {
         if (event.getEntity() instanceof Player player && manager.isHallsWorld(player.getWorld())) {
             event.setCancelled(true);
-            player.setFoodLevel(20);
-            player.setSaturation(20.0f);
+            player.setFoodLevel(manager.forcedFoodLevel(player));
+            player.setSaturation(manager.forcedFoodLevel(player) < 20 ? 0.0f : 20.0f);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerItemConsume(PlayerItemConsumeEvent event) {
+        if (manager.isHallsWorld(event.getPlayer().getWorld()) && manager.blocksEating(event.getPlayer())) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(Component.text("The sculk suppresses your hunger.", NamedTextColor.DARK_AQUA));
         }
     }
 
@@ -87,6 +97,16 @@ public final class HallsOfCarnageListener implements Listener {
         if (manager.isMenuVillager(entity)
                 || (manager.isSessionEntity(entity) && !(event instanceof EntityDamageByEntityEvent))) {
             event.setCancelled(true);
+            return;
+        }
+        manager.handlePlayerDamage(event);
+    }
+
+    @EventHandler
+    public void onEntityDeath(EntityDeathEvent event) {
+        if (manager.isSessionMonster(event.getEntity())) {
+            event.getDrops().clear();
+            event.setDroppedExp(0);
         }
     }
 

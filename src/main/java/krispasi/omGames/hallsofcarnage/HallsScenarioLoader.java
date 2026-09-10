@@ -99,7 +99,8 @@ public final class HallsScenarioLoader {
                     positiveInt(map.get("traps"), 5),
                     trapRange.min(),
                     trapRange.max(),
-                    positiveInt(map.get("holes"), 1)
+                    positiveInt(map.get("holes"), 1),
+                    positiveInt(map.get("sculk-patches"), 2)
             ));
         }
         floors.sort(Comparator.comparingInt(HallsScenario.FloorDefinition::firstFloor));
@@ -125,7 +126,8 @@ public final class HallsScenarioLoader {
                         + " breakables=" + floor.breakables()
                         + " trapped-rooms=" + floor.trappedRooms()
                         + " traps-per-room=" + floor.minTrapsPerRoom() + "-" + floor.maxTrapsPerRoom()
-                        + " holes=" + floor.holes());
+                        + " holes=" + floor.holes()
+                        + " sculk-patches=" + floor.sculkPatches());
             }
         }
         lines.add("loaded-yaml:");

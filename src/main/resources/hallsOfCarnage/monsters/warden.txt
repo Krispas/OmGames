@@ -1,0 +1,4 @@
+id: warden
+name: "Warden"
+entity-type: WARDEN
+health: 500

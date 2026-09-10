@@ -33,11 +33,14 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
@@ -75,9 +78,12 @@ public final class HallsSession {
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
     private final HallsSessionTrapRuntime trapRuntime;
     private final HallsSessionMonsterRuntime monsterRuntime;
+    private final HallsSessionSculkRuntime sculkRuntime;
+    private final Set<UUID> ghostPlayers = new HashSet<>();
     private BukkitTask hudTask;
     private BukkitTask physicsDropTask;
     private BukkitTask floorBuildTask;
+    private BukkitTask gameOverTask;
     private long startedAtMillis;
     private int currentFloor = 1;
     private int woodScrap;
@@ -121,7 +127,9 @@ public final class HallsSession {
             participants.add(player.getUniqueId());
         }
         this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::setBlock, this.trapTypes);
-        this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes);
+        this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock);
+        this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
+                sculkRuntime::maxSculkPercent);
     }
 
     public int id() {
@@ -169,9 +177,17 @@ public final class HallsSession {
                 || physicsDrops.containsKey(entity.getUniqueId()));
     }
 
+    public boolean isSessionMonster(Entity entity) {
+        return monsterRuntime.isSessionMonster(entity);
+    }
+
     public boolean handlePhysicsDropPickup(Player player, Entity entity) {
         if (player == null || entity == null || !running || !player.getWorld().equals(world)) {
             return false;
+        }
+        if (ghostPlayers.contains(player.getUniqueId())) {
+            player.sendActionBar(Component.text("Ghosts cannot pick up items.", NamedTextColor.GRAY));
+            return true;
         }
         PhysicsDrop drop = physicsDrops.get(entity.getUniqueId());
         if (drop == null) {
@@ -207,6 +223,10 @@ public final class HallsSession {
         if (player == null || itemDrop == null || !running || !player.getWorld().equals(world)) {
             return false;
         }
+        if (ghostPlayers.contains(player.getUniqueId())) {
+            itemDrop.remove();
+            return true;
+        }
         ItemStack stack = itemDrop.getItemStack();
         if (stack == null || stack.getType().isAir() || isLockedSlotItem(plugin, stack)) {
             return false;
@@ -240,6 +260,10 @@ public final class HallsSession {
     public boolean handleElevatorButton(Player player, Block block) {
         if (!running || player == null || block == null || !player.getWorld().equals(world)) {
             return false;
+        }
+        if (ghostPlayers.contains(player.getUniqueId())) {
+            player.sendMessage(Component.text("Ghosts cannot operate the elevator.", NamedTextColor.GRAY));
+            return true;
         }
         if (block.getX() != origin.x() - ELEVATOR_INNER_RADIUS
                 || block.getY() != origin.y() + 1
@@ -287,6 +311,10 @@ public final class HallsSession {
         if (!running || player == null || block == null || !player.getWorld().equals(world)) {
             return false;
         }
+        if (ghostPlayers.contains(player.getUniqueId())) {
+            player.sendActionBar(Component.text("Ghosts cannot deposit scrap.", NamedTextColor.GRAY));
+            return true;
+        }
         if (block.getX() != origin.x() - ELEVATOR_INNER_RADIUS
                 || block.getY() != origin.y() + 2
                 || block.getZ() != origin.z()) {
@@ -310,6 +338,9 @@ public final class HallsSession {
         }
         setPlayerElevatorRespawn(player);
         applyInventoryLimit(player);
+        if (ghostPlayers.contains(player.getUniqueId())) {
+            applyGhostState(player);
+        }
     }
 
     public void pushOutOfSessionProps(Player player) {
@@ -345,6 +376,33 @@ public final class HallsSession {
         return trapRuntime.handlePlayerMove(player, running);
     }
 
+    public boolean handlePlayerDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player)
+                || !running
+                || !participants.contains(player.getUniqueId())
+                || !player.getWorld().equals(world)) {
+            return false;
+        }
+        if (ghostPlayers.contains(player.getUniqueId())) {
+            event.setCancelled(true);
+            return true;
+        }
+        if (player.getHealth() - event.getFinalDamage() > 0.0) {
+            return false;
+        }
+        event.setCancelled(true);
+        makeGhost(player);
+        return true;
+    }
+
+    public boolean blocksEating(Player player) {
+        return player != null && (ghostPlayers.contains(player.getUniqueId()) || sculkRuntime.blocksEating(player));
+    }
+
+    public int forcedFoodLevel(Player player) {
+        return sculkRuntime.blocksEating(player) ? 16 : 20;
+    }
+
     public void start() throws IOException {
         if (running) {
             return;
@@ -360,13 +418,13 @@ public final class HallsSession {
             if (player == null) {
                 continue;
             }
-            player.teleport(spawn);
             player.setGameMode(GameMode.ADVENTURE);
             player.setFoodLevel(20);
             player.setSaturation(20.0f);
             setPlayerElevatorRespawn(player);
             player.getInventory().clear();
             applyInventoryLimit(player);
+            fadeTeleport(player, spawn, "Entering " + scenario.name(), "Floor 1", true);
             player.sendMessage(Component.text("Entering " + scenario.name() + " floor 1.", NamedTextColor.DARK_RED));
         }
     }
@@ -382,10 +440,14 @@ public final class HallsSession {
                 restoreInventoryLimit(player);
                 player.getInventory().clear();
                 player.setRespawnLocation(fallback, true);
-                player.teleport(fallback);
+                player.setInvisible(false);
+                player.removePotionEffect(PotionEffectType.INVISIBILITY);
+                fadeTeleport(player, fallback, "Leaving the Halls", "", false);
             } else if (player != null) {
                 restoreInventoryLimit(player);
                 player.getInventory().clear();
+                player.setInvisible(false);
+                player.removePotionEffect(PotionEffectType.INVISIBILITY);
                 if (fallback != null) {
                     player.setRespawnLocation(fallback, true);
                 }
@@ -394,6 +456,7 @@ public final class HallsSession {
         restoreBlocks();
         removeSessionEntities();
         stopHudTask();
+        cancelGameOverTask();
         running = false;
     }
 
@@ -452,6 +515,7 @@ public final class HallsSession {
         renderExplorationRooms(build);
         renderExplorationCorridors(build);
         Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build);
+        renderExplorationSculk(build);
         renderExplorationContents(build, reservedCells);
         startExplorationMonsters(build);
         restoreElevatorChestContents();
@@ -473,8 +537,11 @@ public final class HallsSession {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
                 setPlayerElevatorRespawn(player);
+                clearGhostState(player);
                 if (!isInsideElevator(player.getLocation())) {
-                    player.teleport(spawn);
+                    fadeTeleport(player, spawn, title, subtitle, true);
+                } else {
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 60, 0, true, false, false));
                 }
                 player.sendTitle(title, subtitle, 10, 45, 15);
             }
@@ -589,6 +656,14 @@ public final class HallsSession {
             return;
         }
         monsterRuntime.startExplorationFloor(build.plan(), build.floorDefinition(), build.levelType(), build.random());
+    }
+
+    private void renderExplorationSculk(ExplorationBuild build) {
+        if (build == null || build.plan().rooms().isEmpty()) {
+            sculkRuntime.clear();
+            return;
+        }
+        sculkRuntime.placePatches(build.plan(), build.floorDefinition(), build.random());
     }
 
     private Random floorRandom() {
@@ -1160,13 +1235,28 @@ public final class HallsSession {
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                 .append(Component.text("Coins " + coins, NamedTextColor.YELLOW))
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("Sculk 0", NamedTextColor.AQUA));
+                .append(Component.text("Sculk " + maxParticipantSculk() + "%", NamedTextColor.AQUA));
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
                 player.sendActionBar(message);
+                if (ghostPlayers.contains(playerId)) {
+                    world.spawnParticle(Particle.SOUL_FIRE_FLAME, player.getLocation().add(0.0, 0.9, 0.0),
+                            8, 0.35, 0.45, 0.35, 0.01);
+                }
             }
         }
+    }
+
+    private int maxParticipantSculk() {
+        int max = 0;
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                max = Math.max(max, sculkRuntime.sculkPercent(player));
+            }
+        }
+        return max;
     }
 
     private String formatElapsedSeconds() {
@@ -1494,6 +1584,7 @@ public final class HallsSession {
     }
 
     private void removeSessionEntities() {
+        sculkRuntime.clear();
         monsterRuntime.clear();
         trapRuntime.clear();
         for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
@@ -1551,6 +1642,117 @@ public final class HallsSession {
         if (physicsDropTask != null) {
             physicsDropTask.cancel();
             physicsDropTask = null;
+        }
+    }
+
+    private void makeGhost(Player player) {
+        ghostPlayers.add(player.getUniqueId());
+        dropPlayerSessionInventory(player);
+        applyGhostState(player);
+        player.setHealth(1.0);
+        player.sendTitle("You are a ghost", "Wait for the next floor.", 10, 50, 20);
+        world.playSound(player.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.65f, 1.4f);
+        if (allParticipantsGhosts()) {
+            scheduleGameOver();
+        }
+    }
+
+    private void applyGhostState(Player player) {
+        player.setGameMode(GameMode.ADVENTURE);
+        player.setInvisible(true);
+        player.setAllowFlight(false);
+        player.getInventory().clear();
+        applyInventoryLimit(player);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, PotionEffect.INFINITE_DURATION, 0, true, false, false));
+    }
+
+    private void clearGhostState(Player player) {
+        if (player == null) {
+            return;
+        }
+        ghostPlayers.remove(player.getUniqueId());
+        player.setInvisible(false);
+        player.removePotionEffect(PotionEffectType.INVISIBILITY);
+    }
+
+    private void dropPlayerSessionInventory(Player player) {
+        Location location = player.getLocation().clone().add(0.0, 0.4, 0.0);
+        PlayerInventory inventory = player.getInventory();
+        for (ItemStack item : inventory.getContents()) {
+            if (item != null && !item.getType().isAir() && !isLockedSlotItem(plugin, item)) {
+                dropSessionItem(location, item.clone(), new Vector(Math.random() - 0.5, 0.2, Math.random() - 0.5));
+            }
+        }
+        for (ItemStack item : inventory.getArmorContents()) {
+            if (item != null && !item.getType().isAir()) {
+                dropSessionItem(location, item.clone(), new Vector(Math.random() - 0.5, 0.2, Math.random() - 0.5));
+            }
+        }
+        ItemStack offhand = inventory.getItemInOffHand();
+        if (!offhand.getType().isAir()) {
+            dropSessionItem(location, offhand.clone(), new Vector(Math.random() - 0.5, 0.2, Math.random() - 0.5));
+        }
+        inventory.clear();
+        inventory.setArmorContents(null);
+        inventory.setItemInOffHand(null);
+    }
+
+    private boolean allParticipantsGhosts() {
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world) && !ghostPlayers.contains(playerId)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void scheduleGameOver() {
+        if (gameOverTask != null) {
+            return;
+        }
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.sendTitle("Game Over", "Restarting from floor 1.", 10, 160, 20);
+            }
+        }
+        gameOverTask = Bukkit.getScheduler().runTaskLater(plugin, this::restartFromGameOver, 200L);
+    }
+
+    private void restartFromGameOver() {
+        gameOverTask = null;
+        if (!running) {
+            return;
+        }
+        removeSessionEntities();
+        ghostPlayers.clear();
+        elevatorChestContents = new ItemStack[27];
+        try {
+            buildStartArea();
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Failed to restart Halls session " + id + " after game over: " + ex.getMessage());
+            return;
+        }
+        openElevatorDoors();
+        Location spawn = elevatorSpawnLocation();
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                player.getInventory().clear();
+                player.setHealth(Math.min(player.getMaxHealth(), 20.0));
+                clearGhostState(player);
+                applyInventoryLimit(player);
+                setPlayerElevatorRespawn(player);
+                fadeTeleport(player, spawn, "Run Lost", "Back to floor 1.", true);
+            }
+        }
+    }
+
+    private void cancelGameOverTask() {
+        if (gameOverTask != null) {
+            gameOverTask.cancel();
+            gameOverTask = null;
         }
     }
 
@@ -1871,6 +2073,26 @@ public final class HallsSession {
         }
     }
 
+    private void fadeTeleport(Player player, Location target, String title, String subtitle, boolean prepareSessionPlayer) {
+        if (player == null || target == null) {
+            return;
+        }
+        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 60, 0, true, false, false));
+        player.sendTitle(title, subtitle, 0, 45, 15);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (prepareSessionPlayer && !running) {
+                return;
+            }
+            player.teleport(target);
+            if (prepareSessionPlayer) {
+                player.setGameMode(GameMode.ADVENTURE);
+                player.setFoodLevel(20);
+                player.setSaturation(20.0f);
+                setPlayerElevatorRespawn(player);
+            }
+        }, 20L);
+    }
+
     private Material firstMaterial(String... names) {
         for (String name : names) {
             Material material = Material.matchMaterial(name);
@@ -1967,6 +2189,7 @@ public final class HallsSession {
 
         private void buildTraps() {
             reservedCells = renderExplorationTraps(build);
+            renderExplorationSculk(build);
             stage = 6;
         }
 

@@ -59,7 +59,8 @@ public record HallsScenario(
             int trappedRooms,
             int minTrapsPerRoom,
             int maxTrapsPerRoom,
-            int holes
+            int holes,
+            int sculkPatches
     ) {
         public FloorDefinition {
             trappedRooms = Math.max(0, trappedRooms);
@@ -72,12 +73,12 @@ public record HallsScenario(
         }
 
         public static FloorDefinition fallback(int floor) {
-            return new FloorDefinition(floor, floor, "exploration", "howling_corridors", "0", 8, 0, 16, 3, 1, 2, 1);
+            return new FloorDefinition(floor, floor, "exploration", "howling_corridors", "0", 8, 0, 16, 3, 1, 2, 1, 2);
         }
 
         public FloorDefinition atFloor(int floor) {
             return new FloorDefinition(floor, floor, kind, levelType, difficulty, rooms, items, breakables,
-                    trappedRooms, minTrapsPerRoom, maxTrapsPerRoom, holes);
+                    trappedRooms, minTrapsPerRoom, maxTrapsPerRoom, holes, sculkPatches);
         }
     }
 }
