@@ -82,7 +82,7 @@ final class HallsItemFactory {
         if (meleeDamage != null) {
             meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, new AttributeModifier(
                     new NamespacedKey(plugin, "hoc_melee_damage_" + type.id()),
-                    meleeDamage - vanillaAttackDamage(type.material()),
+                    meleeDamage - 1.0,
                     AttributeModifier.Operation.ADD_NUMBER,
                     EquipmentSlotGroup.HAND
             ));
@@ -91,32 +91,11 @@ final class HallsItemFactory {
         if (attackSpeed != null) {
             meta.addAttributeModifier(Attribute.ATTACK_SPEED, new AttributeModifier(
                     new NamespacedKey(plugin, "hoc_attack_speed_" + type.id()),
-                    attackSpeed - vanillaAttackSpeed(type.material()),
+                    attackSpeed - 4.0,
                     AttributeModifier.Operation.ADD_NUMBER,
                     EquipmentSlotGroup.HAND
             ));
         }
-    }
-
-    private static double vanillaAttackDamage(Material material) {
-        return switch (material) {
-            case WOODEN_SWORD, GOLDEN_SWORD -> 4.0;
-            case STONE_SWORD -> 5.0;
-            case IRON_SWORD -> 6.0;
-            case DIAMOND_SWORD -> 7.0;
-            case NETHERITE_SWORD -> 8.0;
-            default -> 1.0;
-        };
-    }
-
-    private static double vanillaAttackSpeed(Material material) {
-        return switch (material) {
-            case WOODEN_SWORD, STONE_SWORD, IRON_SWORD, GOLDEN_SWORD, DIAMOND_SWORD, NETHERITE_SWORD -> 1.6;
-            case WOODEN_AXE, STONE_AXE -> 0.8;
-            case IRON_AXE -> 0.9;
-            case DIAMOND_AXE, NETHERITE_AXE -> 1.0;
-            default -> 4.0;
-        };
     }
 
     private static void applyArmorModel(ItemMeta meta, HallsItemType type) {

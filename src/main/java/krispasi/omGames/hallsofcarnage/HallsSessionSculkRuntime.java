@@ -2,6 +2,7 @@ package krispasi.omGames.hallsofcarnage;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -24,7 +25,6 @@ import org.bukkit.scheduler.BukkitTask;
 final class HallsSessionSculkRuntime {
     private static final int ROOM_HEIGHT = 5;
     private static final double SCULK_GAIN_PER_SECOND = 0.75;
-    private static final double SCULK_DECAY_PER_SECOND = 0.40;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -32,6 +32,7 @@ final class HallsSessionSculkRuntime {
     private final Set<UUID> participants;
     private final BlockSetter blockSetter;
     private final Set<HallsExplorationGenerator.Cell> patchCells = new HashSet<>();
+    private final List<Patch> patches = new java.util.ArrayList<>();
     private final Map<UUID, Double> playerSculk = new HashMap<>();
     private BukkitTask tickTask;
 
@@ -50,7 +51,7 @@ final class HallsSessionSculkRuntime {
     Set<HallsExplorationGenerator.Cell> placePatches(HallsExplorationGenerator.Plan plan,
                                                      HallsScenario.FloorDefinition floor,
                                                      Random random) {
-        clearPatchesOnly();
+        clearFloor();
         if (plan == null || plan.walkableCells().isEmpty() || floor == null || floor.sculkPatches() <= 0) {
             startTicking();
             return Set.of();
@@ -72,12 +73,16 @@ final class HallsSessionSculkRuntime {
         return Set.copyOf(patchCells);
     }
 
-    void clear() {
+    void clearFloor() {
         if (tickTask != null) {
             tickTask.cancel();
             tickTask = null;
         }
         clearPatchesOnly();
+    }
+
+    void clearAll() {
+        clearFloor();
         playerSculk.clear();
     }
 
@@ -103,6 +108,7 @@ final class HallsSessionSculkRuntime {
         double radiusSquared = radius * radius;
         double xStretch = 0.85 + random.nextDouble() * 0.45;
         double zStretch = 0.85 + random.nextDouble() * 0.45;
+        patches.add(new Patch(center.x() + 0.5, center.z() + 0.5, radius, xStretch, zStretch));
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 double shaped = (dx * dx) / xStretch + (dz * dz) / zStretch;
@@ -120,7 +126,7 @@ final class HallsSessionSculkRuntime {
                     blockSetter.setBlock(x, origin.y() - 1, z, Material.SCULK, null);
                 }
                 maybePlaceVein(x, origin.y(), z, BlockFace.DOWN, random);
-                for (int y = origin.y(); y <= origin.y() + ROOM_HEIGHT - 1; y++) {
+                for (int y = origin.y(); y <= origin.y() + ROOM_HEIGHT; y++) {
                     maybePlaceVein(x, y, z, BlockFace.EAST, random);
                     maybePlaceVein(x, y, z, BlockFace.WEST, random);
                     maybePlaceVein(x, y, z, BlockFace.SOUTH, random);
@@ -132,8 +138,11 @@ final class HallsSessionSculkRuntime {
     }
 
     private void maybePlaceVein(int x, int y, int z, BlockFace face, Random random) {
-        if (random.nextDouble() > 0.45 || !world.getBlockAt(x, y, z).getType().isAir()
-                || !world.getBlockAt(x + face.getModX(), y + face.getModY(), z + face.getModZ()).getType().isSolid()) {
+        if (random.nextDouble() > 0.35 || !world.getBlockAt(x, y, z).getType().isAir()) {
+            return;
+        }
+        Material support = world.getBlockAt(x + face.getModX(), y + face.getModY(), z + face.getModZ()).getType();
+        if (!support.isSolid() || support == Material.SCULK_VEIN) {
             return;
         }
         blockSetter.setBlock(x, y, z, Material.SCULK_VEIN, face);
@@ -141,6 +150,7 @@ final class HallsSessionSculkRuntime {
 
     private void clearPatchesOnly() {
         patchCells.clear();
+        patches.clear();
     }
 
     private void startTicking() {
@@ -158,9 +168,7 @@ final class HallsSessionSculkRuntime {
             }
             boolean inSculk = isInSculk(player.getLocation());
             double current = playerSculk.getOrDefault(playerId, 0.0);
-            double next = inSculk
-                    ? Math.min(100.0, current + SCULK_GAIN_PER_SECOND)
-                    : Math.max(0.0, current - SCULK_DECAY_PER_SECOND);
+            double next = inSculk ? Math.min(100.0, current + SCULK_GAIN_PER_SECOND) : current;
             playerSculk.put(playerId, next);
             applySculkEffects(player, next, inSculk);
         }
@@ -170,14 +178,17 @@ final class HallsSessionSculkRuntime {
         if (location == null || !world.equals(location.getWorld())) {
             return false;
         }
-        HallsExplorationGenerator.Cell feet = new HallsExplorationGenerator.Cell(location.getBlockX(), location.getBlockZ());
-        if (patchCells.contains(feet)) {
-            return true;
+        double x = location.getX();
+        double z = location.getZ();
+        for (Patch patch : patches) {
+            double dx = x - patch.centerX();
+            double dz = z - patch.centerZ();
+            double shaped = (dx * dx) / patch.xStretch() + (dz * dz) / patch.zStretch();
+            if (shaped <= patch.radius() * patch.radius()) {
+                return true;
+            }
         }
-        Material below = world.getBlockAt(location.getBlockX(), location.getBlockY() - 1, location.getBlockZ()).getType();
-        Material feetBlock = world.getBlockAt(location).getType();
-        Material headBlock = world.getBlockAt(location.getBlockX(), location.getBlockY() + 1, location.getBlockZ()).getType();
-        return below == Material.SCULK || feetBlock == Material.SCULK_VEIN || headBlock == Material.SCULK_VEIN;
+        return false;
     }
 
     private void applySculkEffects(Player player, double sculk, boolean inSculk) {
@@ -207,5 +218,8 @@ final class HallsSessionSculkRuntime {
     @FunctionalInterface
     interface BlockSetter {
         void setBlock(int x, int y, int z, Material material, BlockFace face);
+    }
+
+    private record Patch(double centerX, double centerZ, int radius, double xStretch, double zStretch) {
     }
 }

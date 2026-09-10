@@ -323,6 +323,13 @@ public final class HallsOfCarnageManager {
         return entity != null && activeSessions.values().stream().anyMatch(session -> session.isSessionMonster(entity));
     }
 
+    public boolean registerSplitMonster(Entity entity) {
+        if (entity == null) {
+            return false;
+        }
+        return activeSessions.values().stream().anyMatch(session -> session.registerSplitMonster(entity));
+    }
+
     public boolean isActiveSessionParticipant(Player player) {
         if (player == null) {
             return false;

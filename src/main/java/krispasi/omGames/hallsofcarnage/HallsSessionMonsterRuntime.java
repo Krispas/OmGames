@@ -103,6 +103,28 @@ final class HallsSessionMonsterRuntime {
         spawnCells = List.of();
         spawnedThisFloor = 0;
         spawnCooldownTicks = 0;
+        baseMaxAlive = 0;
+        maxAlive = 0;
+        totalSpawnBudget = 0;
+    }
+
+    String debugStatus() {
+        pruneDeadMonsters();
+        return spawnedMonsters.size() + " alive, cap " + baseMaxAlive + ", extended cap " + maxAlive
+                + ", spawned " + spawnedThisFloor + "/" + totalSpawnBudget;
+    }
+
+    boolean registerSplitMonster(Entity entity) {
+        if (!(entity instanceof Slime slime) || !world.equals(entity.getWorld()) || spawnCells.isEmpty()) {
+            return false;
+        }
+        Location location = entity.getLocation();
+        if (Math.abs(location.getX() - origin.x()) > 96.0 || Math.abs(location.getZ() - origin.z()) > 96.0) {
+            return false;
+        }
+        configureSplitSlime(slime);
+        spawnedMonsters.add(slime.getUniqueId());
+        return true;
     }
 
     void alert(Location location) {
@@ -123,10 +145,7 @@ final class HallsSessionMonsterRuntime {
     }
 
     private void tick() {
-        spawnedMonsters.removeIf(entityId -> {
-            Entity entity = Bukkit.getEntity(entityId);
-            return entity == null || entity.isDead() || !entity.isValid();
-        });
+        pruneDeadMonsters();
         killMonstersInPits();
         updateSpawnLimit();
         spawnCooldownTicks -= 20;
@@ -185,6 +204,15 @@ final class HallsSessionMonsterRuntime {
         applyEquipment(living.getEquipment(), type);
     }
 
+    private void configureSplitSlime(Slime slime) {
+        slime.setPersistent(false);
+        slime.addScoreboardTag("omgames_hoc_monster");
+        EntityEquipment equipment = slime.getEquipment();
+        if (equipment != null) {
+            equipment.clear();
+        }
+    }
+
     private void applyEquipment(EntityEquipment equipment, HallsMonsterType type) {
         if (equipment == null) {
             return;
@@ -207,6 +235,13 @@ final class HallsSessionMonsterRuntime {
     boolean isSessionMonster(Entity entity) {
         return entity != null && (spawnedMonsters.contains(entity.getUniqueId())
                 || entity.getScoreboardTags().contains("omgames_hoc_monster"));
+    }
+
+    private void pruneDeadMonsters() {
+        spawnedMonsters.removeIf(entityId -> {
+            Entity entity = Bukkit.getEntity(entityId);
+            return entity == null || entity.isDead() || !entity.isValid();
+        });
     }
 
     private void setArmor(EntityEquipment equipment, String slot, Material material) {

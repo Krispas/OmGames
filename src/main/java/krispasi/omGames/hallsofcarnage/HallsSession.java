@@ -162,6 +162,10 @@ public final class HallsSession {
         return activeGeneratedRooms;
     }
 
+    public String monsterDebugStatus() {
+        return monsterRuntime.debugStatus();
+    }
+
     public boolean isTransitioning() {
         return transitioning;
     }
@@ -181,6 +185,10 @@ public final class HallsSession {
 
     public boolean isSessionMonster(Entity entity) {
         return monsterRuntime.isSessionMonster(entity);
+    }
+
+    public boolean registerSplitMonster(Entity entity) {
+        return monsterRuntime.registerSplitMonster(entity);
     }
 
     public boolean handlePhysicsDropPickup(Player player, Entity entity) {
@@ -275,6 +283,16 @@ public final class HallsSession {
         if (transitioning) {
             player.sendMessage(Component.text("The elevator is already moving.", NamedTextColor.YELLOW));
         } else if (currentFloor < scenario.floorCount()) {
+            int quota = currentCoinQuota();
+            if (player.getGameMode() != GameMode.CREATIVE) {
+                if (coins < quota) {
+                    player.sendMessage(Component.text("The elevator needs " + quota + " coins. Current: " + coins + ".",
+                            NamedTextColor.YELLOW));
+                    return true;
+                }
+                coins = Math.max(0, coins - quota);
+            }
+            markLeftBehindPlayersAsGhosts();
             transitioning = true;
             openElevatorDoors();
             world.playSound(block.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
@@ -617,6 +635,28 @@ public final class HallsSession {
                 && y <= origin.y() + 3;
     }
 
+    private void markLeftBehindPlayersAsGhosts() {
+        if (participants.size() <= 1) {
+            return;
+        }
+        for (UUID playerId : participants) {
+            if (ghostPlayers.contains(playerId)) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.getWorld().equals(world) || isInsideElevator(player.getLocation())) {
+                continue;
+            }
+            ghostPlayers.add(playerId);
+            dropPlayerSessionInventory(player);
+            applyGhostState(player);
+            player.setHealth(1.0);
+            player.sendTitle("Left Behind", "The elevator descended without you.", 10, 70, 20);
+            player.sendMessage(Component.text("You were left behind and became a ghost.", NamedTextColor.DARK_RED));
+            world.playSound(player.getLocation(), Sound.ENTITY_WITHER_HURT, 0.7f, 0.6f);
+        }
+    }
+
     private ExplorationBuild planExplorationBuild(int floor) {
         HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
         HallsLevelType levelType = levelTypeFor(floorDefinition);
@@ -704,7 +744,7 @@ public final class HallsSession {
 
     private void renderExplorationSculk(ExplorationBuild build) {
         if (build == null || build.plan().rooms().isEmpty()) {
-            sculkRuntime.clear();
+            sculkRuntime.clearFloor();
             return;
         }
         sculkRuntime.placePatches(build.plan(), build.floorDefinition(), build.random());
@@ -1270,19 +1310,22 @@ public final class HallsSession {
         if (!running) {
             return;
         }
-        Component message = Component.text("Floor " + currentFloor, NamedTextColor.DARK_RED)
+        Component shared = Component.text("Floor " + currentFloor, NamedTextColor.DARK_RED)
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                 .append(Component.text(formatElapsedSeconds(), NamedTextColor.GRAY))
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                 .append(Component.text("Scrap W" + woodScrap + " I" + ironScrap
                         + " D" + diamondScrap + " R" + redstoneScrap, NamedTextColor.GOLD))
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("Coins " + coins, NamedTextColor.YELLOW))
+                .append(Component.text("Coins " + coins + "/" + currentCoinQuota(), NamedTextColor.YELLOW))
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                 .append(Component.text("Sculk " + maxParticipantSculk() + "%", NamedTextColor.AQUA));
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
+                Component message = shared
+                        .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                        .append(Component.text("Elevator " + elevatorDistanceLabel(player), NamedTextColor.LIGHT_PURPLE));
                 player.sendActionBar(message);
                 if (ghostPlayers.contains(playerId)) {
                     world.spawnParticle(Particle.SOUL_FIRE_FLAME, player.getLocation().add(0.0, 0.9, 0.0),
@@ -1290,6 +1333,24 @@ public final class HallsSession {
                 }
             }
         }
+    }
+
+    private String elevatorDistanceLabel(Player player) {
+        if (player == null || !player.getWorld().equals(world)) {
+            return "FAR";
+        }
+        double distance = player.getLocation().distance(elevatorSpawnLocation());
+        if (distance <= 30.0) {
+            return "NEAR";
+        }
+        if (distance <= 50.0) {
+            return "MEDIUM";
+        }
+        return "FAR";
+    }
+
+    private int currentCoinQuota() {
+        return scenario.floor(currentFloor).coinQuota();
     }
 
     private int maxParticipantSculk() {
@@ -1628,7 +1689,7 @@ public final class HallsSession {
     }
 
     private void removeSessionEntities() {
-        sculkRuntime.clear();
+        sculkRuntime.clearFloor();
         monsterRuntime.clear();
         trapRuntime.clear();
         for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
@@ -1811,7 +1872,7 @@ public final class HallsSession {
         diamondScrap = 0;
         redstoneScrap = 0;
         coins = 0;
-        sculkRuntime.clear();
+        sculkRuntime.clearAll();
     }
 
     private void giveStarterItem(Player player) {
@@ -2135,8 +2196,9 @@ public final class HallsSession {
         }
         if (facing != null && block.getBlockData() instanceof MultipleFacing multipleFacing) {
             for (BlockFace face : multipleFacing.getAllowedFaces()) {
-                boolean solidNeighbor = world.getBlockAt(x + face.getModX(), y + face.getModY(), z + face.getModZ())
-                        .getType().isSolid();
+                boolean solidNeighbor = material == Material.SCULK_VEIN
+                        ? face == facing
+                        : world.getBlockAt(x + face.getModX(), y + face.getModY(), z + face.getModZ()).getType().isSolid();
                 multipleFacing.setFace(face, solidNeighbor);
             }
             block.setBlockData(multipleFacing, false);

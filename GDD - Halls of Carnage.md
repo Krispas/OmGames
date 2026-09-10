@@ -167,7 +167,7 @@ They are not defined in the resource files, so please add resource files for the
 - More enemies - 25% more enemy spawns
 - More traps - 50% more traps
 - Less loot - 25% less loot
-- More sculk - double sculk generation
+- More sculk - triple sculk generation
 - Special enemy - adds a special enemy from special enemy pool to the enemy pool based on level type
 - More rooms - adds 3-5 more rooms (this is bad, because the treasure is more spread)
 - Longer corridors - rooms generate further apart. This effect shouldnt be as powerful when maze corridor generating is active.

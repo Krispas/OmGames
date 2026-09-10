@@ -233,7 +233,8 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                     + " players)", NamedTextColor.YELLOW));
             for (HallsScenario.FloorDefinition floor : scenario.floors()) {
                 sender.sendMessage(Component.text("  " + floorLabel(floor) + ": " + floor.kind()
-                        + ", " + floor.levelType() + ", rooms " + floor.rooms(), NamedTextColor.GRAY));
+                        + ", " + floor.levelType() + ", rooms " + floor.rooms()
+                        + ", quota " + floor.coinQuota(), NamedTextColor.GRAY));
                 if (floor.trappedRooms() > 0 || floor.holes() > 0) {
                     sender.sendMessage(Component.text("    traps: " + floor.trappedRooms() + " rooms, "
                             + floor.minTrapsPerRoom() + "-" + floor.maxTrapsPerRoom()
@@ -293,6 +294,7 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
             sender.sendMessage(Component.text("- " + session.id() + ": " + session.scenario().name()
                     + " (floor " + session.currentFloor() + ", " + session.activeLevelTypeId()
                     + ", rooms " + session.activeGeneratedRooms() + "/" + session.activeTargetRooms()
+                    + ", monsters " + session.monsterDebugStatus()
                     + ", " + session.participants().size() + " players, origin "
                     + origin.x() + " " + origin.y() + " " + origin.z() + ")", NamedTextColor.YELLOW));
         }
