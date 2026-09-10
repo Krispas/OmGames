@@ -468,7 +468,9 @@ public final class HallsSession {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
                 setPlayerElevatorRespawn(player);
-                player.teleport(spawn);
+                if (!isInsideElevator(player.getLocation())) {
+                    player.teleport(spawn);
+                }
                 player.sendTitle(title, subtitle, 10, 45, 15);
             }
         }
@@ -482,6 +484,21 @@ public final class HallsSession {
         if (player != null) {
             player.setRespawnLocation(elevatorSpawnLocation(), true);
         }
+    }
+
+    private boolean isInsideElevator(Location location) {
+        if (location == null || !world.equals(location.getWorld())) {
+            return false;
+        }
+        int x = location.getBlockX();
+        int y = location.getBlockY();
+        int z = location.getBlockZ();
+        return x >= origin.x() - ELEVATOR_INNER_RADIUS
+                && x <= origin.x() + ELEVATOR_INNER_RADIUS
+                && z >= origin.z() - ELEVATOR_INNER_RADIUS
+                && z <= origin.z() + ELEVATOR_INNER_RADIUS
+                && y >= origin.y()
+                && y <= origin.y() + 3;
     }
 
     private ExplorationBuild planExplorationBuild(int floor) {
@@ -639,7 +656,7 @@ public final class HallsSession {
         for (int x = minX; x <= maxX; x++) {
             for (int y = origin.y() - 16; y <= origin.y() + CLEAR_HEIGHT; y++) {
                 for (int z = origin.z() - radius; z <= origin.z() + radius; z++) {
-                    if (isProtectedElevatorCell(x, z)) {
+                    if (isProtectedElevatorTransferCell(x, z)) {
                         continue;
                     }
                     setBlock(x, y, z, Material.AIR);
@@ -813,7 +830,7 @@ public final class HallsSession {
         for (int offset = pathMin - 1; offset <= pathMax + 1; offset++) {
             int blockX = northSouth ? x + offset : x;
             int blockZ = northSouth ? z : z + offset;
-            if (isProtectedElevatorCell(blockX, blockZ)) {
+            if (isProtectedElevatorTransferCell(blockX, blockZ)) {
                 continue;
             }
             boolean path = offset >= pathMin && offset <= pathMax;
@@ -877,7 +894,7 @@ public final class HallsSession {
     private void buildGeneratedCorridorCell(HallsExplorationGenerator.Plan plan,
                                             HallsLevelType levelType,
                                             HallsExplorationGenerator.Cell point) {
-        if (isProtectedElevatorCell(point.x(), point.z())) {
+        if (isProtectedElevatorTransferCell(point.x(), point.z())) {
             return;
         }
         Set<HallsExplorationGenerator.Cell> openCells = plan.corridorCells();
@@ -930,6 +947,13 @@ public final class HallsSession {
 
     private boolean isProtectedElevatorCell(int x, int z) {
         return protectedElevatorBounds().contains(x, z);
+    }
+
+    private boolean isProtectedElevatorTransferCell(int x, int z) {
+        return isProtectedElevatorCell(x, z)
+                || (z == origin.z() + ELEVATOR_OUTER_RADIUS + 1
+                && x >= origin.x() - ELEVATOR_INNER_RADIUS
+                && x <= origin.x() + ELEVATOR_INNER_RADIUS);
     }
 
     private void openElevatorDoors() {

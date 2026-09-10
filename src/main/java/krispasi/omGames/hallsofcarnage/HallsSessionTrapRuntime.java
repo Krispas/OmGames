@@ -237,7 +237,7 @@ final class HallsSessionTrapRuntime {
         if (bridgeCells == null) {
             return false;
         }
-        buildPit(pitCells, bridgeCells, type);
+        buildPit(pitCells, bridgeCells, roomPitCells(candidate), type);
         TrapKind kind = bridgeCells.isEmpty() ? TrapKind.HOLE : TrapKind.HOLE_BRIDGE;
         for (HallsExplorationGenerator.Cell pitCell : pitCells) {
             if (!bridgeCells.contains(pitCell)) {
@@ -657,7 +657,10 @@ final class HallsSessionTrapRuntime {
 
     private void buildPit(Set<HallsExplorationGenerator.Cell> pitCells,
                           Set<HallsExplorationGenerator.Cell> bridgeCells,
+                          Set<HallsExplorationGenerator.Cell> existingPits,
                           HallsTrapType type) {
+        Set<HallsExplorationGenerator.Cell> connectedPitCells = new HashSet<>(pitCells);
+        connectedPitCells.addAll(existingPits);
         for (HallsExplorationGenerator.Cell cell : pitCells) {
             for (int y = origin.y(); y < origin.y() + ROOM_HEIGHT; y++) {
                 setBlock(cell.x(), y, cell.z(), Material.AIR);
@@ -665,7 +668,7 @@ final class HallsSessionTrapRuntime {
             setBlock(cell.x(), origin.y() - 1, cell.z(), Material.AIR);
             for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
                 HallsExplorationGenerator.Cell side = step(cell, face);
-                if (!pitCells.contains(side)) {
+                if (!connectedPitCells.contains(side)) {
                     for (int y = origin.y() - 2; y >= origin.y() - type.depth(); y--) {
                         setBlock(side.x(), y, side.z(), Material.DEEPSLATE_BRICKS);
                     }
@@ -840,6 +843,9 @@ final class HallsSessionTrapRuntime {
         switch (trap.kind()) {
             case SWINGING_BLADE -> {
                 Location bladeCenter = moveTrapDisplay(trap, age).orElse(center.clone().add(0.0, 1.3, 0.0));
+                if (age % Math.max(1L, trap.type().intervalTicks()) == 0L) {
+                    world.playSound(bladeCenter, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.55f, 0.65f);
+                }
                 damagePlayersInSwingingBlade(trap, bladeCenter, "A swinging blade cuts you down.");
             }
             case WALL_SPIKES -> {
@@ -847,6 +853,9 @@ final class HallsSessionTrapRuntime {
                 boolean active = activeAge < trap.type().activeTicks();
                 moveTrapDisplay(trap, active ? activeAge : 0L);
                 if (active) {
+                    if (activeAge == 0L) {
+                        world.playSound(center, Sound.BLOCK_PISTON_EXTEND, 0.7f, 1.45f);
+                    }
                     spawnWallSpikeParticles(trap);
                     damagePlayersInLine(trap, trap.type().radius(), 0.4, trap.type().damage(), "Wall spikes pierce you.");
                 }
@@ -900,6 +909,7 @@ final class HallsSessionTrapRuntime {
 
     private void triggerProximityMine(HallsTrap trap, Player player) {
         Location location = new Location(world, trap.x() + 0.5, origin.y(), trap.z() + 0.5);
+        world.playSound(location, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.2f);
         world.createExplosion(location, trap.type().explosionPower(), false, false);
         damagePlayersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage(), "A proximity mine detonates.");
         setBlock(trap.x(), origin.y(), trap.z(), Material.AIR);

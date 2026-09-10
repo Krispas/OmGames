@@ -203,10 +203,14 @@ This is the first implementation slice. It focuses on:
 - Active Halls participants now have their respawn location set to the session elevator on start, join, and floor transfer; session stop restores their respawn location to the Halls lobby when a lobby fallback is available.
 - Deep Crypt `maze` trap placement now skips repeated full-floor reachability scans for holes, wall traps, and proximity mines, using room-local hole reachability instead to avoid the end-of-generation spike before breakables spawn.
 - Halls verification workflow is documented in `AGENTS.md`: use Maven compile with tests skipped unless tests are explicitly requested.
+- Floor-transfer teleports now skip players who are already inside the session elevator interior while still refreshing their elevator respawn location and title.
+- Staged floor clear and corridor rendering now preserve the protected elevator transfer vestibule line, including the black-concrete backing in front of closed elevator doors.
+- New overlapping holes no longer build pit edge walls against cells already occupied by existing room-local pits, preventing old internal pit walls from surviving inside merged holes.
+- Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, and poison dart firing.
+- Halls sound-pending features: future ghost state, future monster spawns/attacks/deaths, future combat floor wave terminals, future camp building placement/upgrades/demolition, future crafting/cooking/storage interactions, future sculk growth/warden warning, and future modifier reveal/selection.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-For next slice do:
-- Don't tp players to elevator if they are already in it
-- The black concrete in front of the elevator door gets deleted while transfering floors, first when level unloads, second time when corridor before the elevator generates
-- When two holes intersect, the walls of the first hole which are inside the second hole dont get deleted
-- Try to add sound effects to all the features we currently have (and create a list of features which have sounds and features which are yet to receive them, then use that list for future features)
+For the next slice (do all, also keep this line):
+- Falling ice traps are not going all the way to the floor
+- Make it so the swinging blade trap doesnt do the trap once per loop, but once each 20 ticks
+- If I put something into the elevator chest on floor transfer, it gets deleted, prevent that
