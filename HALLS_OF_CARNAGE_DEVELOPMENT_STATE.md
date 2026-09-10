@@ -258,6 +258,7 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice (do not remove this line):
+- The camp corridor now doesnt connect to the wall, but cannot be walked through, if you need space, just put the room a few blocks further from the elevator, if its a corridor gen problem, fix it, also the entrance to the room has missing block above the corridor, making it possible to look out of bounds
 - Utility items like smoke bomb and warding totem should have unlimited uses with cooldown
 - Even after using smoke bomb, the monsters are still locked onto me
 - The rare breakable is always in the first room, change that
