@@ -3,6 +3,6 @@ modifiers:
     type: bad
     display-name: "Falling Ice"
     icon: "✦"
-    weight: 6
+    weight: 7
     effects:
       trap: falling_ice
