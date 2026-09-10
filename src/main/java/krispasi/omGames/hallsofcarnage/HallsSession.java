@@ -50,6 +50,8 @@ public final class HallsSession {
     private static final int ROOM_HEIGHT = 5;
     private static final int ELEVATOR_INNER_RADIUS = 2;
     private static final int ELEVATOR_OUTER_RADIUS = 3;
+    private static final int CLEAR_COLUMNS_PER_TICK = 3;
+    private static final int CORRIDOR_CELLS_PER_TICK = 96;
     private static final int DISPLAY_INTERPOLATION_DELAY_TICKS = 1;
     private static final int DISPLAY_TELEPORT_DURATION_TICKS = 2;
     private static final double DROP_DISPLAY_SUPPORT_OFFSET = 0.08;
@@ -72,6 +74,7 @@ public final class HallsSession {
     private final HallsSessionTrapRuntime trapRuntime;
     private BukkitTask hudTask;
     private BukkitTask physicsDropTask;
+    private BukkitTask floorBuildTask;
     private long startedAtMillis;
     private int currentFloor = 1;
     private int woodScrap;
@@ -364,6 +367,7 @@ public final class HallsSession {
         if (!running && snapshots.isEmpty()) {
             return;
         }
+        cancelFloorBuildTask();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && fallback != null && player.getWorld().equals(world)) {
@@ -421,26 +425,35 @@ public final class HallsSession {
             if (!running) {
                 return;
             }
-            buildExplorationFloor(destinationFloor);
-            openElevatorDoors();
-            transitioning = false;
-            world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
-                    Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.8f);
-        }, 200L);
+            startStagedExplorationFloorBuild(destinationFloor);
+        }, 20L);
     }
 
     private void buildExplorationFloor(int floor) {
         captureElevatorChestContents();
         removeSessionEntities();
-        clearBuildVolume();
         activeClearRadius = clearRadiusFor(scenario.floor(floor));
+        ExplorationBuild build = planExplorationBuild(floor);
         clearBuildVolume();
         buildElevator();
         currentFloor = floor;
-        buildExplorationRooms(floor);
+        renderExplorationRooms(build);
+        renderExplorationCorridors(build);
+        Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build);
+        renderExplorationContents(build, reservedCells);
         restoreElevatorChestContents();
         closeElevatorDoors();
         teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
+    }
+
+    private void startStagedExplorationFloorBuild(int floor) {
+        cancelFloorBuildTask();
+        captureElevatorChestContents();
+        removeSessionEntities();
+        int oldClearRadius = activeClearRadius;
+        activeClearRadius = clearRadiusFor(scenario.floor(floor));
+        FloorBuildJob job = new FloorBuildJob(floor, Math.max(oldClearRadius, activeClearRadius));
+        floorBuildTask = Bukkit.getScheduler().runTaskTimer(plugin, job::tick, 1L, 1L);
     }
 
     private void teleportParticipantsToElevator(String title, String subtitle) {
@@ -454,7 +467,7 @@ public final class HallsSession {
         }
     }
 
-    private void buildExplorationRooms(int floor) {
+    private ExplorationBuild planExplorationBuild(int floor) {
         HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
         HallsLevelType levelType = levelTypeFor(floorDefinition);
         activeLevelTypeId = levelType.id();
@@ -474,10 +487,8 @@ public final class HallsSession {
         );
         int targetRooms = activeTargetRooms;
         int expansions = 0;
-        while ((plan.rooms().size() < targetRooms || !plan.reachable()) && expansions++ < 4) {
+        while ((plan.rooms().size() < targetRooms || !plan.reachable()) && expansions++ < maxPlanningExpansions(levelType)) {
             activeClearRadius += 32;
-            clearBuildVolume();
-            buildElevator();
             random = floorRandom();
             plan = HallsExplorationGenerator.generate(
                     origin.x(),
@@ -491,17 +502,45 @@ public final class HallsSession {
             );
         }
         if (plan.rooms().isEmpty()) {
-            return;
+            return new ExplorationBuild(floor, floorDefinition, levelType, random, plan);
         }
         activeGeneratedRooms = plan.rooms().size();
+        return new ExplorationBuild(floor, floorDefinition, levelType, random, plan);
+    }
 
-        for (HallsExplorationGenerator.Room room : plan.rooms()) {
-            buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(), room.openings(), levelType, random);
+    private int maxPlanningExpansions(HallsLevelType levelType) {
+        return "maze".equalsIgnoreCase(levelType.corridorGeneration()) ? 1 : 4;
+    }
+
+    private void renderExplorationRooms(ExplorationBuild build) {
+        if (build.plan().rooms().isEmpty()) {
+            return;
         }
-        buildGeneratedCorridorMask(plan, levelType);
-        Set<HallsExplorationGenerator.Cell> reservedCells = trapRuntime.placeGeneratedTraps(plan, random, floorDefinition, levelType);
-        for (int i = 0; i < plan.rooms().size(); i++) {
-            placeGeneratedRoomContents(plan.rooms().get(i), random, floor, i, floorDefinition, levelType, reservedCells);
+        for (HallsExplorationGenerator.Room room : build.plan().rooms()) {
+            buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(),
+                    room.openings(), build.levelType(), build.random());
+        }
+    }
+
+    private void renderExplorationCorridors(ExplorationBuild build) {
+        if (!build.plan().rooms().isEmpty()) {
+            for (HallsExplorationGenerator.Cell point : build.plan().corridorShellCells()) {
+                buildGeneratedCorridorCell(build.plan(), build.levelType(), point);
+            }
+        }
+    }
+
+    private Set<HallsExplorationGenerator.Cell> renderExplorationTraps(ExplorationBuild build) {
+        if (build.plan().rooms().isEmpty()) {
+            return Set.of();
+        }
+        return trapRuntime.placeGeneratedTraps(build.plan(), build.random(), build.floorDefinition(), build.levelType());
+    }
+
+    private void renderExplorationContents(ExplorationBuild build, Set<HallsExplorationGenerator.Cell> reservedCells) {
+        for (int i = 0; i < build.plan().rooms().size(); i++) {
+            placeGeneratedRoomContents(build.plan().rooms().get(i), build.random(), build.floor(), i,
+                    build.floorDefinition(), build.levelType(), reservedCells);
         }
     }
 
@@ -576,9 +615,13 @@ public final class HallsSession {
     }
 
     private void clearBuildVolume() {
-        for (int x = origin.x() - activeClearRadius; x <= origin.x() + activeClearRadius; x++) {
+        clearBuildVolumeColumns(origin.x() - activeClearRadius, origin.x() + activeClearRadius, activeClearRadius);
+    }
+
+    private void clearBuildVolumeColumns(int minX, int maxX, int radius) {
+        for (int x = minX; x <= maxX; x++) {
             for (int y = origin.y() - 16; y <= origin.y() + CLEAR_HEIGHT; y++) {
-                for (int z = origin.z() - activeClearRadius; z <= origin.z() + activeClearRadius; z++) {
+                for (int z = origin.z() - radius; z <= origin.z() + radius; z++) {
                     setBlock(x, y, z, Material.AIR);
                 }
             }
@@ -806,27 +849,31 @@ public final class HallsSession {
 
     private void buildGeneratedCorridorMask(HallsExplorationGenerator.Plan plan,
                                             HallsLevelType levelType) {
-        Set<HallsExplorationGenerator.Cell> openCells = plan.corridorCells();
-        Material floor = levelType.corridorFloor();
-        Material ceiling = levelType.corridorCeiling();
         for (HallsExplorationGenerator.Cell point : plan.corridorShellCells()) {
-            if (isProtectedElevatorCell(point.x(), point.z())) {
-                continue;
-            }
-            boolean open = openCells.contains(point);
-            boolean insideRoomShell = isInsideGeneratedRoomShell(point, plan.rooms());
-            if (!open && insideRoomShell) {
-                continue;
-            }
-            setBlock(point.x(), origin.y() - 1, point.z(), floor);
-            if (!insideRoomShell) {
-                setBlock(point.x(), origin.y() + 3, point.z(),
-                        open && isCorridorLightCell(point.x(), point.z()) ? levelType.light() : ceiling);
-            }
-            for (int dy = 0; dy < 3; dy++) {
-                setBlock(point.x(), origin.y() + dy, point.z(),
-                        open ? Material.AIR : corridorWallMaterial(levelType, point, openCells));
-            }
+            buildGeneratedCorridorCell(plan, levelType, point);
+        }
+    }
+
+    private void buildGeneratedCorridorCell(HallsExplorationGenerator.Plan plan,
+                                            HallsLevelType levelType,
+                                            HallsExplorationGenerator.Cell point) {
+        if (isProtectedElevatorCell(point.x(), point.z())) {
+            return;
+        }
+        Set<HallsExplorationGenerator.Cell> openCells = plan.corridorCells();
+        boolean open = openCells.contains(point);
+        boolean insideRoomShell = isInsideGeneratedRoomShell(point, plan.rooms());
+        if (!open && insideRoomShell) {
+            return;
+        }
+        setBlock(point.x(), origin.y() - 1, point.z(), levelType.corridorFloor());
+        if (!insideRoomShell) {
+            setBlock(point.x(), origin.y() + 3, point.z(),
+                    open && isCorridorLightCell(point.x(), point.z()) ? levelType.light() : levelType.corridorCeiling());
+        }
+        for (int dy = 0; dy < 3; dy++) {
+            setBlock(point.x(), origin.y() + dy, point.z(),
+                    open ? Material.AIR : corridorWallMaterial(levelType, point, openCells));
         }
     }
 
@@ -1448,6 +1495,13 @@ public final class HallsSession {
         }
     }
 
+    private void cancelFloorBuildTask() {
+        if (floorBuildTask != null) {
+            floorBuildTask.cancel();
+            floorBuildTask = null;
+        }
+    }
+
     private void tickPhysicsDrops() {
         if (!running || physicsDrops.isEmpty()) {
             stopPhysicsDropTask();
@@ -1768,6 +1822,113 @@ public final class HallsSession {
         return Material.IRON_BARS;
     }
 
+    private final class FloorBuildJob {
+        private final int floor;
+        private int clearRadius;
+        private int clearX;
+        private int stage;
+        private int roomIndex;
+        private int corridorIndex;
+        private int contentRoomIndex;
+        private ExplorationBuild build;
+        private List<HallsExplorationGenerator.Cell> corridorShellCells = List.of();
+        private Set<HallsExplorationGenerator.Cell> reservedCells = Set.of();
+
+        private FloorBuildJob(int floor, int clearRadius) {
+            this.floor = floor;
+            this.clearRadius = clearRadius;
+        }
+
+        private void tick() {
+            if (!running) {
+                cancelFloorBuildTask();
+                return;
+            }
+            switch (stage) {
+                case 0 -> plan();
+                case 1 -> clearNextColumns();
+                case 2 -> buildElevatorPass();
+                case 3 -> buildNextRoom();
+                case 4 -> buildNextCorridorCells();
+                case 5 -> buildTraps();
+                case 6 -> buildNextRoomContents();
+                default -> finish();
+            }
+        }
+
+        private void plan() {
+            build = planExplorationBuild(floor);
+            clearRadius = Math.max(clearRadius, activeClearRadius);
+            clearX = origin.x() - clearRadius;
+            currentFloor = floor;
+            stage = 1;
+        }
+
+        private void clearNextColumns() {
+            int maxX = origin.x() + clearRadius;
+            int endX = Math.min(maxX, clearX + CLEAR_COLUMNS_PER_TICK - 1);
+            clearBuildVolumeColumns(clearX, endX, clearRadius);
+            clearX = endX + 1;
+            if (clearX > maxX) {
+                stage = 2;
+            }
+        }
+
+        private void buildElevatorPass() {
+            buildElevator();
+            closeElevatorDoors();
+            stage = 3;
+        }
+
+        private void buildNextRoom() {
+            if (build.plan().rooms().isEmpty() || roomIndex >= build.plan().rooms().size()) {
+                corridorShellCells = new ArrayList<>(build.plan().corridorShellCells());
+                stage = 4;
+                return;
+            }
+            HallsExplorationGenerator.Room room = build.plan().rooms().get(roomIndex++);
+            buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(),
+                    room.openings(), build.levelType(), build.random());
+        }
+
+        private void buildNextCorridorCells() {
+            if (corridorIndex >= corridorShellCells.size()) {
+                stage = 5;
+                return;
+            }
+            int end = Math.min(corridorShellCells.size(), corridorIndex + CORRIDOR_CELLS_PER_TICK);
+            while (corridorIndex < end) {
+                buildGeneratedCorridorCell(build.plan(), build.levelType(), corridorShellCells.get(corridorIndex++));
+            }
+        }
+
+        private void buildTraps() {
+            reservedCells = renderExplorationTraps(build);
+            stage = 6;
+        }
+
+        private void buildNextRoomContents() {
+            if (contentRoomIndex >= build.plan().rooms().size()) {
+                stage = 7;
+                return;
+            }
+            placeGeneratedRoomContents(build.plan().rooms().get(contentRoomIndex), build.random(), build.floor(),
+                    contentRoomIndex, build.floorDefinition(), build.levelType(), reservedCells);
+            contentRoomIndex++;
+        }
+
+        private void finish() {
+            restoreElevatorChestContents();
+            closeElevatorDoors();
+            teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
+            openElevatorDoors();
+            transitioning = false;
+            world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                    Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.8f);
+            cancelFloorBuildTask();
+        }
+    }
+
     private record RoomBounds(int minX, int maxX, int minZ, int maxZ) {
         private static RoomBounds of(RoomPlacement room) {
             return new RoomBounds(room.startX() - 1, room.startX() + room.layout().width(),
@@ -1788,6 +1949,13 @@ public final class HallsSession {
     }
 
     private record BlockSnapshot(int x, int y, int z, BlockData blockData) {
+    }
+
+    private record ExplorationBuild(int floor,
+                                    HallsScenario.FloorDefinition floorDefinition,
+                                    HallsLevelType levelType,
+                                    Random random,
+                                    HallsExplorationGenerator.Plan plan) {
     }
 
     private static final class PhysicsDrop {

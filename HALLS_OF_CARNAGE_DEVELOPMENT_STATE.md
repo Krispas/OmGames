@@ -196,9 +196,14 @@ This is the first implementation slice. It focuses on:
 - `maze` now builds Deep Crypt-style close room clusters with mostly open grid-locked hall fields, some structural pillars/wall ribs, and extra valid room entrances.
 - Deep Crypt `maze` room placement now uses mode-aware close-room spacing so the generator can fill beyond the first room instead of rejecting most nearby candidates with normal corridor spacing.
 - Swinging blade trap placement now prefers the longest valid room-only lane in a candidate room and chooses the longest axis for the trap, while still avoiding corridor extension.
+- Elevator floor transitions now use a staged session-local floor build job instead of doing the whole exploration-floor rebuild in one delayed synchronous call.
+- Staged floor rebuild passes currently plan the floor, clear old blocks in x-column batches, rebuild the elevator, place rooms one room per tick, place corridor shell cells in bounded batches, place traps, place room contents one room per tick, then restore the elevator chest and open the doors.
+- Deep Crypt `maze` planning now uses lower bounded placement and room-loop attempt counts because open-hall generation provides most of that level type's extra connectivity.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-For the next slice:
-- To make generation less taxing, make it so generation is split into multiple passes. Each of these passes runs on different ticks while the elevator is running.
-- From now on, when working on Halls of Carnage, do not run maven tests since its not setup in the enviroment you work in and each instance of you wastes time and power on it
-- Okay generation of the deep crypts is now perfect, however it takes way too long to generate, even if those development phases are implemented, it will take eternity.
+For the next slice (do all):
+- From now on, when working on Halls of Carnage, do not run maven tests since its not setup in the enviroment you work in and each instance of you wastes time and power on it, put this somewhere, maybe agents file
+- The new multi pass generation is pretty good, however a problem. Do not unload the elevator, it kills players inside of it
+- Set spawnpoint of players playing the game into the elevator, dont forget to put them into the lobby once they leave the session
+- There is something which makes Deep Crypt generation take a big lag spike at the end. When it hapened, whole level was generated, except holes, traps and breakables. At least visually, I am not sure how it works under the hood.
+- Make the required elevator timer 5 seconds instead of the 10, so generation starts sooner

@@ -86,7 +86,7 @@ final class HallsExplorationGenerator {
             return;
         }
         int attempts = 0;
-        while (rooms.size() < targetRooms && attempts++ < targetRooms * 1000) {
+        while (rooms.size() < targetRooms && attempts++ < roomPlacementAttemptLimit(targetRooms)) {
             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
             RoomConnection candidate = randomRoomConnection(layout);
             if (candidate == null || !canPlaceRoom(candidate.room())) {
@@ -644,10 +644,10 @@ final class HallsExplorationGenerator {
     }
 
     private void addRoomToRoomLoops() {
-        int target = Math.max(rooms.size() / 2, 5);
+        int target = corridorMode == CorridorMode.MAZE ? Math.max(rooms.size() / 4, 3) : Math.max(rooms.size() / 2, 5);
         int added = 0;
         int attempts = 0;
-        while (added < target && attempts++ < rooms.size() * rooms.size() * 5) {
+        while (added < target && attempts++ < roomLoopAttemptLimit()) {
             Room from = rooms.get(random.nextInt(rooms.size()));
             Room to = rooms.get(random.nextInt(rooms.size()));
             if (from == to || manhattanDistance(new Cell(from.centerX(), from.centerZ()), new Cell(to.centerX(), to.centerZ())) < 12) {
@@ -925,6 +925,15 @@ final class HallsExplorationGenerator {
         faces.remove(previous.getOppositeFace());
         Collections.shuffle(faces, random);
         return faces.getFirst();
+    }
+
+    private int roomPlacementAttemptLimit(int targetRooms) {
+        return targetRooms * (corridorMode == CorridorMode.MAZE ? 260 : 1000);
+    }
+
+    private int roomLoopAttemptLimit() {
+        int roomCount = Math.max(1, rooms.size());
+        return corridorMode == CorridorMode.MAZE ? roomCount * 18 : roomCount * roomCount * 5;
     }
 
     private BlockFace directionBetween(Cell from, Cell to) {

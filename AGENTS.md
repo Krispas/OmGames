@@ -1295,6 +1295,7 @@ SQLite tables:
 - Exploration corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
 - Generated corridors use ceiling-embedded light blocks so the walkable corridor remains 3 blocks tall, and the elevator has a ceiling light.
 - The elevator exterior vestibule is generated as a sealed mini-tunnel outside the door; opening the door clears only the passage while preserving the vestibule floor, side walls, and ceiling.
+- Elevator transitions rebuild exploration floors through a staged session-local main-thread build job: plan, clear old columns, elevator shell, room batches, corridor batches, traps, content batches, chest restore, and door opening.
 - Halls physics item displays use a 1-tick interpolation delay and short teleport duration for smoother falling/pickup visuals.
 - Halls floor loot/drop placeholders should use session-owned physics drops (`ItemDisplay` plus `Interaction`) instead of vanilla dropped item entities; players pick them up by right-clicking with an empty hand.
 - Halls physics item displays are fixed, flat item displays with randomized yaw so dropped items read as lying on the floor instead of upright.
