@@ -152,6 +152,9 @@ final class HallsSessionTrapRuntime {
             List<TrapCandidate> roomCandidates = new ArrayList<>(candidatesByRoom.getOrDefault(room, List.of()));
             Collections.shuffle(roomCandidates, random);
             HallsTrapType roomType = weightedTrap(pool, random);
+            if (trapKind(roomType.kind()) == TrapKind.SWINGING_BLADE) {
+                roomCandidates.sort((first, second) -> Integer.compare(bestSwingLaneHalfSpan(second), bestSwingLaneHalfSpan(first)));
+            }
             int targetRoomTraps = minTrapsPerRoom == maxTrapsPerRoom
                     ? minTrapsPerRoom
                     : minTrapsPerRoom + random.nextInt(maxTrapsPerRoom - minTrapsPerRoom + 1);
@@ -1189,14 +1192,16 @@ final class HallsSessionTrapRuntime {
 
     private BlockFace trapFace(TrapKind kind, TrapCandidate candidate, Random random) {
         if (kind == TrapKind.SWINGING_BLADE) {
-            List<BlockFace> faces = new ArrayList<>(List.of(BlockFace.EAST, BlockFace.NORTH));
-            Collections.shuffle(faces, random);
-            for (BlockFace face : faces) {
-                if (hasSwingLane(candidate, face)) {
-                    return face;
-                }
+            int eastWestSpan = swingLaneHalfSpan(candidate, BlockFace.EAST);
+            int northSouthSpan = swingLaneHalfSpan(candidate, BlockFace.NORTH);
+            int bestSpan = Math.max(eastWestSpan, northSouthSpan);
+            if (bestSpan < 1) {
+                return BlockFace.SELF;
             }
-            return BlockFace.SELF;
+            if (eastWestSpan == northSouthSpan) {
+                return random.nextBoolean() ? BlockFace.EAST : BlockFace.NORTH;
+            }
+            return eastWestSpan > northSouthSpan ? BlockFace.EAST : BlockFace.NORTH;
         }
         if (kind == TrapKind.FALLING_ICE) {
             return hasFallingIceArea(candidate) ? BlockFace.DOWN : BlockFace.SELF;
@@ -1231,6 +1236,10 @@ final class HallsSessionTrapRuntime {
             halfSpan = offset;
         }
         return halfSpan;
+    }
+
+    private int bestSwingLaneHalfSpan(TrapCandidate candidate) {
+        return Math.max(swingLaneHalfSpan(candidate, BlockFace.EAST), swingLaneHalfSpan(candidate, BlockFace.NORTH));
     }
 
     private boolean hasSwingLane(TrapCandidate candidate, BlockFace face) {

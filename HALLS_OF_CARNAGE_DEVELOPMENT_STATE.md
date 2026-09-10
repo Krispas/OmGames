@@ -194,10 +194,11 @@ This is the first implementation slice. It focuses on:
 - `open_halls` preserves the previous Deep Crypt room-local maze-field behavior.
 - `cave` now builds Frozen Halls-style organic tunnels with biased random-walk connector paths and rough disc widening instead of relying on orthogonal grid-locked routes.
 - `maze` now builds Deep Crypt-style close room clusters with mostly open grid-locked hall fields, some structural pillars/wall ribs, and extra valid room entrances.
+- Deep Crypt `maze` room placement now uses mode-aware close-room spacing so the generator can fill beyond the first room instead of rejecting most nearby candidates with normal corridor spacing.
+- Swinging blade trap placement now prefers the longest valid room-only lane in a candidate room and chooses the longest axis for the trap, while still avoiding corridor extension.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice:
-- The maze generation for deep crypt generated only one room and corridors around it
-- Make it so the swinging blade traps try to be as long as possible when generating, they should not stretch into corridors however
 - To make generation less taxing, make it so generation is split into multiple passes. Each of these passes runs on different ticks while the elevator is running.
 - From now on, when working on Halls of Carnage, do not run maven tests since its not setup in the enviroment you work in and each instance of you wastes time and power on it
+- Okay generation of the deep crypts is now perfect, however it takes way too long to generate, even if those development phases are implemented, it will take eternity.

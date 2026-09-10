@@ -161,7 +161,7 @@ final class HallsExplorationGenerator {
         List<BlockFace> faces = availableFaces(anchor);
         Collections.shuffle(faces, random);
         BlockFace face = faces.getFirst();
-        int gap = corridorMode == CorridorMode.MAZE ? 2 + random.nextInt(4) : 5 + random.nextInt(14);
+        int gap = corridorMode == CorridorMode.MAZE ? 2 + random.nextInt(5) : 5 + random.nextInt(14);
         int lateralBase = corridorMode == CorridorMode.MAZE ? 3 : 10;
         int lateralRange = lateralBase + Math.max(anchor.layout().width(), anchor.layout().depth()) / 2
                 + Math.max(layout.width(), layout.depth()) / 2;
@@ -197,11 +197,12 @@ final class HallsExplorationGenerator {
 
     private boolean canPlaceRoom(Room room) {
         Bounds bounds = Bounds.of(room);
-        if (!insideBuildArea(bounds.inflate(2)) || bounds.intersects(protectedElevator.inflate(6))) {
+        int spacing = roomSpacing();
+        if (!insideBuildArea(bounds.inflate(spacing)) || bounds.intersects(protectedElevator.inflate(6))) {
             return false;
         }
         for (Room existing : rooms) {
-            if (bounds.inflate(2).intersects(Bounds.of(existing).inflate(2))) {
+            if (bounds.inflate(spacing).intersects(Bounds.of(existing).inflate(spacing))) {
                 return false;
             }
         }
@@ -213,6 +214,10 @@ final class HallsExplorationGenerator {
             }
         }
         return true;
+    }
+
+    private int roomSpacing() {
+        return corridorMode == CorridorMode.MAZE ? 0 : 2;
     }
 
     private int doorOffset(HallsLayout layout, BlockFace face) {
