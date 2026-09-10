@@ -254,13 +254,13 @@ This is the first implementation slice. It focuses on:
 - Right-clicking a camp plot with a matching blueprint consumes it and spawns the configured level-1 building display. Sneak-right-clicking a built plot upgrades it up to level 3 by spending stored scrap from the session counters.
 - Cooking Pot, Weapon Bench, Armory, and Mycelia Farm have first-pass active outputs that place configured catalog items into an open hotbar slot. Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers are buildable/upgradable decorative placeholders for now.
 - `/hoc reset confirm` now also resets bundled `buildings/` resources, and `AGENTS.md` documents the new camp/building resource schemas.
+- Next development slice applied: breakable and camp building display parts now parse optional `block-data` plus `rotation`/`euler` degrees, building part offsets rotate with the camp plot facing marker, and the bundled elevator drill/chair resources exercise the new fields. Camp floors now connect the elevator corridor to the nearest open north-edge cell instead of blindly opening the layout center, elevator door bars force east-west connectivity when placed, and the session floor cleanup height was raised to catch leftover high blocks.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice (do not remove this line):
-- When elevator door closes, the bars are connected only from one side for some time, around the time modifiers start appearing, it fixes itself
-- When going to the camp, the corridor leading from the elevator went into a wall. Instead of a direct corridor, search for nearest point without a wall and put the corridor there
-- There was a small part of floor which didnt get clear, maybe extend the cleanup range?
-- Make it so the models for breakables and camp buildings support rotations (euler) and blockdata, rework the elevator drill model to show the blockdata in action
+- Utility items like smoke bomb and warding totem should have unlimited uses with cooldown
+- Even after using smoke bomb, the monsters are still locked onto me
+- The rare breakable is always in the first room, change that
 - Upgrading building shouldnt be a shift action, instead each building should open a GUI after interacting, where should be its functionality, upgrade/destroy button.
 - Armory, Cooking pot and weapon bench should work more like a crafting station, in their UI will be a list of recipes player can craft at it.
 - - The items which can be crafted there should be specified in the scenario file, this way different scenarios can have different locked items, the items in the file should have 3 categories based on which level the recipe can be crafted
@@ -269,6 +269,8 @@ For the next slice (do not remove this line):
 - Add various meal items, they are like a better food granting various temporary buffs crafted at the cooking pot. The recipes cooking pot can cook should be in the scenario file
 - Add a recipe for cooked_mycelia as it can be cooking pot recipe
 - All meals are rare food items.
+- Sculk blocks shouldnt generate in holes
 
 Future (not this slice):
 - Continue camp work by adding persistent camp/save-file state so built buildings survive game-over restarts and later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.
+

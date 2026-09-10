@@ -17,7 +17,14 @@ public record HallsBreakableType(String id,
         loot = List.copyOf(loot);
     }
 
-    public record Part(int offsetX, int offsetY, int offsetZ, Material material) {
+    public record Part(int offsetX,
+                       int offsetY,
+                       int offsetZ,
+                       Material material,
+                       String blockData,
+                       double rotationX,
+                       double rotationY,
+                       double rotationZ) {
     }
 
     public record LootEntry(String item, int weight, int minAmount, int maxAmount) {

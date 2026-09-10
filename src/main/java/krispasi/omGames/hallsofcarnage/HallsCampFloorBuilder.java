@@ -29,16 +29,26 @@ public final class HallsCampFloorBuilder {
         return HallsCampLayoutLoader.load(new File(dataFolder, "level/" + layoutPath));
     }
 
-    public void build(HallsCampLayout layout, int roomStartX, int y, int roomStartZ, HallsLevelType levelType) {
-        buildRoom(layout, roomStartX, y, roomStartZ, levelType);
+    public void build(HallsCampLayout layout,
+                      int roomStartX,
+                      int y,
+                      int roomStartZ,
+                      HallsLevelType levelType,
+                      int northOpeningX) {
+        buildRoom(layout, roomStartX, y, roomStartZ, levelType, northOpeningX);
         renderCampPlots(layout, roomStartX, y, roomStartZ);
     }
 
-    private void buildRoom(HallsCampLayout layout, int startX, int y, int startZ, HallsLevelType levelType) {
+    private void buildRoom(HallsCampLayout layout,
+                           int startX,
+                           int y,
+                           int startZ,
+                           HallsLevelType levelType,
+                           int northOpeningX) {
         for (int z = -1; z <= layout.depth(); z++) {
             for (int x = -1; x <= layout.width(); x++) {
                 boolean border = x < 0 || z < 0 || x >= layout.width() || z >= layout.depth();
-                boolean opening = border && z == -1 && x == layout.width() / 2;
+                boolean opening = border && z == -1 && x == northOpeningX;
                 boolean wall = !opening && (border || layout.at(x, z) == 'X');
                 int blockX = startX + x;
                 int blockZ = startZ + z;

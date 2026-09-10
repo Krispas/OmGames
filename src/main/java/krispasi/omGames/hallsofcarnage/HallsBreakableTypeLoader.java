@@ -71,7 +71,13 @@ public final class HallsBreakableTypeLoader {
             int x = offset.size() > 0 ? offset.get(0) : intValue(map.get("offset-x"), 0);
             int y = offset.size() > 1 ? offset.get(1) : intValue(map.get("offset-y"), 0);
             int z = offset.size() > 2 ? offset.get(2) : intValue(map.get("offset-z"), 0);
-            parts.add(new HallsBreakableType.Part(x, y, z, material));
+            double[] rotation = vector(map.get("rotation"), 0.0, 0.0, 0.0);
+            if (rotation[0] == 0.0 && rotation[1] == 0.0 && rotation[2] == 0.0) {
+                rotation = vector(map.get("euler"), 0.0, 0.0, 0.0);
+            }
+            String blockData = stringValue(map.get("block-data"));
+            parts.add(new HallsBreakableType.Part(x, y, z, material, blockData,
+                    rotation[0], rotation[1], rotation[2]));
         }
         return parts;
     }
@@ -159,6 +165,28 @@ public final class HallsBreakableTypeLoader {
         return ints;
     }
 
+    private static double[] vector(Object value, double x, double y, double z) {
+        if (value instanceof List<?> list && list.size() >= 3) {
+            return new double[]{doubleValue(list.get(0), x), doubleValue(list.get(1), y), doubleValue(list.get(2), z)};
+        }
+        return new double[]{x, y, z};
+    }
+
+    private static double doubleValue(Object value, double fallback) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        try {
+            return Double.parseDouble(String.valueOf(value).trim());
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private static String stringValue(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
     private static Material material(String name, Material fallback) {
         if (name == null || name.equals("null")) {
             return fallback;
@@ -197,11 +225,11 @@ public final class HallsBreakableTypeLoader {
     private static Map<String, HallsBreakableType> fallbackTypes() {
         Map<String, HallsBreakableType> types = new LinkedHashMap<>();
         addFallback(types, "barrel", "You broke open a dusty barrel.", 1.0f, Material.BARREL,
-                List.of(new HallsBreakableType.Part(0, 0, 0, Material.BARREL)),
+                List.of(new HallsBreakableType.Part(0, 0, 0, Material.BARREL, "", 0.0, 0.0, 0.0)),
                 List.of("wood_scrap", "iron_scrap"), fallbackLootPools().get("common"));
         addFallback(types, "chair", "You kicked apart a wooden chair.", 1.0f, Material.OAK_STAIRS,
-                List.of(new HallsBreakableType.Part(0, 0, 0, Material.OAK_STAIRS),
-                        new HallsBreakableType.Part(0, 1, 0, Material.OAK_TRAPDOOR)),
+                List.of(new HallsBreakableType.Part(0, 0, 0, Material.OAK_STAIRS, "", 0.0, 0.0, 0.0),
+                        new HallsBreakableType.Part(0, 1, 0, Material.OAK_TRAPDOOR, "", 0.0, 0.0, 0.0)),
                 List.of("wood_scrap", "iron_scrap"), fallbackLootPools().get("common"));
         return Map.copyOf(types);
     }

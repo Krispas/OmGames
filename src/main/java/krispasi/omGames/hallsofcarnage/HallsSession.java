@@ -49,7 +49,7 @@ import org.joml.Vector3f;
 
 public final class HallsSession {
     private static final int CLEAR_RADIUS = 72;
-    private static final int CLEAR_HEIGHT = 9;
+    private static final int CLEAR_HEIGHT = 12;
     private static final int ROOM_HEIGHT = 5;
     private static final int ELEVATOR_INNER_RADIUS = 2;
     private static final int ELEVATOR_OUTER_RADIUS = 3;
@@ -694,11 +694,40 @@ public final class HallsSession {
         floorStartedAtMillis = System.currentTimeMillis();
         int roomStartX = origin.x() - layout.width() / 2;
         int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
-        new HallsCampFloorBuilder(this::setBlock, campRuntime).build(layout, roomStartX, origin.y(), roomStartZ, levelType);
-        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1, levelType);
+        int entranceX = nearestCampEntranceX(layout, origin.x() - roomStartX);
+        new HallsCampFloorBuilder(this::setBlock, campRuntime).build(layout, roomStartX, origin.y(), roomStartZ,
+                levelType, entranceX);
+        buildCampConnector(roomStartX + entranceX, origin.y(), roomStartZ - 1, levelType);
         restoreElevatorChestContents();
         closeElevatorDoors();
         teleportParticipantsToElevator("Camp Floor " + floor, "Build, upgrade, and regroup.");
+    }
+
+    private int nearestCampEntranceX(HallsCampLayout layout, int targetX) {
+        int bestX = -1;
+        int bestDistance = Integer.MAX_VALUE;
+        for (int x = 0; x < layout.width(); x++) {
+            if (!layout.openAt(x, 0)) {
+                continue;
+            }
+            int distance = Math.abs(x - targetX);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestX = x;
+            }
+        }
+        return bestX >= 0 ? bestX : layout.width() / 2;
+    }
+
+    private void buildCampConnector(int targetX, int y, int targetZ, HallsLevelType levelType) {
+        int startZ = origin.z() + ELEVATOR_OUTER_RADIUS + 1;
+        int turnZ = Math.min(targetZ, startZ + 2);
+        buildConnector(origin.x(), y, startZ, turnZ, levelType);
+        for (int x = Math.min(origin.x(), targetX); x <= Math.max(origin.x(), targetX); x++) {
+            buildCorridorCell(x, y, turnZ, x == origin.x() ? 1 : 0, false, levelType,
+                    new Random((((long) x) << 32) ^ turnZ ^ 0xCA6FL));
+        }
+        buildConnector(targetX, y, turnZ, targetZ, levelType);
     }
 
     private void startStagedFloorBuild(int floor) {
@@ -1808,7 +1837,7 @@ public final class HallsSession {
                                     List<HallsBreakableType.LootEntry> loot) {
         List<UUID> displayIds = new ArrayList<>();
         for (HallsBreakableType.Part part : archetype.parts()) {
-            displayIds.add(spawnPropDisplay(x + part.offsetX(), y + part.offsetY(), z + part.offsetZ(), part.material()));
+            displayIds.add(spawnPropDisplay(x + part.offsetX(), y + part.offsetY(), z + part.offsetZ(), part));
         }
         Location hitboxLocation = new Location(world, x + 0.5, y, z + 0.5);
         Interaction interaction = world.spawn(hitboxLocation, Interaction.class, entity -> {
@@ -1826,11 +1855,11 @@ public final class HallsSession {
         }
     }
 
-    private UUID spawnPropDisplay(int x, int y, int z, Material material) {
+    private UUID spawnPropDisplay(int x, int y, int z, HallsBreakableType.Part part) {
         Location displayLocation = new Location(world, x, y, z);
         BlockDisplay display = world.spawn(displayLocation, BlockDisplay.class, entity -> {
-            entity.setBlock(material.createBlockData());
-            entity.setTransformation(smallRandomScaleTransformation());
+            entity.setBlock(displayBlockData(part.material(), part.blockData()));
+            entity.setTransformation(smallRandomScaleTransformation(part.rotationX(), part.rotationY(), part.rotationZ()));
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_breakable");
         });
@@ -2148,11 +2177,32 @@ public final class HallsSession {
     }
 
     private Transformation smallRandomScaleTransformation() {
+        return smallRandomScaleTransformation(0.0, 0.0, 0.0);
+    }
+
+    private Transformation smallRandomScaleTransformation(double rotationX, double rotationY, double rotationZ) {
         return new Transformation(
                 new Vector3f(),
-                new Quaternionf(),
+                new Quaternionf().rotateXYZ((float) Math.toRadians(rotationX),
+                        (float) Math.toRadians(rotationY),
+                        (float) Math.toRadians(rotationZ)),
                 new Vector3f(randomDisplayScale(1.0f), randomDisplayScale(1.0f), randomDisplayScale(1.0f)),
                 new Quaternionf());
+    }
+
+    private BlockData displayBlockData(Material material, String configured) {
+        if (configured == null || configured.isBlank()) {
+            return material.createBlockData();
+        }
+        try {
+            if (configured.startsWith("minecraft:") || configured.startsWith(material.getKey().asString())) {
+                return Bukkit.createBlockData(configured);
+            }
+            String suffix = configured.startsWith("[") ? configured : "[" + configured + "]";
+            return material.createBlockData(suffix);
+        } catch (IllegalArgumentException ex) {
+            return material.createBlockData();
+        }
     }
 
     private float randomDisplayScale(float base) {
@@ -2678,13 +2728,25 @@ public final class HallsSession {
         }
         if (facing != null && block.getBlockData() instanceof MultipleFacing multipleFacing) {
             for (BlockFace face : multipleFacing.getAllowedFaces()) {
-                boolean solidNeighbor = material == Material.SCULK_VEIN
-                        ? face == facing
-                        : world.getBlockAt(x + face.getModX(), y + face.getModY(), z + face.getModZ()).getType().isSolid();
-                multipleFacing.setFace(face, solidNeighbor);
+                multipleFacing.setFace(face, multipleFacingState(material, facing, face, x, y, z));
             }
             block.setBlockData(multipleFacing, false);
         }
+    }
+
+    private boolean multipleFacingState(Material material, BlockFace configuredFace, BlockFace face, int x, int y, int z) {
+        if (isDoorBar(material)) {
+            return face == BlockFace.EAST || face == BlockFace.WEST;
+        }
+        if (material == Material.SCULK_VEIN) {
+            return face == configuredFace;
+        }
+        return world.getBlockAt(x + face.getModX(), y + face.getModY(), z + face.getModZ()).getType().isSolid();
+    }
+
+    private boolean isDoorBar(Material material) {
+        String name = material.name();
+        return name.endsWith("_BARS") || name.equals("IRON_BARS") || name.equals("COPPER_BARS");
     }
 
     private Material firstMaterial(String... names) {

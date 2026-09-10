@@ -55,11 +55,15 @@ public record HallsBuildingType(String id,
     }
 
     public record Part(Material material,
+                       String blockData,
                        double offsetX,
                        double offsetY,
                        double offsetZ,
                        double scaleX,
                        double scaleY,
-                       double scaleZ) {
+                       double scaleZ,
+                       double rotationX,
+                       double rotationY,
+                       double rotationZ) {
     }
 }

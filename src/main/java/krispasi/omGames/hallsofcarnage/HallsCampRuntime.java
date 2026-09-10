@@ -14,6 +14,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
@@ -77,7 +79,7 @@ public final class HallsCampRuntime {
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_camp_plot");
         });
-        Plot plot = new Plot(spot.id(), spot.size(), worldX, y, worldZ, interaction.getUniqueId());
+        Plot plot = new Plot(spot.id(), spot.size(), worldX, y, worldZ, spot.facing(), interaction.getUniqueId());
         plotsById.put(plot.id(), plot);
         plotsByEntity.put(interaction.getUniqueId(), plot);
     }
@@ -184,13 +186,14 @@ public final class HallsCampRuntime {
         removeDisplays(plot);
         plot.setBuilding(building.id(), level);
         for (HallsBuildingType.Part part : building.level(level).parts()) {
-            Location location = new Location(world, plot.x() + 0.5 + part.offsetX(), plot.y() + part.offsetY(), plot.z() + 0.5 + part.offsetZ());
+            double[] offset = rotatedOffset(part.offsetX(), part.offsetZ(), plot.facing());
+            Location location = new Location(world, plot.x() + 0.5 + offset[0], plot.y() + part.offsetY(), plot.z() + 0.5 + offset[1]);
             BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
-                entity.setBlock(part.material().createBlockData());
+                entity.setBlock(blockData(part.material(), part.blockData()));
                 entity.setBillboard(Display.Billboard.FIXED);
                 entity.setTransformation(new Transformation(
                         new Vector3f(),
-                        new Quaternionf(),
+                        partRotation(part, plot.facing()),
                         new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
                         new Quaternionf()));
                 entity.setPersistent(false);
@@ -199,6 +202,47 @@ public final class HallsCampRuntime {
             plot.displayIds().add(display.getUniqueId());
             plotsByEntity.put(display.getUniqueId(), plot);
         }
+    }
+
+    private BlockData blockData(org.bukkit.Material material, String configured) {
+        if (configured == null || configured.isBlank()) {
+            return material.createBlockData();
+        }
+        try {
+            if (configured.startsWith("minecraft:") || configured.startsWith(material.getKey().asString())) {
+                return Bukkit.createBlockData(configured);
+            }
+            String suffix = configured.startsWith("[") ? configured : "[" + configured + "]";
+            return material.createBlockData(suffix);
+        } catch (IllegalArgumentException ex) {
+            return material.createBlockData();
+        }
+    }
+
+    private Quaternionf partRotation(HallsBuildingType.Part part, BlockFace facing) {
+        return new Quaternionf()
+                .rotateY((float) Math.toRadians(yawDegrees(facing)))
+                .rotateXYZ((float) Math.toRadians(part.rotationX()),
+                        (float) Math.toRadians(part.rotationY()),
+                        (float) Math.toRadians(part.rotationZ()));
+    }
+
+    private double[] rotatedOffset(double x, double z, BlockFace facing) {
+        return switch (facing) {
+            case EAST -> new double[]{-z, x};
+            case SOUTH -> new double[]{-x, -z};
+            case WEST -> new double[]{z, -x};
+            default -> new double[]{x, z};
+        };
+    }
+
+    private double yawDegrees(BlockFace facing) {
+        return switch (facing) {
+            case EAST -> 90.0;
+            case SOUTH -> 180.0;
+            case WEST -> 270.0;
+            default -> 0.0;
+        };
     }
 
     private HallsItemType heldItemType(Player player) {
@@ -259,17 +303,19 @@ public final class HallsCampRuntime {
         private final int x;
         private final int y;
         private final int z;
+        private final BlockFace facing;
         private final UUID interactionId;
         private final List<UUID> displayIds = new ArrayList<>();
         private String buildingId;
         private int level;
 
-        private Plot(int id, String size, int x, int y, int z, UUID interactionId) {
+        private Plot(int id, String size, int x, int y, int z, BlockFace facing, UUID interactionId) {
             this.id = id;
             this.size = size;
             this.x = x;
             this.y = y;
             this.z = z;
+            this.facing = facing == null ? BlockFace.NORTH : facing;
             this.interactionId = interactionId;
         }
 
@@ -291,6 +337,10 @@ public final class HallsCampRuntime {
 
         private int z() {
             return z;
+        }
+
+        private BlockFace facing() {
+            return facing;
         }
 
         private UUID interactionId() {

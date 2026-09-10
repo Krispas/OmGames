@@ -83,7 +83,13 @@ public final class HallsBuildingTypeLoader {
             Material material = material(materialValue == null ? "BARREL" : String.valueOf(materialValue), Material.BARREL);
             double[] offset = vector(row.get("offset"), 0.0, 0.0, 0.0);
             double[] scale = vector(row.get("scale"), 1.0, 1.0, 1.0);
-            parts.add(new HallsBuildingType.Part(material, offset[0], offset[1], offset[2], scale[0], scale[1], scale[2]));
+            double[] rotation = vector(row.get("rotation"), 0.0, 0.0, 0.0);
+            if (rotation[0] == 0.0 && rotation[1] == 0.0 && rotation[2] == 0.0) {
+                rotation = vector(row.get("euler"), 0.0, 0.0, 0.0);
+            }
+            String blockData = stringValue(row.get("block-data"));
+            parts.add(new HallsBuildingType.Part(material, blockData, offset[0], offset[1], offset[2],
+                    scale[0], scale[1], scale[2], rotation[0], rotation[1], rotation[2]));
         }
         return List.copyOf(parts);
     }
@@ -118,6 +124,10 @@ public final class HallsBuildingTypeLoader {
         } catch (NumberFormatException ex) {
             return fallback;
         }
+    }
+
+    private static String stringValue(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private static Material material(String name, Material fallback) {

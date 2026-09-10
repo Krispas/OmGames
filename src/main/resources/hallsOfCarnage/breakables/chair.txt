@@ -8,4 +8,5 @@ scrap-drops:
   - iron_scrap
 parts:
   - material: OAK_STAIRS
+    block-data: "facing=east,half=bottom,shape=straight"
     offset: [0, 0, 0]
