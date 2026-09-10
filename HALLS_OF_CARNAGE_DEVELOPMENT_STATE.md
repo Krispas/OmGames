@@ -235,6 +235,7 @@ This is the first implementation slice. It focuses on:
 - Halls sound-pending features: future monster attacks/deaths, future combat floor wave terminals, future camp building placement/upgrades/demolition, future crafting/cooking/storage interactions, future warden warning, and future modifier reveal/selection.
 
 ## Reviewer note (Delete entries once done, but keep the header)
+Do all for the next slice (keep this line):
 - Make sculk raise more slowly
 - Make sculk generate also on ceilings and walls if the spherical radius allows
 - Make sculk veins have blockstates active only on the sides where solid block is, if there is no solid block, just dont place it there
