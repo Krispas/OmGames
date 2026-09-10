@@ -1,0 +1,6 @@
+id: stray
+name: "Stray"
+entity-type: STRAY
+health: 20
+equipment:
+  main-hand: BOW

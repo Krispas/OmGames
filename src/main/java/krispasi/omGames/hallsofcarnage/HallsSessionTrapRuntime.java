@@ -843,10 +843,10 @@ final class HallsSessionTrapRuntime {
         switch (trap.kind()) {
             case SWINGING_BLADE -> {
                 Location bladeCenter = moveTrapDisplay(trap, age).orElse(center.clone().add(0.0, 1.3, 0.0));
-                if (age % Math.max(1L, trap.type().intervalTicks()) == 0L) {
+                if (age % 20L == 0L) {
                     world.playSound(bladeCenter, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.55f, 0.65f);
+                    damagePlayersInSwingingBlade(trap, bladeCenter, "A swinging blade cuts you down.");
                 }
-                damagePlayersInSwingingBlade(trap, bladeCenter, "A swinging blade cuts you down.");
             }
             case WALL_SPIKES -> {
                 long activeAge = age % trap.type().intervalTicks();
@@ -1051,9 +1051,10 @@ final class HallsSessionTrapRuntime {
         double xOffset = java.util.concurrent.ThreadLocalRandom.current().nextInt(-1, 2);
         double zOffset = java.util.concurrent.ThreadLocalRandom.current().nextInt(-1, 2);
         Location start = new Location(world, trap.x() + 0.5 + xOffset, origin.y() + ROOM_HEIGHT - 0.2, trap.z() + 0.5 + zOffset);
-        if (world.getBlockAt(start.getBlockX(), origin.y(), start.getBlockZ()).getType().isSolid()) {
+        if (!world.getBlockAt(start.getBlockX(), origin.y() - 1, start.getBlockZ()).getType().isSolid()) {
             start = new Location(world, trap.x() + 0.5, origin.y() + ROOM_HEIGHT - 0.2, trap.z() + 0.5);
         }
+        int impactY = fallingIceImpactY(start);
         BlockDisplay display = world.spawn(start, BlockDisplay.class, entity -> {
             entity.setBlock(Material.PACKED_ICE.createBlockData());
             entity.setBillboard(Display.Billboard.FIXED);
@@ -1076,7 +1077,7 @@ final class HallsSessionTrapRuntime {
                 Location next = display.getLocation().add(0.0, -0.42, 0.0);
                 display.teleport(next);
                 world.spawnParticle(Particle.SNOWFLAKE, next, 3, 0.1, 0.1, 0.1, 0.0);
-                if (next.getY() <= origin.y() + 0.7) {
+                if (next.getY() <= impactY + 0.15) {
                     world.spawnParticle(Particle.BLOCK, next, 24, 0.35, 0.3, 0.35, Material.PACKED_ICE.createBlockData());
                     world.playSound(next, Sound.BLOCK_GLASS_BREAK, 0.8f, 0.6f);
                     damagePlayersNear(next, trap.type().radius(), trap.type().damage(), "Falling ice shatters above you.");
@@ -1086,6 +1087,17 @@ final class HallsSessionTrapRuntime {
                 }
             }
         }.runTaskTimer(plugin, 1L, 1L);
+    }
+
+    private int fallingIceImpactY(Location start) {
+        int x = start.getBlockX();
+        int z = start.getBlockZ();
+        for (int y = origin.y() + ROOM_HEIGHT - 1; y >= origin.y() - 16; y--) {
+            if (world.getBlockAt(x, y, z).getType().isSolid()) {
+                return y + 1;
+            }
+        }
+        return origin.y();
     }
 
     private void spawnDartLine(HallsTrap trap) {

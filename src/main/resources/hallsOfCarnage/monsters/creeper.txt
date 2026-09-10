@@ -1,0 +1,4 @@
+id: creeper
+name: "Creeper"
+entity-type: CREEPER
+health: 20

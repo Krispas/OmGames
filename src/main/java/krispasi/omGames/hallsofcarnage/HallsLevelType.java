@@ -14,8 +14,15 @@ public record HallsLevelType(
         Material corridorCeiling,
         Material light,
         List<BlockPalette> walls,
-        List<BlockPalette> pillars
+        List<BlockPalette> pillars,
+        List<String> commonMonsters,
+        List<String> specialMonsters
 ) {
+    public HallsLevelType {
+        commonMonsters = List.copyOf(commonMonsters);
+        specialMonsters = List.copyOf(specialMonsters);
+    }
+
     public static HallsLevelType fallback(String id) {
         String normalizedId = id == null || id.isBlank() ? "howling_corridors" : id;
         if (normalizedId.equals("frozen_halls")) {
@@ -32,7 +39,9 @@ public record HallsLevelType(
                             new BlockPalette(Material.POLISHED_DIORITE, Material.ICE, 0.10),
                             new BlockPalette(Material.TUFF_BRICKS, Material.BLUE_ICE, 0.06)
                     ),
-                    List.of(new BlockPalette(Material.PACKED_ICE, Material.BLUE_ICE, 0.12))
+                    List.of(new BlockPalette(Material.PACKED_ICE, Material.BLUE_ICE, 0.12)),
+                    List.of("stray", "zombie"),
+                    List.of("bogged")
             );
         }
         if (normalizedId.equals("deep_crypt")) {
@@ -49,7 +58,9 @@ public record HallsLevelType(
                             new BlockPalette(Material.SANDSTONE, Material.CHISELED_SANDSTONE, 0.08),
                             new BlockPalette(Material.RED_SANDSTONE, Material.CHISELED_RED_SANDSTONE, 0.06)
                     ),
-                    List.of(new BlockPalette(Material.CUT_SANDSTONE, Material.CHISELED_SANDSTONE, 0.10))
+                    List.of(new BlockPalette(Material.CUT_SANDSTONE, Material.CHISELED_SANDSTONE, 0.10)),
+                    List.of("husk", "skeleton"),
+                    List.of("breeze")
             );
         }
         return new HallsLevelType(
@@ -65,7 +76,9 @@ public record HallsLevelType(
                         new BlockPalette(Material.DEEPSLATE_BRICKS, Material.DEEPSLATE, 0.08),
                         new BlockPalette(Material.COBBLED_DEEPSLATE, Material.DEEPSLATE, 0.08)
                 ),
-                List.of(new BlockPalette(Material.REINFORCED_DEEPSLATE, null, 0.0))
+                List.of(new BlockPalette(Material.REINFORCED_DEEPSLATE, null, 0.0)),
+                List.of("zombie", "creeper", "creaking", "slime_medium"),
+                List.of("zombie_vanguard", "skeleton", "cave_spider")
         );
     }
 

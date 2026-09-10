@@ -1,0 +1,5 @@
+id: husk
+name: "Husk"
+entity-type: HUSK
+health: 20
+baby: false

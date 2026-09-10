@@ -1,0 +1,6 @@
+id: bogged
+name: "Bogged"
+entity-type: BOGGED
+health: 16
+equipment:
+  main-hand: BOW

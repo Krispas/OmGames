@@ -1,0 +1,12 @@
+id: zombie_vanguard
+name: "Zombie Vanguard"
+entity-type: ZOMBIE
+health: 16
+baby: false
+equipment:
+  main-hand: IRON_SWORD
+  armor:
+    helmet: IRON_HELMET
+    chestplate: IRON_CHESTPLATE
+    leggings: CHAINMAIL_LEGGINGS
+    boots: IRON_BOOTS

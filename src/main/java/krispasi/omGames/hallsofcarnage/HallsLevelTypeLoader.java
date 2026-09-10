@@ -55,8 +55,21 @@ public final class HallsLevelTypeLoader {
                 material(config.getString("materials.corridor-ceiling"), fallback.corridorCeiling(), plugin, file),
                 material(config.getString("materials.light"), fallback.light(), plugin, file),
                 palettes(config.getConfigurationSection("wall-palettes"), fallback.walls(), plugin, file),
-                palettes(config.getConfigurationSection("pillar-palettes"), fallback.pillars(), plugin, file)
+                palettes(config.getConfigurationSection("pillar-palettes"), fallback.pillars(), plugin, file),
+                normalizedStringList(config.getStringList("monsters.common"), fallback.commonMonsters()),
+                normalizedStringList(config.getStringList("monsters.special"), fallback.specialMonsters())
         );
+    }
+
+    private static List<String> normalizedStringList(List<String> values, List<String> fallback) {
+        if (values == null || values.isEmpty()) {
+            return fallback;
+        }
+        List<String> normalized = values.stream()
+                .map(HallsLevelTypeLoader::normalizeId)
+                .filter(value -> !value.isBlank())
+                .toList();
+        return normalized.isEmpty() ? fallback : List.copyOf(normalized);
     }
 
     private static List<HallsLevelType.BlockPalette> palettes(ConfigurationSection section,

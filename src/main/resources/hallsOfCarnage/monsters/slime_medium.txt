@@ -1,0 +1,5 @@
+id: slime_medium
+name: "Medium Slime"
+entity-type: SLIME
+health: 16
+slime-size: 2

@@ -68,11 +68,13 @@ public final class HallsSession {
     private final Map<String, HallsBreakableType> breakableTypes;
     private final Map<String, HallsItemType> itemTypes;
     private final Map<String, HallsTrapType> trapTypes;
+    private final Map<String, HallsMonsterType> monsterTypes;
     private final Set<UUID> participants;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
     private final HallsSessionTrapRuntime trapRuntime;
+    private final HallsSessionMonsterRuntime monsterRuntime;
     private BukkitTask hudTask;
     private BukkitTask physicsDropTask;
     private BukkitTask floorBuildTask;
@@ -101,6 +103,7 @@ public final class HallsSession {
                         Map<String, HallsBreakableType> breakableTypes,
                         Map<String, HallsItemType> itemTypes,
                         Map<String, HallsTrapType> trapTypes,
+                        Map<String, HallsMonsterType> monsterTypes,
                         List<Player> players) {
         this.plugin = plugin;
         this.id = id;
@@ -112,11 +115,13 @@ public final class HallsSession {
         this.breakableTypes = breakableTypes == null ? Map.of() : Map.copyOf(breakableTypes);
         this.itemTypes = itemTypes == null ? Map.of() : Map.copyOf(itemTypes);
         this.trapTypes = trapTypes == null ? Map.of() : Map.copyOf(trapTypes);
+        this.monsterTypes = monsterTypes == null ? Map.of() : Map.copyOf(monsterTypes);
         this.participants = new HashSet<>();
         for (Player player : players) {
             participants.add(player.getUniqueId());
         }
         this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::setBlock, this.trapTypes);
+        this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes);
     }
 
     public int id() {
@@ -294,6 +299,7 @@ public final class HallsSession {
         }
         coins += deposited;
         world.playSound(block.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8f, 0.7f);
+        monsterRuntime.alert(block.getLocation());
         player.sendActionBar(Component.text("Deposited " + deposited + " scrap.", NamedTextColor.GOLD));
         return true;
     }
@@ -447,6 +453,7 @@ public final class HallsSession {
         renderExplorationCorridors(build);
         Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build);
         renderExplorationContents(build, reservedCells);
+        startExplorationMonsters(build);
         restoreElevatorChestContents();
         closeElevatorDoors();
         teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
@@ -454,8 +461,6 @@ public final class HallsSession {
 
     private void startStagedExplorationFloorBuild(int floor) {
         cancelFloorBuildTask();
-        captureElevatorChestContents();
-        removeSessionEntities();
         int oldClearRadius = activeClearRadius;
         activeClearRadius = clearRadiusFor(scenario.floor(floor));
         FloorBuildJob job = new FloorBuildJob(floor, Math.max(oldClearRadius, activeClearRadius));
@@ -576,6 +581,14 @@ public final class HallsSession {
             placeGeneratedRoomContents(build.plan().rooms().get(i), build.random(), build.floor(), i,
                     build.floorDefinition(), build.levelType(), reservedCells);
         }
+    }
+
+    private void startExplorationMonsters(ExplorationBuild build) {
+        if (build == null || build.plan().rooms().isEmpty()) {
+            monsterRuntime.clear();
+            return;
+        }
+        monsterRuntime.startExplorationFloor(build.plan(), build.floorDefinition(), build.levelType(), build.random());
     }
 
     private Random floorRandom() {
@@ -1253,6 +1266,7 @@ public final class HallsSession {
         wakePhysicsDropsNear(dropLocation);
         if (dropLocation != null) {
             world.playSound(dropLocation, Sound.BLOCK_WOOD_BREAK, 0.8f, 1.0f);
+            monsterRuntime.alert(dropLocation);
             applyLoot(prop.loot(), dropLocation);
         }
     }
@@ -1480,6 +1494,7 @@ public final class HallsSession {
     }
 
     private void removeSessionEntities() {
+        monsterRuntime.clear();
         trapRuntime.clear();
         for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
             removeBreakableProp(prop);
@@ -1903,6 +1918,8 @@ public final class HallsSession {
         }
 
         private void plan() {
+            captureElevatorChestContents();
+            removeSessionEntities();
             build = planExplorationBuild(floor);
             clearRadius = Math.max(clearRadius, activeClearRadius);
             clearX = origin.x() - clearRadius;
@@ -1955,6 +1972,7 @@ public final class HallsSession {
 
         private void buildNextRoomContents() {
             if (contentRoomIndex >= build.plan().rooms().size()) {
+                startExplorationMonsters(build);
                 stage = 7;
                 return;
             }

@@ -1,0 +1,4 @@
+id: breeze
+name: "Breeze"
+entity-type: BREEZE
+health: 30

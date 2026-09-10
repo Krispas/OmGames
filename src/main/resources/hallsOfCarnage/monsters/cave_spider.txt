@@ -1,0 +1,4 @@
+id: cave_spider
+name: "Cave Spider"
+entity-type: CAVE_SPIDER
+health: 12

@@ -207,12 +207,28 @@ This is the first implementation slice. It focuses on:
 - Staged floor clear and corridor rendering now preserve the protected elevator transfer vestibule line, including the black-concrete backing in front of closed elevator doors.
 - New overlapping holes no longer build pit edge walls against cells already occupied by existing room-local pits, preventing old internal pit walls from surviving inside merged holes.
 - Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, and poison dart firing.
-- Halls sound-pending features: future ghost state, future monster spawns/attacks/deaths, future combat floor wave terminals, future camp building placement/upgrades/demolition, future crafting/cooking/storage interactions, future sculk growth/warden warning, and future modifier reveal/selection.
+- Halls monster archetypes now load from `plugins/OmGames/HallsOfCarnage/monsters/*.txt|*.yml|*.yaml`, seeded by bundled defaults for zombie, creeper, creaking, medium slime, zombie vanguard, skeleton, cave spider, stray, bogged, husk, and breeze.
+- Level type `monsters.common` and `monsters.special` lists are now parsed and used by the first-pass exploration monster flood runtime.
+- `HallsSessionMonsterRuntime` is session-owned and cleans spawned monsters on floor rebuild/session stop.
+- Exploration floors now spawn a bounded first-pass monster flood from walkable cells away from the elevator/players, with max-alive and total budget scaled by room count, participants, and parsed floor difficulty.
+- Custom monster definitions support Bukkit entity type, health, baby state, slime size, main-hand item, and armor slots; `zombie_vanguard` is defined as a 16 HP adult zombie with iron/chainmail armor and an iron sword.
+- Breaking a Halls breakable prop or depositing scrap into the elevator hopper now alerts nearby spawned monsters toward the nearest participant and plays a sound cue.
+- Floor-transfer chest preservation now captures elevator chest contents at the staged rebuild boundary, so items placed into the chest during the short transition window are preserved.
+- Falling ice shards now compute the actual support floor below their chosen cell and continue falling until that impact height instead of shattering early at a fixed offset.
+- Swinging blade sweep sounds now pulse every 20 ticks instead of once per configured movement loop.
+- Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, poison dart firing, and first-pass monster alert.
+- Halls sound-pending features: future ghost state, future monster attacks/deaths, future combat floor wave terminals, future camp building placement/upgrades/demolition, future crafting/cooking/storage interactions, future sculk growth/warden warning, and future modifier reveal/selection.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-For the next slice (do all, also keep this line):
-- Falling ice traps are not going all the way to the floor
-- Make it so the swinging blade trap doesnt do the trap once per loop, but once each 20 ticks
-- If I put something into the elevator chest on floor transfer, it gets deleted, prevent that
-- Implement the monster system as its described in GDD, we also want to define custom monsters such as slime_medium and zombie_vanguard which you can see in the howling_corridors.txt. So let's do it like this. Let's define monsters as another txt files in resources. So for example zombie_vanguard is a zombie, it has specific armor slots filled with specific items, it has an iron sword and has 16 hp and it is also not baby. Do simillar stuff for other mobs.
-- Try to implement the sound alert mechanic.
+- Expand the radius of alerting the mobs
+- Make it so gradually, more monsters spawn in the dungeon if spawn limit allows (aka for example if monsters were killed) and each minute spent on the floor, the floors spawn limit extends by 5%. Don't forget you shouldnt spawn mobs where player can see them from first person.
+- Make it so monsters don't drop their loot.
+- Implement the ghost mode as described in GDD. Use adventure mode for it, no spectator. If all players are ghosts. Game will end in 10 seconds, sending them back to the first floor.
+- When game begins / restarts / ends, give players 3 seconds of blindness, 1 second should overlap before the teleport, almost like fade out/in loading
+- Implement the sculk system as described in GDD. Do it like holes, and by that I mean that scenario file should specify amount of sculk patches per floor. Patches are randomized a little bit, converting 80% of blocks within them to sculk and if air space is available, generating sculk veis with 60% chance arond (even if the block is not sculked). Patches are around simillar sizes as holes, but the mask should be spherical with some small y offset, but not big enough for floor not to be affected. If player's position (or position +1 on y level) is within a sculk patch, the sculk level of the player will start rising.
+- Once sculk of a player is above 50%, with each monster spawn, add a chance to spawn warden, the chance is calculated like following min(sculk - 40, 35).
+- Play a sound while player is standing in the sculk
+- When sculk of a player is above 35%, apply weakness I to the player
+- When sculk of a player is above 80%, apply slowness I to the player
+- When sculk of a player is above 90%, set players food to 16 and saturation to 0, player will be unable to eat
+- When sculk of a player is at 100%, they will receive the darkness I effect
