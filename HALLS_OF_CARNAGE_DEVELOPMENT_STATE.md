@@ -196,6 +196,7 @@ This is the first implementation slice. It focuses on:
 - `maze` now builds Deep Crypt-style close room clusters with mostly open grid-locked hall fields, some structural pillars/wall ribs, and extra valid room entrances.
 
 ## Reviewer note (Delete entries once done, but keep the header)
+For the next slice:
 - The maze generation for deep crypt generated only one room and corridors around it
 - Make it so the swinging blade traps try to be as long as possible when generating, they should not stretch into corridors however
 - To make generation less taxing, make it so generation is split into multiple passes. Each of these passes runs on different ticks while the elevator is running.
