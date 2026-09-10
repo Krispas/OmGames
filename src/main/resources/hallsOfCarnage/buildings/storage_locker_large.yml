@@ -1,0 +1,41 @@
+id: storage_locker_large
+name: "Large Storage Locker"
+size: large
+blueprint: storage_locker_large_blueprint
+implemented: false
+levels:
+  1:
+    upgrade-cost: {wood: 5, iron: 4}
+    parts:
+      - material: BARREL
+        offset: [-0.7, 0, 0]
+        scale: [0.9, 0.9, 0.9]
+      - material: BARREL
+        offset: [0, 0, 0]
+        scale: [0.9, 0.9, 0.9]
+      - material: BARREL
+        offset: [0.7, 0, 0]
+        scale: [0.9, 0.9, 0.9]
+  2:
+    upgrade-cost: {wood: 6, iron: 6}
+    parts:
+      - material: CHEST
+        offset: [-0.7, 0, 0]
+        scale: [0.95, 0.95, 0.95]
+      - material: BARREL
+        offset: [0, 0, 0]
+        scale: [0.95, 0.95, 0.95]
+      - material: CHEST
+        offset: [0.7, 0, 0]
+        scale: [0.95, 0.95, 0.95]
+  3:
+    parts:
+      - material: CHEST
+        offset: [-0.75, 0, 0]
+        scale: [1, 1, 1]
+      - material: CHEST
+        offset: [0, 0, 0]
+        scale: [1, 1, 1]
+      - material: CHEST
+        offset: [0.75, 0, 0]
+        scale: [1, 1, 1]

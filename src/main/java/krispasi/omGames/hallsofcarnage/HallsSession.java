@@ -75,6 +75,7 @@ public final class HallsSession {
     private final Map<String, HallsTrapType> trapTypes;
     private final Map<String, HallsMonsterType> monsterTypes;
     private final Map<String, HallsModifierType> modifierTypes;
+    private final Map<String, HallsBuildingType> buildingTypes;
     private final Set<UUID> participants;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
@@ -82,6 +83,7 @@ public final class HallsSession {
     private final HallsSessionTrapRuntime trapRuntime;
     private final HallsSessionMonsterRuntime monsterRuntime;
     private final HallsSessionSculkRuntime sculkRuntime;
+    private final HallsCampRuntime campRuntime;
     private final Set<UUID> ghostPlayers = new HashSet<>();
     private BukkitTask hudTask;
     private BukkitTask physicsDropTask;
@@ -118,6 +120,7 @@ public final class HallsSession {
                         Map<String, HallsTrapType> trapTypes,
                         Map<String, HallsMonsterType> monsterTypes,
                         Map<String, HallsModifierType> modifierTypes,
+                        Map<String, HallsBuildingType> buildingTypes,
                         List<Player> players) {
         this.plugin = plugin;
         this.id = id;
@@ -131,6 +134,7 @@ public final class HallsSession {
         this.trapTypes = trapTypes == null ? Map.of() : Map.copyOf(trapTypes);
         this.monsterTypes = monsterTypes == null ? Map.of() : Map.copyOf(monsterTypes);
         this.modifierTypes = modifierTypes == null ? Map.of() : Map.copyOf(modifierTypes);
+        this.buildingTypes = buildingTypes == null ? Map.of() : Map.copyOf(buildingTypes);
         this.participants = new HashSet<>();
         for (Player player : players) {
             participants.add(player.getUniqueId());
@@ -139,6 +143,8 @@ public final class HallsSession {
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
                 sculkRuntime::maxSculkPercent, this::isAliveParticipant);
+        this.campRuntime = new HallsCampRuntime(plugin, world, this.buildingTypes, this.itemTypes,
+                type -> HallsItemFactory.create(plugin, type, 1), this::spendStoredScrap);
     }
 
     public int id() {
@@ -187,7 +193,19 @@ public final class HallsSession {
 
     public boolean isSessionEntity(Entity entity) {
         return entity != null && (breakableProps.containsKey(entity.getUniqueId())
-                || physicsDrops.containsKey(entity.getUniqueId()));
+                || physicsDrops.containsKey(entity.getUniqueId())
+                || campRuntime.isCampEntity(entity));
+    }
+
+    public boolean handleCampInteract(Player player, Entity entity) {
+        if (player == null || entity == null || !running || !player.getWorld().equals(world)) {
+            return false;
+        }
+        if (ghostPlayers.contains(player.getUniqueId())) {
+            player.sendActionBar(Component.text("Ghosts cannot use camp plots.", NamedTextColor.GRAY));
+            return campRuntime.isCampEntity(entity);
+        }
+        return campRuntime.handleInteract(player, entity);
     }
 
     public boolean isSessionMonster(Entity entity) {
@@ -345,7 +363,7 @@ public final class HallsSession {
             teleportParticipantsToElevator("Floor 1", "Reset to the start floor.");
             return true;
         }
-        buildExplorationFloor(floor);
+        buildFloor(floor);
         openElevatorDoors();
         return true;
     }
@@ -617,8 +635,17 @@ public final class HallsSession {
             if (!running) {
                 return;
             }
-            startStagedExplorationFloorBuild(destinationFloor);
+            startStagedFloorBuild(destinationFloor);
         }, buildDelay);
+    }
+
+    private void buildFloor(int floor) {
+        HallsScenario.FloorDefinition definition = scenario.floor(floor);
+        if ("camp".equalsIgnoreCase(definition.kind())) {
+            buildCampFloor(floor);
+            return;
+        }
+        buildExplorationFloor(floor);
     }
 
     private void buildExplorationFloor(int floor) {
@@ -642,8 +669,54 @@ public final class HallsSession {
         applyCompassModifier();
     }
 
-    private void startStagedExplorationFloorBuild(int floor) {
+    private void buildCampFloor(int floor) {
+        captureElevatorChestContents();
+        removeSessionEntities();
+        HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
+        HallsLevelType levelType = levelTypeFor(floorDefinition);
+        activeLevelTypeId = levelType.id();
+        activeTargetRooms = 1;
+        activeGeneratedRooms = 1;
+        activeFloorModifiers = HallsFloorModifiers.none();
+        activeClearRadius = CLEAR_RADIUS;
+        HallsCampLayout layout;
+        try {
+            layout = HallsCampFloorBuilder.load(dataFolder, floorDefinition);
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Failed to load Halls camp layout for session " + id + ": " + ex.getMessage());
+            layout = new HallsCampLayout(List.of("OOOOO", "OCCCO", "OCNCO", "OCCCO", "OOOOO"), 5, 5,
+                    List.of(new HallsCampLayout.BuildSpot(1, 1, 3, 1, 3, 2, 2, BlockFace.NORTH, "medium")));
+        }
+        activeClearRadius = Math.max(CLEAR_RADIUS, 16 + Math.max(layout.width(), layout.depth()));
+        clearBuildVolume();
+        buildElevator();
+        currentFloor = floor;
+        floorStartedAtMillis = System.currentTimeMillis();
+        int roomStartX = origin.x() - layout.width() / 2;
+        int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
+        new HallsCampFloorBuilder(this::setBlock, campRuntime).build(layout, roomStartX, origin.y(), roomStartZ, levelType);
+        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1, levelType);
+        restoreElevatorChestContents();
+        closeElevatorDoors();
+        teleportParticipantsToElevator("Camp Floor " + floor, "Build, upgrade, and regroup.");
+    }
+
+    private void startStagedFloorBuild(int floor) {
         cancelFloorBuildTask();
+        HallsScenario.FloorDefinition definition = scenario.floor(floor);
+        if ("camp".equalsIgnoreCase(definition.kind())) {
+            buildCampFloor(floor);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!running) {
+                    return;
+                }
+                openElevatorDoors();
+                transitioning = false;
+                world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                        Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.8f);
+            }, MIN_ELEVATOR_TRANSITION_TICKS);
+            return;
+        }
         int oldClearRadius = activeClearRadius;
         activeClearRadius = clearRadiusFor(scenario.floor(floor));
         FloorBuildJob job = new FloorBuildJob(floor, Math.max(oldClearRadius, activeClearRadius));
@@ -1990,6 +2063,24 @@ public final class HallsSession {
         return amount;
     }
 
+    private boolean spendStoredScrap(Map<String, Integer> cost) {
+        if (cost == null || cost.isEmpty()) {
+            return true;
+        }
+        int wood = cost.getOrDefault("wood", cost.getOrDefault("wood_scrap", 0));
+        int iron = cost.getOrDefault("iron", cost.getOrDefault("iron_scrap", 0));
+        int diamond = cost.getOrDefault("diamond", cost.getOrDefault("diamond_scrap", 0));
+        int redstone = cost.getOrDefault("redstone", cost.getOrDefault("redstone_scrap", 0));
+        if (woodScrap < wood || ironScrap < iron || diamondScrap < diamond || redstoneScrap < redstone) {
+            return false;
+        }
+        woodScrap -= wood;
+        ironScrap -= iron;
+        diamondScrap -= diamond;
+        redstoneScrap -= redstone;
+        return true;
+    }
+
     private void dropSessionItem(Location location, ItemStack stack) {
         Vector velocity = new Vector((Math.random() - 0.5) * 0.18, 0.22, (Math.random() - 0.5) * 0.18);
         dropSessionItem(location, stack, velocity);
@@ -2072,6 +2163,7 @@ public final class HallsSession {
         sculkRuntime.clearFloor();
         monsterRuntime.clear();
         trapRuntime.clear();
+        campRuntime.clear();
         for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
             removeBreakableProp(prop);
         }

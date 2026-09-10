@@ -148,6 +148,11 @@ public final class HallsOfCarnageListener implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (event.getHand() == EquipmentSlot.HAND
+                && manager.handleCampInteract(event.getPlayer(), event.getRightClicked())) {
+            event.setCancelled(true);
+            return;
+        }
         if (!manager.isMenuVillager(event.getRightClicked())) {
             if (manager.isSessionEntity(event.getRightClicked())) {
                 event.setCancelled(true);

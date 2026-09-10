@@ -1284,7 +1284,7 @@ SQLite tables:
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
 - `/hoc scenario <scenario>` is an OP-only debug command that prints the loaded parsed scenario data and the YAML view copied from the active server data folder.
-- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `breakable_loot_pools`, `traps`, `monsters`, `items`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
+- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `breakable_loot_pools`, `traps`, `monsters`, `items`, `buildings`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
 - `HallsExplorationGenerator` owns per-rebuild exploration layout planning.
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.txt|*.yml|*.yaml`.
 - Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, and `pillar-palettes`; monster/modifier sections may exist in resource files for future systems.
@@ -1321,6 +1321,12 @@ SQLite tables:
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, an unused-for-now `recipe` scrap cost map, and an optional `stats` map.
 - Armor `item-model` controls the item icon/model; armor `armor-model` is written to Paper's equippable component for the worn armor model.
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
+- Scenario floor definitions may include `layout`; camp floors use it to load `plugins/OmGames/HallsOfCarnage/level/<layout>`, such as `level/camps/camp_1.txt`.
+- Camp layout files preserve `X`, `O`, `C`, and `N/S/W/E`: `X` is solid, every other marker is open floor, `C` expands a build plot, and `N/S/W/E` marks the plot anchor/facing.
+- Camp build-spot floors are rendered as oak planks and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
+- Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.txt|*.yml|*.yaml` and seeded from bundled defaults.
+- Building files define `id`, `name`, `size` (`small`, `medium`, `large`), `blueprint`, `implemented`, and `levels.<1|2|3>` with display `parts`, optional `upgrade-cost` stored-scrap requirements, and optional `interaction.give-items` outputs.
+- Camp buildings can be upgraded to level 3 by sneak-right-clicking the built plot. Current building state is session-local and is not yet persisted across save files or game-over restarts.
 - Item recipes are parsed for future crafting stations but should not be rendered directly on item lore.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility. `melee-damage`, `attack-speed`, and `durability` are also applied to item meta where Bukkit/Paper exposes the relevant component APIs.
 - `vagabonds_club` is the default starter weapon. Every participant receives it when a Halls run starts or fully restarts after game over.

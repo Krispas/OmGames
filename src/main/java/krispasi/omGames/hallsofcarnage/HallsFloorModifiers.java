@@ -108,7 +108,8 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
                 floor.maxTrapsPerRoom(),
                 floor.holes(),
                 sculkPatches,
-                floor.coinQuota()
+                floor.coinQuota(),
+                floor.layout()
         );
     }
 

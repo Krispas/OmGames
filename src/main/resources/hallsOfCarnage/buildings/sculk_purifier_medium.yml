@@ -1,0 +1,32 @@
+id: sculk_purifier_medium
+name: "Medium Sculk Purifier"
+size: medium
+blueprint: sculk_purifier_medium_blueprint
+implemented: false
+levels:
+  1:
+    upgrade-cost: {diamond: 2, redstone: 4}
+    parts:
+      - material: CALIBRATED_SCULK_SENSOR
+        offset: [-0.3, 0, 0]
+        scale: [0.85, 0.85, 0.85]
+      - material: AMETHYST_BLOCK
+        offset: [0.45, 0, 0]
+        scale: [0.65, 0.65, 0.65]
+  2:
+    upgrade-cost: {diamond: 3, redstone: 6}
+    parts:
+      - material: CALIBRATED_SCULK_SENSOR
+        offset: [-0.3, 0, 0]
+        scale: [1, 1, 1]
+      - material: AMETHYST_BLOCK
+        offset: [0.45, 0, 0]
+        scale: [0.75, 0.75, 0.75]
+  3:
+    parts:
+      - material: CALIBRATED_SCULK_SENSOR
+        offset: [-0.3, 0, 0]
+        scale: [1.1, 1.1, 1.1]
+      - material: AMETHYST_BLOCK
+        offset: [0.5, 0, 0]
+        scale: [0.85, 0.85, 0.85]

@@ -1,0 +1,23 @@
+id: sculk_purifier_small
+name: "Small Sculk Purifier"
+size: small
+blueprint: sculk_purifier_small_blueprint
+implemented: false
+levels:
+  1:
+    upgrade-cost: {diamond: 1, redstone: 3}
+    parts:
+      - material: CALIBRATED_SCULK_SENSOR
+        offset: [0, 0, 0]
+        scale: [0.75, 0.75, 0.75]
+  2:
+    upgrade-cost: {diamond: 2, redstone: 4}
+    parts:
+      - material: CALIBRATED_SCULK_SENSOR
+        offset: [0, 0, 0]
+        scale: [0.9, 0.9, 0.9]
+  3:
+    parts:
+      - material: CALIBRATED_SCULK_SENSOR
+        offset: [0, 0, 0]
+        scale: [1, 1, 1]

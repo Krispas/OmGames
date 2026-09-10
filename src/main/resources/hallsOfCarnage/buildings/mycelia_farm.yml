@@ -1,0 +1,49 @@
+id: mycelia_farm
+name: "Mycelia Farm"
+size: small
+blueprint: mycelia_farm_blueprint
+implemented: true
+levels:
+  1:
+    upgrade-cost:
+      wood: 2
+      redstone: 1
+    interaction:
+      give-items:
+        - stale_bread
+    parts:
+      - material: PODZOL
+        offset: [0, 0, 0]
+        scale: [1, 0.25, 1]
+      - material: BROWN_MUSHROOM
+        offset: [0.15, 0.25, 0.1]
+        scale: [0.7, 0.7, 0.7]
+  2:
+    upgrade-cost:
+      wood: 3
+      redstone: 3
+    interaction:
+      give-items:
+        - cooked_mycelia
+    parts:
+      - material: MYCELIUM
+        offset: [0, 0, 0]
+        scale: [1, 0.25, 1]
+      - material: BROWN_MUSHROOM
+        offset: [0.15, 0.25, 0.1]
+        scale: [0.8, 0.8, 0.8]
+      - material: RED_MUSHROOM
+        offset: [-0.2, 0.25, -0.15]
+        scale: [0.7, 0.7, 0.7]
+  3:
+    interaction:
+      give-items:
+        - cooked_mycelia
+        - golden_jerky
+    parts:
+      - material: MYCELIUM
+        offset: [0, 0, 0]
+        scale: [1.1, 0.25, 1.1]
+      - material: BROWN_MUSHROOM_BLOCK
+        offset: [0.1, 0.45, 0.1]
+        scale: [0.45, 0.45, 0.45]

@@ -1,0 +1,51 @@
+id: armory
+name: "Armory"
+size: medium
+blueprint: armory_blueprint
+implemented: true
+levels:
+  1:
+    upgrade-cost:
+      wood: 3
+      iron: 3
+    interaction:
+      give-items:
+        - padded_armor
+    parts:
+      - material: IRON_BLOCK
+        offset: [0, 0, 0]
+        scale: [0.9, 1.2, 0.9]
+      - material: BARREL
+        offset: [0.7, 0, 0]
+        scale: [0.7, 0.7, 0.7]
+  2:
+    upgrade-cost:
+      wood: 4
+      iron: 6
+    interaction:
+      give-items:
+        - padded_armor
+    parts:
+      - material: IRON_BLOCK
+        offset: [0, 0, 0]
+        scale: [1, 1.25, 1]
+      - material: BARREL
+        offset: [0.7, 0, 0]
+        scale: [0.75, 0.75, 0.75]
+      - material: CHAIN
+        offset: [-0.7, 0.2, 0]
+        scale: [0.65, 1, 0.65]
+  3:
+    interaction:
+      give-items:
+        - reinforced_chestplate
+    parts:
+      - material: IRON_BLOCK
+        offset: [0, 0, 0]
+        scale: [1.1, 1.3, 1.1]
+      - material: BARREL
+        offset: [0.7, 0, 0]
+        scale: [0.8, 0.8, 0.8]
+      - material: CHAIN
+        offset: [-0.7, 0.2, 0]
+        scale: [0.75, 1.1, 0.75]

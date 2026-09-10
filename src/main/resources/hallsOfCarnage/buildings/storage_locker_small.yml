@@ -1,0 +1,23 @@
+id: storage_locker_small
+name: "Small Storage Locker"
+size: small
+blueprint: storage_locker_small_blueprint
+implemented: false
+levels:
+  1:
+    upgrade-cost: {wood: 2, iron: 1}
+    parts:
+      - material: BARREL
+        offset: [0, 0, 0]
+        scale: [0.8, 0.8, 0.8]
+  2:
+    upgrade-cost: {wood: 3, iron: 2}
+    parts:
+      - material: BARREL
+        offset: [0, 0, 0]
+        scale: [0.95, 0.95, 0.95]
+  3:
+    parts:
+      - material: CHEST
+        offset: [0, 0, 0]
+        scale: [1, 1, 1]

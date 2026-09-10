@@ -1,0 +1,45 @@
+id: cooking_pot
+name: "Cooking Pot"
+size: medium
+blueprint: cooking_pot_blueprint
+implemented: true
+levels:
+  1:
+    upgrade-cost:
+      wood: 3
+      iron: 1
+    interaction:
+      give-items:
+        - stale_bread
+    parts:
+      - material: CAULDRON
+        offset: [0, 0, 0]
+        scale: [1, 1, 1]
+      - material: CAMPFIRE
+        offset: [0, -0.05, 0]
+        scale: [0.8, 0.35, 0.8]
+  2:
+    upgrade-cost:
+      wood: 5
+      iron: 3
+    interaction:
+      give-items:
+        - cooked_mycelia
+    parts:
+      - material: CAULDRON
+        offset: [0, 0, 0]
+        scale: [1.1, 1.1, 1.1]
+      - material: SOUL_CAMPFIRE
+        offset: [0, -0.05, 0]
+        scale: [0.9, 0.35, 0.9]
+  3:
+    interaction:
+      give-items:
+        - ember_stew
+    parts:
+      - material: CAULDRON
+        offset: [0, 0, 0]
+        scale: [1.2, 1.2, 1.2]
+      - material: SOUL_CAMPFIRE
+        offset: [0, -0.05, 0]
+        scale: [1, 0.35, 1]

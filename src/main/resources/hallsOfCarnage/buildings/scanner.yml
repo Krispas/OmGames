@@ -1,0 +1,29 @@
+id: scanner
+name: "Scanner"
+size: small
+blueprint: scanner_blueprint
+implemented: false
+levels:
+  1:
+    upgrade-cost: {iron: 2, redstone: 2}
+    parts:
+      - material: LODESTONE
+        offset: [0, 0, 0]
+        scale: [0.8, 0.8, 0.8]
+  2:
+    upgrade-cost: {iron: 3, redstone: 4}
+    parts:
+      - material: LODESTONE
+        offset: [0, 0, 0]
+        scale: [0.9, 0.9, 0.9]
+      - material: REDSTONE_LAMP
+        offset: [0, 0.6, 0]
+        scale: [0.45, 0.45, 0.45]
+  3:
+    parts:
+      - material: LODESTONE
+        offset: [0, 0, 0]
+        scale: [1, 1, 1]
+      - material: REDSTONE_LAMP
+        offset: [0, 0.65, 0]
+        scale: [0.55, 0.55, 0.55]

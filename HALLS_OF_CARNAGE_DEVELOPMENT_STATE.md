@@ -248,14 +248,27 @@ This is the first implementation slice. It focuses on:
 - Exploration monster cap scaling now treats each extra participant after the first as +33% to the base live cap and cap-extension speed before modifier multipliers apply.
 - Breakable loot was centralized into new `breakable_loot_pools/common.yml` and `rare.yml` resources. Breakable files now declare `rarity` and two `scrap-drops`; generic `scrap`/`random_scrap` loot entries pick between those configured scrap drops. Existing per-breakable `loot` remains parser-compatible and overrides the rarity pool.
 - Next development slice applied: trap effects only affect session monsters while a participant is within 20 blocks of the trap effect/contact area; generated room and corridor wall columns now use wall material under the walls instead of floor material; elevator floor arrival heals living players by 6 HP and revives ghosts at 10 HP; right-click physics-drop pickup now inserts into the currently selected empty hand slot; modifier reveal timing and title duration are doubled; exploration content generation now forces exactly one rare breakable per floor and keeps other generated props common; bundled `ender_chest` is registered as its own rare breakable resource.
+- Next development slice applied: camp floors now parse scenario `layout`, load `level/camps/camp_1.txt`, render camp rooms from `X/O/C/N/S/W/E` masks, mark plot floors with oak planks, and add session-owned plot `Interaction` hitboxes.
+- Halls building definitions now load from `plugins/OmGames/HallsOfCarnage/buildings/` and are seeded from bundled defaults for all current blueprint families.
+- Building files define size, blueprint id, implemented flag, level display parts, optional stored-scrap upgrade costs, and optional `interaction.give-items` outputs.
+- Right-clicking a camp plot with a matching blueprint consumes it and spawns the configured level-1 building display. Sneak-right-clicking a built plot upgrades it up to level 3 by spending stored scrap from the session counters.
+- Cooking Pot, Weapon Bench, Armory, and Mycelia Farm have first-pass active outputs that place configured catalog items into an open hotbar slot. Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers are buildable/upgradable decorative placeholders for now.
+- `/hoc reset confirm` now also resets bundled `buildings/` resources, and `AGENTS.md` documents the new camp/building resource schemas.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice (do not remove this line):
-It is time to finaly implement the camp floors as per GDD. I have added camp_1.txt and designated a camp floor in untold_depths.txt scenario
-I've also added layout property for the camps, to choose a file. 
-Except for normal generation of X and O, there is also C and N,S,W,E. Those are for the build spots. C is there to make the plot bigger (3x3 or 5x5 , medium/large). N,S,W,E defines which way the plot is oriented and the plot itself in case of 1x1 (small) plots.
-Build spots have floor made out of oak planks and they have a interaction entity hitbox. Right clicking with a blueprint builds the designated building.
-Developed buildings based on their section within GDD and implement only some for now (and mark in notes those which are not done yet/ are done).
-There should be the abillity to upgrade them up to level 3. Just read the GDD, everything needed is there.
-Each level of the building should have its model in the files. While there also look into stool, it uses 0.9 for offset and I swear the decimal number doesnt work.
-Buildings should be fully configurable from the files.
+- When elevator door closes, the bars are connected only from one side for some time, around the time modifiers start appearing, it fixes itself
+- When going to the camp, the corridor leading from the elevator went into a wall. Instead of a direct corridor, search for nearest point without a wall and put the corridor there
+- There was a small part of floor which didnt get clear, maybe extend the cleanup range?
+- Make it so the models for breakables and camp buildings support rotations (euler) and blockdata, rework the elevator drill model to show the blockdata in action
+- Upgrading building shouldnt be a shift action, instead each building should open a GUI after interacting, where should be its functionality, upgrade/destroy button.
+- Armory, Cooking pot and weapon bench should work more like a crafting station, in their UI will be a list of recipes player can craft at it.
+- - The items which can be crafted there should be specified in the scenario file, this way different scenarios can have different locked items, the items in the file should have 3 categories based on which level the recipe can be crafted
+- - Weapons and utilities and armors use scrap to be crafted, although some items could require other items like rusty_sword
+- The mycelia farm should have its config still in its file. When visited, it will give players new raw_mycelia food, which is a worse version of cooked_mycelia. It can give it number of times based on its level. When upgrading, building should remember it already gave it out. Mycelia can be taken by right clicking the building, UI will show only if the building is empty. There should be a different model based on if its empty or not.
+- Add various meal items, they are like a better food granting various temporary buffs crafted at the cooking pot. The recipes cooking pot can cook should be in the scenario file
+- Add a recipe for cooked_mycelia as it can be cooking pot recipe
+- All meals are rare food items.
+
+Future (not this slice):
+- Continue camp work by adding persistent camp/save-file state so built buildings survive game-over restarts and later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.
