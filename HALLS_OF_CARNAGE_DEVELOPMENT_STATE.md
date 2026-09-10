@@ -220,6 +220,7 @@ This is the first implementation slice. It focuses on:
 - Halls sound-pending features: future ghost state, future monster attacks/deaths, future combat floor wave terminals, future camp building placement/upgrades/demolition, future crafting/cooking/storage interactions, future sculk growth/warden warning, and future modifier reveal/selection.
 
 ## Reviewer note (Delete entries once done, but keep the header)
+Do all for the next slice:
 - Expand the radius of alerting the mobs
 - Make it so gradually, more monsters spawn in the dungeon if spawn limit allows (aka for example if monsters were killed) and each minute spent on the floor, the floors spawn limit extends by 5%. Don't forget you shouldnt spawn mobs where player can see them from first person.
 - Make it so monsters don't drop their loot.
