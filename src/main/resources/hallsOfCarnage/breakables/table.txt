@@ -16,7 +16,7 @@ loot:
     weight: 60
     amount: 1-3
   - item: food
-    weight: 20
+    weight: 18
   - item: rare_food
     weight: 2
   - item: blueprint
