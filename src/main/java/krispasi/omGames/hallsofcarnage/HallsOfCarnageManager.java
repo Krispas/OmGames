@@ -99,7 +99,13 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/monsters/bogged.txt",
             "hallsOfCarnage/monsters/husk.txt",
             "hallsOfCarnage/monsters/breeze.txt",
+            "hallsOfCarnage/monsters/vindicator.txt",
+            "hallsOfCarnage/monsters/silverfish.txt",
+            "hallsOfCarnage/monsters/pillager.txt",
+            "hallsOfCarnage/monsters/witch.txt",
+            "hallsOfCarnage/monsters/wither_skeleton.txt",
             "hallsOfCarnage/monsters/warden.txt",
+            "hallsOfCarnage/items/weapons/vagabonds_club.txt",
             "hallsOfCarnage/items/weapons/rusty_sword.txt",
             "hallsOfCarnage/items/weapons/echo_blade.txt",
             "hallsOfCarnage/items/weapons/miner_pick.txt",
@@ -366,6 +372,15 @@ public final class HallsOfCarnageManager {
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         return session != null && session.handleElevatorButton(player, block);
+    }
+
+    public boolean handleElevatorChestInteract(Player player, org.bukkit.block.Block block) {
+        if (player == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleElevatorChestInteract(player, block);
     }
 
     public boolean handleScrapDeposit(Player player, org.bukkit.block.Block block) {

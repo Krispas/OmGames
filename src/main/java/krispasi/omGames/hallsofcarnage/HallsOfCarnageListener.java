@@ -157,6 +157,12 @@ public final class HallsOfCarnageListener implements Listener {
             return;
         }
         if (event.getAction() == Action.RIGHT_CLICK_BLOCK
+                && event.getClickedBlock().getType() == Material.CHEST
+                && manager.handleElevatorChestInteract(event.getPlayer(), event.getClickedBlock())) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getAction() == Action.RIGHT_CLICK_BLOCK
                 && event.getClickedBlock().getType() == Material.STONE_BUTTON
                 && manager.handleElevatorButton(event.getPlayer(), event.getClickedBlock())) {
             event.setCancelled(true);

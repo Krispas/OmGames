@@ -3,7 +3,7 @@ name: "Rare Blueprint: Large Sculk Purifier"
 category: blueprint
 rarity: rare
 material: PAPER
-item-model: om:hoc_rare_blueprint
+item-model: minecraft:map
 max-stack-size: 1
 lore:
   - "Unlocks future large sculk suppression."

@@ -14,6 +14,7 @@ allowed-items:
     - diamond
     - redstone
   weapon:
+    - vagabonds_club
     - rusty_sword
     - miner_pick
     - echo_blade

@@ -23,6 +23,8 @@ import org.bukkit.scheduler.BukkitTask;
 
 final class HallsSessionSculkRuntime {
     private static final int ROOM_HEIGHT = 5;
+    private static final double SCULK_GAIN_PER_SECOND = 0.75;
+    private static final double SCULK_DECAY_PER_SECOND = 0.40;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -60,10 +62,11 @@ final class HallsSessionSculkRuntime {
             startTicking();
             return Set.of();
         }
+        Set<HallsExplorationGenerator.Cell> validCells = Set.copyOf(plan.walkableCells());
         for (int i = 0; i < floor.sculkPatches(); i++) {
             HallsExplorationGenerator.Cell center = cells.get(random.nextInt(cells.size()));
             int radius = 3 + random.nextInt(5);
-            carvePatch(center, radius, random);
+            carvePatch(center, radius, validCells, random);
         }
         startTicking();
         return Set.copyOf(patchCells);
@@ -93,7 +96,10 @@ final class HallsSessionSculkRuntime {
         return sculkPercent(player) >= 90;
     }
 
-    private void carvePatch(HallsExplorationGenerator.Cell center, int radius, Random random) {
+    private void carvePatch(HallsExplorationGenerator.Cell center,
+                            int radius,
+                            Set<HallsExplorationGenerator.Cell> validCells,
+                            Random random) {
         double radiusSquared = radius * radius;
         double xStretch = 0.85 + random.nextDouble() * 0.45;
         double zStretch = 0.85 + random.nextDouble() * 0.45;
@@ -106,21 +112,28 @@ final class HallsSessionSculkRuntime {
                 int x = center.x() + dx;
                 int z = center.z() + dz;
                 HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(x, z);
+                if (!validCells.contains(cell)) {
+                    continue;
+                }
                 patchCells.add(cell);
                 if (random.nextDouble() < 0.80) {
                     blockSetter.setBlock(x, origin.y() - 1, z, Material.SCULK, null);
                 }
-                maybePlaceVein(x, origin.y(), z, BlockFace.UP, random);
-                maybePlaceVein(x + 1, origin.y(), z, BlockFace.WEST, random);
-                maybePlaceVein(x - 1, origin.y(), z, BlockFace.EAST, random);
-                maybePlaceVein(x, origin.y(), z + 1, BlockFace.NORTH, random);
-                maybePlaceVein(x, origin.y(), z - 1, BlockFace.SOUTH, random);
+                maybePlaceVein(x, origin.y(), z, BlockFace.DOWN, random);
+                for (int y = origin.y(); y <= origin.y() + ROOM_HEIGHT - 1; y++) {
+                    maybePlaceVein(x, y, z, BlockFace.EAST, random);
+                    maybePlaceVein(x, y, z, BlockFace.WEST, random);
+                    maybePlaceVein(x, y, z, BlockFace.SOUTH, random);
+                    maybePlaceVein(x, y, z, BlockFace.NORTH, random);
+                }
+                maybePlaceVein(x, origin.y() + ROOM_HEIGHT - 1, z, BlockFace.UP, random);
             }
         }
     }
 
     private void maybePlaceVein(int x, int y, int z, BlockFace face, Random random) {
-        if (random.nextDouble() > 0.60 || !world.getBlockAt(x, y, z).getType().isAir()) {
+        if (random.nextDouble() > 0.45 || !world.getBlockAt(x, y, z).getType().isAir()
+                || !world.getBlockAt(x + face.getModX(), y + face.getModY(), z + face.getModZ()).getType().isSolid()) {
             return;
         }
         blockSetter.setBlock(x, y, z, Material.SCULK_VEIN, face);
@@ -145,7 +158,9 @@ final class HallsSessionSculkRuntime {
             }
             boolean inSculk = isInSculk(player.getLocation());
             double current = playerSculk.getOrDefault(playerId, 0.0);
-            double next = inSculk ? Math.min(100.0, current + 2.5) : Math.max(0.0, current - 0.75);
+            double next = inSculk
+                    ? Math.min(100.0, current + SCULK_GAIN_PER_SECOND)
+                    : Math.max(0.0, current - SCULK_DECAY_PER_SECOND);
             playerSculk.put(playerId, next);
             applySculkEffects(player, next, inSculk);
         }

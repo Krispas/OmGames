@@ -1,0 +1,12 @@
+id: vagabonds_club
+name: "Vagabond's Club"
+category: weapon
+rarity: normal
+material: WOODEN_SWORD
+max-stack-size: 1
+lore:
+  - "A battered starter club for desperate dives."
+stats:
+  melee-damage: 3
+  attack-speed: 1.6
+  durability: 32000

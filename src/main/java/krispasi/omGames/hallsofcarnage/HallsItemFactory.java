@@ -8,8 +8,12 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.components.EquippableComponent;
 import org.bukkit.persistence.PersistentDataType;
@@ -49,6 +53,8 @@ final class HallsItemFactory {
                 }
             }
             applyArmorModel(meta, type);
+            applyCombatStats(plugin, meta, type);
+            applyDurability(meta, type);
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING, type.id());
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_category"), PersistentDataType.STRING, type.category());
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_rarity"), PersistentDataType.STRING, type.rarity());
@@ -62,6 +68,55 @@ final class HallsItemFactory {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private static void applyDurability(ItemMeta meta, HallsItemType type) {
+        Double durability = type.stats().get("durability");
+        if (durability != null && durability > 0.0 && meta instanceof Damageable damageable) {
+            damageable.setMaxDamage(Math.max(1, durability.intValue()));
+        }
+    }
+
+    private static void applyCombatStats(JavaPlugin plugin, ItemMeta meta, HallsItemType type) {
+        Double meleeDamage = type.stats().get("melee_damage");
+        if (meleeDamage != null) {
+            meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_melee_damage_" + type.id()),
+                    meleeDamage - vanillaAttackDamage(type.material()),
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    EquipmentSlotGroup.HAND
+            ));
+        }
+        Double attackSpeed = type.stats().get("attack_speed");
+        if (attackSpeed != null) {
+            meta.addAttributeModifier(Attribute.ATTACK_SPEED, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_attack_speed_" + type.id()),
+                    attackSpeed - vanillaAttackSpeed(type.material()),
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    EquipmentSlotGroup.HAND
+            ));
+        }
+    }
+
+    private static double vanillaAttackDamage(Material material) {
+        return switch (material) {
+            case WOODEN_SWORD, GOLDEN_SWORD -> 4.0;
+            case STONE_SWORD -> 5.0;
+            case IRON_SWORD -> 6.0;
+            case DIAMOND_SWORD -> 7.0;
+            case NETHERITE_SWORD -> 8.0;
+            default -> 1.0;
+        };
+    }
+
+    private static double vanillaAttackSpeed(Material material) {
+        return switch (material) {
+            case WOODEN_SWORD, STONE_SWORD, IRON_SWORD, GOLDEN_SWORD, DIAMOND_SWORD, NETHERITE_SWORD -> 1.6;
+            case WOODEN_AXE, STONE_AXE -> 0.8;
+            case IRON_AXE -> 0.9;
+            case DIAMOND_AXE, NETHERITE_AXE -> 1.0;
+            default -> 4.0;
+        };
     }
 
     private static void applyArmorModel(ItemMeta meta, HallsItemType type) {

@@ -223,32 +223,26 @@ This is the first implementation slice. It focuses on:
 - Session monsters now drop no loot or XP on death, with equipment drop chances also forced to zero on spawn.
 - First-pass ghost mode is implemented: lethal player damage in a Halls session is cancelled, the player becomes an invisible Adventure-mode ghost, carried gear is dropped as session physics drops, inventory/pickup/elevator/scrap interactions are blocked, and particles mark their location.
 - Ghost players revive automatically on the next floor transfer. If every online participant is a ghost, the run shows a 10-second game-over countdown and rebuilds floor 1.
-- Session start, game-over restart, floor-transfer teleports, and normal Halls exit now apply a 3-second blindness fade with teleport after roughly 1 second.
+- Session start, game-over restart, floor-transfer teleports, and normal Halls exit now teleport directly without a blindness fade.
 - Scenario exploration floors now parse `sculk-patches`, which controls first-pass sculk patch generation separately from holes and traps.
-- Sculk patches are generated from spherical-ish randomized masks, convert about 80% of affected floor blocks to sculk, and attempt nearby sculk veins in air with about 60% chance.
-- Participants standing in sculk patches or on/inside sculk blocks/veins gain personal sculk pressure; pressure decays slowly when away from sculk.
+- Sculk patches are generated from spherical-ish randomized masks, convert about 80% of affected floor blocks to sculk, and attempt bounded sculk veins on floors, walls, and ceilings where an adjacent solid face exists.
+- Participants standing in sculk patches or on/inside sculk blocks/veins gain personal sculk pressure slowly; pressure decays slowly when away from sculk.
 - Sculk pressure above 35% applies Weakness I, above 80% applies Slowness I, above 90% clamps food to 16 with zero saturation and blocks eating, and at 100% applies Darkness I.
 - Standing in sculk plays a sculk sensor sound and emits sculk soul particles.
 - Monster spawns now check max participant sculk; above 50%, each spawn has `min(sculk - 40, 35)%` chance to spawn a warden.
 - Bundled scenario defaults now include `sculk-patches` on exploration floors, and bundled monster defaults include `warden`.
-- Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, poison dart firing, first-pass monster alert, and sculk standing feedback.
+- Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, poison dart firing, and sculk standing feedback.
 - Halls sound-pending features: future monster attacks/deaths, future combat floor wave terminals, future camp building placement/upgrades/demolition, future crafting/cooking/storage interactions, future warden warning, and future modifier reveal/selection.
+- Next reviewer slice applied: sculk rises more slowly and can attach veins to valid floor/wall/ceiling faces; transfer-chest interaction is locked during elevator movement and staged builds recapture contents before rebuilding the elevator; level-change blindness fade use was removed; session monsters clear native/random equipment, no longer play an alert sound, and die after falling into holes; `vagabonds_club` is seeded as the starter weapon and granted on start/game-over reset; start-floor players spawn in the start room; game-over reset now clears inventory, counters, sculk, ghosts, and transfer chest state; normal stop and game-over reset teleport players before cleanup to avoid fall damage; new bundled monster files are included in Halls resource seeding; level-type defaults no longer contain obsolete modifier sections.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all for the next slice (keep this line):
-- Make sculk raise more slowly
-- Make sculk generate also on ceilings and walls if the spherical radius allows
-- Make sculk veins have blockstates active only on the sides where solid block is, if there is no solid block, just dont place it there
-- Putting stuff into the chest while elevator is running still deletes the item, fix this
-- Do not use the blindness fadeout transition on level changes
-- When monster falls into a hole, kill it
-- Disable the sound that plays when monsters are alerted
-- Make it so monsters cant spawn with gear or special properties without it being specified
-- Make it so sculk veins dont generate out of bounds
-- Add a new item called "Vagabond's club" it is a wooden sword with less damage than regular wooden sword. it has 32000 durability and all players start with it
-- When starting on start floor, make it so players dont spawn in the elevator, but in the start room
-- The start room guaranteed bluepirnt drop breakable is only spawning sometimes, fix it, tip: all start floors will always be the same, so use that to your advantage.
-- When the game restarts or ends, players take fall damage becouse elevator vanishes before they get teleported, fix that
-- If a game over happens and players are send back to floor one, make it as if a new game started, clearing their inventories, stats and chest.
-- I've added some new monster types into resources, so just telling you incase they need to be added somewhere in code, vindicator, silverfish, pillager, wither_skeleton
-- in resources: remove modifiers from level types, since we already have modifier folder with level type support
+- The starter sword deals no damage, when doing the attribute damage, it ignores the base sword damage, resulting to 0. Also fix rest of the weaponry.
+- Sculk applying should not work based on standing on specific blocks, but based on culculating distance from the sphere of the patch.
+- Sculk vein generation is fully messed up
+- Make it so sculk does not decay and is permanently kept on the player
+- When slime dies and split, the resulting small slimes are not registered as monsters
+- Add a way for me to check how many monsters are alive, what is the spawn cap and what is the extended spawn cap
+- Add a quota needed for elevator to go down in coins. It should be displayed on the HUD. If player tries going down without enough money, elevator wont let them (make an exception for people in creative mode). Going down removes the money, the quate is set from the scenario file for each level, add it into the file.
+- In multplayer, if elevator goes down and some player is not in, the player will get killed/becomes a ghost with a unique message of being left behind.
+- On the HUD, tell players how far there are from the elevator, NEAR if it is in 30 blocks, MEDIUM if in 50, FAR if more

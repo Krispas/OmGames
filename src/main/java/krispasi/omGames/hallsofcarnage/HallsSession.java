@@ -60,6 +60,7 @@ public final class HallsSession {
     private static final int DISPLAY_TELEPORT_DURATION_TICKS = 2;
     private static final double DROP_DISPLAY_SUPPORT_OFFSET = 0.08;
     private static final double DROP_SETTLE_VELOCITY_SQUARED = 0.0016;
+    private static final String STARTER_ITEM_ID = "vagabonds_club";
 
     private final JavaPlugin plugin;
     private final int id;
@@ -98,6 +99,7 @@ public final class HallsSession {
     private int activeGeneratedRooms;
     private boolean transitioning;
     private boolean running;
+    private Location startRoomSpawn;
 
     public HallsSession(JavaPlugin plugin,
                         int id,
@@ -284,6 +286,22 @@ public final class HallsSession {
         return true;
     }
 
+    public boolean handleElevatorChestInteract(Player player, Block block) {
+        if (!running || player == null || block == null || !player.getWorld().equals(world)) {
+            return false;
+        }
+        if (block.getX() != origin.x() - ELEVATOR_INNER_RADIUS
+                || block.getY() != origin.y()
+                || block.getZ() != origin.z()) {
+            return false;
+        }
+        if (transitioning) {
+            player.sendActionBar(Component.text("The transfer chest is locked while the elevator is moving.", NamedTextColor.YELLOW));
+            return true;
+        }
+        return false;
+    }
+
     public boolean forceBuildFloor(int floor) {
         if (!running || transitioning || floor < 1 || floor > scenario.floorCount()) {
             return false;
@@ -412,7 +430,8 @@ public final class HallsSession {
         running = true;
         startedAtMillis = System.currentTimeMillis();
         startHudTask();
-        Location spawn = elevatorSpawnLocation();
+        resetRunState();
+        Location spawn = startRoomSpawn == null ? elevatorSpawnLocation() : startRoomSpawn;
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player == null) {
@@ -424,7 +443,9 @@ public final class HallsSession {
             setPlayerElevatorRespawn(player);
             player.getInventory().clear();
             applyInventoryLimit(player);
-            fadeTeleport(player, spawn, "Entering " + scenario.name(), "Floor 1", true);
+            giveStarterItem(player);
+            teleportSessionPlayer(player, spawn);
+            player.sendTitle("Entering " + scenario.name(), "Floor 1", 0, 45, 15);
             player.sendMessage(Component.text("Entering " + scenario.name() + " floor 1.", NamedTextColor.DARK_RED));
         }
     }
@@ -442,7 +463,9 @@ public final class HallsSession {
                 player.setRespawnLocation(fallback, true);
                 player.setInvisible(false);
                 player.removePotionEffect(PotionEffectType.INVISIBILITY);
-                fadeTeleport(player, fallback, "Leaving the Halls", "", false);
+                player.teleport(fallback);
+                player.setFallDistance(0.0f);
+                player.sendTitle("Leaving the Halls", "", 0, 35, 10);
             } else if (player != null) {
                 restoreInventoryLimit(player);
                 player.getInventory().clear();
@@ -472,13 +495,28 @@ public final class HallsSession {
         clearBuildVolume();
         buildElevator();
         HallsLayout layout = HallsLayoutLoader.load(new File(dataFolder, "level/special/start_floor.txt"));
+        int roomStartX = origin.x() - layout.width() / 2;
         int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
-        buildLayoutRoom(layout, origin.x() - layout.width() / 2, origin.y(), roomStartZ,
+        buildLayoutRoom(layout, roomStartX, origin.y(), roomStartZ,
                 Map.of(BlockFace.NORTH, layout.width() / 2), levelType, new Random((((long) id) << 32) ^ 1));
         buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1, levelType);
-        spawnBreakableProp(origin.x() - layout.width() / 2 + 1, origin.y(), roomStartZ + 1,
+        startRoomSpawn = new Location(world, roomStartX + layout.width() / 2.0 + 0.5,
+                origin.y() + 1.0, roomStartZ + layout.depth() / 2.0 + 0.5, 0.0f, 0.0f);
+        Cell blueprintCell = firstOpenStartFloorCell(layout);
+        spawnBreakableProp(roomStartX + blueprintCell.x(), origin.y(), roomStartZ + blueprintCell.z(),
                 breakableType("barrel"), 3, List.of(new HallsBreakableType.LootEntry("rare_blueprint", 1, 1, 1)));
         closeElevatorDoors();
+    }
+
+    private Cell firstOpenStartFloorCell(HallsLayout layout) {
+        for (int z = 0; z < layout.depth(); z++) {
+            for (int x = 0; x < layout.width(); x++) {
+                if (layout.at(x, z) == 'O') {
+                    return new Cell(x, z);
+                }
+            }
+        }
+        return new Cell(layout.width() / 2, layout.depth() / 2);
     }
 
     private void startElevatorTransition(int destinationFloor) {
@@ -539,13 +577,19 @@ public final class HallsSession {
                 setPlayerElevatorRespawn(player);
                 clearGhostState(player);
                 if (!isInsideElevator(player.getLocation())) {
-                    fadeTeleport(player, spawn, title, subtitle, true);
-                } else {
-                    player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 60, 0, true, false, false));
+                    teleportSessionPlayer(player, spawn);
                 }
                 player.sendTitle(title, subtitle, 10, 45, 15);
             }
         }
+    }
+
+    private void teleportSessionPlayer(Player player, Location target) {
+        player.teleport(target);
+        player.setGameMode(GameMode.ADVENTURE);
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
+        setPlayerElevatorRespawn(player);
     }
 
     private Location elevatorSpawnLocation() {
@@ -1725,9 +1769,16 @@ public final class HallsSession {
         if (!running) {
             return;
         }
+        Location protectedSpawn = elevatorSpawnLocation();
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.teleport(protectedSpawn);
+                player.setFallDistance(0.0f);
+            }
+        }
         removeSessionEntities();
-        ghostPlayers.clear();
-        elevatorChestContents = new ItemStack[27];
+        resetRunState();
         try {
             buildStartArea();
         } catch (IOException ex) {
@@ -1735,17 +1786,43 @@ public final class HallsSession {
             return;
         }
         openElevatorDoors();
-        Location spawn = elevatorSpawnLocation();
+        Location spawn = startRoomSpawn == null ? elevatorSpawnLocation() : startRoomSpawn;
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
                 player.getInventory().clear();
+                player.getInventory().setArmorContents(null);
+                player.getInventory().setItemInOffHand(null);
                 player.setHealth(Math.min(player.getMaxHealth(), 20.0));
                 clearGhostState(player);
                 applyInventoryLimit(player);
-                setPlayerElevatorRespawn(player);
-                fadeTeleport(player, spawn, "Run Lost", "Back to floor 1.", true);
+                giveStarterItem(player);
+                teleportSessionPlayer(player, spawn);
+                player.sendTitle("Run Lost", "Back to floor 1.", 0, 45, 15);
             }
+        }
+    }
+
+    private void resetRunState() {
+        ghostPlayers.clear();
+        elevatorChestContents = new ItemStack[27];
+        woodScrap = 0;
+        ironScrap = 0;
+        diamondScrap = 0;
+        redstoneScrap = 0;
+        coins = 0;
+        sculkRuntime.clear();
+    }
+
+    private void giveStarterItem(Player player) {
+        HallsItemType type = itemTypes.get(STARTER_ITEM_ID);
+        if (type == null) {
+            return;
+        }
+        ItemStack item = HallsItemFactory.create(plugin, type, 1);
+        int slot = firstAvailableHotbarSlot(player.getInventory());
+        if (slot >= 0) {
+            player.getInventory().setItem(slot, item);
         }
     }
 
@@ -2057,40 +2134,13 @@ public final class HallsSession {
             block.setBlockData(directional, false);
         }
         if (facing != null && block.getBlockData() instanceof MultipleFacing multipleFacing) {
-            if (multipleFacing.getAllowedFaces().contains(facing)) {
-                multipleFacing.setFace(facing, true);
-            }
-            if (multipleFacing.getAllowedFaces().contains(facing.getOppositeFace())) {
-                multipleFacing.setFace(facing.getOppositeFace(), true);
-            }
-            if (multipleFacing.getAllowedFaces().contains(BlockFace.UP)) {
-                multipleFacing.setFace(BlockFace.UP, true);
-            }
-            if (multipleFacing.getAllowedFaces().contains(BlockFace.DOWN)) {
-                multipleFacing.setFace(BlockFace.DOWN, true);
+            for (BlockFace face : multipleFacing.getAllowedFaces()) {
+                boolean solidNeighbor = world.getBlockAt(x + face.getModX(), y + face.getModY(), z + face.getModZ())
+                        .getType().isSolid();
+                multipleFacing.setFace(face, solidNeighbor);
             }
             block.setBlockData(multipleFacing, false);
         }
-    }
-
-    private void fadeTeleport(Player player, Location target, String title, String subtitle, boolean prepareSessionPlayer) {
-        if (player == null || target == null) {
-            return;
-        }
-        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 60, 0, true, false, false));
-        player.sendTitle(title, subtitle, 0, 45, 15);
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (prepareSessionPlayer && !running) {
-                return;
-            }
-            player.teleport(target);
-            if (prepareSessionPlayer) {
-                player.setGameMode(GameMode.ADVENTURE);
-                player.setFoodLevel(20);
-                player.setSaturation(20.0f);
-                setPlayerElevatorRespawn(player);
-            }
-        }, 20L);
     }
 
     private Material firstMaterial(String... names) {
@@ -2160,6 +2210,7 @@ public final class HallsSession {
         }
 
         private void buildElevatorPass() {
+            captureElevatorChestContents();
             buildElevator();
             closeElevatorDoors();
             stage = 3;

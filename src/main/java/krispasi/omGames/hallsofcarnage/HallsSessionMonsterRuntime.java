@@ -13,7 +13,6 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -49,6 +48,7 @@ final class HallsSessionMonsterRuntime {
     private int baseMaxAlive;
     private int totalSpawnBudget;
     private int spawnedThisFloor;
+    private int spawnCooldownTicks;
     private long floorStartedAtMillis;
 
     HallsSessionMonsterRuntime(JavaPlugin plugin,
@@ -83,8 +83,9 @@ final class HallsSessionMonsterRuntime {
         if (spawnCells.isEmpty() || commonPool.isEmpty()) {
             return;
         }
-        spawnTask = Bukkit.getScheduler().runTaskTimer(plugin, this::spawnTick, 20L, SPAWN_INTERVAL_TICKS);
-        spawnTick();
+        spawnTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
+        spawnCooldownTicks = 0;
+        tick();
     }
 
     void clear() {
@@ -101,6 +102,7 @@ final class HallsSessionMonsterRuntime {
         spawnedMonsters.clear();
         spawnCells = List.of();
         spawnedThisFloor = 0;
+        spawnCooldownTicks = 0;
     }
 
     void alert(Location location) {
@@ -118,15 +120,20 @@ final class HallsSessionMonsterRuntime {
                 creature.setTarget(target);
             }
         }
-        world.playSound(location, Sound.ENTITY_ZOMBIE_AMBIENT, 0.7f, 0.65f);
     }
 
-    private void spawnTick() {
+    private void tick() {
         spawnedMonsters.removeIf(entityId -> {
             Entity entity = Bukkit.getEntity(entityId);
             return entity == null || entity.isDead() || !entity.isValid();
         });
+        killMonstersInPits();
         updateSpawnLimit();
+        spawnCooldownTicks -= 20;
+        if (spawnCooldownTicks > 0) {
+            return;
+        }
+        spawnCooldownTicks = SPAWN_INTERVAL_TICKS;
         if (spawnedThisFloor >= totalSpawnBudget) {
             if (spawnedMonsters.isEmpty() && spawnTask != null) {
                 spawnTask.cancel();
@@ -182,6 +189,7 @@ final class HallsSessionMonsterRuntime {
         if (equipment == null) {
             return;
         }
+        equipment.clear();
         if (!type.mainHand().isAir()) {
             equipment.setItemInMainHand(new ItemStack(type.mainHand()));
         }
@@ -212,6 +220,16 @@ final class HallsSessionMonsterRuntime {
             case "leggings" -> equipment.setLeggings(item);
             case "boots" -> equipment.setBoots(item);
             default -> {
+            }
+        }
+    }
+
+    private void killMonstersInPits() {
+        for (UUID entityId : Set.copyOf(spawnedMonsters)) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity instanceof LivingEntity living && living.getWorld().equals(world)
+                    && living.getLocation().getY() <= origin.y() - 8) {
+                living.setHealth(0.0);
             }
         }
     }
