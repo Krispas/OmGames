@@ -108,7 +108,9 @@ final class HallsExplorationGenerator {
         addFirstRoomOnwardRoutes();
         addRoomToRoomLoops();
         if (corridorMode == CorridorMode.MAZE) {
-            addRoomLocalMaze();
+            addGridOpenHalls();
+        } else if (corridorMode == CorridorMode.OPEN_HALLS) {
+            addRoomLocalOpenHalls();
         } else {
             addMazeBranches(Math.max(rooms.size() / 2, 4));
         }
@@ -159,8 +161,8 @@ final class HallsExplorationGenerator {
         List<BlockFace> faces = availableFaces(anchor);
         Collections.shuffle(faces, random);
         BlockFace face = faces.getFirst();
-        int gap = corridorMode == CorridorMode.MAZE ? 3 + random.nextInt(8) : 5 + random.nextInt(14);
-        int lateralBase = corridorMode == CorridorMode.MAZE ? 5 : 10;
+        int gap = corridorMode == CorridorMode.MAZE ? 2 + random.nextInt(4) : 5 + random.nextInt(14);
+        int lateralBase = corridorMode == CorridorMode.MAZE ? 3 : 10;
         int lateralRange = lateralBase + Math.max(anchor.layout().width(), anchor.layout().depth()) / 2
                 + Math.max(layout.width(), layout.depth()) / 2;
         int lateral = random.nextInt(lateralRange * 2 + 1) - lateralRange;
@@ -270,14 +272,22 @@ final class HallsExplorationGenerator {
         }
         List<Cell> candidates = closestTargets(start, targets);
         for (Cell target : candidates) {
-            for (int attempt = 0; attempt < CONNECTOR_CANDIDATE_ATTEMPTS; attempt++) {
-                List<Cell> path = orthogonalCandidatePath(start, target, attempt);
+            for (int attempt = 0; attempt < connectorCandidateAttempts(); attempt++) {
+                List<Cell> path = connectorCandidatePath(start, target, attempt);
                 if (isValidConnectorPath(path, start, targets, blockedBounds)) {
                     return path;
                 }
             }
         }
         return List.of();
+    }
+
+    private int connectorCandidateAttempts() {
+        return switch (corridorMode) {
+            case CAVE -> 44;
+            case MAZE -> 18;
+            default -> CONNECTOR_CANDIDATE_ATTEMPTS;
+        };
     }
 
     private List<Cell> closestTargets(Cell start, Set<Cell> targets) {
@@ -288,6 +298,13 @@ final class HallsExplorationGenerator {
         }
         Collections.shuffle(sorted, random);
         return sorted;
+    }
+
+    private List<Cell> connectorCandidatePath(Cell start, Cell target, int attempt) {
+        if (corridorMode == CorridorMode.CAVE) {
+            return caveCandidatePath(start, target);
+        }
+        return orthogonalCandidatePath(start, target, attempt);
     }
 
     private List<Cell> orthogonalCandidatePath(Cell start, Cell target, int attempt) {
@@ -311,6 +328,71 @@ final class HallsExplorationGenerator {
         return pathThrough(start, waypoints);
     }
 
+    private List<Cell> caveCandidatePath(Cell start, Cell target) {
+        List<Cell> path = new ArrayList<>();
+        Set<Cell> seen = new HashSet<>();
+        Cell current = start;
+        path.add(current);
+        seen.add(current);
+        int directDistance = manhattanDistance(start, target);
+        int maxSteps = Math.max(32, directDistance * 4 + 32);
+        for (int step = 0; step < maxSteps && !current.equals(target); step++) {
+            List<BlockFace> faces = caveStepFaces(current, target);
+            Cell next = null;
+            int distance = manhattanDistance(current, target);
+            for (BlockFace face : faces) {
+                Cell candidate = step(current, face);
+                if (!insideBuildArea(candidate) || (seen.contains(candidate) && !candidate.equals(target))) {
+                    continue;
+                }
+                int candidateDistance = manhattanDistance(candidate, target);
+                if (candidateDistance > distance + 1 && random.nextInt(100) < 80) {
+                    continue;
+                }
+                next = candidate;
+                break;
+            }
+            if (next == null) {
+                return List.of();
+            }
+            current = next;
+            path.add(current);
+            seen.add(current);
+        }
+        return current.equals(target) ? path : List.of();
+    }
+
+    private List<BlockFace> caveStepFaces(Cell current, Cell target) {
+        List<BlockFace> pull = new ArrayList<>();
+        if (current.x() < target.x()) {
+            pull.add(BlockFace.EAST);
+        } else if (current.x() > target.x()) {
+            pull.add(BlockFace.WEST);
+        }
+        if (current.z() < target.z()) {
+            pull.add(BlockFace.SOUTH);
+        } else if (current.z() > target.z()) {
+            pull.add(BlockFace.NORTH);
+        }
+        Collections.shuffle(pull, random);
+
+        List<BlockFace> faces = new ArrayList<>();
+        if (!pull.isEmpty() && random.nextInt(100) < 68) {
+            faces.add(pull.getFirst());
+        }
+        List<BlockFace> side = new ArrayList<>(List.of(CARDINAL_FACES));
+        side.removeAll(pull);
+        Collections.shuffle(side, random);
+        faces.addAll(side);
+        faces.addAll(pull);
+        for (BlockFace face : CARDINAL_FACES) {
+            if (!faces.contains(face)) {
+                faces.add(face);
+            }
+        }
+        return faces;
+    }
+
     private List<Cell> pathThrough(Cell start, List<Cell> waypoints) {
         List<Cell> path = new ArrayList<>();
         Cell current = start;
@@ -329,7 +411,7 @@ final class HallsExplorationGenerator {
     }
 
     private boolean isValidConnectorPath(List<Cell> path, Cell start, Set<Cell> targets, List<Bounds> blockedBounds) {
-        if (path.size() < 2 || hasShortZigzags(path)) {
+        if (path.size() < 2 || (corridorMode != CorridorMode.CAVE && hasShortZigzags(path))) {
             return false;
         }
         Set<Cell> seen = new HashSet<>();
@@ -439,8 +521,9 @@ final class HallsExplorationGenerator {
             return;
         }
         Set<Cell> carved = switch (corridorMode) {
-            case CAVE -> caveCorridorCells(path);
-            case MAZE -> mazeCorridorCells(path);
+            case CAVE -> naturalCaveCorridorCells(path);
+            case LARGE_CORRIDORS -> largeCorridorCells(path);
+            case MAZE, OPEN_HALLS -> openHallConnectorCells(path);
             case NORMAL -> new HashSet<>(path);
         };
         corridorCells.addAll(carved);
@@ -454,7 +537,7 @@ final class HallsExplorationGenerator {
         }
     }
 
-    private Set<Cell> caveCorridorCells(List<Cell> path) {
+    private Set<Cell> largeCorridorCells(List<Cell> path) {
         Set<Cell> cells = new HashSet<>(path);
         for (int i = 0; i < path.size(); i++) {
             Cell current = path.get(i);
@@ -481,7 +564,37 @@ final class HallsExplorationGenerator {
         return cells;
     }
 
-    private Set<Cell> mazeCorridorCells(List<Cell> path) {
+    private Set<Cell> naturalCaveCorridorCells(List<Cell> path) {
+        Set<Cell> cells = new HashSet<>();
+        for (int i = 0; i < path.size(); i++) {
+            Cell current = path.get(i);
+            int radius = random.nextInt(100) < 76 ? 1 : 2;
+            carveDisc(cells, current, radius);
+            if (i > 0 && i < path.size() - 1 && random.nextInt(100) < 35) {
+                BlockFace side = random.nextBoolean()
+                        ? turnLeft(directionBetween(path.get(i - 1), current))
+                        : turnRight(directionBetween(path.get(i - 1), current));
+                carveDisc(cells, step(current, side), 1);
+            }
+        }
+        return cells;
+    }
+
+    private void carveDisc(Set<Cell> cells, Cell center, int radius) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                if (Math.abs(dx) + Math.abs(dz) > radius + random.nextInt(2)) {
+                    continue;
+                }
+                Cell cell = new Cell(center.x() + dx, center.z() + dz);
+                if (cell.equals(center) || canWidenCorridorInto(cell)) {
+                    cells.add(cell);
+                }
+            }
+        }
+    }
+
+    private Set<Cell> openHallConnectorCells(List<Cell> path) {
         Set<Cell> cells = new HashSet<>(path);
         for (Cell current : path) {
             for (BlockFace face : CARDINAL_FACES) {
@@ -612,7 +725,7 @@ final class HallsExplorationGenerator {
         }
     }
 
-    private void addRoomLocalMaze() {
+    private void addRoomLocalOpenHalls() {
         Set<Cell> mazeArea = mazeAreaCells();
         if (mazeArea.isEmpty()) {
             return;
@@ -661,6 +774,73 @@ final class HallsExplorationGenerator {
         }
         rememberCorridor(new ArrayList<>(mazeCells));
         addMazeRoomOpenings(mazeCells);
+    }
+
+    private void addGridOpenHalls() {
+        Set<Cell> openCells = new HashSet<>();
+        for (Room room : rooms) {
+            Bounds bounds = Bounds.of(room).inflate(8);
+            for (int x = bounds.minX(); x <= bounds.maxX(); x++) {
+                for (int z = bounds.minZ(); z <= bounds.maxZ(); z++) {
+                    Cell cell = new Cell(x, z);
+                    if (!canWidenCorridorInto(cell) || !roomWithin(cell, 8) || isOpenHallStructuralBlock(cell)) {
+                        continue;
+                    }
+                    openCells.add(cell);
+                }
+            }
+        }
+        if (openCells.isEmpty()) {
+            return;
+        }
+        corridorCells.addAll(openCells);
+        networkCells.addAll(openCells);
+        for (Cell point : openCells) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    corridorShellCells.add(new Cell(point.x() + dx, point.z() + dz));
+                }
+            }
+        }
+        addOpenHallRoomOpenings(openCells);
+    }
+
+    private boolean isOpenHallStructuralBlock(Cell cell) {
+        int gridX = Math.floorMod(cell.x(), 7);
+        int gridZ = Math.floorMod(cell.z(), 7);
+        if (gridX == 0 && gridZ == 0) {
+            return true;
+        }
+        boolean northSouthRib = gridX == 0 && gridZ >= 2 && gridZ <= 4;
+        boolean eastWestRib = gridZ == 0 && gridX >= 2 && gridX <= 4;
+        return (northSouthRib || eastWestRib) && random.nextInt(100) < 34;
+    }
+
+    private void addOpenHallRoomOpenings(Set<Cell> openCells) {
+        for (Room room : rooms) {
+            List<DoorCandidate> doors = new ArrayList<>();
+            for (BlockFace face : CARDINAL_FACES) {
+                for (int offset : validDoorOffsets(room.layout(), face)) {
+                    Cell door = doorCell(room, face, offset);
+                    if (openCells.contains(door) || openCells.contains(step(door, face))) {
+                        doors.add(new DoorCandidate(face, offset));
+                    }
+                }
+            }
+            Collections.shuffle(doors, random);
+            int wanted = Math.min(4, Math.max(2, doors.size() / 3));
+            int added = 0;
+            for (DoorCandidate door : doors) {
+                if (added >= wanted) {
+                    break;
+                }
+                if (!room.openings().containsKey(door.face())) {
+                    room.openings().put(door.face(), door.offset());
+                    rememberCorridor(List.of(doorCell(room, door.face(), door.offset())));
+                    added++;
+                }
+            }
+        }
     }
 
     private Set<Cell> mazeAreaCells() {
@@ -740,6 +920,42 @@ final class HallsExplorationGenerator {
         faces.remove(previous.getOppositeFace());
         Collections.shuffle(faces, random);
         return faces.getFirst();
+    }
+
+    private BlockFace directionBetween(Cell from, Cell to) {
+        if (to.x() > from.x()) {
+            return BlockFace.EAST;
+        }
+        if (to.x() < from.x()) {
+            return BlockFace.WEST;
+        }
+        if (to.z() > from.z()) {
+            return BlockFace.SOUTH;
+        }
+        if (to.z() < from.z()) {
+            return BlockFace.NORTH;
+        }
+        return randomFace();
+    }
+
+    private BlockFace turnLeft(BlockFace face) {
+        return switch (face) {
+            case NORTH -> BlockFace.WEST;
+            case SOUTH -> BlockFace.EAST;
+            case EAST -> BlockFace.NORTH;
+            case WEST -> BlockFace.SOUTH;
+            default -> randomFace();
+        };
+    }
+
+    private BlockFace turnRight(BlockFace face) {
+        return switch (face) {
+            case NORTH -> BlockFace.EAST;
+            case SOUTH -> BlockFace.WEST;
+            case EAST -> BlockFace.SOUTH;
+            case WEST -> BlockFace.NORTH;
+            default -> randomFace();
+        };
     }
 
     private List<Cell> openInteriorCells(Room room) {
@@ -935,7 +1151,9 @@ final class HallsExplorationGenerator {
     private enum CorridorMode {
         NORMAL,
         CAVE,
-        MAZE;
+        LARGE_CORRIDORS,
+        MAZE,
+        OPEN_HALLS;
 
         private static CorridorMode from(String value) {
             if (value == null) {
@@ -943,7 +1161,9 @@ final class HallsExplorationGenerator {
             }
             return switch (value.trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_')) {
                 case "cave", "caves", "natural" -> CAVE;
-                case "maze", "mazelike" -> MAZE;
+                case "large_corridors", "large_corridor", "wide", "wide_corridors" -> LARGE_CORRIDORS;
+                case "maze", "mazelike", "deep_crypt" -> MAZE;
+                case "open_halls", "open_hall", "legacy_maze" -> OPEN_HALLS;
                 default -> NORMAL;
             };
         }

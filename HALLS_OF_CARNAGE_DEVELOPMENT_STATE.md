@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-02
+Last updated: 2026-09-10
 
 ## Implemented
 
@@ -189,11 +189,14 @@ This is the first implementation slice. It focuses on:
 - Fixed the Frozen Halls cave-generation crash caused by shuffling an immutable `List.of(...)` rough-edge candidate list.
 - Deep Crypt maze rooms now generate closer together, maze coverage is larger, and maze paths widen from the carved cells instead of relying on ordered-path orientation.
 - Hole trap masks once again include room-edge cells while still excluding the generated outer room shell; bridge validation remains based on open room cells so door/room blockage gets a real passable bridge or the pit is skipped.
+- Supported Halls corridor-generation modes are now `normal`, `cave`, `large_corridors`, `maze`, and `open_halls`.
+- `large_corridors` preserves the previous widened orthogonal Frozen Halls cave-corridor behavior.
+- `open_halls` preserves the previous Deep Crypt room-local maze-field behavior.
+- `cave` now builds Frozen Halls-style organic tunnels with biased random-walk connector paths and rough disc widening instead of relying on orthogonal grid-locked routes.
+- `maze` now builds Deep Crypt-style close room clusters with mostly open grid-locked hall fields, some structural pillars/wall ribs, and extra valid room entrances.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-For next slice:
-- Save the current frozen halls corridor generation as a new large_corridors generation
-- Rework frozen halls generation, instead of a grid locked generation, try to generate curves from one place to another, like cave tunnels
-- Save the current deep crypt corridor generation as a new open_halls generation
-- Rework deep-crypt generation to be more grid-locked, make it almost fully open, with some walls and pillars and make rooms generate a lot closer with lots of entrances
-- Look into all pathing except the original one, optimize it more so its less taxing on the server.
+- The maze generation for deep crypt generated only one room and corridors around it
+- Make it so the swinging blade traps try to be as long as possible when generating, they should not stretch into corridors however
+- To make generation less taxing, make it so generation is split into multiple passes. Each of these passes runs on different ticks while the elevator is running.
+- From now on, when working on Halls of Carnage, do not run maven tests since its not setup in the enviroment you work in and each instance of you wastes time and power on it
