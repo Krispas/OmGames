@@ -214,3 +214,5 @@ For the next slice (do all, also keep this line):
 - Falling ice traps are not going all the way to the floor
 - Make it so the swinging blade trap doesnt do the trap once per loop, but once each 20 ticks
 - If I put something into the elevator chest on floor transfer, it gets deleted, prevent that
+- Implement the monster system as its described in GDD, we also want to define custom monsters such as slime_medium and zombie_vanguard which you can see in the howling_corridors.txt. So let's do it like this. Let's define monsters as another txt files in resources. So for example zombie_vanguard is a zombie, it has specific armor slots filled with specific items, it has an iron sword and has 16 hp and it is also not baby. Do simillar stuff for other mobs.
+- Try to implement the sound alert mechanic.

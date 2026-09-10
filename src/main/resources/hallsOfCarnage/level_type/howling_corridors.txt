@@ -23,9 +23,13 @@ pillar-palettes:
 monsters:
   common:
     - zombie
-    - skeleton
+    - creeper
+    - creaking
+    - slime_medium
   special:
-    - warden
+    - zombie_vanguard
+    - skeleton
+    - cave_spider
 modifiers:
   shared:
     - free
