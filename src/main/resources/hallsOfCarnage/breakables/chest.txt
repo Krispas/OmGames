@@ -13,6 +13,10 @@ loot:
   - item: coin
     weight: 60
     amount: 1-3
+  - item: food
+    weight: 24
+  - item: rare_food
+    weight: 2
   - item: blueprint
     weight: 9
   - item: utility

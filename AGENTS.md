@@ -1325,6 +1325,7 @@ SQLite tables:
 - Halls coin drops use session-owned physics drops but bypass normal inventory pickup; right-clicking the coin adds it directly to the shared session coin counter even when the hotbar is full.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
+- Halls food items are catalog items with category `food`; `stats.heal` restores health when consumed while hunger remains locked full.
 - Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.
 - Elevator scrap deposit consumes only the currently selected hotbar stack, not every scrap item in the player hotbar/offhand.
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
@@ -1342,6 +1343,8 @@ SQLite tables:
 - Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults.
 - Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
 - Session monster spawning clears native/random equipment first, then applies only gear explicitly defined in the monster resource file. Session monsters that fall into generated holes are killed.
+- Session monsters are persistent, have far-away removal disabled, and should prioritize alive participants over ghost players as targets.
+- Exploration monster spawning has no finite total spawn budget. It fills to a live cap, extends that cap periodically based on floor difficulty, reduces the cap by one when an alive participant kills a session monster, and adds one cap slot for each session slime created by slime splitting.
 - Level type `monsters.common` and `monsters.special` are parsed into runtime pools; exploration floors spawn a first-pass session-local monster flood from the active level type.
 - Breaking Halls props and depositing elevator scrap alert nearby spawned monsters toward the nearest participant.
 - Exploration monsters avoid first-person-visible spawn cells, drop no loot/XP, and increase their live spawn cap by 5% for every minute spent on the floor.
@@ -1350,8 +1353,9 @@ SQLite tables:
 - Exploration floor scenario field `traps-per-room.min` / `traps-per-room.max` controls how many normal traps Java attempts inside each trapped room.
 - Hole/pit generation is controlled separately by scenario floor field `holes`.
 - Sculk patch generation is controlled separately by scenario floor field `sculk-patches`.
-- Sculk patches convert floor blocks to sculk and place sculk veins in air; participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/hunger/darkness thresholds.
+- Sculk patches convert floor blocks to sculk and place sculk veins in air; participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/eating-block/darkness thresholds.
 - Sculk pressure should rise gradually, not spike during short crossings; generated sculk patches may attach veins to floors, walls, and ceilings, but sculk veins must only enable faces attached to solid neighbor blocks and must stay inside generated walkable floor bounds.
+- Sculk pressure at the eating threshold blocks consumption directly; it should not lower the player's hunger bar.
 - Halls ghost mode is Adventure-mode invisible player state, not spectator mode. A lethal hit drops the player's carried gear as session physics drops, blocks inventory/pickup interactions, and revives the player on the next floor.
 - If all online session participants are ghosts, the run restarts from floor 1 after 10 seconds.
 - Exploration floor layout templates are loaded with runtime rotations so repeated room files can appear in different orientations.

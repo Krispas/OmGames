@@ -16,6 +16,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.components.EquippableComponent;
+import org.bukkit.inventory.meta.components.FoodComponent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -55,6 +56,7 @@ final class HallsItemFactory {
             applyArmorModel(meta, type);
             applyCombatStats(plugin, meta, type);
             applyDurability(meta, type);
+            applyFoodComponent(meta, type);
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING, type.id());
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_category"), PersistentDataType.STRING, type.category());
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_rarity"), PersistentDataType.STRING, type.rarity());
@@ -75,6 +77,17 @@ final class HallsItemFactory {
         if (durability != null && durability > 0.0 && meta instanceof Damageable damageable) {
             damageable.setMaxDamage(Math.max(1, durability.intValue()));
         }
+    }
+
+    private static void applyFoodComponent(ItemMeta meta, HallsItemType type) {
+        if (!type.category().equals("food")) {
+            return;
+        }
+        FoodComponent food = meta.getFood();
+        food.setNutrition(0);
+        food.setSaturation(0.0f);
+        food.setCanAlwaysEat(true);
+        meta.setFood(food);
     }
 
     private static void applyCombatStats(JavaPlugin plugin, ItemMeta meta, HallsItemType type) {
@@ -137,6 +150,9 @@ final class HallsItemFactory {
     private static NamedTextColor itemColor(HallsItemType type) {
         if (type.category().equals("blueprint")) {
             return type.rarity().equals("rare") ? NamedTextColor.LIGHT_PURPLE : NamedTextColor.AQUA;
+        }
+        if (type.category().equals("food")) {
+            return type.rarity().equals("rare") ? NamedTextColor.YELLOW : NamedTextColor.GREEN;
         }
         return type.rarity().equals("rare") ? NamedTextColor.GOLD : NamedTextColor.WHITE;
     }

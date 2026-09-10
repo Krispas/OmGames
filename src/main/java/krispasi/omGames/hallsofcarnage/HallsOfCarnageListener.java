@@ -77,10 +77,15 @@ public final class HallsOfCarnageListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerItemConsume(PlayerItemConsumeEvent event) {
-        if (manager.isHallsWorld(event.getPlayer().getWorld()) && manager.blocksEating(event.getPlayer())) {
+        if (!manager.isHallsWorld(event.getPlayer().getWorld())) {
+            return;
+        }
+        if (manager.blocksEating(event.getPlayer())) {
             event.setCancelled(true);
             event.getPlayer().sendActionBar(Component.text("The sculk suppresses your hunger.", NamedTextColor.DARK_AQUA));
+            return;
         }
+        manager.handleItemConsume(event.getPlayer(), event.getItem());
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -106,6 +111,7 @@ public final class HallsOfCarnageListener implements Listener {
     @EventHandler
     public void onEntityDeath(EntityDeathEvent event) {
         if (manager.isSessionMonster(event.getEntity())) {
+            manager.handleSessionMonsterDeath(event.getEntity(), event.getEntity().getKiller());
             event.getDrops().clear();
             event.setDroppedExp(0);
         }

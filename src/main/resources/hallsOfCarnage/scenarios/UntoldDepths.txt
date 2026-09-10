@@ -24,6 +24,11 @@ allowed-items:
   armor:
     - padded_armor
     - reinforced_chestplate
+  food:
+    - stale_bread
+    - cooked_mycelia
+    - ember_stew
+    - golden_jerky
   utility:
     - smoke_bomb
     - warding_totem

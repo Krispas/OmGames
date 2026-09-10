@@ -1,0 +1,10 @@
+id: cooked_mycelia
+name: "Cooked Mycelia"
+category: food
+rarity: normal
+material: BAKED_POTATO
+max-stack-size: 1
+lore:
+  - "Warm fungal broth in a cracked bottle."
+stats:
+  heal: 5

@@ -13,3 +13,5 @@ loot:
   - item: coin
     weight: 10
     amount: 1-2
+  - item: food
+    weight: 8

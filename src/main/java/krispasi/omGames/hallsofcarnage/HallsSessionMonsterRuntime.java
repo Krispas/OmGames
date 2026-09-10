@@ -8,6 +8,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -21,6 +22,7 @@ import org.bukkit.entity.Creature;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Slime;
 import org.bukkit.entity.Zombie;
@@ -38,6 +40,7 @@ final class HallsSessionMonsterRuntime {
     private final Set<UUID> participants;
     private final Map<String, HallsMonsterType> monsterTypes;
     private final IntSupplier maxSculkSupplier;
+    private final Predicate<UUID> aliveParticipantPredicate;
     private final Set<UUID> spawnedMonsters = new HashSet<>();
     private List<HallsExplorationGenerator.Cell> spawnCells = List.of();
     private List<HallsMonsterType> commonPool = List.of();
@@ -46,23 +49,25 @@ final class HallsSessionMonsterRuntime {
     private BukkitTask spawnTask;
     private int maxAlive;
     private int baseMaxAlive;
-    private int totalSpawnBudget;
     private int spawnedThisFloor;
     private int spawnCooldownTicks;
-    private long floorStartedAtMillis;
+    private int capExtensionCooldownTicks;
+    private int capExtensionIntervalTicks;
 
     HallsSessionMonsterRuntime(JavaPlugin plugin,
                                World world,
                                HallsConfig.BlockPoint origin,
                                Set<UUID> participants,
                                Map<String, HallsMonsterType> monsterTypes,
-                               IntSupplier maxSculkSupplier) {
+                               IntSupplier maxSculkSupplier,
+                               Predicate<UUID> aliveParticipantPredicate) {
         this.plugin = plugin;
         this.world = world;
         this.origin = origin;
         this.participants = participants;
         this.monsterTypes = monsterTypes == null ? Map.of() : Map.copyOf(monsterTypes);
         this.maxSculkSupplier = maxSculkSupplier == null ? () -> 0 : maxSculkSupplier;
+        this.aliveParticipantPredicate = aliveParticipantPredicate == null ? id -> true : aliveParticipantPredicate;
     }
 
     void startExplorationFloor(HallsExplorationGenerator.Plan plan,
@@ -78,8 +83,8 @@ final class HallsSessionMonsterRuntime {
         int rooms = Math.max(1, floor == null ? 1 : floor.rooms());
         this.baseMaxAlive = Math.max(2, Math.min(16, participants.size() + rooms / 4 + difficulty / 15));
         this.maxAlive = baseMaxAlive;
-        this.totalSpawnBudget = Math.max(maxAlive, rooms + difficulty / 3);
-        this.floorStartedAtMillis = System.currentTimeMillis();
+        this.capExtensionIntervalTicks = capExtensionIntervalTicks(difficulty);
+        this.capExtensionCooldownTicks = capExtensionIntervalTicks;
         if (spawnCells.isEmpty() || commonPool.isEmpty()) {
             return;
         }
@@ -105,13 +110,14 @@ final class HallsSessionMonsterRuntime {
         spawnCooldownTicks = 0;
         baseMaxAlive = 0;
         maxAlive = 0;
-        totalSpawnBudget = 0;
+        capExtensionCooldownTicks = 0;
+        capExtensionIntervalTicks = 0;
     }
 
     String debugStatus() {
         pruneDeadMonsters();
         return spawnedMonsters.size() + " alive, cap " + baseMaxAlive + ", extended cap " + maxAlive
-                + ", spawned " + spawnedThisFloor + "/" + totalSpawnBudget;
+                + ", spawned " + spawnedThisFloor + ", next cap +" + Math.max(0, capExtensionCooldownTicks / 20) + "s";
     }
 
     boolean registerSplitMonster(Entity entity) {
@@ -124,7 +130,17 @@ final class HallsSessionMonsterRuntime {
         }
         configureSplitSlime(slime);
         spawnedMonsters.add(slime.getUniqueId());
+        maxAlive++;
         return true;
+    }
+
+    void handleMonsterDeath(LivingEntity entity, Player killer) {
+        if (entity == null || !spawnedMonsters.remove(entity.getUniqueId())) {
+            return;
+        }
+        if (killer != null && participants.contains(killer.getUniqueId()) && aliveParticipantPredicate.test(killer.getUniqueId())) {
+            maxAlive = Math.max(0, maxAlive - 1);
+        }
     }
 
     void alert(Location location) {
@@ -147,19 +163,13 @@ final class HallsSessionMonsterRuntime {
     private void tick() {
         pruneDeadMonsters();
         killMonstersInPits();
-        updateSpawnLimit();
+        updateSpawnCapExtension();
+        updateMonsterTargets();
         spawnCooldownTicks -= 20;
         if (spawnCooldownTicks > 0) {
             return;
         }
         spawnCooldownTicks = SPAWN_INTERVAL_TICKS;
-        if (spawnedThisFloor >= totalSpawnBudget) {
-            if (spawnedMonsters.isEmpty() && spawnTask != null) {
-                spawnTask.cancel();
-                spawnTask = null;
-            }
-            return;
-        }
         if (spawnedMonsters.size() >= maxAlive) {
             return;
         }
@@ -182,7 +192,10 @@ final class HallsSessionMonsterRuntime {
     private void configureLivingMonster(LivingEntity living, HallsMonsterType type) {
         living.customName(Component.text(type.name(), NamedTextColor.DARK_RED));
         living.setCustomNameVisible(false);
-        living.setPersistent(false);
+        living.setPersistent(true);
+        if (living instanceof Mob mob) {
+            mob.setRemoveWhenFarAway(false);
+        }
         living.addScoreboardTag("omgames_hoc_monster");
         AttributeInstance maxHealth = living.getAttribute(Attribute.MAX_HEALTH);
         if (maxHealth != null) {
@@ -202,10 +215,14 @@ final class HallsSessionMonsterRuntime {
             slime.setSize(type.slimeSize());
         }
         applyEquipment(living.getEquipment(), type);
+        if (living instanceof Creature creature) {
+            creature.setTarget(nearestParticipant(living.getLocation(), 96.0));
+        }
     }
 
     private void configureSplitSlime(Slime slime) {
-        slime.setPersistent(false);
+        slime.setPersistent(true);
+        slime.setRemoveWhenFarAway(false);
         slime.addScoreboardTag("omgames_hoc_monster");
         EntityEquipment equipment = slime.getEquipment();
         if (equipment != null) {
@@ -264,6 +281,7 @@ final class HallsSessionMonsterRuntime {
             Entity entity = Bukkit.getEntity(entityId);
             if (entity instanceof LivingEntity living && living.getWorld().equals(world)
                     && living.getLocation().getY() <= origin.y() - 8) {
+                spawnedMonsters.remove(entityId);
                 living.setHealth(0.0);
             }
         }
@@ -332,11 +350,38 @@ final class HallsSessionMonsterRuntime {
         return false;
     }
 
-    private void updateSpawnLimit() {
-        long minutes = Math.max(0L, (System.currentTimeMillis() - floorStartedAtMillis) / 60_000L);
-        int scaled = (int) Math.ceil(baseMaxAlive * (1.0 + minutes * 0.05));
-        maxAlive = Math.max(baseMaxAlive, Math.min(40, scaled));
-        totalSpawnBudget = Math.max(totalSpawnBudget, maxAlive + (int) minutes);
+    private void updateSpawnCapExtension() {
+        if (capExtensionIntervalTicks <= 0) {
+            return;
+        }
+        capExtensionCooldownTicks -= 20;
+        if (capExtensionCooldownTicks > 0) {
+            return;
+        }
+        maxAlive++;
+        capExtensionCooldownTicks = capExtensionIntervalTicks;
+    }
+
+    private void updateMonsterTargets() {
+        for (UUID entityId : Set.copyOf(spawnedMonsters)) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (!(entity instanceof Creature creature) || !creature.getWorld().equals(world)) {
+                continue;
+            }
+            LivingEntity current = creature.getTarget();
+            if (current instanceof Player player
+                    && player.getWorld().equals(world)
+                    && participants.contains(player.getUniqueId())
+                    && aliveParticipantPredicate.test(player.getUniqueId())) {
+                continue;
+            }
+            creature.setTarget(nearestParticipant(creature.getLocation(), 96.0));
+        }
+    }
+
+    private int capExtensionIntervalTicks(int difficulty) {
+        int seconds = Math.max(20, Math.min(120, 120 - difficulty));
+        return seconds * 20;
     }
 
     private Player nearestParticipant(Location location, double radius) {
@@ -344,7 +389,7 @@ final class HallsSessionMonsterRuntime {
         Player best = null;
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
-            if (player == null || !player.getWorld().equals(world)) {
+            if (player == null || !player.getWorld().equals(world) || !aliveParticipantPredicate.test(playerId)) {
                 continue;
             }
             double distance = player.getLocation().distanceSquared(location);

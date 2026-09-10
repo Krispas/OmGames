@@ -202,13 +202,8 @@ final class HallsSessionSculkRuntime {
         if (sculk > 80.0) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 45, 0, true, false, true));
         }
-        if (sculk > 90.0) {
-            player.setFoodLevel(Math.min(player.getFoodLevel(), 16));
-            player.setSaturation(0.0f);
-        } else {
-            player.setFoodLevel(20);
-            player.setSaturation(20.0f);
-        }
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
         if (sculk >= 100.0) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 45, 0, true, false, true));
             player.sendActionBar(Component.text("The sculk has taken hold.", NamedTextColor.DARK_AQUA));

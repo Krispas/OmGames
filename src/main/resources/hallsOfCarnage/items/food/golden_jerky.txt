@@ -1,0 +1,10 @@
+id: golden_jerky
+name: "Golden Jerky"
+category: food
+rarity: rare
+material: GOLDEN_CARROT
+max-stack-size: 1
+lore:
+  - "Preserved with old gold and older luck."
+stats:
+  heal: 12

@@ -131,7 +131,7 @@ public final class HallsSession {
         this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::setBlock, this.trapTypes);
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
-                sculkRuntime::maxSculkPercent);
+                sculkRuntime::maxSculkPercent, this::isAliveParticipant);
     }
 
     public int id() {
@@ -189,6 +189,10 @@ public final class HallsSession {
 
     public boolean registerSplitMonster(Entity entity) {
         return monsterRuntime.registerSplitMonster(entity);
+    }
+
+    public void handleMonsterDeath(org.bukkit.entity.LivingEntity entity, Player killer) {
+        monsterRuntime.handleMonsterDeath(entity, killer);
     }
 
     public boolean handlePhysicsDropPickup(Player player, Entity entity) {
@@ -436,7 +440,33 @@ public final class HallsSession {
     }
 
     public int forcedFoodLevel(Player player) {
-        return sculkRuntime.blocksEating(player) ? 16 : 20;
+        return 20;
+    }
+
+    public boolean handleItemConsume(Player player, ItemStack item) {
+        if (player == null || item == null || !running || !participants.contains(player.getUniqueId())
+                || !player.getWorld().equals(world)) {
+            return false;
+        }
+        if (ghostPlayers.contains(player.getUniqueId())) {
+            return false;
+        }
+        HallsItemType type = itemType(item);
+        if (type == null || !type.category().equals("food")) {
+            return false;
+        }
+        double heal = Math.max(0.0, type.stats().getOrDefault("heal", 0.0));
+        if (heal <= 0.0) {
+            return true;
+        }
+        double maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH) == null
+                ? player.getMaxHealth()
+                : player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
+        double nextHealth = Math.min(maxHealth, player.getHealth() + heal);
+        player.setHealth(nextHealth);
+        world.playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 0.6f, 1.25f);
+        player.sendActionBar(Component.text("Restored " + formatStatAmount(heal) + " health.", NamedTextColor.GREEN));
+        return true;
     }
 
     public void start() throws IOException {
@@ -1364,6 +1394,14 @@ public final class HallsSession {
         return max;
     }
 
+    private boolean isAliveParticipant(UUID playerId) {
+        if (playerId == null || ghostPlayers.contains(playerId)) {
+            return false;
+        }
+        Player player = Bukkit.getPlayer(playerId);
+        return player != null && player.getWorld().equals(world);
+    }
+
     private String formatElapsedSeconds() {
         long elapsedSeconds = Math.max(0L, (System.currentTimeMillis() - startedAtMillis) / 1000L);
         long minutes = elapsedSeconds / 60L;
@@ -1524,11 +1562,12 @@ public final class HallsSession {
             return definedItem(direct, amount);
         }
         return switch (reward) {
-            case "weapon", "armor", "ranged", "utility" -> randomAllowedItem(reward, "normal", amount);
+            case "weapon", "armor", "ranged", "utility", "food" -> randomAllowedItem(reward, "normal", amount);
             case "rare_weapon" -> randomAllowedItem("weapon", "rare", amount);
             case "rare_armor" -> randomAllowedItem("armor", "rare", amount);
             case "rare_ranged" -> randomAllowedItem("ranged", "rare", amount);
             case "rare_utility" -> randomAllowedItem("utility", "rare", amount);
+            case "rare_food" -> randomAllowedItem("food", "rare", amount);
             default -> null;
         };
     }
@@ -1571,6 +1610,22 @@ public final class HallsSession {
 
     private ItemStack definedItem(HallsItemType type, int amount) {
         return HallsItemFactory.create(plugin, type, amount);
+    }
+
+    private HallsItemType itemType(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return null;
+        }
+        String itemId = item.getItemMeta().getPersistentDataContainer()
+                .get(new org.bukkit.NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING);
+        return itemId == null ? null : itemTypes.get(itemId);
+    }
+
+    private String formatStatAmount(double value) {
+        if (Math.rint(value) == value) {
+            return Integer.toString((int) value);
+        }
+        return String.format(java.util.Locale.ROOT, "%.1f", value);
     }
 
     private String scrapRewardId(PropReward reward) {

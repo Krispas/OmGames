@@ -1,0 +1,10 @@
+id: ember_stew
+name: "Ember Stew"
+category: food
+rarity: normal
+material: RABBIT_STEW
+max-stack-size: 1
+lore:
+  - "It burns, then it helps."
+stats:
+  heal: 7

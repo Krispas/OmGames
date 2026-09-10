@@ -113,6 +113,10 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/ranged/storm_crossbow.txt",
             "hallsOfCarnage/items/armors/padded_armor.txt",
             "hallsOfCarnage/items/armors/reinforced_chestplate.txt",
+            "hallsOfCarnage/items/food/stale_bread.txt",
+            "hallsOfCarnage/items/food/cooked_mycelia.txt",
+            "hallsOfCarnage/items/food/ember_stew.txt",
+            "hallsOfCarnage/items/food/golden_jerky.txt",
             "hallsOfCarnage/items/utility/smoke_bomb.txt",
             "hallsOfCarnage/items/utility/warding_totem.txt",
             "hallsOfCarnage/items/blueprints/cooking_pot_blueprint.txt",
@@ -330,6 +334,18 @@ public final class HallsOfCarnageManager {
         return activeSessions.values().stream().anyMatch(session -> session.registerSplitMonster(entity));
     }
 
+    public void handleSessionMonsterDeath(org.bukkit.entity.LivingEntity entity, Player killer) {
+        if (entity == null) {
+            return;
+        }
+        for (HallsSession session : activeSessions.values()) {
+            if (session.isSessionMonster(entity)) {
+                session.handleMonsterDeath(entity, killer);
+                return;
+            }
+        }
+    }
+
     public boolean isActiveSessionParticipant(Player player) {
         if (player == null) {
             return false;
@@ -370,6 +386,15 @@ public final class HallsOfCarnageManager {
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         return session != null && session.handlePlayerDroppedItem(player, itemDrop);
+    }
+
+    public boolean handleItemConsume(Player player, org.bukkit.inventory.ItemStack item) {
+        if (player == null || item == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleItemConsume(player, item);
     }
 
     public boolean handleElevatorButton(Player player, org.bukkit.block.Block block) {
