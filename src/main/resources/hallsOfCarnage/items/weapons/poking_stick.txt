@@ -1,0 +1,14 @@
+id: poking_stick
+name: "Poking Stick"
+category: weapon
+rarity: normal
+material: STONE_SPEAR
+max-stack-size: 1
+lore:
+  - "Pew pew pew!"
+stats:
+  melee-damage: 2
+  attack-speed: 3.0
+  durability: 40
+recipe:
+  wood_scrap: 5

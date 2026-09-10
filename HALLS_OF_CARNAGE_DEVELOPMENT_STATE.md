@@ -248,3 +248,5 @@ Do all for the next slice (keep this line):
 - Reduce warden spawn chance 10 times
 - Push around the sculk punishments, Wardens start spawning at 65, weakness takes hold at 50, slowness at 90
 - When in multiplayer and player is left behind when descending via elevator, after closing the elevator door, wait 5 seconds so the left behind player can see the message without immidietly getting the modifiers message
+- Implement smoke bomb, it will work by clearing targets of all nearby monsters, creating a bunch of particles and making player invisible for some time.
+- Implement warding totem, it will work by giving players in a radius resistance II for 10 seconds

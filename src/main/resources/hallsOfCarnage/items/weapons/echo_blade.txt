@@ -10,8 +10,7 @@ lore:
 stats:
   melee-damage: 8
   attack-speed: 1.8
-  durability: 80
-  shame-reduction: 1
+  durability: 160
 recipe:
   iron_scrap: 12
   diamond_scrap: 5
