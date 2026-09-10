@@ -1,0 +1,4 @@
+id: pillager
+name: "Pillager"
+entity-type: PILLAGER
+health: 20

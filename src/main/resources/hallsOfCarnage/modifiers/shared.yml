@@ -39,7 +39,7 @@ modifiers:
     display-name: "More Sculk"
     weight: 6
     effects:
-      sculk-multiplier: 2.0
+      sculk-multiplier: 3.0
   special_enemy:
     type: bad
     display-name: "Special Enemy"

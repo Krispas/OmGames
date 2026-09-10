@@ -250,3 +250,5 @@ Do all for the next slice (keep this line):
 - The start room guaranteed bluepirnt drop breakable is only spawning sometimes, fix it, tip: all start floors will always be the same, so use that to your advantage.
 - When the game restarts or ends, players take fall damage becouse elevator vanishes before they get teleported, fix that
 - If a game over happens and players are send back to floor one, make it as if a new game started, clearing their inventories, stats and chest.
+- I've added some new monster types into resources, so just telling you incase they need to be added somewhere in code, vindicator, silverfish, pillager, wither_skeleton
+- in resources: remove modifiers from level types, since we already have modifier folder with level type support

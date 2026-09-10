@@ -23,10 +23,14 @@ pillar-palettes:
     special-chance: 0.12
 monsters:
   common:
-    - stray
     - zombie
+    - silverfish
+    - vindicator
+    - slime_medium
   special:
     - bogged
+    - stray
+    - witch
 modifiers:
   shared:
     - free

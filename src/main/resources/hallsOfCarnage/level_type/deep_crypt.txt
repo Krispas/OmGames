@@ -24,9 +24,13 @@ pillar-palettes:
 monsters:
   common:
     - husk
-    - skeleton
-  special:
     - breeze
+    - pillager
+    - silverfish
+  special:
+    - skeleton
+    - parched
+    - wither_skeleton
 modifiers:
   shared:
     - free
