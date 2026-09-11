@@ -42,6 +42,7 @@ final class HallsSessionMonsterRuntime {
     private final IntSupplier maxSculkSupplier;
     private final Predicate<UUID> aliveParticipantPredicate;
     private final Set<UUID> spawnedMonsters = new HashSet<>();
+    private final Map<UUID, Long> concealedParticipants = new java.util.HashMap<>();
     private List<HallsExplorationGenerator.Cell> spawnCells = List.of();
     private List<HallsMonsterType> commonPool = List.of();
     private HallsMonsterType activeSpecialType;
@@ -111,6 +112,7 @@ final class HallsSessionMonsterRuntime {
             }
         }
         spawnedMonsters.clear();
+        concealedParticipants.clear();
         spawnCells = List.of();
         spawnedThisFloor = 0;
         activeSpecialType = null;
@@ -176,6 +178,27 @@ final class HallsSessionMonsterRuntime {
             Entity entity = Bukkit.getEntity(entityId);
             if (entity instanceof Creature creature && creature.getWorld().equals(world)
                     && creature.getLocation().distanceSquared(location) <= radiusSquared) {
+                creature.setTarget(null);
+            }
+        }
+    }
+
+    void concealParticipant(UUID playerId, long durationMillis) {
+        if (playerId == null || durationMillis <= 0L) {
+            return;
+        }
+        concealedParticipants.put(playerId, System.currentTimeMillis() + durationMillis);
+        clearTargetsFor(playerId);
+    }
+
+    private void clearTargetsFor(UUID playerId) {
+        for (UUID entityId : Set.copyOf(spawnedMonsters)) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (!(entity instanceof Creature creature)) {
+                continue;
+            }
+            LivingEntity target = creature.getTarget();
+            if (target instanceof Player player && player.getUniqueId().equals(playerId)) {
                 creature.setTarget(null);
             }
         }
@@ -421,7 +444,9 @@ final class HallsSessionMonsterRuntime {
         Player best = null;
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
-            if (player == null || !player.getWorld().equals(world) || !aliveParticipantPredicate.test(playerId)) {
+            if (player == null || !player.getWorld().equals(world)
+                    || !aliveParticipantPredicate.test(playerId)
+                    || isConcealed(playerId)) {
                 continue;
             }
             double distance = player.getLocation().distanceSquared(location);
@@ -431,6 +456,18 @@ final class HallsSessionMonsterRuntime {
             }
         }
         return best;
+    }
+
+    private boolean isConcealed(UUID playerId) {
+        Long until = concealedParticipants.get(playerId);
+        if (until == null) {
+            return false;
+        }
+        if (until <= System.currentTimeMillis()) {
+            concealedParticipants.remove(playerId);
+            return false;
+        }
+        return true;
     }
 
     private List<HallsMonsterType> monsterPool(List<String> ids) {

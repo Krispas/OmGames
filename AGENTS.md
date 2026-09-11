@@ -1317,7 +1317,7 @@ SQLite tables:
 - Breakable loot pools live in `breakable_loot_pools/` by rarity; existing per-breakable `loot` entries are still parsed for compatibility and override the rarity pool for that breakable.
 - Generic breakable loot entries `scrap` / `random_scrap` choose randomly from that breakable's configured `scrap-drops`.
 - Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
-- Exploration floors force exactly one rare breakable prop when a rare breakable archetype is available, and normal generated prop slots should use common breakables.
+- Exploration floors force exactly one rare breakable prop in a random generated room when a rare breakable archetype is available, and normal generated prop slots should use common breakables.
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, an unused-for-now `recipe` scrap cost map, and an optional `stats` map.
 - Armor `item-model` controls the item icon/model; armor `armor-model` is written to Paper's equippable component for the worn armor model.
@@ -1329,7 +1329,7 @@ SQLite tables:
 - Building files define `id`, `name`, `size` (`small`, `medium`, `large`), `blueprint`, `implemented`, and `levels.<1|2|3>` with display `parts`, optional `upgrade-cost` stored-scrap requirements, and optional `interaction.give-items` outputs.
 - Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker.
 - Camp buildings can be upgraded to level 3 by sneak-right-clicking the built plot. Current building state is session-local and is not yet persisted across save files or game-over restarts.
-- Camp floors connect the elevator corridor to the nearest open north-edge layout cell instead of assuming the layout center is open.
+- Camp floors connect the elevator corridor to the nearest open north-edge layout cell instead of assuming the layout center is open, and should keep the camp room far enough from the elevator to allow a walkable connector with a sealed corridor-height entrance.
 - Item recipes are parsed for future crafting stations but should not be rendered directly on item lore.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility. `melee-damage`, `attack-speed`, and `durability` are also applied to item meta where Bukkit/Paper exposes the relevant component APIs.
 - `vagabonds_club` is the default starter weapon. Every participant receives it when a Halls run starts or fully restarts after game over.
@@ -1343,8 +1343,8 @@ SQLite tables:
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
 - Halls food items are catalog items with category `food`; `stats.heal` restores health when consumed while hunger remains locked full.
-- Halls utility `smoke_bomb` clears nearby session monster targets, emits smoke, applies temporary invisibility, and consumes the item on right-click.
-- Halls utility `warding_totem` gives nearby alive participants Resistance II for 10 seconds and consumes the item on right-click.
+- Halls utility `smoke_bomb` clears nearby session monster targets, conceals the user from monster target selection for its duration, emits smoke, applies temporary invisibility, and uses a per-player cooldown instead of being consumed on right-click.
+- Halls utility `warding_totem` gives nearby alive participants Resistance II for 10 seconds and uses a per-player cooldown instead of being consumed on right-click.
 - Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.
 - Elevator scrap deposit consumes only the currently selected hotbar stack, not every scrap item in the player hotbar/offhand.
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
@@ -1383,7 +1383,7 @@ SQLite tables:
 - Exploration floor scenario field `traps-per-room.min` / `traps-per-room.max` controls how many normal traps Java attempts inside each trapped room.
 - Hole/pit generation is controlled separately by scenario floor field `holes`.
 - Sculk patch generation is controlled separately by scenario floor field `sculk-patches`.
-- Sculk patches convert floor blocks to sculk and place sculk veins in air; participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/eating-block/darkness thresholds.
+- Sculk patches convert floor blocks to sculk and place sculk veins in air; participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/eating-block/darkness thresholds. Sculk generation must avoid trap-reserved cells, including carved pit cells.
 - Sculk pressure should rise gradually, not spike during short crossings; generated sculk patches may attach veins to floors, walls, and ceilings, but sculk veins must only enable faces attached to solid neighbor blocks and must stay inside generated walkable floor bounds.
 - Sculk pressure at 50% applies Weakness I, at 90% applies Slowness I and blocks consumption directly, and at 100% applies Darkness I; it should not lower the player's hunger bar.
 - Halls ghost mode is Adventure-mode invisible player state, not spectator mode. A lethal hit drops the player's carried gear as session physics drops, blocks inventory/pickup interactions, and revives the player on the next floor.

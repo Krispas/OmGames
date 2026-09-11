@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-10
+Last updated: 2026-09-11
 
 ## Implemented
 
@@ -255,13 +255,13 @@ This is the first implementation slice. It focuses on:
 - Cooking Pot, Weapon Bench, Armory, and Mycelia Farm have first-pass active outputs that place configured catalog items into an open hotbar slot. Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers are buildable/upgradable decorative placeholders for now.
 - `/hoc reset confirm` now also resets bundled `buildings/` resources, and `AGENTS.md` documents the new camp/building resource schemas.
 - Next development slice applied: breakable and camp building display parts now parse optional `block-data` plus `rotation`/`euler` degrees, building part offsets rotate with the camp plot facing marker, and the bundled elevator drill/chair resources exercise the new fields. Camp floors now connect the elevator corridor to the nearest open north-edge cell instead of blindly opening the layout center, elevator door bars force east-west connectivity when placed, and the session floor cleanup height was raised to catch leftover high blocks.
+- Next development slice applied: camp floors now spawn several blocks farther from the elevator and carve a 3-wide, 3-block-high north entrance with solid header blocks so the connector is walkable without exposing out-of-bounds space above the doorway.
+- Smoke Bomb and Warding Totem are now reusable utility items with per-player cooldowns from item stats instead of being consumed on use. Smoke Bomb also conceals the user from session monster target selection for its configured duration, so nearby monsters do not immediately reacquire the same player.
+- Exploration floors now choose the forced rare breakable room randomly per floor instead of always using the first generated room.
+- Sculk patch generation now excludes trap-reserved cells, including carved pit cells, so sculk blocks do not regenerate floor surfaces inside holes after trap rendering.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice (do not remove this line):
-- The camp corridor now doesnt connect to the wall, but cannot be walked through, if you need space, just put the room a few blocks further from the elevator, if its a corridor gen problem, fix it, also the entrance to the room has missing block above the corridor, making it possible to look out of bounds
-- Utility items like smoke bomb and warding totem should have unlimited uses with cooldown
-- Even after using smoke bomb, the monsters are still locked onto me
-- The rare breakable is always in the first room, change that
 - Upgrading building shouldnt be a shift action, instead each building should open a GUI after interacting, where should be its functionality, upgrade/destroy button.
 - Armory, Cooking pot and weapon bench should work more like a crafting station, in their UI will be a list of recipes player can craft at it.
 - - The items which can be crafted there should be specified in the scenario file, this way different scenarios can have different locked items, the items in the file should have 3 categories based on which level the recipe can be crafted
@@ -270,7 +270,6 @@ For the next slice (do not remove this line):
 - Add various meal items, they are like a better food granting various temporary buffs crafted at the cooking pot. The recipes cooking pot can cook should be in the scenario file
 - Add a recipe for cooked_mycelia as it can be cooking pot recipe
 - All meals are rare food items.
-- Sculk blocks shouldnt generate in holes
 
 Future (not this slice):
 - Continue camp work by adding persistent camp/save-file state so built buildings survive game-over restarts and later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.

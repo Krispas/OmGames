@@ -48,7 +48,8 @@ public final class HallsCampFloorBuilder {
         for (int z = -1; z <= layout.depth(); z++) {
             for (int x = -1; x <= layout.width(); x++) {
                 boolean border = x < 0 || z < 0 || x >= layout.width() || z >= layout.depth();
-                boolean opening = border && z == -1 && x == northOpeningX;
+                boolean opening = border && z == -1 && x >= 0 && x < layout.width()
+                        && Math.abs(x - northOpeningX) <= 1;
                 boolean wall = !opening && (border || layout.at(x, z) == 'X');
                 int blockX = startX + x;
                 int blockZ = startZ + z;
@@ -56,7 +57,8 @@ public final class HallsCampFloorBuilder {
                 blockPlacer.setBlock(blockX, y - 1, blockZ, wall ? wallMaterial : levelType.floor());
                 blockPlacer.setBlock(blockX, y + ROOM_HEIGHT, blockZ, levelType.ceiling());
                 for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
-                    blockPlacer.setBlock(blockX, y + dy, blockZ, wall ? wallMaterial : Material.AIR);
+                    boolean openingHeader = opening && dy >= 3;
+                    blockPlacer.setBlock(blockX, y + dy, blockZ, wall || openingHeader ? wallMaterial : Material.AIR);
                 }
             }
         }

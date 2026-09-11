@@ -50,7 +50,8 @@ final class HallsSessionSculkRuntime {
 
     Set<HallsExplorationGenerator.Cell> placePatches(HallsExplorationGenerator.Plan plan,
                                                      HallsScenario.FloorDefinition floor,
-                                                     Random random) {
+                                                     Random random,
+                                                     Set<HallsExplorationGenerator.Cell> blockedCells) {
         clearFloor();
         if (plan == null || plan.walkableCells().isEmpty() || floor == null || floor.sculkPatches() <= 0) {
             startTicking();
@@ -63,7 +64,17 @@ final class HallsSessionSculkRuntime {
             startTicking();
             return Set.of();
         }
-        Set<HallsExplorationGenerator.Cell> validCells = Set.copyOf(plan.walkableCells());
+        Set<HallsExplorationGenerator.Cell> validCells = new HashSet<>(plan.walkableCells());
+        if (blockedCells != null) {
+            validCells.removeAll(blockedCells);
+        }
+        cells = cells.stream()
+                .filter(validCells::contains)
+                .toList();
+        if (cells.isEmpty()) {
+            startTicking();
+            return Set.of();
+        }
         for (int i = 0; i < floor.sculkPatches(); i++) {
             HallsExplorationGenerator.Cell center = cells.get(random.nextInt(cells.size()));
             int radius = 3 + random.nextInt(5);

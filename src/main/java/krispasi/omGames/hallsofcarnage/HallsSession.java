@@ -80,6 +80,7 @@ public final class HallsSession {
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
+    private final Map<String, Long> utilityCooldowns = new HashMap<>();
     private final HallsSessionTrapRuntime trapRuntime;
     private final HallsSessionMonsterRuntime monsterRuntime;
     private final HallsSessionSculkRuntime sculkRuntime;
@@ -501,13 +502,19 @@ public final class HallsSession {
         }
         return switch (type.id()) {
             case "smoke_bomb" -> {
+                if (isUtilityOnCooldown(player, type)) {
+                    yield true;
+                }
                 activateSmokeBomb(player, type);
-                consumeOneHeldItem(player);
+                applyUtilityCooldown(player, type);
                 yield true;
             }
             case "warding_totem" -> {
+                if (isUtilityOnCooldown(player, type)) {
+                    yield true;
+                }
                 activateWardingTotem(player, type);
-                consumeOneHeldItem(player);
+                applyUtilityCooldown(player, type);
                 yield true;
             }
             default -> false;
@@ -660,7 +667,7 @@ public final class HallsSession {
         renderExplorationRooms(build);
         renderExplorationCorridors(build);
         Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build);
-        renderExplorationSculk(build);
+        renderExplorationSculk(build, reservedCells);
         renderExplorationContents(build, reservedCells);
         startExplorationMonsters(build);
         restoreElevatorChestContents();
@@ -693,7 +700,7 @@ public final class HallsSession {
         currentFloor = floor;
         floorStartedAtMillis = System.currentTimeMillis();
         int roomStartX = origin.x() - layout.width() / 2;
-        int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
+        int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 10;
         int entranceX = nearestCampEntranceX(layout, origin.x() - roomStartX);
         new HallsCampFloorBuilder(this::setBlock, campRuntime).build(layout, roomStartX, origin.y(), roomStartZ,
                 levelType, entranceX);
@@ -902,10 +909,25 @@ public final class HallsSession {
     }
 
     private void renderExplorationContents(ExplorationBuild build, Set<HallsExplorationGenerator.Cell> reservedCells) {
+        int rareRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
         for (int i = 0; i < build.plan().rooms().size(); i++) {
             placeGeneratedRoomContents(build.plan().rooms().get(i), build.random(), build.floor(), i,
-                    build.floorDefinition(), build.levelType(), reservedCells, i == 0);
+                    build.floorDefinition(), build.levelType(), reservedCells, i == rareRoomIndex);
         }
+    }
+
+    private int rareBreakableRoomIndex(HallsExplorationGenerator.Plan plan,
+                                       Set<HallsExplorationGenerator.Cell> reservedCells,
+                                       Random random) {
+        List<Integer> candidates = new ArrayList<>();
+        for (int i = 0; i < plan.rooms().size(); i++) {
+            HallsExplorationGenerator.Room room = plan.rooms().get(i);
+            Set<HallsExplorationGenerator.Cell> usedCells = new HashSet<>();
+            if (randomFreeContentCell(openInteriorCells(room), room, random, reservedCells, usedCells) != null) {
+                candidates.add(i);
+            }
+        }
+        return candidates.isEmpty() ? -1 : candidates.get(random.nextInt(candidates.size()));
     }
 
     private void startExplorationMonsters(ExplorationBuild build) {
@@ -916,12 +938,12 @@ public final class HallsSession {
         monsterRuntime.startExplorationFloor(build.plan(), build.floorDefinition(), build.levelType(), activeFloorModifiers, build.random());
     }
 
-    private void renderExplorationSculk(ExplorationBuild build) {
+    private void renderExplorationSculk(ExplorationBuild build, Set<HallsExplorationGenerator.Cell> reservedCells) {
         if (build == null || build.plan().rooms().isEmpty()) {
             sculkRuntime.clearFloor();
             return;
         }
-        sculkRuntime.placePatches(build.plan(), build.floorDefinition(), build.random());
+        sculkRuntime.placePatches(build.plan(), build.floorDefinition(), build.random(), reservedCells);
     }
 
     private Random floorRandom() {
@@ -2002,6 +2024,7 @@ public final class HallsSession {
     private void activateSmokeBomb(Player player, HallsItemType type) {
         double radius = Math.max(6.0, type.stats().getOrDefault("radius", 10.0));
         int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("duration_seconds", 6.0) * 20.0));
+        monsterRuntime.concealParticipant(player.getUniqueId(), durationTicks * 50L);
         monsterRuntime.clearTargetsNear(player.getLocation(), radius);
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, durationTicks, 0, true, false, true));
         world.spawnParticle(Particle.CAMPFIRE_COSY_SMOKE, player.getLocation().add(0.0, 1.0, 0.0),
@@ -2027,6 +2050,29 @@ public final class HallsSession {
         world.spawnParticle(Particle.TOTEM_OF_UNDYING, player.getLocation().add(0.0, 1.0, 0.0),
                 80, radius * 0.22, 0.9, radius * 0.22, 0.08);
         world.playSound(player.getLocation(), Sound.ITEM_TOTEM_USE, 0.85f, 1.15f);
+    }
+
+    private boolean isUtilityOnCooldown(Player player, HallsItemType type) {
+        long remainingMillis = utilityCooldowns.getOrDefault(utilityCooldownKey(player, type), 0L) - System.currentTimeMillis();
+        if (remainingMillis <= 0L) {
+            return false;
+        }
+        player.sendActionBar(Component.text(type.name() + " is cooling down: "
+                + Math.max(1L, (remainingMillis + 999L) / 1000L) + "s.", NamedTextColor.YELLOW));
+        return true;
+    }
+
+    private void applyUtilityCooldown(Player player, HallsItemType type) {
+        int cooldownTicks = Math.max(0, (int) Math.round(type.stats().getOrDefault("cooldown_seconds", 0.0) * 20.0));
+        if (cooldownTicks <= 0) {
+            return;
+        }
+        utilityCooldowns.put(utilityCooldownKey(player, type), System.currentTimeMillis() + cooldownTicks * 50L);
+        player.setCooldown(type.material(), cooldownTicks);
+    }
+
+    private String utilityCooldownKey(Player player, HallsItemType type) {
+        return player.getUniqueId() + ":" + type.id();
     }
 
     private void consumeOneHeldItem(Player player) {
@@ -2404,6 +2450,7 @@ public final class HallsSession {
         coins = 0;
         activeFloorModifiers = HallsFloorModifiers.none();
         compassTrailCountdown = 0;
+        utilityCooldowns.clear();
         sculkRuntime.clearAll();
     }
 
@@ -2767,6 +2814,7 @@ public final class HallsSession {
         private int roomIndex;
         private int corridorIndex;
         private int contentRoomIndex;
+        private int rareBreakableRoomIndex = -1;
         private int ticksElapsed;
         private ExplorationBuild build;
         private List<HallsExplorationGenerator.Cell> corridorShellCells = List.of();
@@ -2846,7 +2894,8 @@ public final class HallsSession {
 
         private void buildTraps() {
             reservedCells = renderExplorationTraps(build);
-            renderExplorationSculk(build);
+            renderExplorationSculk(build, reservedCells);
+            rareBreakableRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
             stage = 6;
         }
 
@@ -2857,7 +2906,8 @@ public final class HallsSession {
                 return;
             }
             placeGeneratedRoomContents(build.plan().rooms().get(contentRoomIndex), build.random(), build.floor(),
-                    contentRoomIndex, build.floorDefinition(), build.levelType(), reservedCells, contentRoomIndex == 0);
+                    contentRoomIndex, build.floorDefinition(), build.levelType(), reservedCells,
+                    contentRoomIndex == rareBreakableRoomIndex);
             contentRoomIndex++;
         }
 
