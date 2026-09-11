@@ -149,7 +149,7 @@ This is the first implementation slice. It focuses on:
 - Camp building upgrade-button lore now shows upgrade costs and practical effects, including newly unlocked crafting-station recipes and Mycelia Farm harvest changes.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-For the next slice (do not remove this line):
+For the next slice (do not remove this line, do all for the next slice):
 - Camp is missing using the normal block pallete of the level type
 - All buildings have an offset and are not centered, its a half block offset on both axis.
 
