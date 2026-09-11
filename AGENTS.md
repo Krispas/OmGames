@@ -1334,7 +1334,10 @@ SQLite tables:
 - The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, elevator chest contents, stored scrap/coins, and visited camp plot building state including building id, level, and harvest counters.
 - Save snapshots are created/overwritten when a campaign starts, when the elevator leaves a floor, when arriving at a camp floor, when game-over restarts the run at floor 1, and when the host uses `/hoc leave`.
 - `/hoc leave` is player-only, does not require OP, and only the active session host can use it to save and end the session.
-- The lobby villager save/load/session-settings GUI flow is not implemented yet; existing `/hoc start` remains the direct development start path.
+- The lobby villager opens a GUI flow for New Campaign, Load Save, scenario selection, difficulty selection, and session settings.
+- New campaign session settings can toggle online players currently in the Halls lobby, then start the run.
+- Load Save lists save files containing the clicking player and requires every saved participant to be online in the Halls lobby and outside other Halls sessions before restoring the save.
+- Difficulty options are Normal/Hard/Extreme with multipliers `1.0`, `1.5`, and `2.0`; the first-pass implementation scales floor difficulty, coin quota, trapped-room count, holes, and sculk patch count.
 - Camp floors connect the elevator corridor to the nearest open north-edge layout cell instead of assuming the layout center is open, and should keep the camp room far enough from the elevator to allow a walkable connector with a sealed corridor-height entrance.
 - Item recipes are parsed as stored-scrap and hotbar item costs. Cooking Pot, Weapon Bench, and Armory list scenario-unlocked recipes by station level and craft them from their building GUI.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility. `melee-damage`, `attack-speed`, and `durability` are also applied to item meta where Bukkit/Paper exposes the relevant component APIs.

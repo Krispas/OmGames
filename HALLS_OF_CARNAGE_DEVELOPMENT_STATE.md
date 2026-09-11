@@ -155,14 +155,17 @@ This is the first implementation slice. It focuses on:
 - Save snapshots currently record schema version, save reason, scenario id, host UUID, current floor, active level type, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, elevator transfer chest contents, stored scrap/coins, and visited camp plot building state with level/harvest counters.
 - Saves are created/overwritten when a campaign starts, when the elevator leaves a floor, when a camp floor is reached, when game-over restarts the run at floor 1, and when the host uses `/hoc leave`.
 - `/hoc leave` is now a player-only non-OP command for the active session host; it saves the run, ends the session, and returns participants through normal session cleanup.
+- Next development slice applied: the Halls lobby villager now opens a multi-step GUI flow with New Campaign, Load Save, scenario selection, difficulty selection, and session settings.
+- New campaigns choose Normal/Hard/Extreme difficulty, then session settings can toggle online players currently in the Halls lobby before starting.
+- Difficulty is stored in save files and currently scales first-pass floor difficulty, coin quota, trapped-room count, holes, and sculk patch count by 1.0/1.5/2.0.
+- Load Save lists YAML saves that include the clicking player, requires every saved participant to be online in the Halls lobby and not already in a session, then restores the saved floor, player hotbar/armor/offhand inventories, ghost flags, elevator chest, stored scrap/coins, and saved camp plot state.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice (do not remove this line, do all for the next slice):
-When right clicking the lobby villager, player will have a choice to start a new campaign or load a savefile. Creating new campaign will present you with options of scenarios and difficulty option. Once done, it will send player to session settings.
-Clicking load will show the list of players save files. Clicking a savefile sends him to session settings.
-Difficulty has 3 optiosn, normal, hard and extreme. The difficulty chosen adds a first pass modifier for the difficulty of the scenarios floors. The modifiers are as follow (1.0, 1.5, 2.0)
-Session settings - a place where session is being finalized, here player can pick any players currently within the lobby to jump into the game with. Then the player can click play button, which loads/starts the game.
-- Savefile loading is not implemented yet; current saves are write-only scaffolding for the next GUI/load slice.
+- Mycelia farm does not regenerate when players get game over
+- Sculk stat should not be shared, each player should have its own
+- Small build spots are still not centered, the onse facing east have the model centered -1 on Z axis, on large west, it is -1 on X axis and on south medium it is -1 on both X and Z axis
+- In howling corridors corridor type, make it so that if corridor were to lead nowhere (it is dead), it will not generate
 
 Future (not this slice):
 - Continue camp work by loading persistent camp/save-file state so built buildings survive later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.

@@ -79,6 +79,9 @@ public final class HallsSession {
     private final Map<String, HallsBuildingType> buildingTypes;
     private final Set<UUID> participants;
     private final UUID hostId;
+    private final String difficultyId;
+    private final double difficultyMultiplier;
+    private final HallsSaveData initialSave;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
@@ -127,6 +130,9 @@ public final class HallsSession {
                         Map<String, HallsModifierType> modifierTypes,
                         Map<String, HallsBuildingType> buildingTypes,
                         UUID hostId,
+                        String difficultyId,
+                        double difficultyMultiplier,
+                        HallsSaveData initialSave,
                         List<Player> players) {
         this.plugin = plugin;
         this.id = id;
@@ -142,6 +148,9 @@ public final class HallsSession {
         this.modifierTypes = modifierTypes == null ? Map.of() : Map.copyOf(modifierTypes);
         this.buildingTypes = buildingTypes == null ? Map.of() : Map.copyOf(buildingTypes);
         this.hostId = hostId;
+        this.difficultyId = normalizeId(difficultyId == null || difficultyId.isBlank() ? "normal" : difficultyId);
+        this.difficultyMultiplier = Math.max(1.0, difficultyMultiplier);
+        this.initialSave = initialSave;
         this.participants = new HashSet<>();
         for (Player player : players) {
             participants.add(player.getUniqueId());
@@ -574,13 +583,24 @@ public final class HallsSession {
         if (running) {
             return;
         }
-        buildStartArea();
+        if (initialSave == null) {
+            resetRunState();
+            buildStartArea();
+        } else {
+            restoreSavedSessionState(initialSave);
+            int floor = Math.max(1, Math.min(scenario.floorCount(), initialSave.currentFloor()));
+            if (floor == 1) {
+                buildStartArea();
+                restoreElevatorChestContents();
+            } else {
+                buildFloor(floor);
+            }
+        }
         openElevatorDoors();
         running = true;
         startedAtMillis = System.currentTimeMillis();
         floorStartedAtMillis = startedAtMillis;
         startHudTask();
-        resetRunState();
         Location spawn = startRoomSpawn == null ? elevatorSpawnLocation() : startRoomSpawn;
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
@@ -593,10 +613,18 @@ public final class HallsSession {
             setPlayerElevatorRespawn(player);
             player.getInventory().clear();
             applyInventoryLimit(player);
-            giveStarterItem(player);
+            if (initialSave == null) {
+                giveStarterItem(player);
+            } else {
+                restoreSavedPlayer(player, initialSave.players().get(playerId));
+                if (initialSave.players().get(playerId) != null && initialSave.players().get(playerId).ghost()) {
+                    ghostPlayers.add(playerId);
+                    applyGhostState(player);
+                }
+            }
             teleportSessionPlayer(player, spawn);
-            player.sendTitle("Entering " + scenario.name(), "Floor 1", 0, 45, 15);
-            player.sendMessage(Component.text("Entering " + scenario.name() + " floor 1.", NamedTextColor.DARK_RED));
+            player.sendTitle("Entering " + scenario.name(), "Floor " + currentFloor, 0, 45, 15);
+            player.sendMessage(Component.text("Entering " + scenario.name() + " floor " + currentFloor + ".", NamedTextColor.DARK_RED));
         }
         save("campaign-start");
     }
@@ -889,7 +917,7 @@ public final class HallsSession {
     }
 
     private ExplorationBuild planExplorationBuild(int floor) {
-        HallsScenario.FloorDefinition rawFloorDefinition = scenario.floor(floor);
+        HallsScenario.FloorDefinition rawFloorDefinition = adjustedDifficulty(scenario.floor(floor));
         HallsLevelType levelType = levelTypeFor(rawFloorDefinition);
         Random random = floorRandom();
         activeFloorModifiers = selectFloorModifiers(rawFloorDefinition, levelType, random);
@@ -1809,7 +1837,34 @@ public final class HallsSession {
     }
 
     private int currentCoinQuota() {
-        return scenario.floor(currentFloor).coinQuota();
+        return adjustedDifficulty(scenario.floor(currentFloor)).coinQuota();
+    }
+
+    private HallsScenario.FloorDefinition adjustedDifficulty(HallsScenario.FloorDefinition floor) {
+        if (floor == null || difficultyMultiplier <= 1.0) {
+            return floor;
+        }
+        int difficulty = Math.max(0, (int) Math.round(parseDifficulty(floor.difficulty(), floor.firstFloor()) * difficultyMultiplier));
+        int trappedRooms = Math.max(0, (int) Math.round(floor.trappedRooms() * difficultyMultiplier));
+        int holes = Math.max(0, (int) Math.round(floor.holes() * difficultyMultiplier));
+        int sculkPatches = Math.max(0, (int) Math.round(floor.sculkPatches() * difficultyMultiplier));
+        int coinQuota = Math.max(0, (int) Math.round(floor.coinQuota() * difficultyMultiplier));
+        return new HallsScenario.FloorDefinition(
+                floor.firstFloor(),
+                floor.lastFloor(),
+                floor.kind(),
+                floor.levelType(),
+                Integer.toString(difficulty),
+                floor.rooms(),
+                floor.items(),
+                floor.breakables(),
+                trappedRooms,
+                floor.minTrapsPerRoom(),
+                floor.maxTrapsPerRoom(),
+                holes,
+                sculkPatches,
+                coinQuota,
+                floor.layout());
     }
 
     private int multipliedCoins(int amount) {
@@ -2626,6 +2681,8 @@ public final class HallsSession {
             yaml.set("reason", reason);
             yaml.set("scenario", scenario.id());
             yaml.set("host", hostId.toString());
+            yaml.set("difficulty.id", difficultyId);
+            yaml.set("difficulty.multiplier", difficultyMultiplier);
             yaml.set("current-floor", currentFloor);
             yaml.set("active-level-type", activeLevelTypeId);
             yaml.set("saved-at", System.currentTimeMillis());
@@ -2642,6 +2699,49 @@ public final class HallsSession {
         } catch (IOException | RuntimeException ex) {
             plugin.getLogger().warning("Failed to save Halls session " + id + ": " + ex.getMessage());
         }
+    }
+
+    private void restoreSavedSessionState(HallsSaveData save) {
+        ghostPlayers.clear();
+        savedCampStates.clear();
+        savedCampStates.putAll(save.camps());
+        elevatorChestContents = cloneArray(save.elevatorChest(), 27);
+        elevatorChestSnapshotLocked = true;
+        woodScrap = Math.max(0, save.woodScrap());
+        ironScrap = Math.max(0, save.ironScrap());
+        diamondScrap = Math.max(0, save.diamondScrap());
+        redstoneScrap = Math.max(0, save.redstoneScrap());
+        coins = Math.max(0, save.coins());
+        activeFloorModifiers = HallsFloorModifiers.none();
+        compassTrailCountdown = 0;
+        utilityCooldowns.clear();
+        sculkRuntime.clearAll();
+    }
+
+    private void restoreSavedPlayer(Player player, HallsSaveData.PlayerState state) {
+        if (player == null || state == null) {
+            return;
+        }
+        PlayerInventory inventory = player.getInventory();
+        inventory.clear();
+        for (int slot = 0; slot <= 8 && slot < state.hotbar().length; slot++) {
+            inventory.setItem(slot, cloneOrNull(state.hotbar()[slot]));
+        }
+        ItemStack[] armor = cloneArray(state.armor(), 4);
+        inventory.setArmorContents(armor);
+        inventory.setItemInOffHand(cloneOrNull(state.offhand()));
+        applyInventoryLimit(player);
+    }
+
+    private ItemStack[] cloneArray(ItemStack[] source, int size) {
+        ItemStack[] copy = new ItemStack[size];
+        if (source == null) {
+            return copy;
+        }
+        for (int i = 0; i < Math.min(source.length, size); i++) {
+            copy[i] = cloneOrNull(source[i]);
+        }
+        return copy;
     }
 
     private void savePlayers(YamlConfiguration yaml) {

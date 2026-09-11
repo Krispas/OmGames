@@ -207,8 +207,7 @@ public final class HallsOfCarnageListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onInventoryClick(InventoryClickEvent event) {
-        if (HallsMainMenu.isMenu(event.getInventory())) {
-            event.setCancelled(true);
+        if (manager.handleMainMenuClick(event)) {
             return;
         }
         if (manager.handleCampInventoryClick(event)) {
