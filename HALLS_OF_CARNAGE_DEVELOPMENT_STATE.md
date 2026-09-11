@@ -169,6 +169,7 @@ Do all following for the next slice (and keep this line):
 - Sculk purifier should be one time use per run same as mycelia farm. Also make it so all remove less sculk, but have 3 charges per run. The player who uses the charge is the only player who receives the purification.
 - Implement the grindstone. Make it so it increases the damage of the selected weapon.
 - Also implement a completely new building called Forge. It can be used to repair durability to an item in % of the total durability. 30% * level of the building. Once again, this building has a single charge per run and it is of medium size.
+- Elevator chest is not getting saved in the save file
 
 Future (not this slice):
 - Continue camp work by replacing the decorative placeholder behavior for Grindstone, Elevator Drill, Scanner, and Bounty Board with their real GDD effects.
