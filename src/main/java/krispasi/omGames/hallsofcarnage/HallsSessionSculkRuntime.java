@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -34,18 +35,21 @@ final class HallsSessionSculkRuntime {
     private final Set<HallsExplorationGenerator.Cell> patchCells = new HashSet<>();
     private final List<Patch> patches = new java.util.ArrayList<>();
     private final Map<UUID, Double> playerSculk = new HashMap<>();
+    private final Predicate<UUID> canGainSculk;
     private BukkitTask tickTask;
 
     HallsSessionSculkRuntime(JavaPlugin plugin,
                              World world,
                              HallsConfig.BlockPoint origin,
                              Set<UUID> participants,
-                             BlockSetter blockSetter) {
+                             BlockSetter blockSetter,
+                             Predicate<UUID> canGainSculk) {
         this.plugin = plugin;
         this.world = world;
         this.origin = origin;
         this.participants = participants;
         this.blockSetter = blockSetter;
+        this.canGainSculk = canGainSculk == null ? (playerId -> true) : canGainSculk;
     }
 
     Set<HallsExplorationGenerator.Cell> placePatches(HallsExplorationGenerator.Plan plan,
@@ -189,6 +193,9 @@ final class HallsSessionSculkRuntime {
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player == null || !player.getWorld().equals(world)) {
+                continue;
+            }
+            if (!canGainSculk.test(playerId)) {
                 continue;
             }
             boolean inSculk = isInSculk(player.getLocation());

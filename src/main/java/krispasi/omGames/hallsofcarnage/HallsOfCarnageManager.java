@@ -893,6 +893,7 @@ public final class HallsOfCarnageManager {
                 getDataFolder(), levelTypes, breakableTypes, itemTypes, trapTypes, monsterTypes, modifierTypes,
                 buildingTypes, hostId, selectedDifficulty.id(), selectedDifficulty.multiplier(), saveData, players);
         try {
+            closeOpenHallsMenus(players);
             session.start();
         } catch (IOException ex) {
             session.stop(null);
@@ -905,6 +906,17 @@ public final class HallsOfCarnageManager {
         return Result.ok((saveData == null ? "Started" : "Loaded") + " Halls session " + sessionId
                 + " for " + scenario.name() + " with "
                 + players.size() + " player" + (players.size() == 1 ? "" : "s") + ".");
+    }
+
+    private void closeOpenHallsMenus(List<Player> players) {
+        if (players == null) {
+            return;
+        }
+        for (Player player : players) {
+            if (player != null && HallsMainMenu.isMenu(player.getOpenInventory().getTopInventory())) {
+                player.closeInventory();
+            }
+        }
     }
 
     public Result leaveSession(Player player) {

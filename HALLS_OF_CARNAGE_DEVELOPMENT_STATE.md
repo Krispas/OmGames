@@ -130,7 +130,7 @@ This is the first implementation slice. It focuses on:
 - Halls building definitions now load from `plugins/OmGames/HallsOfCarnage/buildings/` and are seeded from bundled defaults for all current blueprint families.
 - Building files define size, blueprint id, implemented flag, level display parts, optional stored-scrap upgrade costs, and optional `interaction.give-items` outputs.
 - Right-clicking a camp plot with a matching blueprint consumes it and spawns the configured level-1 building display. Right-clicking a built plot opens its camp building GUI for functionality, upgrades, and destruction.
-- Cooking Pot, Weapon Bench, Armory, Mycelia Farm, Storage Lockers, Sculk Purifiers, Grindstone, and Forge have first-pass active camp behavior. Elevator Drill, Scanner, and Bounty Board are buildable/upgradable decorative placeholders for now.
+- Cooking Pot, Weapon Bench, Armory, Mycelia Farm, Storage Lockers, Sculk Purifiers, Grindstone, Forge, Elevator Drill, and Scanner have first-pass active camp behavior. Bounty Board is buildable/upgradable decorative placeholder for now.
 - `/hoc reset confirm` now also resets bundled `buildings/` resources, and `AGENTS.md` documents the new camp/building resource schemas.
 - Next development slice applied: breakable and camp building display parts now parse optional `block-data` plus `rotation`/`euler` degrees, building part offsets rotate with the camp plot facing marker, and the bundled elevator drill/chair resources exercise the new fields. Camp floors now connect the elevator corridor to the nearest open north-edge cell instead of blindly opening the layout center, elevator door bars force east-west connectivity when placed, and the session floor cleanup height was raised to catch leftover high blocks.
 - Next development slice applied: camp floors now spawn several blocks farther from the elevator and carve a 3-wide, 3-block-high north entrance with solid header blocks so the connector is walkable without exposing out-of-bounds space above the doorway.
@@ -163,20 +163,13 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: Load Save entries now document and handle shift-right-click deletion for saves containing the clicking player, with deletion constrained to the Halls saves folder. `/hoc leave` remains a host-only save-and-end command, but is now limited to the start floor and camp floors.
 - Next reviewer slice applied: Storage Locker buildings now open persisted camp-plot inventories sized by locker size and level, save/load their contents, and block destruction while non-empty. Sculk Purifier buildings now reduce active party sculk pressure from the camp GUI. Added four chestplates (`chainmail_hauberk`, `ironbound_chestplate`, `cinderplate`, `deepguard_plate`), three weapons (`bone_cleaver`, `frost_lance`, `sculk_maul`), and a reusable cooldown utility (`mending_salve`) that heals 4 health.
 - Next reviewer slice applied: Storage Locker usable slots were reduced to `1/2/3` for small, `2/4/6` for medium, and `4/8/12` for large with locked filler GUI slots. Sculk Purifiers now have 3 per-run charges, affect only the clicking player, and remove less sculk. Grindstones now spend one per-run charge to add melee damage to the held Halls weapon. Added the medium Forge building plus blueprint; it spends one per-run charge to repair the held Halls item's durability by `30% * level`.
+- Next reviewer slice applied: elevator transfer chest snapshots are locked before floor-leave saves so saved files no longer recapture an already-cleared chest, open transfer chest viewers are closed when descent begins, and selected players with open Halls lobby villager menus have those menus closed before session teleport. Elevator Drill is now implemented and skips up to its level on camp descent without skipping camps or the final floor. Scanner is now implemented and reveals/locks modifiers for the next level-count upcoming exploration floors. Grindstone, Forge, and Sculk Purifier per-run charges now have code fallback defaults for stale server building configs, ghosts no longer gain sculk, Death Fog warns at 3 minutes/1 minute/10 seconds, and bundled proximity mine damage is `6`.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Elevator chest is not getting saved in the save file, elevator chest also seems to get deleted on each descend
-- The grindstone doesnt have any charges, it should have one
-- The sculk purifier began with 1 charge and after reset it has none. When I placed another, it also had 0
-- Implement elevator drill, which will make it so once you descend from the camp, you will skip x number of floors where x equals the level
-- Implement the scanner as per GDD.
-- Reduce the damage proximity mines deal to 6 damage
-- Make it so ghosts cannot get sculk
-- Add another warning about death fog sooner
-- Make it so if player is looking into the elevator chest and the descend begins, it kicks the player out of the chest ui
-- Make it that if player is in the lobby villager UI and is TPd into a game, the UI closes.
-
-Future (not this slice):
-- Continue camp work by replacing the decorative placeholder behavior for Elevator Drill, Scanner, and Bounty Board with their real GDD effects.
-
+- Proximity mines still instakill instead of just dealing some damage
+- Remove the bounty board, also remove it from GDD
+- Add a new health totem building. It is a large building which increases your max health by 2*level. It has 1 charge per run and effect works only for 1 player. When players get game over, they are set back to normal hp. Save the applied buff into the save file.
+- Add a new speed totem building, It is a small building which works simillarly to health totem, but increases your speed by 5*level%
+- Make it so wall spike trap deals damage even when retracting
+- Swinging blade trap seems to have weird damage collision detection as I was able to touch the blade on several ocassions without damage.

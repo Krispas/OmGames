@@ -1332,6 +1332,8 @@ SQLite tables:
 - Sculk Purifier buildings have `3` charges per run, reduce only the clicking player's current sculk pressure from their camp GUI, and scale the amount by purifier size and level.
 - Grindstone buildings have `1` charge per run and increase the held Halls weapon's melee damage by the building level.
 - Forge buildings are medium camp buildings with `1` charge per run and repair the held Halls item's durability by `30% * level` of its maximum durability.
+- Elevator Drill buildings affect the next descent from that camp: they skip up to `level` floors, but never skip a camp floor or the final scenario floor.
+- Scanner buildings reveal and lock the modifier rolls for the next `level` upcoming exploration floors in the current run.
 - Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker and display parts are centered against plot centers/facing, including even-sized future plot footprints and scaled display parts.
 - Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Upgrade buttons show the stored-scrap cost plus practical effects such as newly unlocked station recipes or harvest changes.
 - Halls save snapshots live in `plugins/OmGames/HallsOfCarnage/saves/` as YAML files keyed by scenario id plus sorted participant UUIDs.
@@ -1340,6 +1342,7 @@ SQLite tables:
 - `/hoc leave` is player-only, does not require OP, and only the active session host can use it to save and end the session from the start floor or a camp floor.
 - The lobby villager opens a GUI flow for New Campaign, Load Save, scenario selection, difficulty selection, and session settings.
 - New campaign session settings can toggle online players currently in the Halls lobby, then start the run.
+- Starting/loading a Halls session closes any open Halls lobby villager menu for selected participants before teleporting them into the generated session.
 - Load Save lists save files containing the clicking player, allows shift-right-click deletion of those saves, and requires every saved participant to be online in the Halls lobby and outside other Halls sessions before restoring the save.
 - Difficulty options are Normal/Hard/Extreme with multipliers `1.0`, `1.5`, and `2.0`; the first-pass implementation scales floor difficulty, coin quota, trapped-room count, holes, and sculk patch count.
 - Camp floors connect the elevator corridor to the nearest open north-edge layout cell instead of assuming the layout center is open, and should keep the camp room far enough from the elevator to allow a walkable connector with a sealed corridor-height entrance.
@@ -1384,6 +1387,7 @@ SQLite tables:
 - Duplicate modifiers are allowed and their effects stack or multiply.
 - Modifier reveal pacing is intentionally slow enough for players to read each selected modifier during elevator descent.
 - Implemented modifier effects include coin/enemy/trap/loot/sculk multipliers, special enemy pool inclusion, extra rooms, longer corridors, death fog, trap-kind boosts, and Compass.
+- Death Fog warns at 3 minutes, 1 minute, and 10 seconds before the wither timer begins.
 - Compass once grants an elevator compass, twice adds exact elevator block distance to the HUD, and three times emits an elevator trail every 5 seconds. Elevator compasses are removed from player inventories and the elevator transfer chest before each descent chooses the next floor's modifiers.
 - Session monster spawning clears native/random equipment first, then applies only gear explicitly defined in the monster resource file. Session monsters that fall into generated holes are killed.
 - Session monsters are persistent, have far-away removal disabled, and should prioritize alive participants over ghost players as targets.
@@ -1398,7 +1402,7 @@ SQLite tables:
 - Exploration floor scenario field `traps-per-room.min` / `traps-per-room.max` controls how many normal traps Java attempts inside each trapped room.
 - Hole/pit generation is controlled separately by scenario floor field `holes`.
 - Sculk patch generation is controlled separately by scenario floor field `sculk-patches`.
-- Sculk patches convert floor blocks to sculk and place sculk veins in air; participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/eating-block/darkness thresholds. The HUD and save schema should keep that pressure per player. Sculk generation must avoid trap-reserved cells, including carved pit cells.
+- Sculk patches convert floor blocks to sculk and place sculk veins in air; alive participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/eating-block/darkness thresholds. Ghosts do not gain sculk. The HUD and save schema should keep that pressure per player. Sculk generation must avoid trap-reserved cells, including carved pit cells.
 - Sculk pressure should rise gradually, not spike during short crossings; generated sculk patches may attach veins to floors, walls, and ceilings, but sculk veins must only enable faces attached to solid neighbor blocks and must stay inside generated walkable floor bounds.
 - Sculk pressure at 50% applies Weakness I, at 90% applies Slowness I and blocks consumption directly, and at 100% applies Darkness I; it should not lower the player's hunger bar.
 - Halls ghost mode is Adventure-mode invisible player state, not spectator mode. A lethal hit drops the player's carried gear as session physics drops, blocks inventory/pickup interactions, and revives the player on the next floor.

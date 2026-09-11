@@ -2,7 +2,7 @@ id: scanner
 name: "Scanner"
 size: small
 blueprint: scanner_blueprint
-implemented: false
+implemented: true
 levels:
   1:
     upgrade-cost: {iron: 2, redstone: 2}

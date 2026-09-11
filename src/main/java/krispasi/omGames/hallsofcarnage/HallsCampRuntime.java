@@ -59,6 +59,7 @@ public final class HallsCampRuntime {
     private final Function<HallsItemType, ItemStack> itemFactory;
     private final ScrapAccount scrapAccount;
     private final SculkAccount sculkAccount;
+    private final Function<Integer, List<String>> scanner;
     private final Map<UUID, Plot> plotsByEntity = new HashMap<>();
     private final Map<Integer, Plot> plotsById = new HashMap<>();
 
@@ -69,7 +70,8 @@ public final class HallsCampRuntime {
                             Map<String, HallsItemType> itemTypes,
                             Function<HallsItemType, ItemStack> itemFactory,
                             ScrapAccount scrapAccount,
-                            SculkAccount sculkAccount) {
+                            SculkAccount sculkAccount,
+                            Function<Integer, List<String>> scanner) {
         this.plugin = plugin;
         this.world = world;
         this.scenario = scenario;
@@ -78,6 +80,7 @@ public final class HallsCampRuntime {
         this.itemFactory = itemFactory;
         this.scrapAccount = scrapAccount;
         this.sculkAccount = sculkAccount;
+        this.scanner = scanner;
     }
 
     public void clear() {
@@ -133,6 +136,9 @@ public final class HallsCampRuntime {
             setBuilding(plot, building, level);
             plot.setHarvestRemaining(state.harvestRemaining());
             plot.setHarvestUsed(state.harvestUsed());
+            if (state.harvestRemaining() <= 0 && state.harvestUsed() <= 0 && defaultRunUses(building, level) > 0) {
+                plot.setHarvestRemaining(defaultRunUses(building, level));
+            }
             plot.setStorageContents(state.storageContents());
             HallsBuildingType.Level buildingLevel = building.level(level);
             if (plot.harvestRemaining() <= 0 && !buildingLevel.emptyParts().isEmpty()) {
@@ -229,6 +235,10 @@ public final class HallsCampRuntime {
                 activateForge(player, plot, building);
                 openBuildingMenu(player, plot);
             }
+            case "scanner" -> {
+                activateScanner(player, plot);
+                openBuildingMenu(player, plot);
+            }
             default -> {
             }
         }
@@ -250,6 +260,16 @@ public final class HallsCampRuntime {
             plot.setStorageContents(contents);
         }
         return true;
+    }
+
+    public int highestBuiltLevel(String buildingId) {
+        int level = 0;
+        for (Plot plot : plotsById.values()) {
+            if (buildingId.equals(plot.buildingId())) {
+                level = Math.max(level, plot.level());
+            }
+        }
+        return level;
     }
 
     private boolean buildFromBlueprint(Player player, Plot plot) {
@@ -340,6 +360,16 @@ public final class HallsCampRuntime {
                     List.of("Charges this run: " + plot.harvestRemaining(),
                             "Repairs " + formatStatAmount(forgeRepairPercent(plot.level())) + "% durability."),
                     "forge", null));
+        } else if (building.id().equals("scanner")) {
+            inventory.setItem(13, menuItem(Material.LODESTONE, "Scan Deeper Floors", NamedTextColor.AQUA,
+                    List.of("Reveals and locks modifiers for the next " + Math.max(1, Math.min(3, plot.level()))
+                            + " exploration floor" + (plot.level() == 1 ? "." : "s.")),
+                    "scanner", null));
+        } else if (building.id().equals("elevator_drill")) {
+            inventory.setItem(13, menuItem(Material.POINTED_DRIPSTONE, "Drill Ready", NamedTextColor.AQUA,
+                    List.of("Next camp descent skips up to " + Math.max(1, Math.min(3, plot.level()))
+                            + " floor" + (plot.level() == 1 ? "." : "s."),
+                            "It will not skip camps or the final floor."), null, null));
         } else if (building.id().equals("mycelia_farm")) {
             inventory.setItem(13, menuItem(Material.DEAD_BUSH, "Farm Empty", NamedTextColor.GRAY,
                     List.of("Upgrade or revisit after a future refresh."), null, null));
@@ -497,14 +527,13 @@ public final class HallsCampRuntime {
     }
 
     private void initializeHarvest(Plot plot, HallsBuildingType building) {
-        HallsBuildingType.Level level = building.level(plot.level());
         plot.setHarvestUsed(0);
-        plot.setHarvestRemaining(level.harvestUses());
+        plot.setHarvestRemaining(defaultRunUses(building, plot.level()));
     }
 
     private void refreshHarvestForLevel(Plot plot, HallsBuildingType building) {
         HallsBuildingType.Level level = building.level(plot.level());
-        plot.setHarvestRemaining(Math.max(0, level.harvestUses() - plot.harvestUsed()));
+        plot.setHarvestRemaining(Math.max(0, defaultRunUses(building, plot.level()) - plot.harvestUsed()));
         if (plot.harvestRemaining() <= 0 && !level.emptyParts().isEmpty()) {
             setDisplays(plot, building, level.emptyParts());
         }
@@ -550,6 +579,12 @@ public final class HallsCampRuntime {
         } else if (building.id().equals("forge")) {
             lore.add("Repair: " + formatStatAmount(forgeRepairPercent(plot.level()))
                     + "% -> " + formatStatAmount(forgeRepairPercent(plot.level() + 1)) + "%");
+        } else if (building.id().equals("scanner")) {
+            lore.add("Scans floors: " + Math.max(1, Math.min(3, plot.level()))
+                    + " -> " + Math.max(1, Math.min(3, plot.level() + 1)));
+        } else if (building.id().equals("elevator_drill")) {
+            lore.add("Skip depth: " + Math.max(1, Math.min(3, plot.level()))
+                    + " -> " + Math.max(1, Math.min(3, plot.level() + 1)));
         } else if (!next.giveItems().isEmpty()) {
             lore.add("Outputs: " + next.giveItems().stream().map(this::itemName).collect(java.util.stream.Collectors.joining(", ")));
         } else {
@@ -724,6 +759,23 @@ public final class HallsCampRuntime {
                 + " durability. Charges left: " + plot.harvestRemaining() + ".", NamedTextColor.GREEN));
     }
 
+    private void activateScanner(Player player, Plot plot) {
+        if (scanner == null) {
+            player.sendActionBar(Component.text("This scanner is not connected.", NamedTextColor.RED));
+            return;
+        }
+        List<String> lines = scanner.apply(plot.level());
+        if (lines.isEmpty()) {
+            player.sendActionBar(Component.text("No upcoming floors found.", NamedTextColor.GRAY));
+            return;
+        }
+        player.sendMessage(Component.text("Scanner results:", NamedTextColor.AQUA));
+        for (String line : lines) {
+            player.sendMessage(Component.text("- " + line, NamedTextColor.GRAY));
+        }
+        world.playSound(player.getLocation(), Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.8f, 1.55f);
+    }
+
     private boolean isStorageLocker(HallsBuildingType building) {
         return building != null && isStorageLocker(building.id());
     }
@@ -784,6 +836,23 @@ public final class HallsCampRuntime {
 
     private double forgeRepairPercent(int level) {
         return 30.0 * Math.max(1, Math.min(3, level));
+    }
+
+    private int defaultRunUses(HallsBuildingType building, int level) {
+        if (building == null) {
+            return 0;
+        }
+        int configured = building.level(level).harvestUses();
+        if (configured > 0) {
+            return configured;
+        }
+        if (building.id().startsWith("sculk_purifier_")) {
+            return 3;
+        }
+        if (building.id().equals("grindstone") || building.id().equals("forge")) {
+            return 1;
+        }
+        return 0;
     }
 
     private boolean hasStoredItems(Plot plot) {

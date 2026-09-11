@@ -87,6 +87,7 @@ public final class HallsSession {
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
     private final Map<String, Long> utilityCooldowns = new HashMap<>();
     private final Map<Integer, List<HallsCampRuntime.PlotState>> savedCampStates = new HashMap<>();
+    private final Map<Integer, HallsFloorModifiers> scannedFloorModifiers = new HashMap<>();
     private final HallsSessionTrapRuntime trapRuntime;
     private final HallsSessionMonsterRuntime monsterRuntime;
     private final HallsSessionSculkRuntime sculkRuntime;
@@ -156,7 +157,8 @@ public final class HallsSession {
             participants.add(player.getUniqueId());
         }
         this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::setBlock, this.trapTypes);
-        this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock);
+        this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
+                this::isAliveParticipant);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
                 sculkRuntime::maxSculkPercent, this::isAliveParticipant);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
@@ -170,7 +172,7 @@ public final class HallsSession {
             public boolean spend(Map<String, Integer> cost) {
                 return spendStoredScrap(cost);
             }
-        }, this::reducePlayerSculk);
+        }, this::reducePlayerSculk, this::scanUpcomingFloors);
     }
 
     public int id() {
@@ -364,15 +366,16 @@ public final class HallsSession {
                 coins = Math.max(0, coins - quota);
             }
             boolean leftBehind = markLeftBehindPlayersAsGhosts();
+            closeOpenElevatorChestViewers();
             captureElevatorChestContents();
-            save("floor-leave");
             removeElevatorCompasses();
             elevatorChestSnapshotLocked = true;
+            save("floor-leave");
             transitioning = true;
             openElevatorDoors();
             world.playSound(block.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
             player.sendMessage(Component.text("The elevator begins its descent.", NamedTextColor.DARK_RED));
-            startElevatorTransition(currentFloor + 1, leftBehind);
+            startElevatorTransition(nextFloorAfterCampDrill(), leftBehind);
         } else {
             player.sendMessage(Component.text("No deeper placeholder floor is available.", NamedTextColor.YELLOW));
         }
@@ -937,7 +940,12 @@ public final class HallsSession {
         HallsScenario.FloorDefinition rawFloorDefinition = adjustedDifficulty(scenario.floor(floor));
         HallsLevelType levelType = levelTypeFor(rawFloorDefinition);
         Random random = floorRandom();
-        activeFloorModifiers = selectFloorModifiers(rawFloorDefinition, levelType, random);
+        activeFloorModifiers = scannedFloorModifiers.remove(floor);
+        if (activeFloorModifiers == null) {
+            activeFloorModifiers = selectFloorModifiers(rawFloorDefinition, levelType, random, true);
+        } else {
+            revealFloorModifiers(activeFloorModifiers);
+        }
         HallsScenario.FloorDefinition floorDefinition = activeFloorModifiers.adjustFloor(rawFloorDefinition, random);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = Math.max(1, floorDefinition.rooms());
@@ -1055,7 +1063,8 @@ public final class HallsSession {
 
     private HallsFloorModifiers selectFloorModifiers(HallsScenario.FloorDefinition floorDefinition,
                                                      HallsLevelType levelType,
-                                                     Random random) {
+                                                     Random random,
+                                                     boolean reveal) {
         if (floorDefinition == null || !"exploration".equalsIgnoreCase(floorDefinition.kind()) || modifierTypes.isEmpty()) {
             return HallsFloorModifiers.none();
         }
@@ -1075,8 +1084,29 @@ public final class HallsSession {
             }
         }
         HallsFloorModifiers modifiers = new HallsFloorModifiers(selected);
-        revealFloorModifiers(modifiers);
+        if (reveal) {
+            revealFloorModifiers(modifiers);
+        }
         return modifiers;
+    }
+
+    private List<String> scanUpcomingFloors(int scannerLevel) {
+        if (!isCurrentFloorCamp()) {
+            return List.of("Scanner only works from camp floors.");
+        }
+        int remaining = Math.max(1, Math.min(3, scannerLevel));
+        List<String> lines = new ArrayList<>();
+        for (int floor = currentFloor + 1; floor <= scenario.floorCount() && lines.size() < remaining; floor++) {
+            HallsScenario.FloorDefinition raw = adjustedDifficulty(scenario.floor(floor));
+            if (raw == null || !"exploration".equalsIgnoreCase(raw.kind())) {
+                continue;
+            }
+            HallsLevelType levelType = levelTypeFor(raw);
+            HallsFloorModifiers modifiers = scannedFloorModifiers.computeIfAbsent(floor,
+                    ignored -> selectFloorModifiers(raw, levelType, floorRandom(), false));
+            lines.add("F" + floor + " " + levelType.name() + ": " + modifiers.displaySummary());
+        }
+        return lines.isEmpty() ? List.of("No upcoming exploration floors found.") : lines;
     }
 
     private List<HallsModifierType> applicableModifiers(HallsLevelType levelType, boolean good) {
@@ -1792,7 +1822,9 @@ public final class HallsSession {
             return;
         }
         long floorSeconds = Math.max(0L, (System.currentTimeMillis() - floorStartedAtMillis) / 1000L);
-        if (floorSeconds == witherAfterSeconds - 60 || floorSeconds == witherAfterSeconds - 10) {
+        if (floorSeconds == witherAfterSeconds - 180
+                || floorSeconds == witherAfterSeconds - 60
+                || floorSeconds == witherAfterSeconds - 10) {
             for (UUID playerId : participants) {
                 Player player = Bukkit.getPlayer(playerId);
                 if (player != null && player.getWorld().equals(world)) {
@@ -1855,6 +1887,27 @@ public final class HallsSession {
 
     private int currentCoinQuota() {
         return adjustedDifficulty(scenario.floor(currentFloor)).coinQuota();
+    }
+
+    private int nextFloorAfterCampDrill() {
+        int destination = currentFloor + 1;
+        if (!isCurrentFloorCamp() || campRuntime == null) {
+            return destination;
+        }
+        int skipsRemaining = campRuntime.highestBuiltLevel("elevator_drill");
+        while (skipsRemaining > 0 && destination < scenario.floorCount()) {
+            int candidate = destination + 1;
+            if (candidate >= scenario.floorCount()) {
+                break;
+            }
+            HallsScenario.FloorDefinition candidateFloor = scenario.floor(candidate);
+            if (candidateFloor == null || "camp".equalsIgnoreCase(candidateFloor.kind())) {
+                break;
+            }
+            destination = candidate;
+            skipsRemaining--;
+        }
+        return destination;
     }
 
     private HallsScenario.FloorDefinition adjustedDifficulty(HallsScenario.FloorDefinition floor) {
@@ -1960,6 +2013,16 @@ public final class HallsSession {
             elevatorChestContents[i] = contents[i] == null ? null : contents[i].clone();
         }
         container.getInventory().clear();
+    }
+
+    private void closeOpenElevatorChestViewers() {
+        Container container = elevatorChestContainer();
+        if (container == null) {
+            return;
+        }
+        for (org.bukkit.entity.HumanEntity viewer : new ArrayList<>(container.getInventory().getViewers())) {
+            viewer.closeInventory();
+        }
     }
 
     private void restoreElevatorChestContents() {
@@ -2755,6 +2818,7 @@ public final class HallsSession {
         activeFloorModifiers = HallsFloorModifiers.none();
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
+        scannedFloorModifiers.clear();
         sculkRuntime.clearAll();
         for (Map.Entry<UUID, HallsSaveData.PlayerState> entry : save.players().entrySet()) {
             sculkRuntime.setSculk(entry.getKey(), entry.getValue().sculk());
@@ -2868,6 +2932,7 @@ public final class HallsSession {
         activeFloorModifiers = HallsFloorModifiers.none();
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
+        scannedFloorModifiers.clear();
         sculkRuntime.clearAll();
     }
 
@@ -2876,13 +2941,13 @@ public final class HallsSession {
             List<HallsCampRuntime.PlotState> refreshed = new ArrayList<>();
             for (HallsCampRuntime.PlotState state : entry.getValue()) {
                 HallsBuildingType building = buildingTypes.get(state.buildingId());
-                if (building != null && building.level(Math.max(1, Math.min(3, state.level()))).harvestUses() > 0) {
+                if (building != null && defaultRunUses(building, Math.max(1, Math.min(3, state.level()))) > 0) {
                     int level = Math.max(1, Math.min(3, state.level()));
                     refreshed.add(new HallsCampRuntime.PlotState(
                             state.plotId(),
                             state.buildingId(),
                             level,
-                            building.level(level).harvestUses(),
+                            defaultRunUses(building, level),
                             0,
                             state.storageContents()));
                     continue;
@@ -2891,6 +2956,23 @@ public final class HallsSession {
             }
             savedCampStates.put(entry.getKey(), List.copyOf(refreshed));
         }
+    }
+
+    private int defaultRunUses(HallsBuildingType building, int level) {
+        if (building == null) {
+            return 0;
+        }
+        int configured = building.level(level).harvestUses();
+        if (configured > 0) {
+            return configured;
+        }
+        if (building.id().startsWith("sculk_purifier_")) {
+            return 3;
+        }
+        if (building.id().equals("grindstone") || building.id().equals("forge")) {
+            return 1;
+        }
+        return 0;
     }
 
     private void giveStarterItem(Player player) {

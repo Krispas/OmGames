@@ -2,7 +2,7 @@ id: elevator_drill
 name: "Elevator Drill"
 size: large
 blueprint: elevator_drill_blueprint
-implemented: false
+implemented: true
 levels:
   1:
     upgrade-cost: {iron: 6, redstone: 4}
