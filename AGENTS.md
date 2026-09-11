@@ -1332,11 +1332,11 @@ SQLite tables:
 - Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Upgrade buttons show the stored-scrap cost plus practical effects such as newly unlocked station recipes or harvest changes.
 - Halls save snapshots live in `plugins/OmGames/HallsOfCarnage/saves/` as YAML files keyed by scenario id plus sorted participant UUIDs.
 - The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, per-player sculk pressure, elevator chest contents, stored scrap/coins, and visited camp plot building state including building id, level, and harvest counters.
-- Save snapshots are created/overwritten when a campaign starts, when the elevator leaves a floor, when arriving at a camp floor, when game-over restarts the run at floor 1, and when the host uses `/hoc leave`.
-- `/hoc leave` is player-only, does not require OP, and only the active session host can use it to save and end the session.
+- Save snapshots are created/overwritten when a campaign starts, when the elevator leaves a floor, when arriving at a camp floor, when game-over restarts the run at floor 1, and when the host uses `/hoc leave` from the start floor or a camp floor.
+- `/hoc leave` is player-only, does not require OP, and only the active session host can use it to save and end the session from the start floor or a camp floor.
 - The lobby villager opens a GUI flow for New Campaign, Load Save, scenario selection, difficulty selection, and session settings.
 - New campaign session settings can toggle online players currently in the Halls lobby, then start the run.
-- Load Save lists save files containing the clicking player and requires every saved participant to be online in the Halls lobby and outside other Halls sessions before restoring the save.
+- Load Save lists save files containing the clicking player, allows shift-right-click deletion of those saves, and requires every saved participant to be online in the Halls lobby and outside other Halls sessions before restoring the save.
 - Difficulty options are Normal/Hard/Extreme with multipliers `1.0`, `1.5`, and `2.0`; the first-pass implementation scales floor difficulty, coin quota, trapped-room count, holes, and sculk patch count.
 - Camp floors connect the elevator corridor to the nearest open north-edge layout cell instead of assuming the layout center is open, and should keep the camp room far enough from the elevator to allow a walkable connector with a sealed corridor-height entrance.
 - Item recipes are parsed as stored-scrap and hotbar item costs. Cooking Pot, Weapon Bench, and Armory list scenario-unlocked recipes by station level and craft them from their building GUI.

@@ -160,10 +160,9 @@ This is the first implementation slice. It focuses on:
 - Difficulty is stored in save files and currently scales first-pass floor difficulty, coin quota, trapped-room count, holes, and sculk patch count by 1.0/1.5/2.0.
 - Load Save lists YAML saves that include the clicking player, requires every saved participant to be online in the Halls lobby and not already in a session, then restores the saved floor, player hotbar/armor/offhand inventories, ghost flags, elevator chest, stored scrap/coins, and saved camp plot state.
 - Next reviewer slice applied: game-over restarts now restock saved Mycelia Farms, Halls save files persist sculk pressure per player, HUD sculk display shows each player's own value, rotated camp building displays use facing-aware centering corrections, and normal/Howling Corridors generation no longer adds decorative dead-end branch corridors.
+- Next reviewer slice applied: Load Save entries now document and handle shift-right-click deletion for saves containing the clicking player, with deletion constrained to the Halls saves folder. `/hoc leave` remains a host-only save-and-end command, but is now limited to the start floor and camp floors.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-- When selecting save, add an option to delete it
-- Make it so /hoc leave saves the game too. Make it so command works only in camps and start floor
 - Add storage closet (all three sizes) as per GDD
 - Add sculk purifier (all three sizes) as per GDD
 - Add a few more chestplates, weapons and a new utility item which heals 4 hp with a cooldown

@@ -209,6 +209,10 @@ public final class HallsSession {
         return transitioning;
     }
 
+    public boolean canSaveAndLeave() {
+        return running && !transitioning && (currentFloor == 1 || isCurrentFloorCamp());
+    }
+
     public boolean isParticipant(UUID playerId) {
         return participants.contains(playerId);
     }

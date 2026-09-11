@@ -163,7 +163,9 @@ public final class HallsMainMenu {
         return item(plugin, Material.WRITABLE_BOOK, save.displayName(), NamedTextColor.AQUA,
                 List.of("Difficulty: " + save.difficultyId() + " x" + save.difficultyMultiplier(),
                         "Players: " + save.participants().size(),
-                        "Saved: " + date), ACTION_SAVE, save.file().getName());
+                        "Saved: " + date,
+                        "Left-click to load.",
+                        "Shift-right-click to delete."), ACTION_SAVE, save.file().getName());
     }
 
     private static ItemStack playerItem(JavaPlugin plugin, PlayerChoice choice) {

@@ -404,6 +404,12 @@ public final class HallsOfCarnageManager {
                     HallsMainMenu.openSaves(plugin, player, savesFor(player));
                     return true;
                 }
+                if (event.isShiftClick() && event.isRightClick()) {
+                    Result result = deleteSave(player, save);
+                    player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+                    HallsMainMenu.openSaves(plugin, player, savesFor(player));
+                    return true;
+                }
                 DifficultyOption difficulty = DIFFICULTIES.getOrDefault(save.difficultyId(),
                         new DifficultyOption(save.difficultyId(), save.difficultyId(), save.difficultyMultiplier()));
                 PendingSession pending = new PendingSession(save.scenarioId(), difficulty, save.file(),
@@ -573,6 +579,28 @@ public final class HallsOfCarnageManager {
             }
         }
         return null;
+    }
+
+    private Result deleteSave(Player player, HallsSaveData save) {
+        if (player == null || save == null || !save.participants().contains(player.getUniqueId())) {
+            return Result.fail("That save is no longer available.");
+        }
+        try {
+            Path savesRoot = getSavesFolder().getCanonicalFile().toPath();
+            Path savePath = save.file().getCanonicalFile().toPath();
+            if (!savePath.startsWith(savesRoot) || savePath.equals(savesRoot)) {
+                return Result.fail("Refusing to delete a save outside the Halls saves folder.");
+            }
+            Files.deleteIfExists(savePath);
+            PendingSession pending = pendingSessions.get(player.getUniqueId());
+            if (pending != null && pending.saveFile() != null
+                    && pending.saveFile().getCanonicalFile().toPath().equals(savePath)) {
+                pendingSessions.remove(player.getUniqueId());
+            }
+            return Result.ok("Deleted Halls save " + save.displayName() + ".");
+        } catch (IOException ex) {
+            return Result.fail("Failed to delete Halls save: " + ex.getMessage());
+        }
     }
 
     public boolean isMenuVillager(Entity entity) {
@@ -875,6 +903,9 @@ public final class HallsOfCarnageManager {
         }
         if (!session.isHost(player)) {
             return Result.fail("Only the session host can end this Halls run.");
+        }
+        if (!session.canSaveAndLeave()) {
+            return Result.fail("/hoc leave can only save from the start floor or a camp floor.");
         }
         session.save("host-leave");
         stopSession(sessionId, true);
