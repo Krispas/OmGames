@@ -36,7 +36,7 @@ public final class HallsCampFloorBuilder {
                       HallsLevelType levelType,
                       int northOpeningX) {
         buildRoom(layout, roomStartX, y, roomStartZ, levelType, northOpeningX);
-        renderCampPlots(layout, roomStartX, y, roomStartZ);
+        renderCampPlots(layout, roomStartX, y, roomStartZ, levelType);
     }
 
     private void buildRoom(HallsCampLayout layout,
@@ -70,12 +70,12 @@ public final class HallsCampFloorBuilder {
         return levelType.wallPalette(random).material(random);
     }
 
-    private void renderCampPlots(HallsCampLayout layout, int roomStartX, int y, int roomStartZ) {
+    private void renderCampPlots(HallsCampLayout layout, int roomStartX, int y, int roomStartZ, HallsLevelType levelType) {
         for (int z = 0; z < layout.depth(); z++) {
             for (int x = 0; x < layout.width(); x++) {
                 char cell = layout.at(x, z);
                 if (cell == 'C' || cell == 'N' || cell == 'S' || cell == 'E' || cell == 'W') {
-                    blockPlacer.setBlock(roomStartX + x, y - 1, roomStartZ + z, Material.OAK_PLANKS);
+                    blockPlacer.setBlock(roomStartX + x, y - 1, roomStartZ + z, levelType.floor());
                 }
             }
         }

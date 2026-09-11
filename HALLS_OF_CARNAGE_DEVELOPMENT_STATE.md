@@ -147,11 +147,13 @@ This is the first implementation slice. It focuses on:
 - Elevator compasses are tagged when granted and are removed from player inventories plus the elevator transfer chest before descent starts, before the next floor's modifiers are selected.
 - `/hoc give <wood_scrap|iron_scrap|diamond_scrap|redstone_scrap> [amount]` now deposits test scrap directly into the caller's active session elevator storage and awards the matching test coins.
 - Camp building upgrade-button lore now shows upgrade costs and practical effects, including newly unlocked crafting-station recipes and Mycelia Farm harvest changes.
+- Next reviewer slice applied: camp build-spot floors and the elevator exterior vestibule now use the active level type's floor/corridor/wall palette, and camp building block displays are spawned from block origins so configured parts are no longer shifted by half a block on X/Z.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice (do not remove this line, do all for the next slice):
-- Camp is missing using the normal block pallete of the level type
-- All buildings have an offset and are not centered, its a half block offset on both axis.
+- Stool breakable is ignoring the decimal values in its model and seems to be using integers? I tried multiple things and its still the same
+- Not only camps dont use the pillar pallete, but its not properly generating lights, the build spots are now not using oak planks and its just the floor texture.
+- Some variations of the camp build spots (by variation I mean size/facing) still dont have centered buildings when built there
 
 Future (not this slice):
 - Continue camp work by adding persistent camp/save-file state so built buildings survive game-over restarts and later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.

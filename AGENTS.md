@@ -1324,7 +1324,7 @@ SQLite tables:
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
 - Scenario floor definitions may include `layout`; camp floors use it to load `plugins/OmGames/HallsOfCarnage/level/<layout>`, such as `level/camps/camp_1.txt`.
 - Camp layout files preserve `X`, `O`, `C`, and `N/S/W/E`: `X` is solid, every other marker is open floor, `C` expands a build plot, and `N/S/W/E` marks the plot anchor/facing.
-- Camp build-spot floors are rendered as oak planks and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
+- Camp build-spot floors are rendered with the active level type's normal floor material and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
 - Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.txt|*.yml|*.yaml` and seeded from bundled defaults.
 - Building files define `id`, `name`, `size` (`small`, `medium`, `large`), `blueprint`, `implemented`, and `levels.<1|2|3>` with display `parts`, optional `empty-parts`, optional `upgrade-cost` stored-scrap requirements, optional `interaction.give-items` compatibility outputs, and optional `harvest.uses` / `harvest.items` for harvestable buildings.
 - Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker.

@@ -358,7 +358,7 @@ public final class HallsCampRuntime {
         removeDisplays(plot);
         for (HallsBuildingType.Part part : parts) {
             double[] offset = rotatedOffset(part.offsetX(), part.offsetZ(), plot.facing());
-            Location location = new Location(world, plot.x() + 0.5 + offset[0], plot.y() + part.offsetY(), plot.z() + 0.5 + offset[1]);
+            Location location = new Location(world, plot.x() + offset[0], plot.y() + part.offsetY(), plot.z() + offset[1]);
             BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
                 entity.setBlock(blockData(part.material(), part.blockData()));
                 entity.setBillboard(Display.Billboard.FIXED);

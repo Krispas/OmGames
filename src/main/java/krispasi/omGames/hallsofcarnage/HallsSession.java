@@ -1138,6 +1138,10 @@ public final class HallsSession {
         return levelTypes.getOrDefault(floorDefinition.levelType(), HallsLevelType.fallback(floorDefinition.levelType()));
     }
 
+    private HallsLevelType activeLevelType() {
+        return levelTypes.getOrDefault(activeLevelTypeId, HallsLevelType.fallback(activeLevelTypeId));
+    }
+
     private int clearRadiusFor(HallsScenario.FloorDefinition floorDefinition) {
         int rooms = Math.max(1, floorDefinition.rooms());
         return Math.max(CLEAR_RADIUS, 30 + (int) Math.ceil(Math.sqrt(rooms) * 14.0));
@@ -1493,14 +1497,16 @@ public final class HallsSession {
 
     private void buildElevatorVestibule(boolean open) {
         int z = origin.z() + ELEVATOR_OUTER_RADIUS + 1;
-        Material wall = Material.DEEPSLATE_BRICKS;
+        HallsLevelType levelType = activeLevelType();
         for (int x = -2; x <= 2; x++) {
-            setBlock(origin.x() + x, origin.y() - 1, z, Material.PACKED_MUD);
-            setBlock(origin.x() + x, origin.y() + 3, z, wall);
-            setBlock(origin.x() + x, origin.y() + 4, z, wall);
+            int blockX = origin.x() + x;
+            Material wall = wallMaterial(levelType, blockX, z, Math.abs(x) == 2, 0xE1E7A7);
+            setBlock(blockX, origin.y() - 1, z, levelType.corridorFloor());
+            setBlock(blockX, origin.y() + 3, z, levelType.corridorCeiling());
+            setBlock(blockX, origin.y() + 4, z, wall);
             boolean sideWall = Math.abs(x) == 2;
             for (int y = 0; y <= 2; y++) {
-                setBlock(origin.x() + x, origin.y() + y, z,
+                setBlock(blockX, origin.y() + y, z,
                         sideWall ? wall : open ? Material.AIR : Material.BLACK_CONCRETE);
             }
         }
