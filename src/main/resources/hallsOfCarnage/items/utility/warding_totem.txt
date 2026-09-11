@@ -9,7 +9,7 @@ lore:
   - "Grants nearby players Resistance II for 10 seconds."
 stats:
   cooldown-seconds: 120
-  duration-seconds: 10
+  duration-seconds: 20
   radius: 8
   ward-strength: 2
 recipe:

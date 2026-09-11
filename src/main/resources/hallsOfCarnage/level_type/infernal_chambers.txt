@@ -23,9 +23,11 @@ pillar-palettes:
     special-chance: 0.12
 monsters:
   common:
-    - wither_skeleton
-    - skeleton
-    - vindicator
-  special:
+    - piglin
+    - blaze
     - breeze
-    - witch
+    - husk
+  special:
+    - piglin_brute
+    - wither_skeleton
+    - parched

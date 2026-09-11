@@ -24,9 +24,10 @@ pillar-palettes:
 monsters:
   common:
     - zombie
-    - skeleton
-    - pillager
-    - slime_medium
-  special:
-    - breeze
+    - silverfish
     - creaking
+    - vindicator
+  special:
+    - stray
+    - cave_spider
+    - zombie_vanguard

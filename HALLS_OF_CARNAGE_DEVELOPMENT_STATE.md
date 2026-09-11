@@ -137,3 +137,11 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- Make it so the lab level type has enabled redstone lights as lamps. 
+- Look more into the corridor gen of the new level types and try to optimize them even more.
+- Remove the ranged weapon category
+- Make it so cinderplate uses its 4 second resistance effect when hit.
+- Add AoE damage to the sculk maul (configurable)
+- Add loyalty III to frost_lance. Disable the enchantment glint for this item
+- Add 4 more utility items, figure them out yourself.
+- add piglin, blaze and piglin_brute, also add parched.
