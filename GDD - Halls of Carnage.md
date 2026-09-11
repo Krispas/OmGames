@@ -202,11 +202,15 @@ Same as weapon bench, but for armor.
 ### Grindstone
 - Size: Large
 
-Each run, can upgrade one armor or weapon piece, giving it better stats. The upgrade strenght is based on level.
+Each run, can sharpen one held weapon, increasing its melee damage. The upgrade strength is based on level.
+### Forge
+- Size: Medium
+
+Each run, can repair one held Halls item. It restores 30% of the item's maximum durability per building level.
 ### Storage Locker
 - Size: All three sizes (different blueprints)
 
-Has a storage based on its size. Size x Level. Allows storing items for future runs.
+Has storage based on its size and level: small lockers have 1/2/3 slots, medium lockers have 2/4/6, and large lockers have 4/8/12. Allows storing items for future runs.
 ### Mycelia Farm
 - Size: Small
 
@@ -228,7 +232,7 @@ Based on level, gives you 1-3 quests. Like kill specific common mobs (they must 
 ### Sculk Purifier
 - Size: All three sizes (different blueprints)
 
-Removes some sculk based on size and level.
+Has 3 charges per run. Removes some sculk from the player who uses the charge, based on size and level.
 ### More
 System must allow more to be added in the future. If anything comes to you during development, add it into this doc.
 

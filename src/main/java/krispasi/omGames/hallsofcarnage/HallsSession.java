@@ -170,7 +170,7 @@ public final class HallsSession {
             public boolean spend(Map<String, Integer> cost) {
                 return spendStoredScrap(cost);
             }
-        }, this::reducePartySculk);
+        }, this::reducePlayerSculk);
     }
 
     public int id() {
@@ -2349,25 +2349,21 @@ public final class HallsSession {
         return true;
     }
 
-    private int reducePartySculk(double amount) {
-        if (amount <= 0.0) {
-            return 0;
+    private boolean reducePlayerSculk(UUID playerId, double amount) {
+        if (playerId == null || amount <= 0.0) {
+            return false;
         }
-        int affected = 0;
-        for (UUID playerId : participants) {
-            int current = sculkRuntime.sculkPercent(playerId);
-            if (current <= 0) {
-                continue;
-            }
-            sculkRuntime.setSculk(playerId, Math.max(0.0, current - amount));
-            affected++;
-            Player player = Bukkit.getPlayer(playerId);
-            if (player != null && player.getWorld().equals(world)) {
-                player.sendActionBar(Component.text("Sculk pressure reduced to "
-                        + sculkRuntime.sculkPercent(playerId) + "%.", NamedTextColor.AQUA));
-            }
+        int current = sculkRuntime.sculkPercent(playerId);
+        if (current <= 0) {
+            return false;
         }
-        return affected;
+        sculkRuntime.setSculk(playerId, Math.max(0.0, current - amount));
+        Player player = Bukkit.getPlayer(playerId);
+        if (player != null && player.getWorld().equals(world)) {
+            player.sendActionBar(Component.text("Sculk pressure reduced to "
+                    + sculkRuntime.sculkPercent(playerId) + "%.", NamedTextColor.AQUA));
+        }
+        return true;
     }
 
     public static boolean isScrapId(String rawType) {
@@ -2880,7 +2876,7 @@ public final class HallsSession {
             List<HallsCampRuntime.PlotState> refreshed = new ArrayList<>();
             for (HallsCampRuntime.PlotState state : entry.getValue()) {
                 HallsBuildingType building = buildingTypes.get(state.buildingId());
-                if (building != null && building.id().equals("mycelia_farm")) {
+                if (building != null && building.level(Math.max(1, Math.min(3, state.level()))).harvestUses() > 0) {
                     int level = Math.max(1, Math.min(3, state.level()));
                     refreshed.add(new HallsCampRuntime.PlotState(
                             state.plotId(),

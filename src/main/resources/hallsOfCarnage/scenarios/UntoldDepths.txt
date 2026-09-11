@@ -49,6 +49,7 @@ allowed-items:
     - cooking_pot_blueprint
     - weapon_bench_blueprint
     - armory_blueprint
+    - forge_blueprint
     - grindstone_blueprint
     - storage_locker_small_blueprint
     - storage_locker_medium_blueprint
@@ -64,6 +65,7 @@ allowed-items:
     - cooking_pot
     - weapon_bench
     - armory
+    - forge
     - grindstone
     - storage_locker_small
     - storage_locker_medium
@@ -80,6 +82,7 @@ blueprint-pools:
     - cooking_pot_blueprint
     - weapon_bench_blueprint
     - armory_blueprint
+    - forge_blueprint
     - storage_locker_small_blueprint
     - storage_locker_medium_blueprint
     - mycelia_farm_blueprint

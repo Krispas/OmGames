@@ -130,7 +130,7 @@ This is the first implementation slice. It focuses on:
 - Halls building definitions now load from `plugins/OmGames/HallsOfCarnage/buildings/` and are seeded from bundled defaults for all current blueprint families.
 - Building files define size, blueprint id, implemented flag, level display parts, optional stored-scrap upgrade costs, and optional `interaction.give-items` outputs.
 - Right-clicking a camp plot with a matching blueprint consumes it and spawns the configured level-1 building display. Right-clicking a built plot opens its camp building GUI for functionality, upgrades, and destruction.
-- Cooking Pot, Weapon Bench, Armory, Mycelia Farm, Storage Lockers, and Sculk Purifiers have first-pass active camp behavior. Grindstone, Elevator Drill, Scanner, and Bounty Board are buildable/upgradable decorative placeholders for now.
+- Cooking Pot, Weapon Bench, Armory, Mycelia Farm, Storage Lockers, Sculk Purifiers, Grindstone, and Forge have first-pass active camp behavior. Elevator Drill, Scanner, and Bounty Board are buildable/upgradable decorative placeholders for now.
 - `/hoc reset confirm` now also resets bundled `buildings/` resources, and `AGENTS.md` documents the new camp/building resource schemas.
 - Next development slice applied: breakable and camp building display parts now parse optional `block-data` plus `rotation`/`euler` degrees, building part offsets rotate with the camp plot facing marker, and the bundled elevator drill/chair resources exercise the new fields. Camp floors now connect the elevator corridor to the nearest open north-edge cell instead of blindly opening the layout center, elevator door bars force east-west connectivity when placed, and the session floor cleanup height was raised to catch leftover high blocks.
 - Next development slice applied: camp floors now spawn several blocks farther from the elevator and carve a 3-wide, 3-block-high north entrance with solid header blocks so the connector is walkable without exposing out-of-bounds space above the doorway.
@@ -162,15 +162,16 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: game-over restarts now restock saved Mycelia Farms, Halls save files persist sculk pressure per player, HUD sculk display shows each player's own value, rotated camp building displays use facing-aware centering corrections, and normal/Howling Corridors generation no longer adds decorative dead-end branch corridors.
 - Next reviewer slice applied: Load Save entries now document and handle shift-right-click deletion for saves containing the clicking player, with deletion constrained to the Halls saves folder. `/hoc leave` remains a host-only save-and-end command, but is now limited to the start floor and camp floors.
 - Next reviewer slice applied: Storage Locker buildings now open persisted camp-plot inventories sized by locker size and level, save/load their contents, and block destruction while non-empty. Sculk Purifier buildings now reduce active party sculk pressure from the camp GUI. Added four chestplates (`chainmail_hauberk`, `ironbound_chestplate`, `cinderplate`, `deepguard_plate`), three weapons (`bone_cleaver`, `frost_lance`, `sculk_maul`), and a reusable cooldown utility (`mending_salve`) that heals 4 health.
+- Next reviewer slice applied: Storage Locker usable slots were reduced to `1/2/3` for small, `2/4/6` for medium, and `4/8/12` for large with locked filler GUI slots. Sculk Purifiers now have 3 per-run charges, affect only the clicking player, and remove less sculk. Grindstones now spend one per-run charge to add melee damage to the held Halls weapon. Added the medium Forge building plus blueprint; it spends one per-run charge to repair the held Halls item's durability by `30% * level`.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Storage lockers are way too large storage vise. The number of slots they should have is 1/2/3 for small, 2/4/6 for medium and 4/8/12 for large ones.
-- Sculk purifier should be one time use per run same as mycelia farm. Also make it so all remove less sculk, but have 3 charges per run. The player who uses the charge is the only player who receives the purification.
-- Implement the grindstone. Make it so it increases the damage of the selected weapon.
-- Also implement a completely new building called Forge. It can be used to repair durability to an item in % of the total durability. 30% * level of the building. Once again, this building has a single charge per run and it is of medium size.
 - Elevator chest is not getting saved in the save file
+- The grindstone doesnt have any charges, it should have one
+- The sculk purifier began with 1 charge and after reset it has none. When I placed another, it also had 0
+- Implement elevator drill, which will make it so once you descend from the camp, you will skip x number of floors where x equals the level
+- Implement the scanner as per GDD.
 
 Future (not this slice):
-- Continue camp work by replacing the decorative placeholder behavior for Grindstone, Elevator Drill, Scanner, and Bounty Board with their real GDD effects.
+- Continue camp work by replacing the decorative placeholder behavior for Elevator Drill, Scanner, and Bounty Board with their real GDD effects.
 

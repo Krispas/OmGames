@@ -6,6 +6,8 @@ implemented: true
 levels:
   1:
     upgrade-cost: {diamond: 2, redstone: 4}
+    harvest:
+      uses: 3
     parts:
       - material: CALIBRATED_SCULK_SENSOR
         offset: [-0.3, 0, 0]
@@ -15,6 +17,8 @@ levels:
         scale: [0.65, 0.65, 0.65]
   2:
     upgrade-cost: {diamond: 3, redstone: 6}
+    harvest:
+      uses: 3
     parts:
       - material: CALIBRATED_SCULK_SENSOR
         offset: [-0.3, 0, 0]
@@ -23,6 +27,8 @@ levels:
         offset: [0.45, 0, 0]
         scale: [0.75, 0.75, 0.75]
   3:
+    harvest:
+      uses: 3
     parts:
       - material: CALIBRATED_SCULK_SENSOR
         offset: [-0.3, 0, 0]

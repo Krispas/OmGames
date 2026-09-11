@@ -16,6 +16,8 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.BlockDisplay;
@@ -25,10 +27,12 @@ import org.bukkit.entity.Interaction;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -44,7 +48,7 @@ public final class HallsCampRuntime {
     }
 
     public interface SculkAccount {
-        int reduceAll(double amount);
+        boolean reduce(UUID playerId, double amount);
     }
 
     private final JavaPlugin plugin;
@@ -157,6 +161,18 @@ public final class HallsCampRuntime {
     }
 
     public boolean handleInventoryClick(InventoryClickEvent event) {
+        if (event.getInventory().getHolder() instanceof StorageMenu menu) {
+            ItemStack clicked = event.getCurrentItem();
+            ItemStack cursor = event.getCursor();
+            if (event.isShiftClick()
+                    || event.getClickedInventory() == event.getView().getTopInventory()
+                    && event.getSlot() >= storageSlots(menu.plotId())
+                    && (cursor != null && !cursor.getType().isAir()
+                    || clicked == null || clicked.getType().isAir() || isLockedStorageFiller(clicked))) {
+                event.setCancelled(true);
+            }
+            return true;
+        }
         if (!(event.getInventory().getHolder() instanceof CampMenu menu)) {
             return false;
         }
@@ -205,6 +221,14 @@ public final class HallsCampRuntime {
                 activateSculkPurifier(player, plot, building);
                 openBuildingMenu(player, plot);
             }
+            case "grindstone" -> {
+                activateGrindstone(player, plot, building);
+                openBuildingMenu(player, plot);
+            }
+            case "forge" -> {
+                activateForge(player, plot, building);
+                openBuildingMenu(player, plot);
+            }
             default -> {
             }
         }
@@ -217,7 +241,13 @@ public final class HallsCampRuntime {
         }
         Plot plot = plotsById.get(menu.plotId());
         if (plot != null && plot.buildingId() != null && isStorageLocker(plot.buildingId())) {
-            plot.setStorageContents(event.getInventory().getContents());
+            int slots = storageOpenSlots(plot);
+            ItemStack[] contents = new ItemStack[slots];
+            for (int slot = 0; slot < slots; slot++) {
+                ItemStack item = event.getInventory().getItem(slot);
+                contents[slot] = isLockedStorageFiller(item) ? null : cloneOrNull(item);
+            }
+            plot.setStorageContents(contents);
         }
         return true;
     }
@@ -297,8 +327,19 @@ public final class HallsCampRuntime {
                     List.of("Slots: " + slots, "Stored items persist with this camp."), "storage", null));
         } else if (isSculkPurifier(building)) {
             inventory.setItem(13, menuItem(Material.CALIBRATED_SCULK_SENSOR, "Purify Sculk", NamedTextColor.AQUA,
-                    List.of("Reduces party sculk pressure by " + formatStatAmount(purifyAmount(building, plot.level())) + "%."),
+                    List.of("Charges this run: " + plot.harvestRemaining(),
+                            "Reduces your sculk pressure by " + formatStatAmount(purifyAmount(building, plot.level())) + "%."),
                     "purify", null));
+        } else if (building.id().equals("grindstone")) {
+            inventory.setItem(13, menuItem(Material.GRINDSTONE, "Sharpen Held Weapon", NamedTextColor.AQUA,
+                    List.of("Charges this run: " + plot.harvestRemaining(),
+                            "Adds +" + formatStatAmount(grindstoneDamageBonus(plot.level())) + " melee damage."),
+                    "grindstone", null));
+        } else if (building.id().equals("forge")) {
+            inventory.setItem(13, menuItem(Material.ANVIL, "Repair Held Item", NamedTextColor.AQUA,
+                    List.of("Charges this run: " + plot.harvestRemaining(),
+                            "Repairs " + formatStatAmount(forgeRepairPercent(plot.level())) + "% durability."),
+                    "forge", null));
         } else if (building.id().equals("mycelia_farm")) {
             inventory.setItem(13, menuItem(Material.DEAD_BUSH, "Farm Empty", NamedTextColor.GRAY,
                     List.of("Upgrade or revisit after a future refresh."), null, null));
@@ -503,6 +544,12 @@ public final class HallsCampRuntime {
         } else if (isSculkPurifier(building)) {
             lore.add("Purify amount: " + formatStatAmount(purifyAmount(building, plot.level()))
                     + "% -> " + formatStatAmount(purifyAmount(building, plot.level() + 1)) + "%");
+        } else if (building.id().equals("grindstone")) {
+            lore.add("Damage bonus: +" + formatStatAmount(grindstoneDamageBonus(plot.level()))
+                    + " -> +" + formatStatAmount(grindstoneDamageBonus(plot.level() + 1)));
+        } else if (building.id().equals("forge")) {
+            lore.add("Repair: " + formatStatAmount(forgeRepairPercent(plot.level()))
+                    + "% -> " + formatStatAmount(forgeRepairPercent(plot.level() + 1)) + "%");
         } else if (!next.giveItems().isEmpty()) {
             lore.add("Outputs: " + next.giveItems().stream().map(this::itemName).collect(java.util.stream.Collectors.joining(", ")));
         } else {
@@ -559,11 +606,20 @@ public final class HallsCampRuntime {
 
     private void openStorage(Player player, Plot plot, HallsBuildingType building) {
         int slots = storageSlots(building, plot.level());
-        Inventory inventory = Bukkit.createInventory(new StorageMenu(plot.id()), slots,
+        int openSlots = storageOpenSlots(plot);
+        Inventory inventory = Bukkit.createInventory(new StorageMenu(plot.id()), storageInventorySize(openSlots),
                 Component.text(building.name() + " Storage", NamedTextColor.DARK_GREEN));
         ItemStack[] stored = plot.storageContents();
-        for (int slot = 0; slot < Math.min(slots, stored.length); slot++) {
+        for (int slot = 0; slot < Math.min(openSlots, stored.length); slot++) {
             inventory.setItem(slot, cloneOrNull(stored[slot]));
+        }
+        ItemStack locked = menuItem(Material.GRAY_STAINED_GLASS_PANE, "Locked Slot", NamedTextColor.GRAY,
+                List.of("Upgrade this locker for more storage."), null, null);
+        markLockedStorageFiller(locked);
+        for (int slot = slots; slot < inventory.getSize(); slot++) {
+            if (inventory.getItem(slot) == null || inventory.getItem(slot).getType().isAir()) {
+                inventory.setItem(slot, locked);
+            }
         }
         player.openInventory(inventory);
     }
@@ -573,16 +629,99 @@ public final class HallsCampRuntime {
             player.sendActionBar(Component.text("This purifier is not connected.", NamedTextColor.RED));
             return;
         }
-        int affected = sculkAccount.reduceAll(purifyAmount(building, plot.level()));
-        if (affected <= 0) {
+        if (plot.harvestRemaining() <= 0) {
+            player.sendActionBar(Component.text("This purifier is depleted for this run.", NamedTextColor.GRAY));
+            return;
+        }
+        boolean affected = sculkAccount.reduce(player.getUniqueId(), purifyAmount(building, plot.level()));
+        if (!affected) {
             player.sendActionBar(Component.text("No sculk pressure to purify.", NamedTextColor.GRAY));
             return;
         }
+        plot.setHarvestRemaining(plot.harvestRemaining() - 1);
+        plot.setHarvestUsed(plot.harvestUsed() + 1);
         world.spawnParticle(org.bukkit.Particle.WAX_OFF, player.getLocation().add(0.0, 1.0, 0.0),
                 45, 1.2, 0.7, 1.2, 0.03);
         world.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.35f);
-        player.sendActionBar(Component.text("Purified sculk pressure for " + affected + " player"
-                + (affected == 1 ? "" : "s") + ".", NamedTextColor.AQUA));
+        player.sendActionBar(Component.text("Purified your sculk pressure. Charges left: "
+                + plot.harvestRemaining() + ".", NamedTextColor.AQUA));
+    }
+
+    private void activateGrindstone(Player player, Plot plot, HallsBuildingType building) {
+        if (plot.harvestRemaining() <= 0) {
+            player.sendActionBar(Component.text("This grindstone is depleted for this run.", NamedTextColor.GRAY));
+            return;
+        }
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (!isHallsCategory(item, "weapon")) {
+            player.sendActionBar(Component.text("Hold a Halls weapon to sharpen it.", NamedTextColor.RED));
+            return;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        double currentDamage = hallsStat(meta, "melee_damage");
+        if (currentDamage <= 0.0) {
+            player.sendActionBar(Component.text("That weapon has no melee damage stat.", NamedTextColor.RED));
+            return;
+        }
+        double bonus = grindstoneDamageBonus(plot.level());
+        double nextDamage = currentDamage + bonus;
+        meta.removeAttributeModifier(Attribute.ATTACK_DAMAGE);
+        meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, new AttributeModifier(
+                new NamespacedKey(plugin, "hoc_melee_damage_grindstone"),
+                nextDamage - 1.0,
+                AttributeModifier.Operation.ADD_NUMBER,
+                EquipmentSlotGroup.HAND
+        ));
+        meta.getPersistentDataContainer().set(
+                new NamespacedKey(plugin, "hoc_stat_melee_damage"),
+                PersistentDataType.DOUBLE,
+                nextDamage);
+        meta.getPersistentDataContainer().set(
+                new NamespacedKey(plugin, "hoc_grindstone_bonus"),
+                PersistentDataType.DOUBLE,
+                hallsDouble(meta, "hoc_grindstone_bonus") + bonus);
+        addOrReplaceLoreLine(meta, "Grindstone bonus: +" + formatStatAmount(hallsDouble(meta, "hoc_grindstone_bonus")) + " damage");
+        item.setItemMeta(meta);
+        plot.setHarvestRemaining(plot.harvestRemaining() - 1);
+        plot.setHarvestUsed(plot.harvestUsed() + 1);
+        world.playSound(player.getLocation(), Sound.BLOCK_GRINDSTONE_USE, 0.8f, 1.0f);
+        player.sendActionBar(Component.text("Sharpened weapon to " + formatStatAmount(nextDamage)
+                + " melee damage.", NamedTextColor.GREEN));
+    }
+
+    private void activateForge(Player player, Plot plot, HallsBuildingType building) {
+        if (plot.harvestRemaining() <= 0) {
+            player.sendActionBar(Component.text("This forge is depleted for this run.", NamedTextColor.GRAY));
+            return;
+        }
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item == null || item.getType().isAir() || !(item.getItemMeta() instanceof Damageable)) {
+            player.sendActionBar(Component.text("Hold a damaged Halls item to repair it.", NamedTextColor.RED));
+            return;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || !isHallsItem(meta)) {
+            player.sendActionBar(Component.text("Hold a Halls item to repair it.", NamedTextColor.RED));
+            return;
+        }
+        Damageable damageable = (Damageable) meta;
+        int maxDamage = damageable.getMaxDamage();
+        int currentDamage = damageable.getDamage();
+        if (maxDamage <= 0 || currentDamage <= 0) {
+            player.sendActionBar(Component.text("That item is already fully repaired.", NamedTextColor.GRAY));
+            return;
+        }
+        int repair = Math.max(1, (int) Math.ceil(maxDamage * forgeRepairPercent(plot.level()) / 100.0));
+        damageable.setDamage(Math.max(0, currentDamage - repair));
+        item.setItemMeta((ItemMeta) damageable);
+        plot.setHarvestRemaining(plot.harvestRemaining() - 1);
+        plot.setHarvestUsed(plot.harvestUsed() + 1);
+        world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 0.8f, 1.2f);
+        player.sendActionBar(Component.text("Repaired " + Math.min(repair, currentDamage)
+                + " durability. Charges left: " + plot.harvestRemaining() + ".", NamedTextColor.GREEN));
     }
 
     private boolean isStorageLocker(HallsBuildingType building) {
@@ -598,21 +737,53 @@ public final class HallsCampRuntime {
     }
 
     private int storageSlots(HallsBuildingType building, int level) {
-        int baseRows = switch (building.size()) {
+        int baseSlots = switch (building.size()) {
             case "medium" -> 2;
-            case "large" -> 3;
+            case "large" -> 4;
             default -> 1;
         };
-        return Math.max(9, Math.min(54, baseRows * Math.max(1, Math.min(3, level)) * 9));
+        return Math.max(1, Math.min(54, baseSlots * Math.max(1, Math.min(3, level))));
+    }
+
+    private int storageSlots(int plotId) {
+        Plot plot = plotsById.get(plotId);
+        if (plot == null || plot.buildingId() == null) {
+            return 0;
+        }
+        HallsBuildingType building = buildingTypes.get(plot.buildingId());
+        return building == null ? 0 : storageSlots(building, plot.level());
+    }
+
+    private int storageOpenSlots(Plot plot) {
+        int slots = storageSlots(plot.id());
+        ItemStack[] stored = plot.storageContents();
+        for (int i = stored.length - 1; i >= slots; i--) {
+            if (stored[i] != null && !stored[i].getType().isAir()) {
+                return i + 1;
+            }
+        }
+        return slots;
+    }
+
+    private int storageInventorySize(int slots) {
+        return Math.max(9, Math.min(54, ((Math.max(1, slots) + 8) / 9) * 9));
     }
 
     private double purifyAmount(HallsBuildingType building, int level) {
         double base = switch (building.size()) {
-            case "medium" -> 18.0;
-            case "large" -> 30.0;
-            default -> 10.0;
+            case "medium" -> 8.0;
+            case "large" -> 12.0;
+            default -> 5.0;
         };
         return base * Math.max(1, Math.min(3, level));
+    }
+
+    private double grindstoneDamageBonus(int level) {
+        return Math.max(1, Math.min(3, level));
+    }
+
+    private double forgeRepairPercent(int level) {
+        return 30.0 * Math.max(1, Math.min(3, level));
     }
 
     private boolean hasStoredItems(Plot plot) {
@@ -722,6 +893,65 @@ public final class HallsCampRuntime {
         String actual = item.getItemMeta().getPersistentDataContainer()
                 .get(new NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING);
         return itemId.equals(actual);
+    }
+
+    private void markLockedStorageFiller(ItemStack item) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_locked_storage_slot"),
+                PersistentDataType.BYTE, (byte) 1);
+        item.setItemMeta(meta);
+    }
+
+    private boolean isLockedStorageFiller(ItemStack item) {
+        return item != null
+                && !item.getType().isAir()
+                && item.hasItemMeta()
+                && item.getItemMeta().getPersistentDataContainer()
+                .has(new NamespacedKey(plugin, "hoc_locked_storage_slot"), PersistentDataType.BYTE);
+    }
+
+    private boolean isHallsCategory(ItemStack item, String category) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return false;
+        }
+        String actual = item.getItemMeta().getPersistentDataContainer()
+                .get(new NamespacedKey(plugin, "hoc_item_category"), PersistentDataType.STRING);
+        return category.equals(actual);
+    }
+
+    private boolean isHallsItem(ItemMeta meta) {
+        return meta.getPersistentDataContainer().has(new NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING);
+    }
+
+    private double hallsStat(ItemMeta meta, String statId) {
+        return hallsDouble(meta, "hoc_stat_" + statId);
+    }
+
+    private double hallsDouble(ItemMeta meta, String key) {
+        Double value = meta.getPersistentDataContainer().get(new NamespacedKey(plugin, key), PersistentDataType.DOUBLE);
+        return value == null ? 0.0 : value;
+    }
+
+    private void addOrReplaceLoreLine(ItemMeta meta, String line) {
+        List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
+        Component component = Component.text(line, NamedTextColor.DARK_AQUA);
+        for (int i = 0; i < lore.size(); i++) {
+            Component existing = lore.get(i);
+            if (net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                    .serialize(existing).startsWith("Grindstone bonus:")) {
+                lore.set(i, component);
+                meta.lore(lore);
+                return;
+            }
+        }
+        if (!lore.isEmpty()) {
+            lore.add(Component.empty());
+        }
+        lore.add(component);
+        meta.lore(lore);
     }
 
     private boolean canEquipEmptyArmorSlot(PlayerInventory inventory, ItemStack item) {

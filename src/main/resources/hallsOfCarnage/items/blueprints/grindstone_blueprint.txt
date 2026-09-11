@@ -6,4 +6,4 @@ material: PAPER
 item-model: minecraft:map
 max-stack-size: 1
 lore:
-  - "Unlocks future camp gear upgrading."
+  - "Unlocks a camp station for sharpening held weapons."

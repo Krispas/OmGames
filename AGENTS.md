@@ -1328,8 +1328,10 @@ SQLite tables:
 - Camp build-spot floors are rendered as oak planks for visibility and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
 - Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.txt|*.yml|*.yaml` and seeded from bundled defaults.
 - Building files define `id`, `name`, `size` (`small`, `medium`, `large`), `blueprint`, `implemented`, and `levels.<1|2|3>` with display `parts`, optional `empty-parts`, optional `upgrade-cost` stored-scrap requirements, optional `interaction.give-items` compatibility outputs, and optional `harvest.uses` / `harvest.items` for harvestable buildings.
-- Storage Locker buildings open persisted camp-plot inventories sized by building size and level: small lockers provide `9/18/27` slots, medium lockers provide `18/36/54`, and large lockers provide `27/54/54`; lockers cannot be destroyed until emptied.
-- Sculk Purifier buildings reduce current party sculk pressure from their camp GUI; reduction amount scales by purifier size and level.
+- Storage Locker buildings open persisted camp-plot inventories sized by building size and level: small lockers provide `1/2/3` usable slots, medium lockers provide `2/4/6`, and large lockers provide `4/8/12`; unused Bukkit row slots are locked filler, and lockers cannot be destroyed until emptied.
+- Sculk Purifier buildings have `3` charges per run, reduce only the clicking player's current sculk pressure from their camp GUI, and scale the amount by purifier size and level.
+- Grindstone buildings have `1` charge per run and increase the held Halls weapon's melee damage by the building level.
+- Forge buildings are medium camp buildings with `1` charge per run and repair the held Halls item's durability by `30% * level` of its maximum durability.
 - Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker and display parts are centered against plot centers/facing, including even-sized future plot footprints and scaled display parts.
 - Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Upgrade buttons show the stored-scrap cost plus practical effects such as newly unlocked station recipes or harvest changes.
 - Halls save snapshots live in `plugins/OmGames/HallsOfCarnage/saves/` as YAML files keyed by scenario id plus sorted participant UUIDs.
@@ -1345,7 +1347,7 @@ SQLite tables:
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility. `melee-damage`, `attack-speed`, and `durability` are also applied to item meta where Bukkit/Paper exposes the relevant component APIs.
 - `vagabonds_club` is the default starter weapon. Every participant receives it when a Halls run starts or fully restarts after game over.
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control blueprint keyword drops.
-- Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, storage lockers by size, mycelia farm, elevator drill, scanner, bounty board, and sculk purifiers by size.
+- Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, forge, storage lockers by size, mycelia farm, elevator drill, scanner, bounty board, and sculk purifiers by size.
 - Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `ranged`, `utility`, `rare_weapon`, `rare_armor`, `rare_ranged`, and `rare_utility`.
 - The generic `blueprint` loot keyword rolls the scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools.
 - `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions. If `<item>` is `wood_scrap`, `iron_scrap`, `diamond_scrap`, or `redstone_scrap`, the amount is deposited directly into the caller's active session elevator storage and awards the matching test coins.
