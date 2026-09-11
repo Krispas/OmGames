@@ -1313,7 +1313,7 @@ SQLite tables:
 - Halls breakable props are session-owned display/interactions and may be multi-part prop archetypes such as barrels, chests, tables, chairs, stools, radiators, and metal barrels; keep cleanup routed through `HallsSession`.
 - Halls breakable prop archetypes are loaded from `plugins/OmGames/HallsOfCarnage/breakables/` and seeded from bundled defaults.
 - Breakable files define `id`, `rarity`, `break-message`, `hitbox-height`, `particle-material`, `scrap-drops`, and `parts`.
-- Breakable display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees.
+- Breakable display parts support decimal `offset`, optional `block-data`, and `rotation`/`euler` `[x, y, z]` degrees.
 - Breakable loot pools live in `breakable_loot_pools/` by rarity; existing per-breakable `loot` entries are still parsed for compatibility and override the rarity pool for that breakable.
 - Generic breakable loot entries `scrap` / `random_scrap` choose randomly from that breakable's configured `scrap-drops`.
 - Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
@@ -1324,10 +1324,11 @@ SQLite tables:
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
 - Scenario floor definitions may include `layout`; camp floors use it to load `plugins/OmGames/HallsOfCarnage/level/<layout>`, such as `level/camps/camp_1.txt`.
 - Camp layout files preserve `X`, `O`, `C`, and `N/S/W/E`: `X` is solid, every other marker is open floor, `C` expands a build plot, and `N/S/W/E` marks the plot anchor/facing.
-- Camp build-spot floors are rendered with the active level type's normal floor material and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
+- Camp room walls use the active level type wall palette, camp corner/internal pillar-like columns use the pillar palette, and camp ceilings receive multiple embedded light blocks.
+- Camp build-spot floors are rendered as oak planks for visibility and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
 - Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.txt|*.yml|*.yaml` and seeded from bundled defaults.
 - Building files define `id`, `name`, `size` (`small`, `medium`, `large`), `blueprint`, `implemented`, and `levels.<1|2|3>` with display `parts`, optional `empty-parts`, optional `upgrade-cost` stored-scrap requirements, optional `interaction.give-items` compatibility outputs, and optional `harvest.uses` / `harvest.items` for harvestable buildings.
-- Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker.
+- Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker and display parts are centered against plot centers, including even-sized future plot footprints and scaled display parts.
 - Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Upgrade buttons show the stored-scrap cost plus practical effects such as newly unlocked station recipes or harvest changes. Current building state is session-local and is not yet persisted across save files or game-over restarts.
 - Camp floors connect the elevator corridor to the nearest open north-edge layout cell instead of assuming the layout center is open, and should keep the camp room far enough from the elevator to allow a walkable connector with a sealed corridor-height entrance.
 - Item recipes are parsed as stored-scrap and hotbar item costs. Cooking Pot, Weapon Bench, and Armory list scenario-unlocked recipes by station level and craft them from their building GUI.

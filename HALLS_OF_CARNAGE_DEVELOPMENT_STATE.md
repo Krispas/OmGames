@@ -148,12 +148,18 @@ This is the first implementation slice. It focuses on:
 - `/hoc give <wood_scrap|iron_scrap|diamond_scrap|redstone_scrap> [amount]` now deposits test scrap directly into the caller's active session elevator storage and awards the matching test coins.
 - Camp building upgrade-button lore now shows upgrade costs and practical effects, including newly unlocked crafting-station recipes and Mycelia Farm harvest changes.
 - Next reviewer slice applied: camp build-spot floors and the elevator exterior vestibule now use the active level type's floor/corridor/wall palette, and camp building block displays are spawned from block origins so configured parts are no longer shifted by half a block on X/Z.
+- Next reviewer slice applied: breakable prop offsets now preserve decimal values end-to-end, scaled breakable/building display parts are centered around their nominal cells, camp rooms use pillar palettes for corner/internal pillar-like columns, camp ceilings place multiple embedded lights, and camp build spots are visible oak-plank markers again.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice (do not remove this line, do all for the next slice):
-- Stool breakable is ignoring the decimal values in its model and seems to be using integers? I tried multiple things and its still the same
-- Not only camps dont use the pillar pallete, but its not properly generating lights, the build spots are now not using oak planks and its just the floor texture.
-- Some variations of the camp build spots (by variation I mean size/facing) still dont have centered buildings when built there
+- Some buildings in camps are still not positioned centered on the build plot. I am talking about small east and medium south. I have not tested other small ones, medium east/west.
+- Add the save system, I will describe how it should work.
+When going to a camp floor or leaving a game floor, game will create/overwrite a savefile. Savefile should save player inventories, all so far visited camp floors, their buildings and states of those buildings (not needed right now, as lockers are not yet in, but add the possibility). A game is also saved when going to the first floor as part of game over and when the campaign is started.
+When right clicking the lobby villager, player will have a choice to start a new campaign or load a savefile. Creating new campaign will present you with options of scenarios and difficulty option. Once done, it will send player to session settings.
+Clicking load will show the list of players save files. Clicking a savefile sends him to session settings.
+Difficulty has 3 optiosn, normal, hard and extreme. The difficulty chosen adds a first pass modifier for the difficulty of the scenarios floors. The modifiers are as follow (1.0, 1.5, 2.0)
+Session settings - a place where session is being finalized, here player can pick any players currently within the lobby to jump into the game with. Then the player can click play button, which loads/starts the game.
+Ingame, using command /hoc leave should end the current session, the command should be only runnable by player hosting the session, even if they do not have OP.
 
 Future (not this slice):
 - Continue camp work by adding persistent camp/save-file state so built buildings survive game-over restarts and later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.

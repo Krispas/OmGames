@@ -67,10 +67,10 @@ public final class HallsBreakableTypeLoader {
         List<HallsBreakableType.Part> parts = new ArrayList<>();
         for (Map<?, ?> map : yaml.getMapList("parts")) {
             Material material = material(String.valueOf(map.get("material")), Material.BARREL);
-            List<Integer> offset = intList(map.get("offset"));
-            int x = offset.size() > 0 ? offset.get(0) : intValue(map.get("offset-x"), 0);
-            int y = offset.size() > 1 ? offset.get(1) : intValue(map.get("offset-y"), 0);
-            int z = offset.size() > 2 ? offset.get(2) : intValue(map.get("offset-z"), 0);
+            double[] offset = vector(map.get("offset"), 0.0, 0.0, 0.0);
+            double x = map.containsKey("offset") ? offset[0] : doubleValue(map.get("offset-x"), 0.0);
+            double y = map.containsKey("offset") ? offset[1] : doubleValue(map.get("offset-y"), 0.0);
+            double z = map.containsKey("offset") ? offset[2] : doubleValue(map.get("offset-z"), 0.0);
             double[] rotation = vector(map.get("rotation"), 0.0, 0.0, 0.0);
             if (rotation[0] == 0.0 && rotation[1] == 0.0 && rotation[2] == 0.0) {
                 rotation = vector(map.get("euler"), 0.0, 0.0, 0.0);
@@ -152,17 +152,6 @@ public final class HallsBreakableTypeLoader {
         int min = parseInt(parts[0], 1);
         int max = parts.length > 1 ? parseInt(parts[1], min) : min;
         return new int[]{Math.max(1, min), Math.max(Math.max(1, min), max)};
-    }
-
-    private static List<Integer> intList(Object value) {
-        if (!(value instanceof List<?> raw)) {
-            return List.of();
-        }
-        List<Integer> ints = new ArrayList<>();
-        for (Object entry : raw) {
-            ints.add(intValue(entry, 0));
-        }
-        return ints;
     }
 
     private static double[] vector(Object value, double x, double y, double z) {

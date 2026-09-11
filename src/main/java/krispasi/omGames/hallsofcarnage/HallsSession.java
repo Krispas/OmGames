@@ -1974,7 +1974,7 @@ public final class HallsSession {
         }
     }
 
-    private UUID spawnPropDisplay(int x, int y, int z, HallsBreakableType.Part part) {
+    private UUID spawnPropDisplay(double x, double y, double z, HallsBreakableType.Part part) {
         Location displayLocation = new Location(world, x, y, z);
         BlockDisplay display = world.spawn(displayLocation, BlockDisplay.class, entity -> {
             entity.setBlock(displayBlockData(part.material(), part.blockData()));
@@ -2374,12 +2374,15 @@ public final class HallsSession {
     }
 
     private Transformation smallRandomScaleTransformation(double rotationX, double rotationY, double rotationZ) {
+        float scaleX = randomDisplayScale(1.0f);
+        float scaleY = randomDisplayScale(1.0f);
+        float scaleZ = randomDisplayScale(1.0f);
         return new Transformation(
-                new Vector3f(),
+                new Vector3f((1.0f - scaleX) * 0.5f, 0.0f, (1.0f - scaleZ) * 0.5f),
                 new Quaternionf().rotateXYZ((float) Math.toRadians(rotationX),
                         (float) Math.toRadians(rotationY),
                         (float) Math.toRadians(rotationZ)),
-                new Vector3f(randomDisplayScale(1.0f), randomDisplayScale(1.0f), randomDisplayScale(1.0f)),
+                new Vector3f(scaleX, scaleY, scaleZ),
                 new Quaternionf());
     }
 

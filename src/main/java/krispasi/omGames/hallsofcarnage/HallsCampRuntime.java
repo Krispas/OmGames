@@ -81,7 +81,7 @@ public final class HallsCampRuntime {
         return entity != null && plotsByEntity.containsKey(entity.getUniqueId());
     }
 
-    public void addPlot(int worldX, int y, int worldZ, HallsCampLayout.BuildSpot spot) {
+    public void addPlot(double worldX, int y, double worldZ, HallsCampLayout.BuildSpot spot) {
         Location location = new Location(world, worldX + 0.5, y, worldZ + 0.5);
         Interaction interaction = world.spawn(location, Interaction.class, entity -> {
             entity.setInteractionWidth(Math.max(1.0f, spot.maxX() - spot.minX() + 1.0f));
@@ -363,7 +363,7 @@ public final class HallsCampRuntime {
                 entity.setBlock(blockData(part.material(), part.blockData()));
                 entity.setBillboard(Display.Billboard.FIXED);
                 entity.setTransformation(new Transformation(
-                        new Vector3f(),
+                        centerTranslation(part.scaleX(), part.scaleZ()),
                         partRotation(part, plot.facing()),
                         new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
                         new Quaternionf()));
@@ -606,6 +606,10 @@ public final class HallsCampRuntime {
                         (float) Math.toRadians(part.rotationZ()));
     }
 
+    private Vector3f centerTranslation(double scaleX, double scaleZ) {
+        return new Vector3f((float) ((1.0 - scaleX) * 0.5), 0.0f, (float) ((1.0 - scaleZ) * 0.5));
+    }
+
     private double[] rotatedOffset(double x, double z, BlockFace facing) {
         return switch (facing) {
             case EAST -> new double[]{-z, x};
@@ -679,9 +683,9 @@ public final class HallsCampRuntime {
     private static final class Plot {
         private final int id;
         private final String size;
-        private final int x;
+        private final double x;
         private final int y;
-        private final int z;
+        private final double z;
         private final BlockFace facing;
         private final UUID interactionId;
         private final List<UUID> displayIds = new ArrayList<>();
@@ -690,7 +694,7 @@ public final class HallsCampRuntime {
         private int harvestRemaining;
         private int harvestUsed;
 
-        private Plot(int id, String size, int x, int y, int z, BlockFace facing, UUID interactionId) {
+        private Plot(int id, String size, double x, int y, double z, BlockFace facing, UUID interactionId) {
             this.id = id;
             this.size = size;
             this.x = x;
@@ -708,7 +712,7 @@ public final class HallsCampRuntime {
             return size;
         }
 
-        private int x() {
+        private double x() {
             return x;
         }
 
@@ -716,7 +720,7 @@ public final class HallsCampRuntime {
             return y;
         }
 
-        private int z() {
+        private double z() {
             return z;
         }
 

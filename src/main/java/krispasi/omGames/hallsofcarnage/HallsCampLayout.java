@@ -36,12 +36,12 @@ public record HallsCampLayout(List<String> rows,
                             int anchorZ,
                             BlockFace facing,
                             String size) {
-        public int centerX() {
-            return (minX + maxX) / 2;
+        public double centerX() {
+            return (minX + maxX) / 2.0;
         }
 
-        public int centerZ() {
-            return (minZ + maxZ) / 2;
+        public double centerZ() {
+            return (minZ + maxZ) / 2.0;
         }
     }
 }
