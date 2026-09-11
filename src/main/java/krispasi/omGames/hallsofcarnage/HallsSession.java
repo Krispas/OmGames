@@ -27,6 +27,7 @@ import org.bukkit.block.Container;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.MultipleFacing;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
@@ -77,10 +78,12 @@ public final class HallsSession {
     private final Map<String, HallsModifierType> modifierTypes;
     private final Map<String, HallsBuildingType> buildingTypes;
     private final Set<UUID> participants;
+    private final UUID hostId;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
     private final Map<String, Long> utilityCooldowns = new HashMap<>();
+    private final Map<Integer, List<HallsCampRuntime.PlotState>> savedCampStates = new HashMap<>();
     private final HallsSessionTrapRuntime trapRuntime;
     private final HallsSessionMonsterRuntime monsterRuntime;
     private final HallsSessionSculkRuntime sculkRuntime;
@@ -123,6 +126,7 @@ public final class HallsSession {
                         Map<String, HallsMonsterType> monsterTypes,
                         Map<String, HallsModifierType> modifierTypes,
                         Map<String, HallsBuildingType> buildingTypes,
+                        UUID hostId,
                         List<Player> players) {
         this.plugin = plugin;
         this.id = id;
@@ -137,6 +141,7 @@ public final class HallsSession {
         this.monsterTypes = monsterTypes == null ? Map.of() : Map.copyOf(monsterTypes);
         this.modifierTypes = modifierTypes == null ? Map.of() : Map.copyOf(modifierTypes);
         this.buildingTypes = buildingTypes == null ? Map.of() : Map.copyOf(buildingTypes);
+        this.hostId = hostId;
         this.participants = new HashSet<>();
         for (Player player : players) {
             participants.add(player.getUniqueId());
@@ -201,6 +206,14 @@ public final class HallsSession {
 
     public Set<UUID> participants() {
         return Set.copyOf(participants);
+    }
+
+    public UUID hostId() {
+        return hostId;
+    }
+
+    public boolean isHost(Player player) {
+        return player != null && player.getUniqueId().equals(hostId);
     }
 
     public boolean isSessionEntity(Entity entity) {
@@ -335,6 +348,7 @@ public final class HallsSession {
             }
             boolean leftBehind = markLeftBehindPlayersAsGhosts();
             captureElevatorChestContents();
+            save("floor-leave");
             removeElevatorCompasses();
             elevatorChestSnapshotLocked = true;
             transitioning = true;
@@ -584,6 +598,7 @@ public final class HallsSession {
             player.sendTitle("Entering " + scenario.name(), "Floor 1", 0, 45, 15);
             player.sendMessage(Component.text("Entering " + scenario.name() + " floor 1.", NamedTextColor.DARK_RED));
         }
+        save("campaign-start");
     }
 
     public void stop(Location fallback) {
@@ -691,6 +706,7 @@ public final class HallsSession {
     }
 
     private void buildExplorationFloor(int floor) {
+        captureCurrentCampState();
         captureElevatorChestContents();
         removeSessionEntities();
         activeClearRadius = clearRadiusFor(scenario.floor(floor));
@@ -712,6 +728,7 @@ public final class HallsSession {
     }
 
     private void buildCampFloor(int floor) {
+        captureCurrentCampState();
         captureElevatorChestContents();
         removeSessionEntities();
         HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
@@ -739,10 +756,12 @@ public final class HallsSession {
         int entranceX = nearestCampEntranceX(layout, origin.x() - roomStartX);
         new HallsCampFloorBuilder(this::setBlock, campRuntime).build(layout, roomStartX, origin.y(), roomStartZ,
                 levelType, entranceX);
+        campRuntime.restore(savedCampStates.get(floor));
         buildCampConnector(roomStartX + entranceX, origin.y(), roomStartZ - 1, levelType);
         restoreElevatorChestContents();
         closeElevatorDoors();
         teleportParticipantsToElevator("Camp Floor " + floor, "Build, upgrade, and regroup.");
+        save("camp-floor");
     }
 
     private int nearestCampEntranceX(HallsCampLayout layout, int targetX) {
@@ -2588,6 +2607,108 @@ public final class HallsSession {
                 player.sendTitle("Run Lost", "Back to floor 1.", 0, 45, 15);
             }
         }
+        save("game-over-restart");
+    }
+
+    public void save(String reason) {
+        try {
+            captureCurrentCampState();
+            if (!elevatorChestSnapshotLocked) {
+                captureElevatorChestContents();
+            }
+            File folder = new File(dataFolder, "saves");
+            if (!folder.exists() && !folder.mkdirs()) {
+                plugin.getLogger().warning("Failed to create Halls save folder: " + folder);
+                return;
+            }
+            YamlConfiguration yaml = new YamlConfiguration();
+            yaml.set("schema-version", 1);
+            yaml.set("reason", reason);
+            yaml.set("scenario", scenario.id());
+            yaml.set("host", hostId.toString());
+            yaml.set("current-floor", currentFloor);
+            yaml.set("active-level-type", activeLevelTypeId);
+            yaml.set("saved-at", System.currentTimeMillis());
+            yaml.set("participants", participants.stream().map(UUID::toString).sorted().toList());
+            yaml.set("storage.wood", woodScrap);
+            yaml.set("storage.iron", ironScrap);
+            yaml.set("storage.diamond", diamondScrap);
+            yaml.set("storage.redstone", redstoneScrap);
+            yaml.set("storage.coins", coins);
+            yaml.set("elevator-chest", java.util.Arrays.asList(elevatorChestContents));
+            savePlayers(yaml);
+            saveCamps(yaml);
+            yaml.save(saveFile());
+        } catch (IOException | RuntimeException ex) {
+            plugin.getLogger().warning("Failed to save Halls session " + id + ": " + ex.getMessage());
+        }
+    }
+
+    private void savePlayers(YamlConfiguration yaml) {
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            String path = "players." + playerId;
+            yaml.set(path + ".ghost", ghostPlayers.contains(playerId));
+            if (player == null) {
+                continue;
+            }
+            yaml.set(path + ".name", player.getName());
+            PlayerInventory inventory = player.getInventory();
+            List<ItemStack> hotbar = new ArrayList<>();
+            for (int slot = 0; slot <= 8; slot++) {
+                hotbar.add(cloneOrNull(inventory.getItem(slot)));
+            }
+            yaml.set(path + ".hotbar", hotbar);
+            yaml.set(path + ".armor", java.util.Arrays.asList(inventory.getArmorContents()));
+            yaml.set(path + ".offhand", cloneOrNull(inventory.getItemInOffHand()));
+        }
+    }
+
+    private void saveCamps(YamlConfiguration yaml) {
+        for (Map.Entry<Integer, List<HallsCampRuntime.PlotState>> entry : savedCampStates.entrySet()) {
+            List<Map<String, Object>> plots = new ArrayList<>();
+            for (HallsCampRuntime.PlotState state : entry.getValue()) {
+                Map<String, Object> row = new HashMap<>();
+                row.put("plot", state.plotId());
+                row.put("building", state.buildingId());
+                row.put("level", state.level());
+                row.put("harvest-remaining", state.harvestRemaining());
+                row.put("harvest-used", state.harvestUsed());
+                plots.add(row);
+            }
+            yaml.set("camps." + entry.getKey() + ".plots", plots);
+        }
+    }
+
+    private File saveFile() {
+        String participantsKey = participants.stream()
+                .map(UUID::toString)
+                .sorted()
+                .collect(java.util.stream.Collectors.joining("_"));
+        return new File(new File(dataFolder, "saves"), scenario.id() + "_" + participantsKey + ".yml");
+    }
+
+    private ItemStack cloneOrNull(ItemStack item) {
+        return item == null || item.getType().isAir() ? null : item.clone();
+    }
+
+    private void captureCurrentCampState() {
+        if (!isCurrentFloorCamp()) {
+            return;
+        }
+        List<HallsCampRuntime.PlotState> snapshot = campRuntime.snapshot();
+        if (snapshot.isEmpty()) {
+            savedCampStates.remove(currentFloor);
+            return;
+        }
+        savedCampStates.put(currentFloor, snapshot);
+    }
+
+    private boolean isCurrentFloorCamp() {
+        if (currentFloor < 1 || currentFloor > scenario.floorCount()) {
+            return false;
+        }
+        return "camp".equalsIgnoreCase(scenario.floor(currentFloor).kind());
     }
 
     private void resetRunState() {

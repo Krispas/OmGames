@@ -163,7 +163,7 @@ public final class HallsOfCarnageListener implements Listener {
         manager.openMainMenu(event.getPlayer());
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (!manager.isHallsWorld(event.getPlayer().getWorld())) {
             return;
@@ -174,6 +174,9 @@ public final class HallsOfCarnageListener implements Listener {
         if ((event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK)
                 && manager.handleUtilityUse(event.getPlayer(), event.getItem())) {
             event.setCancelled(true);
+            return;
+        }
+        if (event.isCancelled()) {
             return;
         }
         if (event.getClickedBlock() == null) {

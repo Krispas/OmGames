@@ -95,6 +95,39 @@ public final class HallsCampRuntime {
         plotsByEntity.put(interaction.getUniqueId(), plot);
     }
 
+    public List<PlotState> snapshot() {
+        List<PlotState> states = new ArrayList<>();
+        for (Plot plot : plotsById.values()) {
+            if (plot.buildingId() == null) {
+                continue;
+            }
+            states.add(new PlotState(plot.id(), plot.buildingId(), plot.level(),
+                    plot.harvestRemaining(), plot.harvestUsed()));
+        }
+        return states;
+    }
+
+    public void restore(List<PlotState> states) {
+        if (states == null || states.isEmpty()) {
+            return;
+        }
+        for (PlotState state : states) {
+            Plot plot = plotsById.get(state.plotId());
+            HallsBuildingType building = buildingTypes.get(state.buildingId());
+            if (plot == null || building == null || !building.fits(plot.size())) {
+                continue;
+            }
+            int level = Math.max(1, Math.min(3, state.level()));
+            setBuilding(plot, building, level);
+            plot.setHarvestRemaining(state.harvestRemaining());
+            plot.setHarvestUsed(state.harvestUsed());
+            HallsBuildingType.Level buildingLevel = building.level(level);
+            if (plot.harvestRemaining() <= 0 && !buildingLevel.emptyParts().isEmpty()) {
+                setDisplays(plot, building, buildingLevel.emptyParts());
+            }
+        }
+    }
+
     public boolean handleInteract(Player player, Entity entity) {
         if (player == null || entity == null) {
             return false;
@@ -358,12 +391,15 @@ public final class HallsCampRuntime {
         removeDisplays(plot);
         for (HallsBuildingType.Part part : parts) {
             double[] offset = rotatedOffset(part.offsetX(), part.offsetZ(), plot.facing());
-            Location location = new Location(world, plot.x() + offset[0], plot.y() + part.offsetY(), plot.z() + offset[1]);
+            Location location = new Location(world,
+                    plot.x() + 0.5 + offset[0],
+                    plot.y() + part.offsetY(),
+                    plot.z() + 0.5 + offset[1]);
             BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
                 entity.setBlock(blockData(part.material(), part.blockData()));
                 entity.setBillboard(Display.Billboard.FIXED);
                 entity.setTransformation(new Transformation(
-                        centerTranslation(part.scaleX(), part.scaleZ()),
+                        centerOnDisplayOrigin(part.scaleX(), part.scaleZ()),
                         partRotation(part, plot.facing()),
                         new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
                         new Quaternionf()));
@@ -606,8 +642,8 @@ public final class HallsCampRuntime {
                         (float) Math.toRadians(part.rotationZ()));
     }
 
-    private Vector3f centerTranslation(double scaleX, double scaleZ) {
-        return new Vector3f((float) ((1.0 - scaleX) * 0.5), 0.0f, (float) ((1.0 - scaleZ) * 0.5));
+    private Vector3f centerOnDisplayOrigin(double scaleX, double scaleZ) {
+        return new Vector3f((float) (-scaleX * 0.5), 0.0f, (float) (-scaleZ * 0.5));
     }
 
     private double[] rotatedOffset(double x, double z, BlockFace facing) {
@@ -774,6 +810,9 @@ public final class HallsCampRuntime {
     }
 
     private static final int[] RECIPE_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 23, 24, 25};
+
+    public record PlotState(int plotId, String buildingId, int level, int harvestRemaining, int harvestUsed) {
+    }
 
     private record CampMenu(int plotId) implements InventoryHolder {
         @Override

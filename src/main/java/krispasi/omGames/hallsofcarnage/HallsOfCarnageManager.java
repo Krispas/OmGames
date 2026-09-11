@@ -594,9 +594,12 @@ public final class HallsOfCarnageManager {
         }
         int sessionId = nextSessionId++;
         int slot = firstFreeSessionSlot();
+        UUID hostId = initiator != null && players.contains(initiator)
+                ? initiator.getUniqueId()
+                : players.getFirst().getUniqueId();
         HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot),
                 getDataFolder(), levelTypes, breakableTypes, itemTypes, trapTypes, monsterTypes, modifierTypes,
-                buildingTypes, players);
+                buildingTypes, hostId, players);
         try {
             session.start();
         } catch (IOException ex) {
@@ -609,6 +612,27 @@ public final class HallsOfCarnageManager {
         }
         return Result.ok("Started Halls session " + sessionId + " for " + scenario.name() + " with "
                 + players.size() + " player" + (players.size() == 1 ? "" : "s") + ".");
+    }
+
+    public Result leaveSession(Player player) {
+        if (player == null) {
+            return Result.fail("Only players can leave a Halls session.");
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        if (sessionId == null) {
+            return Result.fail("You are not in an active Halls session.");
+        }
+        HallsSession session = activeSessions.get(sessionId);
+        if (session == null) {
+            playerSessions.remove(player.getUniqueId());
+            return Result.fail("Your Halls session is no longer active.");
+        }
+        if (!session.isHost(player)) {
+            return Result.fail("Only the session host can end this Halls run.");
+        }
+        session.save("host-leave");
+        stopSession(sessionId, true);
+        return Result.ok("Saved and ended Halls session " + sessionId + ".");
     }
 
     public Result stopSession(String rawSessionId) {

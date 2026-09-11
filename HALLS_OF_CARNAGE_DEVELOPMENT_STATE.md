@@ -149,19 +149,21 @@ This is the first implementation slice. It focuses on:
 - Camp building upgrade-button lore now shows upgrade costs and practical effects, including newly unlocked crafting-station recipes and Mycelia Farm harvest changes.
 - Next reviewer slice applied: camp build-spot floors and the elevator exterior vestibule now use the active level type's floor/corridor/wall palette, and camp building block displays are spawned from block origins so configured parts are no longer shifted by half a block on X/Z.
 - Next reviewer slice applied: breakable prop offsets now preserve decimal values end-to-end, scaled breakable/building display parts are centered around their nominal cells, camp rooms use pillar palettes for corner/internal pillar-like columns, camp ceilings place multiple embedded lights, and camp build spots are visible oak-plank markers again.
+- Next development slice applied: camp building display offsets are now treated as part centers and rendered around the display origin, improving facing-independent centering for small/medium plots such as east-facing small and south-facing medium spots.
+- Smoke Bomb and Warding Totem utility handling now receives right-click-air interactions even when the interaction event is already cancelled, while cancelled non-utility block handling remains ignored.
+- First-pass Halls save snapshots are written under `plugins/OmGames/HallsOfCarnage/saves/` as YAML files keyed by scenario id plus sorted participant UUIDs.
+- Save snapshots currently record schema version, save reason, scenario id, host UUID, current floor, active level type, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, elevator transfer chest contents, stored scrap/coins, and visited camp plot building state with level/harvest counters.
+- Saves are created/overwritten when a campaign starts, when the elevator leaves a floor, when a camp floor is reached, when game-over restarts the run at floor 1, and when the host uses `/hoc leave`.
+- `/hoc leave` is now a player-only non-OP command for the active session host; it saves the run, ends the session, and returns participants through normal session cleanup.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice (do not remove this line, do all for the next slice):
-- Some buildings in camps are still not positioned centered on the build plot. I am talking about small east and medium south. I have not tested other small ones, medium east/west.
-- Add the save system, I will describe how it should work.
-- Make it so utilities like smoke bomb and warding totem can be used by right clicking into the air
-When going to a camp floor or leaving a game floor, game will create/overwrite a savefile. Savefile should save player inventories, all so far visited camp floors, their buildings and states of those buildings (not needed right now, as lockers are not yet in, but add the possibility). A game is also saved when going to the first floor as part of game over and when the campaign is started.
 When right clicking the lobby villager, player will have a choice to start a new campaign or load a savefile. Creating new campaign will present you with options of scenarios and difficulty option. Once done, it will send player to session settings.
 Clicking load will show the list of players save files. Clicking a savefile sends him to session settings.
 Difficulty has 3 optiosn, normal, hard and extreme. The difficulty chosen adds a first pass modifier for the difficulty of the scenarios floors. The modifiers are as follow (1.0, 1.5, 2.0)
 Session settings - a place where session is being finalized, here player can pick any players currently within the lobby to jump into the game with. Then the player can click play button, which loads/starts the game.
-Ingame, using command /hoc leave should end the current session, the command should be only runnable by player hosting the session, even if they do not have OP.
+- Savefile loading is not implemented yet; current saves are write-only scaffolding for the next GUI/load slice.
 
 Future (not this slice):
-- Continue camp work by adding persistent camp/save-file state so built buildings survive game-over restarts and later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.
+- Continue camp work by loading persistent camp/save-file state so built buildings survive later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.
 
