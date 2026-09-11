@@ -124,8 +124,6 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/weapons/bone_cleaver.txt",
             "hallsOfCarnage/items/weapons/frost_lance.txt",
             "hallsOfCarnage/items/weapons/sculk_maul.txt",
-            "hallsOfCarnage/items/weapons/short_bow.txt",
-            "hallsOfCarnage/items/weapons/storm_crossbow.txt",
             "hallsOfCarnage/items/armors/padded_armor.txt",
             "hallsOfCarnage/items/armors/reinforced_chestplate.txt",
             "hallsOfCarnage/items/armors/chainmail_hauberk.txt",

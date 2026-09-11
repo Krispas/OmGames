@@ -18,6 +18,7 @@ import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Ageable;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Creature;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
@@ -42,6 +43,7 @@ final class HallsSessionMonsterRuntime {
     private final IntSupplier maxSculkSupplier;
     private final Predicate<UUID> aliveParticipantPredicate;
     private final Set<UUID> spawnedMonsters = new HashSet<>();
+    private final Set<UUID> lureTargets = new HashSet<>();
     private final Map<UUID, Long> concealedParticipants = new java.util.HashMap<>();
     private List<HallsExplorationGenerator.Cell> spawnCells = List.of();
     private List<HallsMonsterType> commonPool = List.of();
@@ -111,7 +113,14 @@ final class HallsSessionMonsterRuntime {
                 entity.remove();
             }
         }
+        for (UUID entityId : Set.copyOf(lureTargets)) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity != null) {
+                entity.remove();
+            }
+        }
         spawnedMonsters.clear();
+        lureTargets.clear();
         concealedParticipants.clear();
         spawnCells = List.of();
         spawnedThisFloor = 0;
@@ -181,6 +190,44 @@ final class HallsSessionMonsterRuntime {
                 creature.setTarget(null);
             }
         }
+    }
+
+    boolean lure(Location source, Location target, double radius, int durationTicks) {
+        if (source == null || target == null || !world.equals(source.getWorld()) || !world.equals(target.getWorld())) {
+            return false;
+        }
+        ArmorStand stand = world.spawn(target, ArmorStand.class, entity -> {
+            entity.setInvisible(true);
+            entity.setInvulnerable(true);
+            entity.setMarker(false);
+            entity.setSilent(true);
+            entity.setGravity(false);
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_lure");
+        });
+        lureTargets.add(stand.getUniqueId());
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            lureTargets.remove(stand.getUniqueId());
+            if (stand.isValid()) {
+                stand.remove();
+            }
+        }, Math.max(20L, durationTicks));
+        double radiusSquared = radius * radius;
+        int affected = 0;
+        for (UUID entityId : Set.copyOf(spawnedMonsters)) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity instanceof Creature creature && creature.getWorld().equals(world)
+                    && creature.getLocation().distanceSquared(source) <= radiusSquared) {
+                creature.setTarget(stand);
+                affected++;
+            }
+        }
+        if (affected == 0) {
+            lureTargets.remove(stand.getUniqueId());
+            stand.remove();
+            return false;
+        }
+        return true;
     }
 
     void concealParticipant(UUID playerId, long durationMillis) {

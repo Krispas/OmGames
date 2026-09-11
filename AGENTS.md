@@ -1320,7 +1320,7 @@ SQLite tables:
 - Exploration floors force exactly one rare breakable prop in a random generated room when a rare breakable archetype is available, and normal generated prop slots should use common breakables.
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, optional `recipe` cost map, and an optional `stats` map.
-- Halls no longer uses a separate `ranged` item category; bows, crossbows, tridents, and other ranged gear are `weapon` items.
+- Halls player item defaults do not include ranged gear; do not add bows, crossbows, tridents, arrows, or fireworks as Halls player items unless the design changes again.
 - Armor `item-model` controls the item icon/model; armor `armor-model` is written to Paper's equippable component for the worn armor model.
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
 - Scenario floor definitions may include `layout`; camp floors use it to load `plugins/OmGames/HallsOfCarnage/level/<layout>`, such as `level/camps/camp_1.txt`.
@@ -1354,7 +1354,7 @@ SQLite tables:
 - `vagabonds_club` is the default starter weapon. Every participant receives it when a Halls run starts or fully restarts after game over.
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control blueprint keyword drops.
 - Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, forge, storage lockers by size, mycelia farm, elevator drill, scanner, health totem, speed totem, and sculk purifiers by size.
-- Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `utility`, `rare_weapon`, `rare_armor`, and `rare_utility`; old `ranged` / `rare_ranged` loot keywords are compatibility aliases for weapon rolls.
+- Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `utility`, `rare_weapon`, `rare_armor`, and `rare_utility`; `ranged` / `rare_ranged` are no longer supported Halls loot keywords.
 - The generic `blueprint` loot keyword rolls the scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools.
 - `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions. If `<item>` is `wood_scrap`, `iron_scrap`, `diamond_scrap`, or `redstone_scrap`, the amount is deposited directly into the caller's active session elevator storage and awards the matching test coins.
 - Halls armor items equip into empty matching armor slots from `/hoc give`; right-click physics-drop pickup still inserts into the selected hotbar slot.

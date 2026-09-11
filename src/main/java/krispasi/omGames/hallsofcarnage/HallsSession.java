@@ -70,6 +70,7 @@ public final class HallsSession {
     private static final long LEFT_BEHIND_MODIFIER_DELAY_TICKS = 100L;
     private static final String HEALTH_TOTEM_MODIFIER = "hoc_health_totem";
     private static final String SPEED_TOTEM_MODIFIER = "hoc_speed_totem";
+    private static final long SCULK_MAUL_SPLASH_COOLDOWN_MILLIS = 350L;
 
     private final JavaPlugin plugin;
     private final int id;
@@ -93,6 +94,8 @@ public final class HallsSession {
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
     private final Map<String, Long> utilityCooldowns = new HashMap<>();
+    private final Map<String, Long> sculkMaulSplashCooldowns = new HashMap<>();
+    private final Set<UUID> sculkMaulSplashing = new HashSet<>();
     private final Map<Integer, List<HallsCampRuntime.PlotState>> savedCampStates = new HashMap<>();
     private final Map<Integer, HallsFloorModifiers> scannedFloorModifiers = new HashMap<>();
     private final HallsSessionTrapRuntime trapRuntime;
@@ -547,6 +550,9 @@ public final class HallsSession {
         if (type == null || !type.id().equals("sculk_maul")) {
             return false;
         }
+        if (sculkMaulSplashing.contains(player.getUniqueId()) || !canTriggerSculkMaulSplash(player, living)) {
+            return false;
+        }
         double radius = Math.max(0.0, type.stats().getOrDefault("aoe_radius", 0.0));
         double damage = Math.max(0.0, type.stats().getOrDefault("aoe_damage", 0.0));
         if (radius <= 0.0 || damage <= 0.0) {
@@ -554,22 +560,41 @@ public final class HallsSession {
         }
         Location center = living.getLocation();
         int hits = 0;
-        for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
-            if (!(nearby instanceof LivingEntity nearbyLiving)
-                    || nearbyLiving.getUniqueId().equals(living.getUniqueId())
-                    || !monsterRuntime.isSessionMonster(nearbyLiving)
-                    || nearbyLiving.getLocation().distanceSquared(center) > radius * radius) {
-                continue;
+        sculkMaulSplashing.add(player.getUniqueId());
+        try {
+            for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
+                if (!(nearby instanceof LivingEntity nearbyLiving)
+                        || nearbyLiving.getUniqueId().equals(living.getUniqueId())
+                        || !monsterRuntime.isSessionMonster(nearbyLiving)
+                        || nearbyLiving.getLocation().distanceSquared(center) > radius * radius) {
+                    continue;
+                }
+                nearbyLiving.damage(Math.min(damage, Math.max(0.0, nearbyLiving.getHealth() - 0.5)), player);
+                hits++;
             }
-            nearbyLiving.damage(damage, player);
-            hits++;
+        } finally {
+            sculkMaulSplashing.remove(player.getUniqueId());
         }
         if (hits > 0) {
             world.spawnParticle(Particle.SCULK_SOUL, center.clone().add(0.0, 0.8, 0.0),
-                    28, radius * 0.25, 0.45, radius * 0.25, 0.03);
-            world.playSound(center, Sound.BLOCK_SCULK_SHRIEKER_SHRIEK, 0.45f, 1.35f);
+                    8, radius * 0.16, 0.25, radius * 0.16, 0.01);
+            world.playSound(center, Sound.BLOCK_SCULK_SENSOR_CLICKING, 0.18f, 0.75f);
         }
         return hits > 0;
+    }
+
+    private boolean canTriggerSculkMaulSplash(Player player, LivingEntity target) {
+        String key = player.getUniqueId() + ":" + target.getUniqueId();
+        long now = System.currentTimeMillis();
+        long nextAllowed = sculkMaulSplashCooldowns.getOrDefault(key, 0L);
+        if (nextAllowed > now) {
+            return false;
+        }
+        sculkMaulSplashCooldowns.put(key, now + SCULK_MAUL_SPLASH_COOLDOWN_MILLIS);
+        if (sculkMaulSplashCooldowns.size() > 256) {
+            sculkMaulSplashCooldowns.entrySet().removeIf(entry -> entry.getValue() <= now);
+        }
+        return true;
     }
 
     private void applyArmorHitEffects(Player player) {
@@ -684,7 +709,7 @@ public final class HallsSession {
                 if (isUtilityOnCooldown(player, type)) {
                     yield true;
                 }
-                activateSelfBuffUtility(player, type, PotionEffectType.RESISTANCE, "resistance", "Ironhide seals your wounds.", Sound.BLOCK_ANVIL_USE);
+                activateSelfBuffUtility(player, type, PotionEffectType.RESISTANCE, "resistance", "Ironhide seals your skin.", Sound.BLOCK_ANVIL_USE);
                 applyUtilityCooldown(player, type);
                 yield true;
             }
@@ -701,8 +726,9 @@ public final class HallsSession {
                 if (isUtilityOnCooldown(player, type)) {
                     yield true;
                 }
-                activateEchoLure(player, type);
-                applyUtilityCooldown(player, type);
+                if (activateEchoLure(player, type)) {
+                    applyUtilityCooldown(player, type);
+                }
                 yield true;
             }
             default -> false;
@@ -2326,10 +2352,8 @@ public final class HallsSession {
         }
         return switch (reward) {
             case "weapon", "armor", "utility", "food" -> randomAllowedItem(reward, "normal", amount);
-            case "ranged" -> randomAllowedItem("weapon", "normal", amount);
             case "rare_weapon" -> randomAllowedItem("weapon", "rare", amount);
             case "rare_armor" -> randomAllowedItem("armor", "rare", amount);
-            case "rare_ranged" -> randomAllowedItem("weapon", "rare", amount);
             case "rare_utility" -> randomAllowedItem("utility", "rare", amount);
             case "rare_food" -> randomAllowedItem("food", "rare", amount);
             default -> null;
@@ -2459,14 +2483,25 @@ public final class HallsSession {
         player.sendActionBar(Component.text(message, NamedTextColor.AQUA));
     }
 
-    private void activateEchoLure(Player player, HallsItemType type) {
+    private boolean activateEchoLure(Player player, HallsItemType type) {
         double radius = Math.max(6.0, type.stats().getOrDefault("radius", 12.0));
-        monsterRuntime.clearTargetsNear(player.getLocation(), radius);
-        Location lure = player.getLocation().add(player.getLocation().getDirection().normalize().multiply(radius * 0.75));
-        monsterRuntime.alert(lure);
-        world.spawnParticle(Particle.NOTE, lure.add(0.0, 1.0, 0.0), 24, 0.7, 0.45, 0.7, 0.02);
+        int durationTicks = Math.max(40, (int) Math.round(type.stats().getOrDefault("duration_seconds", 8.0) * 20.0));
+        Vector direction = player.getLocation().getDirection().clone();
+        direction.setY(0.0);
+        if (direction.lengthSquared() < 0.01) {
+            direction = new Vector(0.0, 0.0, 1.0);
+        }
+        direction.normalize();
+        Location lure = player.getLocation().clone().add(direction.multiply(radius * 0.75));
+        lure.setY(origin.y());
+        if (!monsterRuntime.lure(player.getLocation(), lure, radius, durationTicks)) {
+            player.sendActionBar(Component.text("No monsters hear the lure.", NamedTextColor.GRAY));
+            return false;
+        }
+        world.spawnParticle(Particle.NOTE, lure.clone().add(0.0, 1.0, 0.0), 24, 0.7, 0.45, 0.7, 0.02);
         world.playSound(lure, Sound.BLOCK_NOTE_BLOCK_BELL, 1.0f, 0.75f);
         player.sendActionBar(Component.text("Echoes pull nearby monsters away.", NamedTextColor.LIGHT_PURPLE));
+        return true;
     }
 
     private boolean isUtilityOnCooldown(Player player, HallsItemType type) {
@@ -2485,7 +2520,9 @@ public final class HallsSession {
             return;
         }
         utilityCooldowns.put(utilityCooldownKey(player, type), System.currentTimeMillis() + cooldownTicks * 50L);
-        player.setCooldown(type.material(), cooldownTicks);
+        org.bukkit.NamespacedKey cooldownKey = new org.bukkit.NamespacedKey(plugin, "hoc_" + type.id());
+        player.setCooldown(cooldownKey, cooldownTicks);
+        player.setCooldown(player.getInventory().getItemInMainHand(), cooldownTicks);
     }
 
     private String utilityCooldownKey(Player player, HallsItemType type) {
@@ -2980,6 +3017,8 @@ public final class HallsSession {
         activeFloorModifiers = HallsFloorModifiers.none();
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
+        sculkMaulSplashCooldowns.clear();
+        sculkMaulSplashing.clear();
         scannedFloorModifiers.clear();
         healthTotemLevels.clear();
         speedTotemLevels.clear();
@@ -3098,6 +3137,8 @@ public final class HallsSession {
         activeFloorModifiers = HallsFloorModifiers.none();
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
+        sculkMaulSplashCooldowns.clear();
+        sculkMaulSplashing.clear();
         scannedFloorModifiers.clear();
         healthTotemLevels.clear();
         speedTotemLevels.clear();

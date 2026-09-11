@@ -10,8 +10,8 @@ lore:
 stats:
   melee-damage: 9
   attack-speed: 0.9
-  aoe-damage: 3
-  aoe-radius: 3.5
+  aoe-damage: 1.5
+  aoe-radius: 2.75
   durability: 120
 recipe:
   iron_scrap: 10

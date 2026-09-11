@@ -36,6 +36,7 @@ final class HallsExplorationGenerator {
     private final Set<Cell> roomShellCells = new HashSet<>();
     private final Set<Cell> roomInteriorCells = new HashSet<>();
     private final Set<Cell> networkCells = new HashSet<>();
+    private final Map<DoorOffsetKey, List<Integer>> validDoorOffsetCache = new HashMap<>();
 
     private HallsExplorationGenerator(int originX,
                                       int originZ,
@@ -239,6 +240,11 @@ final class HallsExplorationGenerator {
     }
 
     private List<Integer> validDoorOffsets(HallsLayout layout, BlockFace face) {
+        DoorOffsetKey key = new DoorOffsetKey(layout, face);
+        List<Integer> cached = validDoorOffsetCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
         int span = face == BlockFace.NORTH || face == BlockFace.SOUTH ? layout.width() : layout.depth();
         List<Integer> offsets = new ArrayList<>();
         for (int offset = 1; offset < span - 1; offset++) {
@@ -246,7 +252,9 @@ final class HallsExplorationGenerator {
                 offsets.add(offset);
             }
         }
-        return offsets;
+        List<Integer> result = List.copyOf(offsets);
+        validDoorOffsetCache.put(key, result);
+        return result;
     }
 
     private boolean isValidDoorOffset(HallsLayout layout, BlockFace face, int offset) {
@@ -757,20 +765,17 @@ final class HallsExplorationGenerator {
         mazeCells.add(start);
         int targetCells = Math.min(mazeArea.size(), Math.max(160, rooms.size() * 80));
         int attempts = 0;
+        Map<Cell, List<OpenHallStep>> steps = openHallSteps(mazeArea);
         while (!stack.isEmpty() && mazeCells.size() < targetCells && attempts++ < targetCells * 20) {
             Cell current = stack.peek();
-            List<BlockFace> faces = new ArrayList<>(List.of(CARDINAL_FACES));
-            Collections.shuffle(faces, random);
+            List<OpenHallStep> candidates = new ArrayList<>(steps.getOrDefault(current, List.of()));
+            Collections.shuffle(candidates, random);
             Cell next = null;
-            for (BlockFace face : faces) {
-                Cell candidate = step(step(current, face), face);
-                Cell between = step(current, face);
-                if (mazeArea.contains(candidate) && mazeArea.contains(between)
-                        && !mazeCells.contains(candidate)
-                        && !mazeCells.contains(between)) {
-                    next = candidate;
-                    mazeCells.add(between);
-                    mazeCells.add(candidate);
+            for (OpenHallStep candidate : candidates) {
+                if (!mazeCells.contains(candidate.target()) && !mazeCells.contains(candidate.between())) {
+                    next = candidate.target();
+                    mazeCells.add(candidate.between());
+                    mazeCells.add(candidate.target());
                     break;
                 }
             }
@@ -785,6 +790,22 @@ final class HallsExplorationGenerator {
         }
         rememberCorridor(new ArrayList<>(mazeCells));
         addMazeRoomOpenings(mazeCells);
+    }
+
+    private Map<Cell, List<OpenHallStep>> openHallSteps(Set<Cell> mazeArea) {
+        Map<Cell, List<OpenHallStep>> steps = new HashMap<>();
+        for (Cell cell : mazeArea) {
+            List<OpenHallStep> candidates = new ArrayList<>(4);
+            for (BlockFace face : CARDINAL_FACES) {
+                Cell between = step(cell, face);
+                Cell target = step(between, face);
+                if (mazeArea.contains(between) && mazeArea.contains(target)) {
+                    candidates.add(new OpenHallStep(between, target));
+                }
+            }
+            steps.put(cell, List.copyOf(candidates));
+        }
+        return steps;
     }
 
     private void addGridOpenHalls() {
@@ -1154,6 +1175,12 @@ final class HallsExplorationGenerator {
     }
 
     private record DoorCandidate(BlockFace face, int offset) {
+    }
+
+    private record DoorOffsetKey(HallsLayout layout, BlockFace face) {
+    }
+
+    private record OpenHallStep(Cell between, Cell target) {
     }
 
     private enum CorridorMode {

@@ -22,8 +22,6 @@ allowed-items:
     - frost_lance
     - echo_blade
     - sculk_maul
-    - short_bow
-    - storm_crossbow
   armor:
     - padded_armor
     - chainmail_hauberk
@@ -122,13 +120,11 @@ crafting-stations:
       - miner_pick
       - bone_cleaver
       - frost_lance
-      - short_bow
       - adrenaline_shot
       - ironhide_salve
     3:
       - echo_blade
       - sculk_maul
-      - storm_crossbow
       - warding_totem
       - storm_vial
       - echo_lure

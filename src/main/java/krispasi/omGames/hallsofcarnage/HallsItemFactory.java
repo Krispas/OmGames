@@ -16,6 +16,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.components.UseCooldownComponent;
 import org.bukkit.inventory.meta.components.EquippableComponent;
 import org.bukkit.inventory.meta.components.FoodComponent;
 import org.bukkit.persistence.PersistentDataType;
@@ -58,6 +59,7 @@ final class HallsItemFactory {
             applyCombatStats(plugin, meta, type);
             applySpecialItemMetadata(meta, type);
             applyDurability(meta, type);
+            applyUseCooldown(plugin, meta, type);
             applyFoodComponent(meta, type);
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING, type.id());
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_category"), PersistentDataType.STRING, type.category());
@@ -90,6 +92,17 @@ final class HallsItemFactory {
         food.setSaturation(0.0f);
         food.setCanAlwaysEat(true);
         meta.setFood(food);
+    }
+
+    private static void applyUseCooldown(JavaPlugin plugin, ItemMeta meta, HallsItemType type) {
+        Double cooldownSeconds = type.stats().get("cooldown_seconds");
+        if (cooldownSeconds == null || cooldownSeconds <= 0.0) {
+            return;
+        }
+        UseCooldownComponent cooldown = meta.getUseCooldown();
+        cooldown.setCooldownSeconds(cooldownSeconds.floatValue());
+        cooldown.setCooldownGroup(new NamespacedKey(plugin, "hoc_" + type.id()));
+        meta.setUseCooldown(cooldown);
     }
 
     private static void applyCombatStats(JavaPlugin plugin, ItemMeta meta, HallsItemType type) {

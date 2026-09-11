@@ -8,8 +8,8 @@ lore:
   - "A gritty coating that hardens skin for a short push."
 stats:
   cooldown-seconds: 70
-  resistance-seconds: 6
-  resistance-amplifier: 1
+  resistance-seconds: 5
+  resistance-amplifier: 5
 recipe:
   iron_scrap: 4
   redstone_scrap: 2

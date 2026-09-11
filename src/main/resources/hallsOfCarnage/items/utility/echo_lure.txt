@@ -9,6 +9,7 @@ lore:
 stats:
   cooldown-seconds: 65
   radius: 12
+  duration-seconds: 8
 recipe:
   diamond_scrap: 2
   redstone_scrap: 5

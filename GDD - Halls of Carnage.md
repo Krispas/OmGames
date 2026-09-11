@@ -53,7 +53,7 @@ If scenario is finished by beating last floor, the save is marked as completed a
 
 When creating a savefile, scenario is first picked and then players present in the lobby.
 ## Items
-Players have limited inventory of armor slots and only the hotbar row. All items except arrows and fireworks are unstackable. Dropped items on the ground are removed and instead a physics driven item drop is created. They can use Item Displays and Interaction entities for a smooth experience. Players can pick them up with right-clicking by empty hand.
+Players have limited inventory of armor slots and only the hotbar row. Halls player equipment and utility items are unstackable unless an item file explicitly says otherwise. Dropped items on the ground are removed and instead a physics driven item drop is created. They can use Item Displays and Interaction entities for a smooth experience. Players can pick them up with right-clicking by empty hand.
 
 Items are located in the resources/hallsOfCarnage/items/ folder. Look into there for examples. There is also a chest in the elevator, giving players access to 27 slots for floor transfer. The contents of the chest are lost if players loose.
 
@@ -256,12 +256,10 @@ Food is meant for regenerating lost health, as natural regeneration is turned of
 Some food can apply status effects.
 ### Melee
 Swords, axes, spears and so on. All have durability, which is not a normal minecraft durability.
-### Ranged weapons
-Bows, crossbows, arrows, explosive fireworks, tridents. These are weapon-category items in config, not a separate item category.
 ### Utility
 Shields, totems of undying and other stuff.
 ### Armor
-Armor. Of course, stuff like melee weapons, ranged weapons, utility and armor can have special attributes, to make things spicy. Define this in the files.
+Armor. Of course, stuff like melee weapons, utility and armor can have special attributes, to make things spicy. Define this in the files.
 ### Blueprints
 Sometimes a blueprint can be found, which can be used for buildings.
 ## Monsters
