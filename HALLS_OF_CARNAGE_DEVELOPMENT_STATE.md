@@ -271,6 +271,7 @@ For the next slice (do not remove this line):
 - Elevator corridor is still impassable on camp floors, as it is offset by one block to allign to a  free wall, but that closes it off since its 1 block wide.
 - Make it so elevator compass gets removed from both player inventories and elevator chest when going down the floor, before modifiers are chosen
 - Make it so /hoc give can give you scraps deposited right into the elevator, preferably with amount argument
+- Make it so when howering over upgrade button in buildings, it tells you the effects of the upgrade. In case of crafting, show new recipies
 
 Future (not this slice):
 - Continue camp work by adding persistent camp/save-file state so built buildings survive game-over restarts and later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.
