@@ -154,6 +154,7 @@ This is the first implementation slice. It focuses on:
 For the next slice (do not remove this line, do all for the next slice):
 - Some buildings in camps are still not positioned centered on the build plot. I am talking about small east and medium south. I have not tested other small ones, medium east/west.
 - Add the save system, I will describe how it should work.
+- Make it so utilities like smoke bomb and warding totem can be used by right clicking into the air
 When going to a camp floor or leaving a game floor, game will create/overwrite a savefile. Savefile should save player inventories, all so far visited camp floors, their buildings and states of those buildings (not needed right now, as lockers are not yet in, but add the possibility). A game is also saved when going to the first floor as part of game over and when the campaign is started.
 When right clicking the lobby villager, player will have a choice to start a new campaign or load a savefile. Creating new campaign will present you with options of scenarios and difficulty option. Once done, it will send player to session settings.
 Clicking load will show the list of players save files. Clicking a savefile sends him to session settings.
