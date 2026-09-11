@@ -166,11 +166,16 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Elevator chest is not getting saved in the save file
+- Elevator chest is not getting saved in the save file, elevator chest also seems to get deleted on each descend
 - The grindstone doesnt have any charges, it should have one
 - The sculk purifier began with 1 charge and after reset it has none. When I placed another, it also had 0
 - Implement elevator drill, which will make it so once you descend from the camp, you will skip x number of floors where x equals the level
 - Implement the scanner as per GDD.
+- Reduce the damage proximity mines deal to 6 damage
+- Make it so ghosts cannot get sculk
+- Add another warning about death fog sooner
+- Make it so if player is looking into the elevator chest and the descend begins, it kicks the player out of the chest ui
+- Make it that if player is in the lobby villager UI and is TPd into a game, the UI closes.
 
 Future (not this slice):
 - Continue camp work by replacing the decorative placeholder behavior for Elevator Drill, Scanner, and Bounty Board with their real GDD effects.
