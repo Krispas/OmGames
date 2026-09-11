@@ -860,23 +860,27 @@ final class HallsSessionTrapRuntime {
         switch (trap.kind()) {
             case SWINGING_BLADE -> {
                 Location bladeCenter = moveTrapDisplay(trap, age).orElse(center.clone().add(0.0, 1.3, 0.0));
+                damagePlayersInSwingingBlade(trap, bladeCenter, "A swinging blade cuts you down.");
+                damageMonstersInSwingingBlade(trap, bladeCenter);
                 if (age % 20L == 0L) {
                     world.playSound(bladeCenter, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.55f, 0.65f);
-                    damagePlayersInSwingingBlade(trap, bladeCenter, "A swinging blade cuts you down.");
-                    damageMonstersInSwingingBlade(trap, bladeCenter);
                 }
             }
             case WALL_SPIKES -> {
                 long activeAge = age % trap.type().intervalTicks();
-                boolean active = activeAge < trap.type().activeTicks();
-                moveTrapDisplay(trap, active ? activeAge : 0L);
-                if (active) {
+                boolean moving = activeAge < trap.type().activeTicks();
+                long displayAge = moving ? activeAge : 0L;
+                moveTrapDisplay(trap, displayAge);
+                double progress = moving
+                        ? Math.sin(Math.min(1.0, displayAge / (double) Math.max(1, trap.type().activeTicks())) * Math.PI)
+                        : 0.0;
+                if (progress > 0.05) {
                     if (activeAge == 0L) {
                         world.playSound(center, Sound.BLOCK_PISTON_EXTEND, 0.7f, 1.45f);
                     }
                     spawnWallSpikeParticles(trap);
-                    damagePlayersInLine(trap, trap.type().radius(), 0.4, trap.type().damage(), "Wall spikes pierce you.");
-                    damageMonstersInLine(trap, trap.type().radius(), 0.4, trap.type().damage());
+                    damagePlayersInLine(trap, trap.type().radius() * progress, 0.4, trap.type().damage(), "Wall spikes pierce you.");
+                    damageMonstersInLine(trap, trap.type().radius() * progress, 0.4, trap.type().damage());
                 }
             }
             case FALLING_ICE -> {
@@ -956,7 +960,8 @@ final class HallsSessionTrapRuntime {
     private void triggerProximityMine(HallsTrap trap, LivingEntity trigger) {
         Location location = new Location(world, trap.x() + 0.5, origin.y(), trap.z() + 0.5);
         world.playSound(location, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.2f);
-        world.createExplosion(location, trap.type().explosionPower(), false, false);
+        world.spawnParticle(Particle.EXPLOSION, location.clone().add(0.0, 0.45, 0.0), 1, 0.0, 0.0, 0.0, 0.0);
+        world.spawnParticle(Particle.SMOKE, location.clone().add(0.0, 0.35, 0.0), 30, 0.9, 0.35, 0.9, 0.03);
         damagePlayersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage(), "A proximity mine detonates.");
         damageMonstersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage());
         setBlock(trap.x(), origin.y(), trap.z(), Material.AIR);

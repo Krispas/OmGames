@@ -51,6 +51,12 @@ public final class HallsCampRuntime {
         boolean reduce(UUID playerId, double amount);
     }
 
+    public interface TotemAccount {
+        boolean applyHealthTotem(Player player, int level);
+
+        boolean applySpeedTotem(Player player, int level);
+    }
+
     private final JavaPlugin plugin;
     private final World world;
     private final HallsScenario scenario;
@@ -59,6 +65,7 @@ public final class HallsCampRuntime {
     private final Function<HallsItemType, ItemStack> itemFactory;
     private final ScrapAccount scrapAccount;
     private final SculkAccount sculkAccount;
+    private final TotemAccount totemAccount;
     private final Function<Integer, List<String>> scanner;
     private final Map<UUID, Plot> plotsByEntity = new HashMap<>();
     private final Map<Integer, Plot> plotsById = new HashMap<>();
@@ -71,6 +78,7 @@ public final class HallsCampRuntime {
                             Function<HallsItemType, ItemStack> itemFactory,
                             ScrapAccount scrapAccount,
                             SculkAccount sculkAccount,
+                            TotemAccount totemAccount,
                             Function<Integer, List<String>> scanner) {
         this.plugin = plugin;
         this.world = world;
@@ -80,6 +88,7 @@ public final class HallsCampRuntime {
         this.itemFactory = itemFactory;
         this.scrapAccount = scrapAccount;
         this.sculkAccount = sculkAccount;
+        this.totemAccount = totemAccount;
         this.scanner = scanner;
     }
 
@@ -239,6 +248,14 @@ public final class HallsCampRuntime {
                 activateScanner(player, plot);
                 openBuildingMenu(player, plot);
             }
+            case "health_totem" -> {
+                activateHealthTotem(player, plot);
+                openBuildingMenu(player, plot);
+            }
+            case "speed_totem" -> {
+                activateSpeedTotem(player, plot);
+                openBuildingMenu(player, plot);
+            }
             default -> {
             }
         }
@@ -365,6 +382,16 @@ public final class HallsCampRuntime {
                     List.of("Reveals and locks modifiers for the next " + Math.max(1, Math.min(3, plot.level()))
                             + " exploration floor" + (plot.level() == 1 ? "." : "s.")),
                     "scanner", null));
+        } else if (building.id().equals("health_totem")) {
+            inventory.setItem(13, menuItem(Material.TOTEM_OF_UNDYING, "Receive Vitality", NamedTextColor.AQUA,
+                    List.of("Charges this run: " + plot.harvestRemaining(),
+                            "Adds +" + healthTotemBonus(plot.level()) + " max health to you for this run."),
+                    "health_totem", null));
+        } else if (building.id().equals("speed_totem")) {
+            inventory.setItem(13, menuItem(Material.FEATHER, "Receive Swiftness", NamedTextColor.AQUA,
+                    List.of("Charges this run: " + plot.harvestRemaining(),
+                            "Adds +" + speedTotemPercent(plot.level()) + "% movement speed to you for this run."),
+                    "speed_totem", null));
         } else if (building.id().equals("elevator_drill")) {
             inventory.setItem(13, menuItem(Material.POINTED_DRIPSTONE, "Drill Ready", NamedTextColor.AQUA,
                     List.of("Next camp descent skips up to " + Math.max(1, Math.min(3, plot.level()))
@@ -582,6 +609,12 @@ public final class HallsCampRuntime {
         } else if (building.id().equals("scanner")) {
             lore.add("Scans floors: " + Math.max(1, Math.min(3, plot.level()))
                     + " -> " + Math.max(1, Math.min(3, plot.level() + 1)));
+        } else if (building.id().equals("health_totem")) {
+            lore.add("Max health: +" + healthTotemBonus(plot.level())
+                    + " -> +" + healthTotemBonus(plot.level() + 1));
+        } else if (building.id().equals("speed_totem")) {
+            lore.add("Movement speed: +" + speedTotemPercent(plot.level())
+                    + "% -> +" + speedTotemPercent(plot.level() + 1) + "%");
         } else if (building.id().equals("elevator_drill")) {
             lore.add("Skip depth: " + Math.max(1, Math.min(3, plot.level()))
                     + " -> " + Math.max(1, Math.min(3, plot.level() + 1)));
@@ -776,6 +809,48 @@ public final class HallsCampRuntime {
         world.playSound(player.getLocation(), Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.8f, 1.55f);
     }
 
+    private void activateHealthTotem(Player player, Plot plot) {
+        if (totemAccount == null) {
+            player.sendActionBar(Component.text("This totem is not connected.", NamedTextColor.RED));
+            return;
+        }
+        if (plot.harvestRemaining() <= 0) {
+            player.sendActionBar(Component.text("This totem is depleted for this run.", NamedTextColor.GRAY));
+            return;
+        }
+        if (!totemAccount.applyHealthTotem(player, plot.level())) {
+            return;
+        }
+        plot.setHarvestRemaining(plot.harvestRemaining() - 1);
+        plot.setHarvestUsed(plot.harvestUsed() + 1);
+        world.spawnParticle(org.bukkit.Particle.HEART, player.getLocation().add(0.0, 1.0, 0.0),
+                10, 0.45, 0.55, 0.45, 0.02);
+        world.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 1.0f);
+        player.sendActionBar(Component.text("Vitality increased. Charges left: "
+                + plot.harvestRemaining() + ".", NamedTextColor.GREEN));
+    }
+
+    private void activateSpeedTotem(Player player, Plot plot) {
+        if (totemAccount == null) {
+            player.sendActionBar(Component.text("This totem is not connected.", NamedTextColor.RED));
+            return;
+        }
+        if (plot.harvestRemaining() <= 0) {
+            player.sendActionBar(Component.text("This totem is depleted for this run.", NamedTextColor.GRAY));
+            return;
+        }
+        if (!totemAccount.applySpeedTotem(player, plot.level())) {
+            return;
+        }
+        plot.setHarvestRemaining(plot.harvestRemaining() - 1);
+        plot.setHarvestUsed(plot.harvestUsed() + 1);
+        world.spawnParticle(org.bukkit.Particle.CLOUD, player.getLocation().add(0.0, 0.2, 0.0),
+                24, 0.55, 0.1, 0.55, 0.03);
+        world.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 1.55f);
+        player.sendActionBar(Component.text("Speed increased. Charges left: "
+                + plot.harvestRemaining() + ".", NamedTextColor.GREEN));
+    }
+
     private boolean isStorageLocker(HallsBuildingType building) {
         return building != null && isStorageLocker(building.id());
     }
@@ -852,7 +927,18 @@ public final class HallsCampRuntime {
         if (building.id().equals("grindstone") || building.id().equals("forge")) {
             return 1;
         }
+        if (building.id().equals("health_totem") || building.id().equals("speed_totem")) {
+            return 1;
+        }
         return 0;
+    }
+
+    private int healthTotemBonus(int level) {
+        return 2 * Math.max(1, Math.min(3, level));
+    }
+
+    private int speedTotemPercent(int level) {
+        return 5 * Math.max(1, Math.min(3, level));
     }
 
     private boolean hasStoredItems(Plot plot) {

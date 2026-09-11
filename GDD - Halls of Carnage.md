@@ -224,10 +224,14 @@ Makes it so players skip next few floors, the skip depends on the level. Cannot 
 - Size: Small
 
 Tells you modifiers for the next floors based on the level.
-### Bounty Board
-- Size: Medium
+### Health Totem
+- Size: Large
 
-Based on level, gives you 1-3 quests. Like kill specific common mobs (they must be present before the next camp). Or gather specific amount of scrap to trade in. The board will then appear in next camp on a special additional slot (which is normaly empty and cannot be seen). Rewards can be blueprints, items and so on. Rewards are known beforehand.
+Has 1 charge per run. Increases one player's max health by 2 per level for the current run. The effect is saved when the run is saved, and game over resets affected players back to normal max health.
+### Speed Totem
+- Size: Small
+
+Has 1 charge per run. Increases one player's movement speed by 5% per level for the current run. The effect is saved when the run is saved, and game over resets affected players back to normal speed.
 
 ### Sculk Purifier
 - Size: All three sizes (different blueprints)

@@ -145,7 +145,8 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/blueprints/storage_locker_large_blueprint.txt",
             "hallsOfCarnage/items/blueprints/elevator_drill_blueprint.txt",
             "hallsOfCarnage/items/blueprints/scanner_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/bounty_board_blueprint.txt",
+            "hallsOfCarnage/items/blueprints/health_totem_blueprint.txt",
+            "hallsOfCarnage/items/blueprints/speed_totem_blueprint.txt",
             "hallsOfCarnage/items/blueprints/mycelia_farm_blueprint.txt",
             "hallsOfCarnage/items/blueprints/sculk_purifier_small_blueprint.txt",
             "hallsOfCarnage/items/blueprints/sculk_purifier_medium_blueprint.txt",
@@ -161,7 +162,8 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/buildings/grindstone.yml",
             "hallsOfCarnage/buildings/elevator_drill.yml",
             "hallsOfCarnage/buildings/scanner.yml",
-            "hallsOfCarnage/buildings/bounty_board.yml",
+            "hallsOfCarnage/buildings/health_totem.yml",
+            "hallsOfCarnage/buildings/speed_totem.yml",
             "hallsOfCarnage/buildings/sculk_purifier_small.yml",
             "hallsOfCarnage/buildings/sculk_purifier_medium.yml",
             "hallsOfCarnage/buildings/sculk_purifier_large.yml"
@@ -1005,6 +1007,7 @@ public final class HallsOfCarnageManager {
         if (session == null) {
             return;
         }
+        session.handlePlayerQuit(player);
         long delayTicks = Math.max(1L, config.disconnectGraceSeconds()) * 20L;
         BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             disconnectGraceTasks.remove(sessionId);

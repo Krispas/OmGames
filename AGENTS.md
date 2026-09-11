@@ -1334,10 +1334,12 @@ SQLite tables:
 - Forge buildings are medium camp buildings with `1` charge per run and repair the held Halls item's durability by `30% * level` of its maximum durability.
 - Elevator Drill buildings affect the next descent from that camp: they skip up to `level` floors, but never skip a camp floor or the final scenario floor.
 - Scanner buildings reveal and lock the modifier rolls for the next `level` upcoming exploration floors in the current run.
+- Health Totem buildings are large camp buildings with `1` charge per run and increase one player's max health by `2 * level` for the current run.
+- Speed Totem buildings are small camp buildings with `1` charge per run and increase one player's movement speed by `5% * level` for the current run.
 - Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker and display parts are centered against plot centers/facing, including even-sized future plot footprints and scaled display parts.
 - Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Upgrade buttons show the stored-scrap cost plus practical effects such as newly unlocked station recipes or harvest changes.
 - Halls save snapshots live in `plugins/OmGames/HallsOfCarnage/saves/` as YAML files keyed by scenario id plus sorted participant UUIDs.
-- The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, per-player sculk pressure, elevator chest contents, stored scrap/coins, and visited camp plot building state including building id, level, harvest counters, and storage locker contents.
+- The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, per-player sculk pressure, per-player active totem buff levels, elevator chest contents, stored scrap/coins, and visited camp plot building state including building id, level, harvest counters, and storage locker contents.
 - Save snapshots are created/overwritten when a campaign starts, when the elevator leaves a floor, when arriving at a camp floor, when game-over restarts the run at floor 1, and when the host uses `/hoc leave` from the start floor or a camp floor.
 - `/hoc leave` is player-only, does not require OP, and only the active session host can use it to save and end the session from the start floor or a camp floor.
 - The lobby villager opens a GUI flow for New Campaign, Load Save, scenario selection, difficulty selection, and session settings.
@@ -1350,7 +1352,7 @@ SQLite tables:
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility. `melee-damage`, `attack-speed`, and `durability` are also applied to item meta where Bukkit/Paper exposes the relevant component APIs.
 - `vagabonds_club` is the default starter weapon. Every participant receives it when a Halls run starts or fully restarts after game over.
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control blueprint keyword drops.
-- Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, forge, storage lockers by size, mycelia farm, elevator drill, scanner, bounty board, and sculk purifiers by size.
+- Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, forge, storage lockers by size, mycelia farm, elevator drill, scanner, health totem, speed totem, and sculk purifiers by size.
 - Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `ranged`, `utility`, `rare_weapon`, `rare_armor`, `rare_ranged`, and `rare_utility`.
 - The generic `blueprint` loot keyword rolls the scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools.
 - `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions. If `<item>` is `wood_scrap`, `iron_scrap`, `diamond_scrap`, or `redstone_scrap`, the amount is deposited directly into the caller's active session elevator storage and awards the matching test coins.
@@ -1413,10 +1415,10 @@ SQLite tables:
 - Hole traps choose a rectangular configurable 5x5-15x15 room-interior mask that may intersect internal blocked room cells/pillars, but only open room floor cells are carved into the actual pit; they may generate near doorway zones and must add a wooden bridge when the carved pit would break floor reachability.
 - Hole trap masks may overlap prior hole masks, but normal traps should still avoid occupied pit cells and trap footprints.
 - Hole bridge placement should preserve reachability from each generated room entrance to every non-hole open cell in that room, not only whole-floor reachability from the elevator.
-- Proximity mines trigger in a larger radius and reserve/validate a 3x3 obstacle footprint for traversal.
+- Proximity mines trigger in a larger radius, reserve/validate a 3x3 obstacle footprint for traversal, and use configured trap damage instead of vanilla explosion entity damage.
 - Swinging blade traps use a stretched ceiling `BlockDisplay` rail plus a moving vanilla iron-sword `ItemDisplay` blade by default, and should damage during the whole swing cycle without debug particles.
 - Wall spikes and poison darts mount from adjacent room walls as display-only fixtures instead of solid blocks, and wall-trap candidates should stay away from room entrances.
-- Wall spikes animate a sword display inward from the wall and check a forward lane up to their configured radius, defaulting to 3 blocks and stopping at walls.
+- Wall spikes animate a sword display inward from the wall and check a forward lane through both extension and retraction, up to their configured radius, defaulting to 3 blocks and stopping at walls.
 - Falling ice traps may use display-only ceiling fixtures when configured, spawn temporary falling block-display shards around the trap cell, and must not place solid trap blocks; `ceiling-material: AIR` keeps the trap position hidden.
 - Poison darts trigger from a wider forward warning lane with one extra block of reach, but the rendered dart line and damage use one narrow forward lane, defaulting to 5 blocks with a 3-second cooldown.
 - Frozen Halls defaults to `cave` corridor generation, which uses organic biased tunnel paths. The prior widened orthogonal cave style remains available as `large_corridors`.

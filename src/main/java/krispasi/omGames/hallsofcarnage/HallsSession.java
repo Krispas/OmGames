@@ -21,6 +21,9 @@ import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Container;
@@ -63,6 +66,8 @@ public final class HallsSession {
     private static final double DROP_SETTLE_VELOCITY_SQUARED = 0.0016;
     private static final String STARTER_ITEM_ID = "vagabonds_club";
     private static final long LEFT_BEHIND_MODIFIER_DELAY_TICKS = 100L;
+    private static final String HEALTH_TOTEM_MODIFIER = "hoc_health_totem";
+    private static final String SPEED_TOTEM_MODIFIER = "hoc_speed_totem";
 
     private final JavaPlugin plugin;
     private final int id;
@@ -93,6 +98,8 @@ public final class HallsSession {
     private final HallsSessionSculkRuntime sculkRuntime;
     private final HallsCampRuntime campRuntime;
     private final Set<UUID> ghostPlayers = new HashSet<>();
+    private final Map<UUID, Integer> healthTotemLevels = new HashMap<>();
+    private final Map<UUID, Integer> speedTotemLevels = new HashMap<>();
     private BukkitTask hudTask;
     private BukkitTask physicsDropTask;
     private BukkitTask floorBuildTask;
@@ -172,7 +179,17 @@ public final class HallsSession {
             public boolean spend(Map<String, Integer> cost) {
                 return spendStoredScrap(cost);
             }
-        }, this::reducePlayerSculk, this::scanUpcomingFloors);
+        }, this::reducePlayerSculk, new HallsCampRuntime.TotemAccount() {
+            @Override
+            public boolean applyHealthTotem(Player player, int level) {
+                return HallsSession.this.applyHealthTotem(player, level);
+            }
+
+            @Override
+            public boolean applySpeedTotem(Player player, int level) {
+                return HallsSession.this.applySpeedTotem(player, level);
+            }
+        }, this::scanUpcomingFloors);
     }
 
     public int id() {
@@ -455,6 +472,14 @@ public final class HallsSession {
         if (ghostPlayers.contains(player.getUniqueId())) {
             applyGhostState(player);
         }
+        reapplyActiveTotemBuffs(player);
+    }
+
+    public void handlePlayerQuit(Player player) {
+        if (player == null || !participants.contains(player.getUniqueId())) {
+            return;
+        }
+        clearTotemAttributeModifiers(player);
     }
 
     public void pushOutOfSessionProps(Player player) {
@@ -636,8 +661,10 @@ public final class HallsSession {
             if (initialSave == null) {
                 giveStarterItem(player);
             } else {
-                restoreSavedPlayer(player, initialSave.players().get(playerId));
-                if (initialSave.players().get(playerId) != null && initialSave.players().get(playerId).ghost()) {
+                HallsSaveData.PlayerState state = initialSave.players().get(playerId);
+                restoreSavedPlayer(player, state);
+                restoreSavedTotemBuffs(player, state);
+                if (state != null && state.ghost()) {
                     ghostPlayers.add(playerId);
                     applyGhostState(player);
                 }
@@ -662,6 +689,7 @@ public final class HallsSession {
                 player.setRespawnLocation(fallback, true);
                 player.setInvisible(false);
                 player.removePotionEffect(PotionEffectType.INVISIBILITY);
+                clearTotemBuffs(player);
                 player.teleport(fallback);
                 player.setFallDistance(0.0f);
                 player.sendTitle("Leaving the Halls", "", 0, 35, 10);
@@ -670,6 +698,7 @@ public final class HallsSession {
                 player.getInventory().clear();
                 player.setInvisible(false);
                 player.removePotionEffect(PotionEffectType.INVISIBILITY);
+                clearTotemBuffs(player);
                 if (fallback != null) {
                     player.setRespawnLocation(fallback, true);
                 }
@@ -2757,6 +2786,7 @@ public final class HallsSession {
                 player.getInventory().clear();
                 player.getInventory().setArmorContents(null);
                 player.getInventory().setItemInOffHand(null);
+                clearTotemBuffs(player);
                 player.setHealth(Math.min(player.getMaxHealth(), 20.0));
                 clearGhostState(player);
                 applyInventoryLimit(player);
@@ -2819,6 +2849,8 @@ public final class HallsSession {
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
         scannedFloorModifiers.clear();
+        healthTotemLevels.clear();
+        speedTotemLevels.clear();
         sculkRuntime.clearAll();
         for (Map.Entry<UUID, HallsSaveData.PlayerState> entry : save.players().entrySet()) {
             sculkRuntime.setSculk(entry.getKey(), entry.getValue().sculk());
@@ -2857,6 +2889,8 @@ public final class HallsSession {
             String path = "players." + playerId;
             yaml.set(path + ".ghost", ghostPlayers.contains(playerId));
             yaml.set(path + ".sculk", sculkRuntime.sculkPercent(playerId));
+            yaml.set(path + ".health-totem-level", healthTotemLevels.getOrDefault(playerId, 0));
+            yaml.set(path + ".speed-totem-level", speedTotemLevels.getOrDefault(playerId, 0));
             if (player == null) {
                 continue;
             }
@@ -2933,6 +2967,8 @@ public final class HallsSession {
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
         scannedFloorModifiers.clear();
+        healthTotemLevels.clear();
+        speedTotemLevels.clear();
         sculkRuntime.clearAll();
     }
 
@@ -2972,7 +3008,129 @@ public final class HallsSession {
         if (building.id().equals("grindstone") || building.id().equals("forge")) {
             return 1;
         }
+        if (building.id().equals("health_totem") || building.id().equals("speed_totem")) {
+            return 1;
+        }
         return 0;
+    }
+
+    private boolean applyHealthTotem(Player player, int level) {
+        if (player == null) {
+            return false;
+        }
+        if (healthTotemLevels.getOrDefault(player.getUniqueId(), 0) > 0) {
+            player.sendActionBar(Component.text("You already carry a vitality totem blessing.", NamedTextColor.GRAY));
+            return false;
+        }
+        int normalizedLevel = Math.max(1, Math.min(3, level));
+        AttributeInstance attribute = player.getAttribute(Attribute.MAX_HEALTH);
+        if (attribute == null) {
+            player.sendActionBar(Component.text("Your max health cannot be changed here.", NamedTextColor.RED));
+            return false;
+        }
+        removeModifier(attribute, HEALTH_TOTEM_MODIFIER);
+        attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, HEALTH_TOTEM_MODIFIER),
+                2.0 * normalizedLevel, AttributeModifier.Operation.ADD_NUMBER));
+        healthTotemLevels.put(player.getUniqueId(), normalizedLevel);
+        player.setHealth(Math.min(attribute.getValue(), player.getHealth() + 2.0 * normalizedLevel));
+        return true;
+    }
+
+    private boolean applySpeedTotem(Player player, int level) {
+        if (player == null) {
+            return false;
+        }
+        if (speedTotemLevels.getOrDefault(player.getUniqueId(), 0) > 0) {
+            player.sendActionBar(Component.text("You already carry a speed totem blessing.", NamedTextColor.GRAY));
+            return false;
+        }
+        int normalizedLevel = Math.max(1, Math.min(3, level));
+        AttributeInstance attribute = player.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (attribute == null) {
+            player.sendActionBar(Component.text("Your movement speed cannot be changed here.", NamedTextColor.RED));
+            return false;
+        }
+        removeModifier(attribute, SPEED_TOTEM_MODIFIER);
+        attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, SPEED_TOTEM_MODIFIER),
+                0.05 * normalizedLevel, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
+        speedTotemLevels.put(player.getUniqueId(), normalizedLevel);
+        return true;
+    }
+
+    private void restoreSavedTotemBuffs(Player player, HallsSaveData.PlayerState state) {
+        if (player == null || state == null) {
+            return;
+        }
+        clearTotemBuffs(player);
+        int healthLevel = Math.max(0, Math.min(3, state.healthTotemLevel()));
+        if (healthLevel > 0) {
+            AttributeInstance attribute = player.getAttribute(Attribute.MAX_HEALTH);
+            if (attribute != null) {
+                attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, HEALTH_TOTEM_MODIFIER),
+                        2.0 * healthLevel, AttributeModifier.Operation.ADD_NUMBER));
+                healthTotemLevels.put(player.getUniqueId(), healthLevel);
+            }
+        }
+        int speedLevel = Math.max(0, Math.min(3, state.speedTotemLevel()));
+        if (speedLevel > 0) {
+            AttributeInstance attribute = player.getAttribute(Attribute.MOVEMENT_SPEED);
+            if (attribute != null) {
+                attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, SPEED_TOTEM_MODIFIER),
+                        0.05 * speedLevel, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
+                speedTotemLevels.put(player.getUniqueId(), speedLevel);
+            }
+        }
+    }
+
+    private void reapplyActiveTotemBuffs(Player player) {
+        if (player == null) {
+            return;
+        }
+        int healthLevel = healthTotemLevels.getOrDefault(player.getUniqueId(), 0);
+        int speedLevel = speedTotemLevels.getOrDefault(player.getUniqueId(), 0);
+        clearTotemAttributeModifiers(player);
+        if (healthLevel > 0) {
+            AttributeInstance attribute = player.getAttribute(Attribute.MAX_HEALTH);
+            if (attribute != null) {
+                attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, HEALTH_TOTEM_MODIFIER),
+                        2.0 * healthLevel, AttributeModifier.Operation.ADD_NUMBER));
+            }
+        }
+        if (speedLevel > 0) {
+            AttributeInstance attribute = player.getAttribute(Attribute.MOVEMENT_SPEED);
+            if (attribute != null) {
+                attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, SPEED_TOTEM_MODIFIER),
+                        0.05 * speedLevel, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
+            }
+        }
+    }
+
+    private void clearTotemBuffs(Player player) {
+        if (player == null) {
+            return;
+        }
+        clearTotemAttributeModifiers(player);
+        healthTotemLevels.remove(player.getUniqueId());
+        speedTotemLevels.remove(player.getUniqueId());
+    }
+
+    private void clearTotemAttributeModifiers(Player player) {
+        if (player == null) {
+            return;
+        }
+        AttributeInstance health = player.getAttribute(Attribute.MAX_HEALTH);
+        if (health != null) {
+            removeModifier(health, HEALTH_TOTEM_MODIFIER);
+            player.setHealth(Math.min(player.getHealth(), health.getValue()));
+        }
+        AttributeInstance speed = player.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (speed != null) {
+            removeModifier(speed, SPEED_TOTEM_MODIFIER);
+        }
+    }
+
+    private void removeModifier(AttributeInstance attribute, String key) {
+        attribute.removeModifier(new org.bukkit.NamespacedKey(plugin, key));
     }
 
     private void giveStarterItem(Player player) {

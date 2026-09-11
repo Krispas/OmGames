@@ -1,0 +1,8 @@
+id: health_totem_blueprint
+name: "Rare Blueprint: Health Totem"
+category: blueprint
+rarity: rare
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Builds a large camp totem that grants temporary max health."

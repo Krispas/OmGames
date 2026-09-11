@@ -9,4 +9,4 @@ lore:
 stats:
   melee-damage: 3
   attack-speed: 1.6
-  durability: 32000
+  durability: 320

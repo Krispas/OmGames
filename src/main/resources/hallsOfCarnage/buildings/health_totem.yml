@@ -1,0 +1,44 @@
+id: health_totem
+name: "Health Totem"
+size: large
+blueprint: health_totem_blueprint
+implemented: true
+levels:
+  1:
+    upgrade-cost: {diamond: 3, redstone: 3}
+    harvest:
+      uses: 1
+    parts:
+      - material: CHISELED_DEEPSLATE
+        offset: [0, 0, 0]
+        scale: [1, 1, 1]
+      - material: REDSTONE_BLOCK
+        offset: [0, 1, 0]
+        scale: [0.65, 0.65, 0.65]
+  2:
+    upgrade-cost: {diamond: 5, redstone: 5}
+    harvest:
+      uses: 1
+    parts:
+      - material: CHISELED_DEEPSLATE
+        offset: [0, 0, 0]
+        scale: [1.1, 1.1, 1.1]
+      - material: REDSTONE_BLOCK
+        offset: [0, 1.1, 0]
+        scale: [0.8, 0.8, 0.8]
+      - material: REDSTONE_LAMP
+        offset: [0, 1.8, 0]
+        scale: [0.45, 0.45, 0.45]
+  3:
+    harvest:
+      uses: 1
+    parts:
+      - material: CHISELED_DEEPSLATE
+        offset: [0, 0, 0]
+        scale: [1.2, 1.2, 1.2]
+      - material: REDSTONE_BLOCK
+        offset: [0, 1.2, 0]
+        scale: [0.9, 0.9, 0.9]
+      - material: BEACON
+        offset: [0, 2, 0]
+        scale: [0.45, 0.45, 0.45]

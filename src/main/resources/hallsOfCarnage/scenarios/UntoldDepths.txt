@@ -56,7 +56,8 @@ allowed-items:
     - storage_locker_large_blueprint
     - elevator_drill_blueprint
     - scanner_blueprint
-    - bounty_board_blueprint
+    - health_totem_blueprint
+    - speed_totem_blueprint
     - mycelia_farm_blueprint
     - sculk_purifier_small_blueprint
     - sculk_purifier_medium_blueprint
@@ -73,7 +74,8 @@ allowed-items:
     - mycelia_farm
     - elevator_drill
     - scanner
-    - bounty_board
+    - health_totem
+    - speed_totem
     - sculk_purifier_small
     - sculk_purifier_medium
     - sculk_purifier_large
@@ -91,7 +93,8 @@ blueprint-pools:
     - grindstone_blueprint
     - storage_locker_large_blueprint
     - elevator_drill_blueprint
-    - bounty_board_blueprint
+    - health_totem_blueprint
+    - speed_totem_blueprint
     - sculk_purifier_small_blueprint
     - sculk_purifier_medium_blueprint
     - sculk_purifier_large_blueprint
