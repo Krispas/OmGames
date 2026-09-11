@@ -13,12 +13,14 @@ public record HallsScenario(
         int floorCount,
         Map<String, List<String>> allowedItems,
         Map<String, List<String>> blueprintPools,
+        Map<String, Map<Integer, List<String>>> craftingStations,
         List<FloorDefinition> floors,
         List<String> debugLines
 ) {
     public HallsScenario {
         allowedItems = Map.copyOf(allowedItems);
         blueprintPools = Map.copyOf(blueprintPools);
+        craftingStations = deepCopyCraftingStations(craftingStations);
     }
 
     public List<String> allowedItems(String category) {
@@ -27,6 +29,16 @@ public record HallsScenario(
 
     public List<String> blueprintPool(String rarity) {
         return blueprintPools.getOrDefault(rarity, List.of());
+    }
+
+    public List<String> craftingRecipes(String stationId, int level) {
+        Map<Integer, List<String>> levels = craftingStations.getOrDefault(normalize(stationId), Map.of());
+        List<String> recipes = new java.util.ArrayList<>();
+        int cappedLevel = Math.max(1, Math.min(3, level));
+        for (int current = 1; current <= cappedLevel; current++) {
+            recipes.addAll(levels.getOrDefault(current, List.of()));
+        }
+        return List.copyOf(recipes);
     }
 
     public FloorDefinition floor(int floor) {
@@ -84,5 +96,22 @@ public record HallsScenario(
             return new FloorDefinition(floor, floor, kind, levelType, difficulty, rooms, items, breakables,
                     trappedRooms, minTrapsPerRoom, maxTrapsPerRoom, holes, sculkPatches, coinQuota, layout);
         }
+    }
+
+    private static Map<String, Map<Integer, List<String>>> deepCopyCraftingStations(
+            Map<String, Map<Integer, List<String>>> source) {
+        Map<String, Map<Integer, List<String>>> copy = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Map<Integer, List<String>>> station : source.entrySet()) {
+            Map<Integer, List<String>> levels = new java.util.LinkedHashMap<>();
+            for (Map.Entry<Integer, List<String>> level : station.getValue().entrySet()) {
+                levels.put(level.getKey(), List.copyOf(level.getValue()));
+            }
+            copy.put(normalize(station.getKey()), Map.copyOf(levels));
+        }
+        return Map.copyOf(copy);
+    }
+
+    private static String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_').replace(' ', '_');
     }
 }

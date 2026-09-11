@@ -1,0 +1,15 @@
+id: fleetfoot_ration
+name: "Fleetfoot Ration"
+category: food
+rarity: rare
+material: COOKED_RABBIT
+max-stack-size: 1
+lore:
+  - "Light food for moving before the halls notice."
+stats:
+  heal: 6
+  speed-seconds: 20
+  speed-amplifier: 1
+recipe:
+  cooked_mycelia: 1
+  redstone_scrap: 3

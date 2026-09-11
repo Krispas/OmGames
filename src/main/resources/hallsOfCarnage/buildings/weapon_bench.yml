@@ -8,9 +8,6 @@ levels:
     upgrade-cost:
       wood: 4
       iron: 2
-    interaction:
-      give-items:
-        - rusty_sword
     parts:
       - material: SMITHING_TABLE
         offset: [0, 0, 0]
@@ -19,9 +16,6 @@ levels:
     upgrade-cost:
       wood: 5
       iron: 5
-    interaction:
-      give-items:
-        - miner_pick
     parts:
       - material: SMITHING_TABLE
         offset: [0, 0, 0]
@@ -30,9 +24,6 @@ levels:
         offset: [0.7, 0.2, 0]
         scale: [0.65, 0.65, 0.65]
   3:
-    interaction:
-      give-items:
-        - echo_blade
     parts:
       - material: SMITHING_TABLE
         offset: [0, 0, 0]

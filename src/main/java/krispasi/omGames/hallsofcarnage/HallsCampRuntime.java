@@ -12,6 +12,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.BlockFace;
@@ -21,8 +23,12 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Transformation;
@@ -31,11 +37,14 @@ import org.joml.Vector3f;
 
 public final class HallsCampRuntime {
     public interface ScrapAccount {
+        boolean canSpend(Map<String, Integer> cost);
+
         boolean spend(Map<String, Integer> cost);
     }
 
     private final JavaPlugin plugin;
     private final World world;
+    private final HallsScenario scenario;
     private final Map<String, HallsBuildingType> buildingTypes;
     private final Map<String, HallsItemType> itemTypes;
     private final Function<HallsItemType, ItemStack> itemFactory;
@@ -45,12 +54,14 @@ public final class HallsCampRuntime {
 
     public HallsCampRuntime(JavaPlugin plugin,
                             World world,
+                            HallsScenario scenario,
                             Map<String, HallsBuildingType> buildingTypes,
                             Map<String, HallsItemType> itemTypes,
                             Function<HallsItemType, ItemStack> itemFactory,
                             ScrapAccount scrapAccount) {
         this.plugin = plugin;
         this.world = world;
+        this.scenario = scenario;
         this.buildingTypes = buildingTypes == null ? Map.of() : Map.copyOf(buildingTypes);
         this.itemTypes = itemTypes == null ? Map.of() : Map.copyOf(itemTypes);
         this.itemFactory = itemFactory;
@@ -95,10 +106,62 @@ public final class HallsCampRuntime {
         if (plot.buildingId() == null) {
             return buildFromBlueprint(player, plot);
         }
-        if (player.isSneaking()) {
-            return upgrade(player, plot);
+        HallsBuildingType building = buildingTypes.get(plot.buildingId());
+        if (building != null && building.id().equals("mycelia_farm") && plot.harvestRemaining() > 0) {
+            return harvestMycelia(player, plot, building);
         }
-        return useBuilding(player, plot);
+        openBuildingMenu(player, plot);
+        return true;
+    }
+
+    public boolean handleInventoryClick(InventoryClickEvent event) {
+        if (!(event.getInventory().getHolder() instanceof CampMenu menu)) {
+            return false;
+        }
+        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player player)
+                || event.getClickedInventory() == null
+                || event.getClickedInventory() != event.getView().getTopInventory()) {
+            return true;
+        }
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || clicked.getType().isAir() || !clicked.hasItemMeta()) {
+            return true;
+        }
+        String action = clicked.getItemMeta().getPersistentDataContainer()
+                .get(new NamespacedKey(plugin, "hoc_camp_action"), PersistentDataType.STRING);
+        if (action == null) {
+            return true;
+        }
+        Plot plot = plotsById.get(menu.plotId());
+        if (plot == null || plot.buildingId() == null) {
+            player.closeInventory();
+            return true;
+        }
+        HallsBuildingType building = buildingTypes.get(plot.buildingId());
+        if (building == null) {
+            player.closeInventory();
+            return true;
+        }
+        switch (action) {
+            case "upgrade" -> {
+                upgrade(player, plot);
+                openBuildingMenu(player, plot);
+            }
+            case "destroy" -> {
+                destroyBuilding(player, plot, building);
+                player.closeInventory();
+            }
+            case "craft" -> {
+                String itemId = clicked.getItemMeta().getPersistentDataContainer()
+                        .get(new NamespacedKey(plugin, "hoc_camp_item"), PersistentDataType.STRING);
+                craftRecipe(player, plot, building, itemId);
+                openBuildingMenu(player, plot);
+            }
+            default -> {
+            }
+        }
+        return true;
     }
 
     private boolean buildFromBlueprint(Player player, Plot plot) {
@@ -121,6 +184,7 @@ public final class HallsCampRuntime {
         }
         consumeHeld(player);
         setBuilding(plot, building, 1);
+        initializeHarvest(plot, building);
         player.sendMessage(Component.text("Built " + building.name() + ".", NamedTextColor.GREEN));
         world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_PLACE, 0.7f, 1.25f);
         return true;
@@ -141,27 +205,124 @@ public final class HallsCampRuntime {
             return true;
         }
         setBuilding(plot, building, plot.level() + 1);
+        refreshHarvestForLevel(plot, building);
         player.sendMessage(Component.text("Upgraded " + building.name() + " to level " + plot.level() + ".", NamedTextColor.GREEN));
         world.playSound(player.getLocation(), Sound.BLOCK_SMITHING_TABLE_USE, 0.8f, 1.1f);
         return true;
     }
 
-    private boolean useBuilding(Player player, Plot plot) {
+    private void openBuildingMenu(Player player, Plot plot) {
         HallsBuildingType building = buildingTypes.get(plot.buildingId());
         if (building == null) {
-            return true;
+            return;
         }
-        if (!building.implemented()) {
-            player.sendActionBar(Component.text(building.name() + " is decorative for now.", NamedTextColor.GRAY));
-            return true;
+        Inventory inventory = Bukkit.createInventory(new CampMenu(plot.id()), 27,
+                Component.text(building.name() + " L" + plot.level(), NamedTextColor.DARK_GREEN));
+        inventory.setItem(4, menuItem(Material.OAK_SIGN, building.name(), NamedTextColor.GREEN,
+                List.of("Level " + plot.level(), "Plot size: " + plot.size()), null, null));
+        List<String> recipes = scenario == null ? List.of() : scenario.craftingRecipes(building.id(), plot.level());
+        int recipeIndex = 0;
+        if (isCraftingStation(building) && !recipes.isEmpty()) {
+            for (String itemId : recipes) {
+                if (recipeIndex >= RECIPE_SLOTS.length) {
+                    break;
+                }
+                HallsItemType itemType = itemTypes.get(itemId);
+                if (itemType == null) {
+                    continue;
+                }
+                inventory.setItem(RECIPE_SLOTS[recipeIndex++], recipeMenuItem(itemType));
+            }
+        } else if (building.id().equals("mycelia_farm")) {
+            inventory.setItem(13, menuItem(Material.DEAD_BUSH, "Farm Empty", NamedTextColor.GRAY,
+                    List.of("Upgrade or revisit after a future refresh."), null, null));
+        } else if (!building.implemented()) {
+            inventory.setItem(13, menuItem(Material.BARRIER, "Placeholder", NamedTextColor.GRAY,
+                    List.of("This building has no active behavior yet."), null, null));
+        } else {
+            inventory.setItem(13, menuItem(Material.PAPER, "No Recipes", NamedTextColor.GRAY,
+                    List.of("No scenario recipes are unlocked here."), null, null));
         }
-        List<String> giveItems = building.level(plot.level()).giveItems();
-        if (giveItems.isEmpty()) {
-            player.sendActionBar(Component.text(building.name() + " has no active output configured.", NamedTextColor.GRAY));
-            return true;
+        if (plot.level() < 3) {
+            HallsBuildingType.Level next = building.level(plot.level() + 1);
+            inventory.setItem(22, menuItem(Material.SMITHING_TABLE, "Upgrade", NamedTextColor.YELLOW,
+                    List.of("Cost: " + formatCost(next.upgradeCost())), "upgrade", null));
+        } else {
+            inventory.setItem(22, menuItem(Material.SMITHING_TABLE, "Max Level", NamedTextColor.GRAY,
+                    List.of("This building is already level 3."), null, null));
         }
+        inventory.setItem(26, menuItem(Material.TNT, "Destroy", NamedTextColor.RED,
+                List.of("Removes the building.", "The blueprint is not returned."), "destroy", null));
+        player.openInventory(inventory);
+    }
+
+    private ItemStack recipeMenuItem(HallsItemType type) {
+        ItemStack preview = itemFactory.apply(type);
+        ItemMeta meta = preview.getItemMeta();
+        if (meta != null) {
+            List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
+            if (!lore.isEmpty()) {
+                lore.add(Component.empty());
+            }
+            lore.add(Component.text("Cost: " + formatCost(type.recipe()), NamedTextColor.GOLD));
+            meta.lore(lore);
+            meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_camp_action"),
+                    PersistentDataType.STRING, "craft");
+            meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_camp_item"),
+                    PersistentDataType.STRING, type.id());
+            preview.setItemMeta(meta);
+        }
+        return preview;
+    }
+
+    private void craftRecipe(Player player, Plot plot, HallsBuildingType building, String itemId) {
+        if (itemId == null || (scenario != null && !scenario.craftingRecipes(building.id(), plot.level()).contains(itemId))) {
+            player.sendActionBar(Component.text("That recipe is not available here.", NamedTextColor.RED));
+            return;
+        }
+        HallsItemType itemType = itemTypes.get(itemId);
+        if (itemType == null) {
+            player.sendActionBar(Component.text("That recipe is not loaded.", NamedTextColor.RED));
+            return;
+        }
+        Map<String, Integer> scrapCost = scrapCost(itemType.recipe());
+        Map<String, Integer> itemCost = itemCost(itemType.recipe());
+        if (scrapAccount != null && !scrapAccount.canSpend(scrapCost)) {
+            player.sendActionBar(Component.text("Not enough stored scrap.", NamedTextColor.RED));
+            return;
+        }
+        if (!hasItemIngredients(player.getInventory(), itemCost)) {
+            player.sendActionBar(Component.text("Missing ingredient items.", NamedTextColor.RED));
+            return;
+        }
+        ItemStack crafted = itemFactory.apply(itemType);
+        boolean willEquipArmor = canEquipEmptyArmorSlot(player.getInventory(), crafted);
+        int outputSlot = willEquipArmor ? -1 : firstAvailableHotbarSlot(player.getInventory());
+        if (!willEquipArmor && outputSlot < 0) {
+            player.sendActionBar(Component.text("Your hotbar is full.", NamedTextColor.RED));
+            return;
+        }
+        if (!itemCost.isEmpty()) {
+            consumeItemIngredients(player.getInventory(), itemCost);
+        }
+        if (scrapAccount != null && !scrapAccount.spend(scrapCost)) {
+            player.sendActionBar(Component.text("Not enough stored scrap.", NamedTextColor.RED));
+            return;
+        }
+        if (willEquipArmor) {
+            equipArmorSlot(player.getInventory(), crafted);
+        } else {
+            player.getInventory().setItem(outputSlot, crafted);
+        }
+        world.playSound(player.getLocation(), Sound.BLOCK_SMITHING_TABLE_USE, 0.8f, 1.25f);
+        player.sendActionBar(Component.text("Crafted " + itemType.name() + ".", NamedTextColor.GREEN));
+    }
+
+    private boolean harvestMycelia(Player player, Plot plot, HallsBuildingType building) {
+        HallsBuildingType.Level level = building.level(plot.level());
+        List<String> harvestItems = level.harvestItems().isEmpty() ? level.giveItems() : level.harvestItems();
         int given = 0;
-        for (String itemId : giveItems) {
+        for (String itemId : harvestItems) {
             HallsItemType itemType = itemTypes.get(itemId);
             if (itemType == null) {
                 continue;
@@ -173,19 +334,29 @@ public final class HallsCampRuntime {
             player.getInventory().setItem(slot, itemFactory.apply(itemType));
             given++;
         }
-        if (given == 0) {
+        if (given <= 0) {
             player.sendActionBar(Component.text("Your hotbar is full.", NamedTextColor.RED));
             return true;
         }
+        plot.setHarvestRemaining(Math.max(0, plot.harvestRemaining() - 1));
+        plot.setHarvestUsed(plot.harvestUsed() + 1);
+        if (plot.harvestRemaining() <= 0) {
+            setDisplays(plot, building, level.emptyParts().isEmpty() ? level.parts() : level.emptyParts());
+        }
         world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.35f);
-        player.sendActionBar(Component.text(building.name() + " produced " + given + " item(s).", NamedTextColor.GREEN));
+        player.sendActionBar(Component.text("Harvested " + given + " mycelia.", NamedTextColor.GREEN));
         return true;
     }
 
     private void setBuilding(Plot plot, HallsBuildingType building, int level) {
         removeDisplays(plot);
         plot.setBuilding(building.id(), level);
-        for (HallsBuildingType.Part part : building.level(level).parts()) {
+        setDisplays(plot, building, building.level(level).parts());
+    }
+
+    private void setDisplays(Plot plot, HallsBuildingType building, List<HallsBuildingType.Part> parts) {
+        removeDisplays(plot);
+        for (HallsBuildingType.Part part : parts) {
             double[] offset = rotatedOffset(part.offsetX(), part.offsetZ(), plot.facing());
             Location location = new Location(world, plot.x() + 0.5 + offset[0], plot.y() + part.offsetY(), plot.z() + 0.5 + offset[1]);
             BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
@@ -202,6 +373,178 @@ public final class HallsCampRuntime {
             plot.displayIds().add(display.getUniqueId());
             plotsByEntity.put(display.getUniqueId(), plot);
         }
+    }
+
+    private void destroyBuilding(Player player, Plot plot, HallsBuildingType building) {
+        removeDisplays(plot);
+        plot.clearBuilding();
+        world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_DESTROY, 0.7f, 1.1f);
+        player.sendMessage(Component.text("Destroyed " + building.name() + ".", NamedTextColor.RED));
+    }
+
+    private void initializeHarvest(Plot plot, HallsBuildingType building) {
+        HallsBuildingType.Level level = building.level(plot.level());
+        plot.setHarvestUsed(0);
+        plot.setHarvestRemaining(level.harvestUses());
+    }
+
+    private void refreshHarvestForLevel(Plot plot, HallsBuildingType building) {
+        HallsBuildingType.Level level = building.level(plot.level());
+        plot.setHarvestRemaining(Math.max(0, level.harvestUses() - plot.harvestUsed()));
+        if (plot.harvestRemaining() <= 0 && !level.emptyParts().isEmpty()) {
+            setDisplays(plot, building, level.emptyParts());
+        }
+    }
+
+    private boolean isCraftingStation(HallsBuildingType building) {
+        return building.id().equals("cooking_pot")
+                || building.id().equals("weapon_bench")
+                || building.id().equals("armory");
+    }
+
+    private ItemStack menuItem(Material material,
+                               String name,
+                               NamedTextColor color,
+                               List<String> loreLines,
+                               String action,
+                               String itemId) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text(name, color));
+            if (loreLines != null && !loreLines.isEmpty()) {
+                meta.lore(loreLines.stream()
+                        .map(line -> Component.text(line, NamedTextColor.GRAY))
+                        .toList());
+            }
+            if (action != null) {
+                meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_camp_action"),
+                        PersistentDataType.STRING, action);
+            }
+            if (itemId != null) {
+                meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_camp_item"),
+                        PersistentDataType.STRING, itemId);
+            }
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private String formatCost(Map<String, Integer> cost) {
+        if (cost == null || cost.isEmpty()) {
+            return "free";
+        }
+        List<String> parts = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : cost.entrySet()) {
+            if (entry.getValue() > 0) {
+                parts.add(entry.getValue() + " " + entry.getKey().replace('_', ' '));
+            }
+        }
+        return parts.isEmpty() ? "free" : String.join(", ", parts);
+    }
+
+    private Map<String, Integer> scrapCost(Map<String, Integer> cost) {
+        Map<String, Integer> scrap = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : cost.entrySet()) {
+            if (isScrapCost(entry.getKey())) {
+                scrap.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return scrap;
+    }
+
+    private Map<String, Integer> itemCost(Map<String, Integer> cost) {
+        Map<String, Integer> items = new HashMap<>();
+        for (Map.Entry<String, Integer> entry : cost.entrySet()) {
+            if (!isScrapCost(entry.getKey())) {
+                items.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return items;
+    }
+
+    private boolean isScrapCost(String key) {
+        return key.equals("wood") || key.equals("wood_scrap")
+                || key.equals("iron") || key.equals("iron_scrap")
+                || key.equals("diamond") || key.equals("diamond_scrap")
+                || key.equals("redstone") || key.equals("redstone_scrap");
+    }
+
+    private boolean hasItemIngredients(PlayerInventory inventory, Map<String, Integer> cost) {
+        for (Map.Entry<String, Integer> entry : cost.entrySet()) {
+            if (countHotbarItem(inventory, entry.getKey()) < entry.getValue()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int countHotbarItem(PlayerInventory inventory, String itemId) {
+        int count = 0;
+        for (int slot = 0; slot <= 8; slot++) {
+            ItemStack item = inventory.getItem(slot);
+            if (hasHallsItemId(item, itemId)) {
+                count += Math.max(1, item.getAmount());
+            }
+        }
+        return count;
+    }
+
+    private void consumeItemIngredients(PlayerInventory inventory, Map<String, Integer> cost) {
+        for (Map.Entry<String, Integer> entry : cost.entrySet()) {
+            int remaining = entry.getValue();
+            for (int slot = 0; slot <= 8 && remaining > 0; slot++) {
+                ItemStack item = inventory.getItem(slot);
+                if (!hasHallsItemId(item, entry.getKey())) {
+                    continue;
+                }
+                int take = Math.min(remaining, Math.max(1, item.getAmount()));
+                remaining -= take;
+                int newAmount = item.getAmount() - take;
+                if (newAmount <= 0) {
+                    inventory.setItem(slot, null);
+                } else {
+                    ItemStack remainingItem = item.clone();
+                    remainingItem.setAmount(newAmount);
+                    inventory.setItem(slot, remainingItem);
+                }
+            }
+        }
+    }
+
+    private boolean hasHallsItemId(ItemStack item, String itemId) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
+            return false;
+        }
+        String actual = item.getItemMeta().getPersistentDataContainer()
+                .get(new NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING);
+        return itemId.equals(actual);
+    }
+
+    private boolean canEquipEmptyArmorSlot(PlayerInventory inventory, ItemStack item) {
+        org.bukkit.inventory.EquipmentSlot slot = armorSlot(item);
+        return slot != null && inventory.getItem(slot) == null;
+    }
+
+    private void equipArmorSlot(PlayerInventory inventory, ItemStack item) {
+        org.bukkit.inventory.EquipmentSlot slot = armorSlot(item);
+        if (slot == null) {
+            return;
+        }
+        inventory.setItem(slot, item);
+    }
+
+    private org.bukkit.inventory.EquipmentSlot armorSlot(ItemStack item) {
+        return switch (item.getType()) {
+            case LEATHER_HELMET, CHAINMAIL_HELMET, IRON_HELMET, GOLDEN_HELMET, DIAMOND_HELMET, NETHERITE_HELMET,
+                 TURTLE_HELMET -> org.bukkit.inventory.EquipmentSlot.HEAD;
+            case LEATHER_CHESTPLATE, CHAINMAIL_CHESTPLATE, IRON_CHESTPLATE, GOLDEN_CHESTPLATE, DIAMOND_CHESTPLATE,
+                 NETHERITE_CHESTPLATE, ELYTRA -> org.bukkit.inventory.EquipmentSlot.CHEST;
+            case LEATHER_LEGGINGS, CHAINMAIL_LEGGINGS, IRON_LEGGINGS, GOLDEN_LEGGINGS, DIAMOND_LEGGINGS,
+                 NETHERITE_LEGGINGS -> org.bukkit.inventory.EquipmentSlot.LEGS;
+            case LEATHER_BOOTS, CHAINMAIL_BOOTS, IRON_BOOTS, GOLDEN_BOOTS, DIAMOND_BOOTS, NETHERITE_BOOTS -> org.bukkit.inventory.EquipmentSlot.FEET;
+            default -> null;
+        };
     }
 
     private BlockData blockData(org.bukkit.Material material, String configured) {
@@ -308,6 +651,8 @@ public final class HallsCampRuntime {
         private final List<UUID> displayIds = new ArrayList<>();
         private String buildingId;
         private int level;
+        private int harvestRemaining;
+        private int harvestUsed;
 
         private Plot(int id, String size, int x, int y, int z, BlockFace facing, UUID interactionId) {
             this.id = id;
@@ -362,6 +707,38 @@ public final class HallsCampRuntime {
         private void setBuilding(String buildingId, int level) {
             this.buildingId = buildingId;
             this.level = level;
+        }
+
+        private void clearBuilding() {
+            this.buildingId = null;
+            this.level = 0;
+            this.harvestRemaining = 0;
+            this.harvestUsed = 0;
+        }
+
+        private int harvestRemaining() {
+            return harvestRemaining;
+        }
+
+        private void setHarvestRemaining(int harvestRemaining) {
+            this.harvestRemaining = Math.max(0, harvestRemaining);
+        }
+
+        private int harvestUsed() {
+            return harvestUsed;
+        }
+
+        private void setHarvestUsed(int harvestUsed) {
+            this.harvestUsed = Math.max(0, harvestUsed);
+        }
+    }
+
+    private static final int[] RECIPE_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 23, 24, 25};
+
+    private record CampMenu(int plotId) implements InventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
         }
     }
 }

@@ -54,7 +54,7 @@ Last updated: 2026-09-11
 - Breakable loot now rolls from each prop's configured loot table and supports placeholder scrap, random scrap, blueprint keywords, and coin drops.
 - Coin drops are session-owned physics items that add directly to the shared session coin counter on right-click pickup, bypassing normal hotbar capacity.
 - Item definitions now load recursively from `plugins/OmGames/HallsOfCarnage/items/**/*.txt|*.yml|*.yaml`, seeded by bundled defaults for normal/rare weapons, ranged gear, armors, utility items, and building blueprints grouped by category folder.
-- Item resource files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, and `lore`; non-blueprint items may also define recipe scrap costs for future camp crafting.
+- Item resource files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, and `lore`; non-blueprint items may also define recipe costs for camp crafting.
 - Item resource files now support `stats`; stats are written into item PDC as `hoc_stat_<stat_id>` and rendered in lore for test visibility.
 - Scenarios now parse `allowed-items` by category and `blueprint-pools.normal` / `blueprint-pools.rare`.
 - Breakable loot can reference concrete item ids, scenario-aware category keywords (`weapon`, `armor`, `ranged`, `utility` and rare variants), and scenario blueprint keywords.
@@ -113,7 +113,7 @@ This is the first implementation slice. It focuses on:
 - Scrap storage and camp building runtime.
 - Combat/exploration/camp floor gameplay.
 - Persistent sculk, polished monster flood behavior, and polished trap visuals/config.
-- Real item effects, equipment stats, crafting/building recipe consumers, and persisted unlock/storage systems.
+- Full real item effects, advanced equipment stat consumers, and persisted unlock/storage systems.
 - Dedicated elevator transfer chest inventory and item persistence rules.
 - Scenario-aware randomized template-driven exploration room selection from `resources/hallsOfCarnage/level/<level_type>/`.
 - Runtime use of level-type monster pools, modifier pools, and polished non-normal corridor algorithms beyond the current first-pass cave/maze generators.
@@ -232,7 +232,7 @@ This is the first implementation slice. It focuses on:
 - Monster spawns now check max participant sculk; above 50%, each spawn has `min(sculk - 40, 35)%` chance to spawn a warden.
 - Bundled scenario defaults now include `sculk-patches` on exploration floors, and bundled monster defaults include `warden`.
 - Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, poison dart firing, and sculk standing feedback.
-- Halls sound-pending features: future monster attacks/deaths, future combat floor wave terminals, future camp building placement/upgrades/demolition, future crafting/cooking/storage interactions, future warden warning, and future modifier reveal/selection.
+- Halls sound-pending features: future monster attacks/deaths, future combat floor wave terminals, future detailed camp building placement/upgrades/demolition, future storage interactions, future warden warning, and future modifier reveal/selection.
 - Next reviewer slice applied: sculk rises more slowly and can attach veins to valid floor/wall/ceiling faces; transfer-chest interaction is locked during elevator movement and staged builds recapture contents before rebuilding the elevator; level-change blindness fade use was removed; session monsters clear native/random equipment, no longer play an alert sound, and die after falling into holes; `vagabonds_club` is seeded as the starter weapon and granted on start/game-over reset; start-floor players spawn in the start room; game-over reset now clears inventory, counters, sculk, ghosts, and transfer chest state; normal stop and game-over reset teleport players before cleanup to avoid fall damage; new bundled monster files are included in Halls resource seeding; level-type defaults no longer contain obsolete modifier sections.
 - Next development slice applied: Halls weapon attack attributes now write total target damage/speed against player base attributes so low-damage custom weapons no longer cancel out vanilla weapon damage; sculk exposure uses generated patch geometry instead of block-under-player checks; sculk pressure no longer decays and survives floor rebuilds until run reset/game over; sculk vein block data pins only the intended support face; slime split children from session slimes are registered as session monsters; `/hoc sessions` reports alive monsters, base cap, extended cap, and spawned budget; scenario floors parse `coin-quota`; the HUD shows `Coins current/quota` and per-player elevator range as `NEAR`, `MEDIUM`, or `FAR`; elevator descent requires and spends the current floor quota unless the activating player is in Creative; multiplayer participants outside the elevator when descent starts are converted to ghosts with a left-behind message.
 - Next development slice applied: session monsters are now persistent with far-away removal disabled; exploration monster spawning no longer has a finite total budget; the live spawn cap extends periodically with a difficulty-based interval, player kills reduce the cap by one, and slime split children add cap slots as they register; monsters retarget toward alive participants and avoid ghost targets; Halls food item category is active with `stats.heal` restoring health on consume while hunger stays full; bundled food items and breakable food loot entries were added; sculk high-pressure eating suppression now blocks consumption without lowering hunger.
@@ -251,7 +251,7 @@ This is the first implementation slice. It focuses on:
 - Next development slice applied: camp floors now parse scenario `layout`, load `level/camps/camp_1.txt`, render camp rooms from `X/O/C/N/S/W/E` masks, mark plot floors with oak planks, and add session-owned plot `Interaction` hitboxes.
 - Halls building definitions now load from `plugins/OmGames/HallsOfCarnage/buildings/` and are seeded from bundled defaults for all current blueprint families.
 - Building files define size, blueprint id, implemented flag, level display parts, optional stored-scrap upgrade costs, and optional `interaction.give-items` outputs.
-- Right-clicking a camp plot with a matching blueprint consumes it and spawns the configured level-1 building display. Sneak-right-clicking a built plot upgrades it up to level 3 by spending stored scrap from the session counters.
+- Right-clicking a camp plot with a matching blueprint consumes it and spawns the configured level-1 building display. Right-clicking a built plot opens its camp building GUI for functionality, upgrades, and destruction.
 - Cooking Pot, Weapon Bench, Armory, and Mycelia Farm have first-pass active outputs that place configured catalog items into an open hotbar slot. Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers are buildable/upgradable decorative placeholders for now.
 - `/hoc reset confirm` now also resets bundled `buildings/` resources, and `AGENTS.md` documents the new camp/building resource schemas.
 - Next development slice applied: breakable and camp building display parts now parse optional `block-data` plus `rotation`/`euler` degrees, building part offsets rotate with the camp plot facing marker, and the bundled elevator drill/chair resources exercise the new fields. Camp floors now connect the elevator corridor to the nearest open north-edge cell instead of blindly opening the layout center, elevator door bars force east-west connectivity when placed, and the session floor cleanup height was raised to catch leftover high blocks.
@@ -259,17 +259,18 @@ This is the first implementation slice. It focuses on:
 - Smoke Bomb and Warding Totem are now reusable utility items with per-player cooldowns from item stats instead of being consumed on use. Smoke Bomb also conceals the user from session monster target selection for its configured duration, so nearby monsters do not immediately reacquire the same player.
 - Exploration floors now choose the forced rare breakable room randomly per floor instead of always using the first generated room.
 - Sculk patch generation now excludes trap-reserved cells, including carved pit cells, so sculk blocks do not regenerate floor surfaces inside holes after trap rendering.
+- Next development slice applied: built camp plots now open a building GUI instead of using sneak-right-click upgrades; the GUI handles station functionality plus upgrade and destroy actions.
+- Cooking Pot, Weapon Bench, and Armory now read scenario `crafting-stations.<station>.<1|2|3>` unlock lists and craft catalog items from their GUI using stored scrap plus optional hotbar item ingredients from item `recipe`.
+- Mycelia Farm now uses per-level `harvest.uses`, `harvest.items`, and `empty-parts`; right-click harvests raw mycelia while stocked, empty farms open the GUI, and upgrades remember previous harvests instead of fully refilling the building.
+- Added `raw_mycelia`, rare meal foods, cooked-mycelia recipe data, and food buff application for speed, resistance, regeneration, and absorption meal stats.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice (do not remove this line):
-- Upgrading building shouldnt be a shift action, instead each building should open a GUI after interacting, where should be its functionality, upgrade/destroy button.
-- Armory, Cooking pot and weapon bench should work more like a crafting station, in their UI will be a list of recipes player can craft at it.
-- - The items which can be crafted there should be specified in the scenario file, this way different scenarios can have different locked items, the items in the file should have 3 categories based on which level the recipe can be crafted
-- - Weapons and utilities and armors use scrap to be crafted, although some items could require other items like rusty_sword
-- The mycelia farm should have its config still in its file. When visited, it will give players new raw_mycelia food, which is a worse version of cooked_mycelia. It can give it number of times based on its level. When upgrading, building should remember it already gave it out. Mycelia can be taken by right clicking the building, UI will show only if the building is empty. There should be a different model based on if its empty or not.
-- Add various meal items, they are like a better food granting various temporary buffs crafted at the cooking pot. The recipes cooking pot can cook should be in the scenario file
-- Add a recipe for cooked_mycelia as it can be cooking pot recipe
-- All meals are rare food items.
+- Smoke bomb is still not working, arent anti-ghost target mechanics overiding the effect? Get to the bottom of this. For example, I was in the elevator in creative and zombie tracked me here from accross the whole floor.
+- Contents of the elevator chest for some reason get deleted when going down a floor
+- Elevator corridor is still impassable on camp floors, as it is offset by one block to allign to a  free wall, but that closes it off since its 1 block wide.
+- Make it so elevator compass gets removed from both player inventories and elevator chest when going down the floor, before modifiers are chosen
+- Make it so /hoc give can give you scraps deposited right into the elevator, preferably with amount argument
 
 Future (not this slice):
 - Continue camp work by adding persistent camp/save-file state so built buildings survive game-over restarts and later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.

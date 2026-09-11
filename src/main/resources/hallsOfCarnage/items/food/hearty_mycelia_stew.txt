@@ -1,0 +1,16 @@
+id: hearty_mycelia_stew
+name: "Hearty Mycelia Stew"
+category: food
+rarity: rare
+material: MUSHROOM_STEW
+max-stack-size: 1
+lore:
+  - "A careful camp meal that keeps wounds closed."
+stats:
+  heal: 8
+  regeneration-seconds: 8
+  regeneration-amplifier: 1
+recipe:
+  raw_mycelia: 1
+  wood_scrap: 1
+  iron_scrap: 1

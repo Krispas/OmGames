@@ -1,0 +1,16 @@
+id: stonehide_chowder
+name: "Stonehide Chowder"
+category: food
+rarity: rare
+material: BEETROOT_SOUP
+max-stack-size: 1
+lore:
+  - "Thick enough to feel like armor."
+stats:
+  heal: 7
+  resistance-seconds: 15
+  resistance-amplifier: 1
+recipe:
+  cooked_mycelia: 1
+  diamond_scrap: 1
+  iron_scrap: 3

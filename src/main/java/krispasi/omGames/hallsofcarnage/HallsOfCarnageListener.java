@@ -208,6 +208,9 @@ public final class HallsOfCarnageListener implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (manager.handleCampInventoryClick(event)) {
+            return;
+        }
         if (!(event.getWhoClicked() instanceof Player player)
                 || !manager.isActiveSessionParticipant(player)
                 || !manager.isHallsWorld(player.getWorld())) {

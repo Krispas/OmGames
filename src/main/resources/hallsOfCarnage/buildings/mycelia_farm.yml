@@ -8,9 +8,10 @@ levels:
     upgrade-cost:
       wood: 2
       redstone: 1
-    interaction:
-      give-items:
-        - stale_bread
+    harvest:
+      uses: 1
+      items:
+        - raw_mycelia
     parts:
       - material: PODZOL
         offset: [0, 0, 0]
@@ -18,13 +19,18 @@ levels:
       - material: BROWN_MUSHROOM
         offset: [0.15, 0.25, 0.1]
         scale: [0.7, 0.7, 0.7]
+    empty-parts:
+      - material: PODZOL
+        offset: [0, 0, 0]
+        scale: [1, 0.25, 1]
   2:
     upgrade-cost:
       wood: 3
       redstone: 3
-    interaction:
-      give-items:
-        - cooked_mycelia
+    harvest:
+      uses: 2
+      items:
+        - raw_mycelia
     parts:
       - material: MYCELIUM
         offset: [0, 0, 0]
@@ -35,11 +41,19 @@ levels:
       - material: RED_MUSHROOM
         offset: [-0.2, 0.25, -0.15]
         scale: [0.7, 0.7, 0.7]
+    empty-parts:
+      - material: MYCELIUM
+        offset: [0, 0, 0]
+        scale: [1, 0.25, 1]
+      - material: DEAD_BUSH
+        offset: [0.15, 0.2, 0.1]
+        scale: [0.55, 0.55, 0.55]
   3:
-    interaction:
-      give-items:
-        - cooked_mycelia
-        - golden_jerky
+    harvest:
+      uses: 3
+      items:
+        - raw_mycelia
+        - raw_mycelia
     parts:
       - material: MYCELIUM
         offset: [0, 0, 0]
@@ -47,3 +61,10 @@ levels:
       - material: BROWN_MUSHROOM_BLOCK
         offset: [0.1, 0.45, 0.1]
         scale: [0.45, 0.45, 0.45]
+    empty-parts:
+      - material: MYCELIUM
+        offset: [0, 0, 0]
+        scale: [1.1, 0.25, 1.1]
+      - material: DEAD_BUSH
+        offset: [0.1, 0.2, 0.1]
+        scale: [0.65, 0.65, 0.65]

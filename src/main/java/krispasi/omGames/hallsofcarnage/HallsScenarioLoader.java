@@ -52,6 +52,7 @@ public final class HallsScenarioLoader {
         int maxPlayers = players == null ? 6 : clamp(players.getInt("max", 6), minPlayers, 6);
         Map<String, List<String>> allowedItems = loadStringListMap(config.getConfigurationSection("allowed-items"));
         Map<String, List<String>> blueprintPools = loadStringListMap(config.getConfigurationSection("blueprint-pools"));
+        Map<String, Map<Integer, List<String>>> craftingStations = loadCraftingStations(config.getConfigurationSection("crafting-stations"));
         List<HallsScenario.FloorDefinition> floors = loadFloors(config);
         int floorCount = floors.stream().mapToInt(HallsScenario.FloorDefinition::lastFloor).max().orElse(0);
         if (id.isBlank() || name == null || name.isBlank()) {
@@ -59,7 +60,7 @@ public final class HallsScenarioLoader {
             return null;
         }
         return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers,
-                floorCount, allowedItems, blueprintPools, List.copyOf(floors), debugLines(file, config, floors));
+                floorCount, allowedItems, blueprintPools, craftingStations, List.copyOf(floors), debugLines(file, config, floors));
     }
 
     private static Map<String, List<String>> loadStringListMap(ConfigurationSection section) {
@@ -74,6 +75,37 @@ public final class HallsScenarioLoader {
                     .toList());
         }
         return Map.copyOf(values);
+    }
+
+    private static Map<String, Map<Integer, List<String>>> loadCraftingStations(ConfigurationSection section) {
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, Map<Integer, List<String>>> stations = new LinkedHashMap<>();
+        for (String stationKey : section.getKeys(false)) {
+            ConfigurationSection stationSection = section.getConfigurationSection(stationKey);
+            if (stationSection == null) {
+                continue;
+            }
+            Map<Integer, List<String>> levels = new LinkedHashMap<>();
+            for (String levelKey : stationSection.getKeys(false)) {
+                int level = parseCraftingLevel(levelKey);
+                if (level < 1 || level > 3) {
+                    continue;
+                }
+                List<String> recipes = stationSection.getStringList(levelKey).stream()
+                        .map(HallsScenarioLoader::normalizeId)
+                        .filter(value -> !value.isBlank())
+                        .toList();
+                if (!recipes.isEmpty()) {
+                    levels.put(level, recipes);
+                }
+            }
+            if (!levels.isEmpty()) {
+                stations.put(normalizeId(stationKey), Map.copyOf(levels));
+            }
+        }
+        return Map.copyOf(stations);
     }
 
     private static List<HallsScenario.FloorDefinition> loadFloors(YamlConfiguration config) {
@@ -208,6 +240,15 @@ public final class HallsScenarioLoader {
             return "";
         }
         return value.trim().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+    }
+
+    private static int parseCraftingLevel(String key) {
+        String normalized = normalizeId(key).replace("level_", "");
+        try {
+            return Integer.parseInt(normalized);
+        } catch (NumberFormatException ex) {
+            return -1;
+        }
     }
 
     private static int clamp(int value, int min, int max) {

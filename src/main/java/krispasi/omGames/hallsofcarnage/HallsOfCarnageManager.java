@@ -118,9 +118,13 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/armors/padded_armor.txt",
             "hallsOfCarnage/items/armors/reinforced_chestplate.txt",
             "hallsOfCarnage/items/food/stale_bread.txt",
+            "hallsOfCarnage/items/food/raw_mycelia.txt",
             "hallsOfCarnage/items/food/cooked_mycelia.txt",
             "hallsOfCarnage/items/food/ember_stew.txt",
             "hallsOfCarnage/items/food/golden_jerky.txt",
+            "hallsOfCarnage/items/food/hearty_mycelia_stew.txt",
+            "hallsOfCarnage/items/food/fleetfoot_ration.txt",
+            "hallsOfCarnage/items/food/stonehide_chowder.txt",
             "hallsOfCarnage/items/utility/smoke_bomb.txt",
             "hallsOfCarnage/items/utility/warding_totem.txt",
             "hallsOfCarnage/items/blueprints/cooking_pot_blueprint.txt",
@@ -417,6 +421,15 @@ public final class HallsOfCarnageManager {
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         return session != null && session.handleCampInteract(player, entity);
+    }
+
+    public boolean handleCampInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleCampInventoryClick(event);
     }
 
     public boolean handlePlayerDroppedItem(Player player, org.bukkit.entity.Item itemDrop) {

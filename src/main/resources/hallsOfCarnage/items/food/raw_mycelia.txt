@@ -1,0 +1,10 @@
+id: raw_mycelia
+name: "Raw Mycelia"
+category: food
+rarity: normal
+material: BROWN_MUSHROOM
+max-stack-size: 1
+lore:
+  - "Fresh camp fungus. Bitter, but useful."
+stats:
+  heal: 2

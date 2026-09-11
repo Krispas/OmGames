@@ -144,8 +144,18 @@ public final class HallsSession {
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
                 sculkRuntime::maxSculkPercent, this::isAliveParticipant);
-        this.campRuntime = new HallsCampRuntime(plugin, world, this.buildingTypes, this.itemTypes,
-                type -> HallsItemFactory.create(plugin, type, 1), this::spendStoredScrap);
+        this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
+                type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
+            @Override
+            public boolean canSpend(Map<String, Integer> cost) {
+                return hasStoredScrap(cost);
+            }
+
+            @Override
+            public boolean spend(Map<String, Integer> cost) {
+                return spendStoredScrap(cost);
+            }
+        });
     }
 
     public int id() {
@@ -207,6 +217,10 @@ public final class HallsSession {
             return campRuntime.isCampEntity(entity);
         }
         return campRuntime.handleInteract(player, entity);
+    }
+
+    public boolean handleCampInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        return campRuntime.handleInventoryClick(event);
     }
 
     public boolean isSessionMonster(Entity entity) {
@@ -486,9 +500,26 @@ public final class HallsSession {
                 : player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
         double nextHealth = Math.min(maxHealth, player.getHealth() + heal);
         player.setHealth(nextHealth);
+        applyFoodBuffs(player, type);
         world.playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 0.6f, 1.25f);
         player.sendActionBar(Component.text("Restored " + formatStatAmount(heal) + " health.", NamedTextColor.GREEN));
         return true;
+    }
+
+    private void applyFoodBuffs(Player player, HallsItemType type) {
+        applyFoodBuff(player, type, "speed", PotionEffectType.SPEED);
+        applyFoodBuff(player, type, "resistance", PotionEffectType.RESISTANCE);
+        applyFoodBuff(player, type, "regeneration", PotionEffectType.REGENERATION);
+        applyFoodBuff(player, type, "absorption", PotionEffectType.ABSORPTION);
+    }
+
+    private void applyFoodBuff(Player player, HallsItemType type, String key, PotionEffectType effectType) {
+        int durationTicks = (int) Math.round(type.stats().getOrDefault(key + "_seconds", 0.0) * 20.0);
+        if (durationTicks <= 0) {
+            return;
+        }
+        int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault(key + "_amplifier", 1.0)) - 1);
+        player.addPotionEffect(new PotionEffect(effectType, durationTicks, amplifier, true, true, true));
     }
 
     public boolean handleUtilityUse(Player player, ItemStack item) {
@@ -2146,7 +2177,7 @@ public final class HallsSession {
         int iron = cost.getOrDefault("iron", cost.getOrDefault("iron_scrap", 0));
         int diamond = cost.getOrDefault("diamond", cost.getOrDefault("diamond_scrap", 0));
         int redstone = cost.getOrDefault("redstone", cost.getOrDefault("redstone_scrap", 0));
-        if (woodScrap < wood || ironScrap < iron || diamondScrap < diamond || redstoneScrap < redstone) {
+        if (!hasStoredScrap(wood, iron, diamond, redstone)) {
             return false;
         }
         woodScrap -= wood;
@@ -2154,6 +2185,21 @@ public final class HallsSession {
         diamondScrap -= diamond;
         redstoneScrap -= redstone;
         return true;
+    }
+
+    private boolean hasStoredScrap(Map<String, Integer> cost) {
+        if (cost == null || cost.isEmpty()) {
+            return true;
+        }
+        int wood = cost.getOrDefault("wood", cost.getOrDefault("wood_scrap", 0));
+        int iron = cost.getOrDefault("iron", cost.getOrDefault("iron_scrap", 0));
+        int diamond = cost.getOrDefault("diamond", cost.getOrDefault("diamond_scrap", 0));
+        int redstone = cost.getOrDefault("redstone", cost.getOrDefault("redstone_scrap", 0));
+        return hasStoredScrap(wood, iron, diamond, redstone);
+    }
+
+    private boolean hasStoredScrap(int wood, int iron, int diamond, int redstone) {
+        return woodScrap >= wood && ironScrap >= iron && diamondScrap >= diamond && redstoneScrap >= redstone;
     }
 
     private void dropSessionItem(Location location, ItemStack stack) {

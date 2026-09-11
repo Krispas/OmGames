@@ -8,3 +8,6 @@ lore:
   - "Warm fungal broth in a cracked bottle."
 stats:
   heal: 5
+recipe:
+  raw_mycelia: 1
+  wood_scrap: 1

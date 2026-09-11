@@ -1,10 +1,15 @@
 id: ember_stew
 name: "Ember Stew"
 category: food
-rarity: normal
+rarity: rare
 material: RABBIT_STEW
 max-stack-size: 1
 lore:
   - "It burns, then it helps."
 stats:
   heal: 7
+  regeneration-seconds: 5
+  regeneration-amplifier: 1
+recipe:
+  cooked_mycelia: 1
+  redstone_scrap: 2

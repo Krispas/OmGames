@@ -26,8 +26,12 @@ allowed-items:
     - padded_armor
     - reinforced_chestplate
   food:
+    - raw_mycelia
     - stale_bread
     - cooked_mycelia
+    - hearty_mycelia_stew
+    - fleetfoot_ration
+    - stonehide_chowder
     - ember_stew
     - golden_jerky
   utility:
@@ -80,6 +84,32 @@ blueprint-pools:
     - sculk_purifier_small_blueprint
     - sculk_purifier_medium_blueprint
     - sculk_purifier_large_blueprint
+crafting-stations:
+  cooking_pot:
+    1:
+      - cooked_mycelia
+      - hearty_mycelia_stew
+    2:
+      - fleetfoot_ration
+      - stonehide_chowder
+      - ember_stew
+    3:
+      - golden_jerky
+  weapon_bench:
+    1:
+      - rusty_sword
+      - poking_stick
+      - smoke_bomb
+    2:
+      - miner_pick
+    3:
+      - echo_blade
+      - warding_totem
+  armory:
+    1:
+      - padded_armor
+    3:
+      - reinforced_chestplate
 floors:
   - number: 1
     kind: start

@@ -41,16 +41,22 @@ public record HallsBuildingType(String id,
     }
 
     public record Level(List<Part> parts,
+                        List<Part> emptyParts,
                         Map<String, Integer> upgradeCost,
-                        List<String> giveItems) {
+                        List<String> giveItems,
+                        List<String> harvestItems,
+                        int harvestUses) {
         public Level {
             parts = List.copyOf(parts);
+            emptyParts = List.copyOf(emptyParts);
             upgradeCost = Map.copyOf(upgradeCost);
             giveItems = List.copyOf(giveItems);
+            harvestItems = List.copyOf(harvestItems);
+            harvestUses = Math.max(0, harvestUses);
         }
 
         public static Level empty() {
-            return new Level(List.of(), Map.of(), List.of());
+            return new Level(List.of(), List.of(), Map.of(), List.of(), List.of(), 0);
         }
     }
 

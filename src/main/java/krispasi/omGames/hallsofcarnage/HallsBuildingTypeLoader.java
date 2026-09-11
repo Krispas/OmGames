@@ -68,11 +68,17 @@ public final class HallsBuildingTypeLoader {
     private static HallsBuildingType.Level parseLevel(ConfigurationSection section) {
         return new HallsBuildingType.Level(
                 parseParts(section.getMapList("parts")),
+                parseParts(section.getMapList("empty-parts")),
                 parseCost(section.getConfigurationSection("upgrade-cost")),
                 section.getStringList("interaction.give-items").stream()
                         .map(HallsBuildingTypeLoader::normalizeId)
                         .filter(value -> !value.isBlank())
-                        .toList()
+                        .toList(),
+                section.getStringList("harvest.items").stream()
+                        .map(HallsBuildingTypeLoader::normalizeId)
+                        .filter(value -> !value.isBlank())
+                        .toList(),
+                Math.max(0, section.getInt("harvest.uses", 0))
         );
     }
 
