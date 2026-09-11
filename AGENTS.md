@@ -1423,3 +1423,5 @@ SQLite tables:
 - Poison darts trigger from a wider forward warning lane with one extra block of reach, but the rendered dart line and damage use one narrow forward lane, defaulting to 5 blocks with a 3-second cooldown.
 - Frozen Halls defaults to `cave` corridor generation, which uses organic biased tunnel paths. The prior widened orthogonal cave style remains available as `large_corridors`.
 - Deep Crypt defaults to `maze` corridor generation, which uses close room placement plus mostly open grid-locked halls with some pillars/wall ribs and extra entrances. The prior room-local maze field remains available as `open_halls`.
+- Infernal Chambers defaults to `large_corridors` corridor generation and currently has one bundled exploration room for testing.
+- Factory defaults to `open_halls` corridor generation and currently has one bundled exploration room for testing.

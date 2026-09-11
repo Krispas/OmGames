@@ -63,6 +63,44 @@ public record HallsLevelType(
                     List.of("breeze")
             );
         }
+        if (normalizedId.equals("infernal_chambers")) {
+            return new HallsLevelType(
+                    normalizedId,
+                    "Infernal Chambers",
+                    "large_corridors",
+                    Material.CRACKED_POLISHED_BLACKSTONE_BRICKS,
+                    Material.POLISHED_BLACKSTONE_BRICKS,
+                    Material.BLACKSTONE,
+                    Material.POLISHED_BLACKSTONE_BRICKS,
+                    Material.SHROOMLIGHT,
+                    List.of(
+                            new BlockPalette(Material.POLISHED_BLACKSTONE_BRICKS, Material.MAGMA_BLOCK, 0.08),
+                            new BlockPalette(Material.NETHER_BRICKS, Material.RED_NETHER_BRICKS, 0.10)
+                    ),
+                    List.of(new BlockPalette(Material.BASALT, Material.POLISHED_BASALT, 0.12)),
+                    List.of("wither_skeleton", "skeleton", "vindicator"),
+                    List.of("breeze", "witch")
+            );
+        }
+        if (normalizedId.equals("factory")) {
+            return new HallsLevelType(
+                    normalizedId,
+                    "Factory",
+                    "open_halls",
+                    Material.SMOOTH_STONE,
+                    Material.IRON_BLOCK,
+                    Material.POLISHED_ANDESITE,
+                    Material.IRON_BLOCK,
+                    Material.REDSTONE_LAMP,
+                    List.of(
+                            new BlockPalette(Material.IRON_BLOCK, Material.COPPER_BLOCK, 0.08),
+                            new BlockPalette(Material.POLISHED_ANDESITE, Material.SMOOTH_STONE, 0.12)
+                    ),
+                    List.of(new BlockPalette(Material.DEEPSLATE_TILES, Material.COPPER_BLOCK, 0.08)),
+                    List.of("zombie", "skeleton", "pillager", "slime_medium"),
+                    List.of("breeze", "creaking")
+            );
+        }
         return new HallsLevelType(
                 normalizedId,
                 "Howling Corridors",

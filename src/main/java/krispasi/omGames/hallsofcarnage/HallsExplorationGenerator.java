@@ -788,19 +788,8 @@ final class HallsExplorationGenerator {
     }
 
     private void addGridOpenHalls() {
-        Set<Cell> openCells = new HashSet<>();
-        for (Room room : rooms) {
-            Bounds bounds = Bounds.of(room).inflate(8);
-            for (int x = bounds.minX(); x <= bounds.maxX(); x++) {
-                for (int z = bounds.minZ(); z <= bounds.maxZ(); z++) {
-                    Cell cell = new Cell(x, z);
-                    if (!canWidenCorridorInto(cell) || !roomWithin(cell, 8) || isOpenHallStructuralBlock(cell)) {
-                        continue;
-                    }
-                    openCells.add(cell);
-                }
-            }
-        }
+        Set<Cell> openCells = cellsWithinRoomDistance(8);
+        openCells.removeIf(this::isOpenHallStructuralBlock);
         if (openCells.isEmpty()) {
             return;
         }
@@ -855,19 +844,24 @@ final class HallsExplorationGenerator {
     }
 
     private Set<Cell> mazeAreaCells() {
-        Set<Cell> area = new HashSet<>();
+        return cellsWithinRoomDistance(10);
+    }
+
+    private Set<Cell> cellsWithinRoomDistance(int distance) {
+        Set<Cell> cells = new HashSet<>();
         for (Room room : rooms) {
-            Bounds bounds = Bounds.of(room).inflate(10);
+            Bounds roomBounds = Bounds.of(room);
+            Bounds bounds = roomBounds.inflate(distance);
             for (int x = bounds.minX(); x <= bounds.maxX(); x++) {
                 for (int z = bounds.minZ(); z <= bounds.maxZ(); z++) {
                     Cell cell = new Cell(x, z);
-                    if (canWidenCorridorInto(cell) && roomWithin(cell, 10)) {
-                        area.add(cell);
+                    if (distanceFromBounds(cell, roomBounds) <= distance && canWidenCorridorInto(cell)) {
+                        cells.add(cell);
                     }
                 }
             }
         }
-        return area;
+        return cells;
     }
 
     private List<Cell> mazeStartsFromRoomDoors(Set<Cell> mazeArea) {
@@ -884,20 +878,14 @@ final class HallsExplorationGenerator {
         return starts;
     }
 
-    private boolean roomWithin(Cell cell, int distance) {
-        for (Room room : rooms) {
-            Bounds bounds = Bounds.of(room);
-            int dx = cell.x() < bounds.minX() ? bounds.minX() - cell.x()
-                    : cell.x() > bounds.maxX() ? cell.x() - bounds.maxX()
-                    : 0;
-            int dz = cell.z() < bounds.minZ() ? bounds.minZ() - cell.z()
-                    : cell.z() > bounds.maxZ() ? cell.z() - bounds.maxZ()
-                    : 0;
-            if (dx + dz <= distance) {
-                return true;
-            }
-        }
-        return false;
+    private int distanceFromBounds(Cell cell, Bounds bounds) {
+        int dx = cell.x() < bounds.minX() ? bounds.minX() - cell.x()
+                : cell.x() > bounds.maxX() ? cell.x() - bounds.maxX()
+                : 0;
+        int dz = cell.z() < bounds.minZ() ? bounds.minZ() - cell.z()
+                : cell.z() > bounds.maxZ() ? cell.z() - bounds.maxZ()
+                : 0;
+        return dx + dz;
     }
 
     private void addMazeRoomOpenings(Set<Cell> mazeCells) {

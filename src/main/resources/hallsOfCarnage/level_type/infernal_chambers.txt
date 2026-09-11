@@ -1,0 +1,31 @@
+id: infernal_chambers
+name: "Infernal Chambers"
+corridor-generation: large_corridors
+materials:
+  floor: CRACKED_POLISHED_BLACKSTONE_BRICKS
+  ceiling: POLISHED_BLACKSTONE_BRICKS
+  corridor-floor: BLACKSTONE
+  corridor-ceiling: POLISHED_BLACKSTONE_BRICKS
+  light: SHROOMLIGHT
+wall-palettes:
+  blackstone:
+    block: POLISHED_BLACKSTONE_BRICKS
+    special-block: MAGMA_BLOCK
+    special-chance: 0.08
+  nether_bricks:
+    block: NETHER_BRICKS
+    special-block: RED_NETHER_BRICKS
+    special-chance: 0.10
+pillar-palettes:
+  basalt:
+    block: BASALT
+    special-block: POLISHED_BASALT
+    special-chance: 0.12
+monsters:
+  common:
+    - wither_skeleton
+    - skeleton
+    - vindicator
+  special:
+    - breeze
+    - witch

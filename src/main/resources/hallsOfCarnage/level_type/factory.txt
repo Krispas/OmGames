@@ -1,0 +1,32 @@
+id: factory
+name: "Factory"
+corridor-generation: open_halls
+materials:
+  floor: SMOOTH_STONE
+  ceiling: IRON_BLOCK
+  corridor-floor: POLISHED_ANDESITE
+  corridor-ceiling: IRON_BLOCK
+  light: REDSTONE_LAMP
+wall-palettes:
+  iron:
+    block: IRON_BLOCK
+    special-block: COPPER_BLOCK
+    special-chance: 0.08
+  andesite:
+    block: POLISHED_ANDESITE
+    special-block: SMOOTH_STONE
+    special-chance: 0.12
+pillar-palettes:
+  machinery:
+    block: DEEPSLATE_TILES
+    special-block: COPPER_BLOCK
+    special-chance: 0.08
+monsters:
+  common:
+    - zombie
+    - skeleton
+    - pillager
+    - slime_medium
+  special:
+    - breeze
+    - creaking

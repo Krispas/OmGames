@@ -140,6 +140,10 @@ Your basic minecraft dungeons. Zombies, skeletons and so on.
 Frozen Caves.
 ### Deep Crypt
 Desert temple.
+### Infernal Chambers
+Nether-blackstone halls with wider corridors, heat-lit walls, and harsher monster pools.
+### Factory
+Industrial open halls with machinery-like pillars and room-local open-hall generation.
 ### Other levels
 Of course, other types will be implemented throughout development.
 ## Traps
