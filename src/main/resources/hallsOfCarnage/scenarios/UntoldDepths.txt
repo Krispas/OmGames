@@ -22,7 +22,6 @@ allowed-items:
     - frost_lance
     - echo_blade
     - sculk_maul
-  ranged:
     - short_bow
     - storm_crossbow
   armor:
@@ -45,6 +44,10 @@ allowed-items:
     - smoke_bomb
     - mending_salve
     - warding_totem
+    - adrenaline_shot
+    - ironhide_salve
+    - storm_vial
+    - echo_lure
   blueprint:
     - cooking_pot_blueprint
     - weapon_bench_blueprint
@@ -119,10 +122,16 @@ crafting-stations:
       - miner_pick
       - bone_cleaver
       - frost_lance
+      - short_bow
+      - adrenaline_shot
+      - ironhide_salve
     3:
       - echo_blade
       - sculk_maul
+      - storm_crossbow
       - warding_totem
+      - storm_vial
+      - echo_lure
   armory:
     1:
       - padded_armor

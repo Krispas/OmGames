@@ -78,8 +78,8 @@ public record HallsLevelType(
                             new BlockPalette(Material.NETHER_BRICKS, Material.RED_NETHER_BRICKS, 0.10)
                     ),
                     List.of(new BlockPalette(Material.BASALT, Material.POLISHED_BASALT, 0.12)),
-                    List.of("wither_skeleton", "skeleton", "vindicator"),
-                    List.of("breeze", "witch")
+                    List.of("piglin", "blaze", "breeze", "husk"),
+                    List.of("piglin_brute", "wither_skeleton", "parched")
             );
         }
         if (normalizedId.equals("factory")) {

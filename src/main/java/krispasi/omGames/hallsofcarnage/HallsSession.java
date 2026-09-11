@@ -29,6 +29,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.Container;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
+import org.bukkit.block.data.Lightable;
 import org.bukkit.block.data.MultipleFacing;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.BlockDisplay;
@@ -36,6 +37,7 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
@@ -526,12 +528,62 @@ public final class HallsSession {
             event.setCancelled(true);
             return true;
         }
+        applyArmorHitEffects(player);
         if (player.getHealth() - event.getFinalDamage() > 0.0) {
             return false;
         }
         event.setCancelled(true);
         makeGhost(player);
         return true;
+    }
+
+    public boolean handleWeaponHit(Player player, Entity target) {
+        if (player == null || target == null || !running || !participants.contains(player.getUniqueId())
+                || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())
+                || !(target instanceof LivingEntity living) || !monsterRuntime.isSessionMonster(living)) {
+            return false;
+        }
+        HallsItemType type = itemType(player.getInventory().getItemInMainHand());
+        if (type == null || !type.id().equals("sculk_maul")) {
+            return false;
+        }
+        double radius = Math.max(0.0, type.stats().getOrDefault("aoe_radius", 0.0));
+        double damage = Math.max(0.0, type.stats().getOrDefault("aoe_damage", 0.0));
+        if (radius <= 0.0 || damage <= 0.0) {
+            return false;
+        }
+        Location center = living.getLocation();
+        int hits = 0;
+        for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
+            if (!(nearby instanceof LivingEntity nearbyLiving)
+                    || nearbyLiving.getUniqueId().equals(living.getUniqueId())
+                    || !monsterRuntime.isSessionMonster(nearbyLiving)
+                    || nearbyLiving.getLocation().distanceSquared(center) > radius * radius) {
+                continue;
+            }
+            nearbyLiving.damage(damage, player);
+            hits++;
+        }
+        if (hits > 0) {
+            world.spawnParticle(Particle.SCULK_SOUL, center.clone().add(0.0, 0.8, 0.0),
+                    28, radius * 0.25, 0.45, radius * 0.25, 0.03);
+            world.playSound(center, Sound.BLOCK_SCULK_SHRIEKER_SHRIEK, 0.45f, 1.35f);
+        }
+        return hits > 0;
+    }
+
+    private void applyArmorHitEffects(Player player) {
+        ItemStack chestplate = player.getInventory().getChestplate();
+        HallsItemType type = itemType(chestplate);
+        if (type == null || !type.id().equals("cinderplate")) {
+            return;
+        }
+        int durationTicks = (int) Math.round(type.stats().getOrDefault("resistance_seconds", 0.0) * 20.0);
+        if (durationTicks <= 0) {
+            return;
+        }
+        int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("resistance_amplifier", 1.0)) - 1);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, durationTicks, amplifier, true, true, true));
     }
 
     public boolean blocksEating(Player player) {
@@ -618,6 +670,39 @@ public final class HallsSession {
                 if (activateHealingUtility(player, type)) {
                     applyUtilityCooldown(player, type);
                 }
+                yield true;
+            }
+            case "adrenaline_shot" -> {
+                if (isUtilityOnCooldown(player, type)) {
+                    yield true;
+                }
+                activateSelfBuffUtility(player, type, PotionEffectType.SPEED, "speed", "Adrenaline floods your legs.", Sound.ENTITY_RABBIT_JUMP);
+                applyUtilityCooldown(player, type);
+                yield true;
+            }
+            case "ironhide_salve" -> {
+                if (isUtilityOnCooldown(player, type)) {
+                    yield true;
+                }
+                activateSelfBuffUtility(player, type, PotionEffectType.RESISTANCE, "resistance", "Ironhide seals your wounds.", Sound.BLOCK_ANVIL_USE);
+                applyUtilityCooldown(player, type);
+                yield true;
+            }
+            case "storm_vial" -> {
+                if (isUtilityOnCooldown(player, type)) {
+                    yield true;
+                }
+                activateMonsterPulseUtility(player, type, Particle.ELECTRIC_SPARK, Sound.ENTITY_LIGHTNING_BOLT_THUNDER,
+                        "The vial bursts into chained sparks.");
+                applyUtilityCooldown(player, type);
+                yield true;
+            }
+            case "echo_lure" -> {
+                if (isUtilityOnCooldown(player, type)) {
+                    yield true;
+                }
+                activateEchoLure(player, type);
+                applyUtilityCooldown(player, type);
                 yield true;
             }
             default -> false;
@@ -2240,10 +2325,11 @@ public final class HallsSession {
             return definedItem(direct, amount);
         }
         return switch (reward) {
-            case "weapon", "armor", "ranged", "utility", "food" -> randomAllowedItem(reward, "normal", amount);
+            case "weapon", "armor", "utility", "food" -> randomAllowedItem(reward, "normal", amount);
+            case "ranged" -> randomAllowedItem("weapon", "normal", amount);
             case "rare_weapon" -> randomAllowedItem("weapon", "rare", amount);
             case "rare_armor" -> randomAllowedItem("armor", "rare", amount);
-            case "rare_ranged" -> randomAllowedItem("ranged", "rare", amount);
+            case "rare_ranged" -> randomAllowedItem("weapon", "rare", amount);
             case "rare_utility" -> randomAllowedItem("utility", "rare", amount);
             case "rare_food" -> randomAllowedItem("food", "rare", amount);
             default -> null;
@@ -2335,6 +2421,52 @@ public final class HallsSession {
         world.playSound(player.getLocation(), Sound.ITEM_HONEY_BOTTLE_DRINK, 0.7f, 1.35f);
         player.sendActionBar(Component.text("Restored " + formatStatAmount(heal) + " health.", NamedTextColor.GREEN));
         return true;
+    }
+
+    private void activateSelfBuffUtility(Player player,
+                                         HallsItemType type,
+                                         PotionEffectType effectType,
+                                         String statPrefix,
+                                         String message,
+                                         Sound sound) {
+        int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault(statPrefix + "_seconds", 8.0) * 20.0));
+        int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault(statPrefix + "_amplifier", 1.0)) - 1);
+        player.addPotionEffect(new PotionEffect(effectType, durationTicks, amplifier, true, true, true));
+        world.spawnParticle(Particle.EFFECT, player.getLocation().add(0.0, 1.0, 0.0),
+                32, 0.35, 0.6, 0.35, 0.05);
+        world.playSound(player.getLocation(), sound, 0.75f, 1.2f);
+        player.sendActionBar(Component.text(message, NamedTextColor.GREEN));
+    }
+
+    private void activateMonsterPulseUtility(Player player,
+                                             HallsItemType type,
+                                             Particle particle,
+                                             Sound sound,
+                                             String message) {
+        double radius = Math.max(1.0, type.stats().getOrDefault("radius", 5.0));
+        double damage = Math.max(0.0, type.stats().getOrDefault("monster_damage", 5.0));
+        Location center = player.getLocation();
+        for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
+            if (nearby instanceof LivingEntity living
+                    && monsterRuntime.isSessionMonster(living)
+                    && living.getLocation().distanceSquared(center) <= radius * radius) {
+                living.damage(damage, player);
+            }
+        }
+        world.spawnParticle(particle, center.clone().add(0.0, 1.0, 0.0),
+                80, radius * 0.35, 0.7, radius * 0.35, 0.08);
+        world.playSound(center, sound, 0.7f, 1.45f);
+        player.sendActionBar(Component.text(message, NamedTextColor.AQUA));
+    }
+
+    private void activateEchoLure(Player player, HallsItemType type) {
+        double radius = Math.max(6.0, type.stats().getOrDefault("radius", 12.0));
+        monsterRuntime.clearTargetsNear(player.getLocation(), radius);
+        Location lure = player.getLocation().add(player.getLocation().getDirection().normalize().multiply(radius * 0.75));
+        monsterRuntime.alert(lure);
+        world.spawnParticle(Particle.NOTE, lure.add(0.0, 1.0, 0.0), 24, 0.7, 0.45, 0.7, 0.02);
+        world.playSound(lure, Sound.BLOCK_NOTE_BLOCK_BELL, 1.0f, 0.75f);
+        player.sendActionBar(Component.text("Echoes pull nearby monsters away.", NamedTextColor.LIGHT_PURPLE));
     }
 
     private boolean isUtilityOnCooldown(Player player, HallsItemType type) {
@@ -3448,6 +3580,10 @@ public final class HallsSession {
             container.getInventory().clear();
         }
         block.setType(material, false);
+        if (material == Material.REDSTONE_LAMP && block.getBlockData() instanceof Lightable lightable) {
+            lightable.setLit(true);
+            block.setBlockData(lightable, false);
+        }
         if (facing != null && block.getBlockData() instanceof Directional directional) {
             directional.setFacing(facing);
             block.setBlockData(directional, false);

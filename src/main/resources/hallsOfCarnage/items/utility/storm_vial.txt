@@ -1,0 +1,15 @@
+id: storm_vial
+name: "Storm Vial"
+category: utility
+rarity: rare
+material: EXPERIENCE_BOTTLE
+max-stack-size: 1
+lore:
+  - "Bursts into a short-range shock pulse around the user."
+stats:
+  cooldown-seconds: 80
+  monster-damage: 6
+  radius: 5
+recipe:
+  diamond_scrap: 3
+  redstone_scrap: 7

@@ -10,6 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -55,6 +56,7 @@ final class HallsItemFactory {
             }
             applyArmorModel(meta, type);
             applyCombatStats(plugin, meta, type);
+            applySpecialItemMetadata(meta, type);
             applyDurability(meta, type);
             applyFoodComponent(meta, type);
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING, type.id());
@@ -109,6 +111,14 @@ final class HallsItemFactory {
                     EquipmentSlotGroup.HAND
             ));
         }
+    }
+
+    private static void applySpecialItemMetadata(ItemMeta meta, HallsItemType type) {
+        if (!type.id().equals("frost_lance")) {
+            return;
+        }
+        meta.addEnchant(Enchantment.LOYALTY, 3, true);
+        meta.setEnchantmentGlintOverride(false);
     }
 
     private static void applyArmorModel(ItemMeta meta, HallsItemType type) {

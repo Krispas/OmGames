@@ -1,0 +1,15 @@
+id: ironhide_salve
+name: "Ironhide Salve"
+category: utility
+rarity: normal
+material: CLAY_BALL
+max-stack-size: 1
+lore:
+  - "A gritty coating that hardens skin for a short push."
+stats:
+  cooldown-seconds: 70
+  resistance-seconds: 6
+  resistance-amplifier: 1
+recipe:
+  iron_scrap: 4
+  redstone_scrap: 2

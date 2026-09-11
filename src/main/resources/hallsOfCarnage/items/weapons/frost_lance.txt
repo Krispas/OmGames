@@ -6,6 +6,7 @@ material: TRIDENT
 max-stack-size: 1
 lore:
   - "A salvaged prong balanced for keeping monsters at reach."
+  - "Carries Loyalty III without the usual enchantment shimmer."
 stats:
   melee-damage: 5
   attack-speed: 1.4

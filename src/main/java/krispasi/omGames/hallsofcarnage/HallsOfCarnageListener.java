@@ -139,7 +139,9 @@ public final class HallsOfCarnageListener implements Listener {
         }
         if (manager.handleSessionEntityAttack(player, event.getEntity())) {
             event.setCancelled(true);
+            return;
         }
+        manager.handleSessionWeaponHit(player, event.getEntity());
     }
 
     @EventHandler(ignoreCancelled = true)

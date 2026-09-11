@@ -88,6 +88,9 @@ final class HallsMonsterTypeLoader {
         if (value == null || value.isBlank()) {
             return null;
         }
+        if (normalizeId(value).equals("parched")) {
+            return EntityType.HUSK;
+        }
         try {
             return EntityType.valueOf(normalizeId(value).toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
@@ -139,7 +142,8 @@ final class HallsMonsterTypeLoader {
     private static final class ListIds {
         private static final java.util.List<String> DEFAULT_MONSTERS = java.util.List.of(
                 "zombie", "creeper", "creaking", "skeleton", "cave_spider", "stray", "bogged", "husk", "breeze",
-                "vindicator", "silverfish", "pillager", "witch", "wither_skeleton"
+                "vindicator", "silverfish", "pillager", "witch", "wither_skeleton", "piglin", "blaze",
+                "piglin_brute", "parched"
         );
     }
 }

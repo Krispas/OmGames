@@ -1,0 +1,6 @@
+id: piglin
+name: "Piglin"
+entity-type: PIGLIN
+health: 18
+equipment:
+  main-hand: GOLDEN_SWORD

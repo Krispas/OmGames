@@ -6,9 +6,12 @@ material: MACE
 max-stack-size: 1
 lore:
   - "A dense head of humming salvage and dead sensors."
+  - "Heavy hits ripple through nearby monsters."
 stats:
   melee-damage: 9
   attack-speed: 0.9
+  aoe-damage: 3
+  aoe-radius: 3.5
   durability: 120
 recipe:
   iron_scrap: 10

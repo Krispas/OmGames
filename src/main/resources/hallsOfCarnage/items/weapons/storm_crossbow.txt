@@ -1,6 +1,6 @@
 id: storm_crossbow
 name: "Storm Crossbow"
-category: ranged
+category: weapon
 rarity: rare
 material: CROSSBOW
 item-model: om:hoc_storm_crossbow

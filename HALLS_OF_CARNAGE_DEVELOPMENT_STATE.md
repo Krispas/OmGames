@@ -53,11 +53,11 @@ Last updated: 2026-09-11
 - Breakable resource files define display parts, hitbox height, particle material, break message, and weighted loot entries.
 - Breakable loot now rolls from each prop's configured loot table and supports placeholder scrap, random scrap, blueprint keywords, and coin drops.
 - Coin drops are session-owned physics items that add directly to the shared session coin counter on right-click pickup, bypassing normal hotbar capacity.
-- Item definitions now load recursively from `plugins/OmGames/HallsOfCarnage/items/**/*.txt|*.yml|*.yaml`, seeded by bundled defaults for normal/rare weapons, ranged gear, armors, utility items, and building blueprints grouped by category folder.
+- Item definitions now load recursively from `plugins/OmGames/HallsOfCarnage/items/**/*.txt|*.yml|*.yaml`, seeded by bundled defaults for normal/rare weapons, armors, utility items, and building blueprints grouped by category folder.
 - Item resource files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, and `lore`; non-blueprint items may also define recipe costs for camp crafting.
 - Item resource files now support `stats`; stats are written into item PDC as `hoc_stat_<stat_id>` and rendered in lore for test visibility.
 - Scenarios now parse `allowed-items` by category and `blueprint-pools.normal` / `blueprint-pools.rare`.
-- Breakable loot can reference concrete item ids, scenario-aware category keywords (`weapon`, `armor`, `ranged`, `utility` and rare variants), and scenario blueprint keywords.
+- Breakable loot can reference concrete item ids, scenario-aware category keywords (`weapon`, `armor`, `utility` and rare variants), and scenario blueprint keywords. Old `ranged` and `rare_ranged` loot keywords are compatibility aliases for weapon rolls.
 - The first-floor crate now forces a rare blueprint drop through the scenario rare blueprint pool.
 - `/hoc give <item> [amount]` is an OP-only self-target test command for loaded Halls item definitions.
 - `/hoc give` and Halls item loot share the same item factory so test-given items and dropped items get identical display, model, PDC, recipe, and stat metadata.
@@ -134,14 +134,12 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: elevator transfer chest snapshots are locked before floor-leave saves so saved files no longer recapture an already-cleared chest, open transfer chest viewers are closed when descent begins, and selected players with open Halls lobby villager menus have those menus closed before session teleport. Elevator Drill is now implemented and skips up to its level on camp descent without skipping camps or the final floor. Scanner is now implemented and reveals/locks modifiers for the next level-count upcoming exploration floors. Grindstone, Forge, and Sculk Purifier per-run charges now have code fallback defaults for stale server building configs, ghosts no longer gain sculk, Death Fog warns at 3 minutes/1 minute/10 seconds, and bundled proximity mine damage is `6`.
 - Next reviewer slice applied: proximity mines now render a visual/audio blast without vanilla explosion entity damage, so their configured damage is authoritative. Swinging blade collision now checks every trap tick against the moving blade position, and wall spikes damage during both extension and retraction based on current spike reach. Bounty Board was removed from Halls resources and the GDD, replaced by Health Totem and Speed Totem buildings/blueprints. Health Totem grants one player `2 * level` max health for the run, Speed Totem grants one player `5% * level` movement speed for the run, both have one per-run charge, both persist in save files, and game over/session stop clears their attribute modifiers.
 - Next reviewer slice applied: `open_halls` area generation now precomputes room-distance candidate cells instead of repeatedly scanning every room per candidate, reducing generation cost. Added bundled `infernal_chambers` (`large_corridors`) and `factory` (`open_halls`) level types with one exploration room each, seeded them through `HallsOfCarnageManager.RESOURCE_FILES`, and split Untold Depths floors 6 and 7 for test coverage.
+- Next reviewer slice applied: redstone lamp level lights now place as lit lamps, so Factory/lab-style rooms are illuminated. Removed the separate ranged item category by moving bow/crossbow defaults into weapons and keeping stale `ranged` loot keywords as weapon aliases. Cinderplate now grants its configured 4-second Resistance effect when hit, Sculk Maul has configurable monster AoE damage on hit, and Frost Lance receives Loyalty III with enchantment glint disabled. Added four utility items (`adrenaline_shot`, `ironhide_salve`, `storm_vial`, `echo_lure`) with runtime effects, and added bundled/fallback monster support for piglin, blaze, piglin brute, and parched.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Make it so the lab level type has enabled redstone lights as lamps. 
 - Look more into the corridor gen of the new level types and try to optimize them even more.
-- Remove the ranged weapon category
-- Make it so cinderplate uses its 4 second resistance effect when hit.
-- Add AoE damage to the sculk maul (configurable)
-- Add loyalty III to frost_lance. Disable the enchantment glint for this item
-- Add 4 more utility items, figure them out yourself.
-- add piglin, blaze and piglin_brute, also add parched.
+- I meant to completely remove the ranged stuff, no bows or crossbows
+- Sculk Maul AOE is way too loud and has way too many particles, it also seems to instakill stuff, maybe it gets triggered too many times?
+- Echo lure is not working, my guess is becouse the whole lure mechanic behaves kinda weird, if you wont be able to fix it, just remove the item
+- Adrenaline shot and ironhide salve are missing the cooldown set on their items so player cannot see their cooldown. Make it so ironhide salve applies resistance V for 5 seconds instead of what it does now.

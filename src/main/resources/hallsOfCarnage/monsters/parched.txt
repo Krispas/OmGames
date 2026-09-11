@@ -1,0 +1,6 @@
+id: parched
+name: "Parched"
+entity-type: HUSK
+health: 26
+equipment:
+  main-hand: STONE_AXE

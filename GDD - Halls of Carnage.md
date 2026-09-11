@@ -256,12 +256,12 @@ Food is meant for regenerating lost health, as natural regeneration is turned of
 Some food can apply status effects.
 ### Melee
 Swords, axes, spears and so on. All have durability, which is not a normal minecraft durability.
-### Ranged
-Bows, crossbows, arrows, explosive fireworks, tridents.
+### Ranged weapons
+Bows, crossbows, arrows, explosive fireworks, tridents. These are weapon-category items in config, not a separate item category.
 ### Utility
 Shields, totems of undying and other stuff.
 ### Armor
-Armor. Of course, stuff like melee, ranged, utility and armor can have special attributes, to make things spicy. Define this in the files.
+Armor. Of course, stuff like melee weapons, ranged weapons, utility and armor can have special attributes, to make things spicy. Define this in the files.
 ### Blueprints
 Sometimes a blueprint can be found, which can be used for buildings.
 ## Monsters

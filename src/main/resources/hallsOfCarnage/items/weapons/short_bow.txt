@@ -1,6 +1,6 @@
 id: short_bow
 name: "Short Bow"
-category: ranged
+category: weapon
 rarity: normal
 material: BOW
 max-stack-size: 1

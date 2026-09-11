@@ -113,6 +113,10 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/monsters/witch.txt",
             "hallsOfCarnage/monsters/wither_skeleton.txt",
             "hallsOfCarnage/monsters/warden.txt",
+            "hallsOfCarnage/monsters/piglin.txt",
+            "hallsOfCarnage/monsters/blaze.txt",
+            "hallsOfCarnage/monsters/piglin_brute.txt",
+            "hallsOfCarnage/monsters/parched.txt",
             "hallsOfCarnage/items/weapons/vagabonds_club.txt",
             "hallsOfCarnage/items/weapons/rusty_sword.txt",
             "hallsOfCarnage/items/weapons/echo_blade.txt",
@@ -120,8 +124,8 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/weapons/bone_cleaver.txt",
             "hallsOfCarnage/items/weapons/frost_lance.txt",
             "hallsOfCarnage/items/weapons/sculk_maul.txt",
-            "hallsOfCarnage/items/ranged/short_bow.txt",
-            "hallsOfCarnage/items/ranged/storm_crossbow.txt",
+            "hallsOfCarnage/items/weapons/short_bow.txt",
+            "hallsOfCarnage/items/weapons/storm_crossbow.txt",
             "hallsOfCarnage/items/armors/padded_armor.txt",
             "hallsOfCarnage/items/armors/reinforced_chestplate.txt",
             "hallsOfCarnage/items/armors/chainmail_hauberk.txt",
@@ -139,6 +143,10 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/utility/smoke_bomb.txt",
             "hallsOfCarnage/items/utility/warding_totem.txt",
             "hallsOfCarnage/items/utility/mending_salve.txt",
+            "hallsOfCarnage/items/utility/adrenaline_shot.txt",
+            "hallsOfCarnage/items/utility/ironhide_salve.txt",
+            "hallsOfCarnage/items/utility/storm_vial.txt",
+            "hallsOfCarnage/items/utility/echo_lure.txt",
             "hallsOfCarnage/items/blueprints/cooking_pot_blueprint.txt",
             "hallsOfCarnage/items/blueprints/weapon_bench_blueprint.txt",
             "hallsOfCarnage/items/blueprints/armory_blueprint.txt",
@@ -673,6 +681,17 @@ public final class HallsOfCarnageManager {
             }
         }
         return isSessionEntity(entity);
+    }
+
+    public void handleSessionWeaponHit(Player player, Entity entity) {
+        if (player == null || entity == null) {
+            return;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (session != null) {
+            session.handleWeaponHit(player, entity);
+        }
     }
 
     public boolean handlePhysicsDropPickup(Player player, Entity entity) {
