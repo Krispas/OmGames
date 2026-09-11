@@ -159,14 +159,15 @@ This is the first implementation slice. It focuses on:
 - New campaigns choose Normal/Hard/Extreme difficulty, then session settings can toggle online players currently in the Halls lobby before starting.
 - Difficulty is stored in save files and currently scales first-pass floor difficulty, coin quota, trapped-room count, holes, and sculk patch count by 1.0/1.5/2.0.
 - Load Save lists YAML saves that include the clicking player, requires every saved participant to be online in the Halls lobby and not already in a session, then restores the saved floor, player hotbar/armor/offhand inventories, ghost flags, elevator chest, stored scrap/coins, and saved camp plot state.
+- Next reviewer slice applied: game-over restarts now restock saved Mycelia Farms, Halls save files persist sculk pressure per player, HUD sculk display shows each player's own value, rotated camp building displays use facing-aware centering corrections, and normal/Howling Corridors generation no longer adds decorative dead-end branch corridors.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-For the next slice (do not remove this line, do all for the next slice):
-- Mycelia farm does not regenerate when players get game over
-- Sculk stat should not be shared, each player should have its own
-- Small build spots are still not centered, the onse facing east have the model centered -1 on Z axis, on large west, it is -1 on X axis and on south medium it is -1 on both X and Z axis
-- In howling corridors corridor type, make it so that if corridor were to lead nowhere (it is dead), it will not generate
+- When selecting save, add an option to delete it
+- Make it so /hoc leave saves the game too. Make it so command works only in camps and start floor
+- Add storage closet (all three sizes) as per GDD
+- Add sculk purifier (all three sizes) as per GDD
+- Add a few more chestplates, weapons and a new utility item which heals 4 hp with a cooldown
 
 Future (not this slice):
-- Continue camp work by loading persistent camp/save-file state so built buildings survive later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.
+- Continue camp work by replacing the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.
 

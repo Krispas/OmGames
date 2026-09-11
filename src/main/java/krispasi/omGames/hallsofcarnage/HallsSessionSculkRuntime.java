@@ -105,7 +105,21 @@ final class HallsSessionSculkRuntime {
         if (player == null) {
             return 0;
         }
-        return (int) Math.round(playerSculk.getOrDefault(player.getUniqueId(), 0.0));
+        return sculkPercent(player.getUniqueId());
+    }
+
+    int sculkPercent(UUID playerId) {
+        if (playerId == null) {
+            return 0;
+        }
+        return (int) Math.round(playerSculk.getOrDefault(playerId, 0.0));
+    }
+
+    void setSculk(UUID playerId, double value) {
+        if (playerId == null) {
+            return;
+        }
+        playerSculk.put(playerId, Math.max(0.0, Math.min(100.0, value)));
     }
 
     boolean blocksEating(Player player) {

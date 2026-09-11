@@ -399,7 +399,7 @@ public final class HallsCampRuntime {
                 entity.setBlock(blockData(part.material(), part.blockData()));
                 entity.setBillboard(Display.Billboard.FIXED);
                 entity.setTransformation(new Transformation(
-                        centerOnDisplayOrigin(part.scaleX(), part.scaleZ()),
+                        centerOnDisplayOrigin(part.scaleX(), part.scaleZ(), plot.facing()),
                         partRotation(part, plot.facing()),
                         new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
                         new Quaternionf()));
@@ -642,8 +642,13 @@ public final class HallsCampRuntime {
                         (float) Math.toRadians(part.rotationZ()));
     }
 
-    private Vector3f centerOnDisplayOrigin(double scaleX, double scaleZ) {
-        return new Vector3f((float) (-scaleX * 0.5), 0.0f, (float) (-scaleZ * 0.5));
+    private Vector3f centerOnDisplayOrigin(double scaleX, double scaleZ, BlockFace facing) {
+        return switch (facing) {
+            case EAST -> new Vector3f((float) (-scaleZ * 0.5), 0.0f, (float) (scaleX * 0.5));
+            case SOUTH -> new Vector3f((float) (scaleX * 0.5), 0.0f, (float) (scaleZ * 0.5));
+            case WEST -> new Vector3f((float) (scaleZ * 0.5), 0.0f, (float) (-scaleX * 0.5));
+            default -> new Vector3f((float) (-scaleX * 0.5), 0.0f, (float) (-scaleZ * 0.5));
+        };
     }
 
     private double[] rotatedOffset(double x, double z, BlockFace facing) {

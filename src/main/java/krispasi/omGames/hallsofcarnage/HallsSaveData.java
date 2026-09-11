@@ -45,6 +45,7 @@ public record HallsSaveData(File file,
             players.put(playerId, new PlayerState(
                     yaml.getString(path + ".name", playerId.toString().substring(0, 8)),
                     yaml.getBoolean(path + ".ghost", false),
+                    yaml.getDouble(path + ".sculk", 0.0),
                     itemArray(yaml.getList(path + ".hotbar"), 9),
                     itemArray(yaml.getList(path + ".armor"), 4),
                     item(yaml.get(path + ".offhand"))));
@@ -143,6 +144,7 @@ public record HallsSaveData(File file,
 
     public record PlayerState(String name,
                               boolean ghost,
+                              double sculk,
                               ItemStack[] hotbar,
                               ItemStack[] armor,
                               ItemStack offhand) {

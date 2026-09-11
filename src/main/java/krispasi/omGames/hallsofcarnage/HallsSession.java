@@ -1741,9 +1741,7 @@ public final class HallsSession {
                 .append(Component.text("Scrap W" + woodScrap + " I" + ironScrap
                         + " D" + diamondScrap + " R" + redstoneScrap, NamedTextColor.GOLD))
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("Coins " + coins + "/" + currentCoinQuota(), NamedTextColor.YELLOW))
-                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("Sculk " + maxParticipantSculk() + "%", NamedTextColor.AQUA));
+                .append(Component.text("Coins " + coins + "/" + currentCoinQuota(), NamedTextColor.YELLOW));
         if (!activeFloorModifiers.empty()) {
             shared = shared.append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                     .append(activeFloorModifiers.hudComponent());
@@ -1758,6 +1756,8 @@ public final class HallsSession {
                     elevatorDistance += " " + Math.round(player.getLocation().distance(elevatorSpawnLocation())) + "b";
                 }
                 Component message = shared
+                        .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                        .append(Component.text("Sculk " + sculkRuntime.sculkPercent(player) + "%", NamedTextColor.AQUA))
                         .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                         .append(Component.text("Elevator " + elevatorDistance, NamedTextColor.LIGHT_PURPLE));
                 player.sendActionBar(message);
@@ -1900,17 +1900,6 @@ public final class HallsSession {
             }
         }
         return false;
-    }
-
-    private int maxParticipantSculk() {
-        int max = 0;
-        for (UUID playerId : participants) {
-            Player player = Bukkit.getPlayer(playerId);
-            if (player != null) {
-                max = Math.max(max, sculkRuntime.sculkPercent(player));
-            }
-        }
-        return max;
     }
 
     private boolean isAliveParticipant(UUID playerId) {
@@ -2640,6 +2629,7 @@ public final class HallsSession {
         }
         removeSessionEntities();
         resetRunState();
+        resetCampHarvestForNewRun();
         try {
             buildStartArea();
         } catch (IOException ex) {
@@ -2716,6 +2706,9 @@ public final class HallsSession {
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
         sculkRuntime.clearAll();
+        for (Map.Entry<UUID, HallsSaveData.PlayerState> entry : save.players().entrySet()) {
+            sculkRuntime.setSculk(entry.getKey(), entry.getValue().sculk());
+        }
     }
 
     private void restoreSavedPlayer(Player player, HallsSaveData.PlayerState state) {
@@ -2749,6 +2742,7 @@ public final class HallsSession {
             Player player = Bukkit.getPlayer(playerId);
             String path = "players." + playerId;
             yaml.set(path + ".ghost", ghostPlayers.contains(playerId));
+            yaml.set(path + ".sculk", sculkRuntime.sculkPercent(playerId));
             if (player == null) {
                 continue;
             }
@@ -2824,6 +2818,27 @@ public final class HallsSession {
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
         sculkRuntime.clearAll();
+    }
+
+    private void resetCampHarvestForNewRun() {
+        for (Map.Entry<Integer, List<HallsCampRuntime.PlotState>> entry : new ArrayList<>(savedCampStates.entrySet())) {
+            List<HallsCampRuntime.PlotState> refreshed = new ArrayList<>();
+            for (HallsCampRuntime.PlotState state : entry.getValue()) {
+                HallsBuildingType building = buildingTypes.get(state.buildingId());
+                if (building != null && building.id().equals("mycelia_farm")) {
+                    int level = Math.max(1, Math.min(3, state.level()));
+                    refreshed.add(new HallsCampRuntime.PlotState(
+                            state.plotId(),
+                            state.buildingId(),
+                            level,
+                            building.level(level).harvestUses(),
+                            0));
+                    continue;
+                }
+                refreshed.add(state);
+            }
+            savedCampStates.put(entry.getKey(), List.copyOf(refreshed));
+        }
     }
 
     private void giveStarterItem(Player player) {

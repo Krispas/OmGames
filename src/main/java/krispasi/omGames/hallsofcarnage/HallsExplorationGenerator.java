@@ -116,7 +116,7 @@ final class HallsExplorationGenerator {
             addGridOpenHalls();
         } else if (corridorMode == CorridorMode.OPEN_HALLS) {
             addRoomLocalOpenHalls();
-        } else {
+        } else if (corridorMode != CorridorMode.NORMAL) {
             addMazeBranches(Math.max(rooms.size() / 2, 4));
         }
     }

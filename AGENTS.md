@@ -1296,7 +1296,7 @@ SQLite tables:
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
 - If a scenario floor is not explicitly configured but a prior exploration floor is configured, runtime reuses that prior exploration floor definition for the requested floor instead of falling back to the generic 8-room placeholder.
 - Exploration floors grow their per-session generation/cleanup radius from the configured room count and retry with larger radii if planning underfills.
-- Exploration corridor routing uses turn-aware cardinal pathing over the baked mask, grows primarily through room-to-room corridor clusters instead of connecting every room into one shared corridor spine, rejects short zigzag paths that read as diagonal, adds direct room-to-room loop corridors and side branches after the main connected layout is built, and checks reachability from the elevator before the plan is accepted.
+- Exploration corridor routing uses turn-aware cardinal pathing over the baked mask, grows primarily through room-to-room corridor clusters instead of connecting every room into one shared corridor spine, rejects short zigzag paths that read as diagonal, adds direct room-to-room loop corridors, and checks reachability from the elevator before the plan is accepted. Normal corridor generation must not add decorative dead-end branch corridors.
 - The first exploration room connected to the elevator is given extra onward room-to-room exits when enough rooms exist, so the elevator does not feed into a single-path start.
 - Exploration corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
 - Generated corridors use ceiling-embedded light blocks so the walkable corridor remains 3 blocks tall, and the elevator has a ceiling light.
@@ -1328,10 +1328,10 @@ SQLite tables:
 - Camp build-spot floors are rendered as oak planks for visibility and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
 - Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.txt|*.yml|*.yaml` and seeded from bundled defaults.
 - Building files define `id`, `name`, `size` (`small`, `medium`, `large`), `blueprint`, `implemented`, and `levels.<1|2|3>` with display `parts`, optional `empty-parts`, optional `upgrade-cost` stored-scrap requirements, optional `interaction.give-items` compatibility outputs, and optional `harvest.uses` / `harvest.items` for harvestable buildings.
-- Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker and display parts are centered against plot centers, including even-sized future plot footprints and scaled display parts.
+- Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker and display parts are centered against plot centers/facing, including even-sized future plot footprints and scaled display parts.
 - Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Upgrade buttons show the stored-scrap cost plus practical effects such as newly unlocked station recipes or harvest changes.
 - Halls save snapshots live in `plugins/OmGames/HallsOfCarnage/saves/` as YAML files keyed by scenario id plus sorted participant UUIDs.
-- The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, elevator chest contents, stored scrap/coins, and visited camp plot building state including building id, level, and harvest counters.
+- The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, per-player sculk pressure, elevator chest contents, stored scrap/coins, and visited camp plot building state including building id, level, and harvest counters.
 - Save snapshots are created/overwritten when a campaign starts, when the elevator leaves a floor, when arriving at a camp floor, when game-over restarts the run at floor 1, and when the host uses `/hoc leave`.
 - `/hoc leave` is player-only, does not require OP, and only the active session host can use it to save and end the session.
 - The lobby villager opens a GUI flow for New Campaign, Load Save, scenario selection, difficulty selection, and session settings.
@@ -1352,6 +1352,7 @@ SQLite tables:
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
 - Halls food items are catalog items with category `food`; `stats.heal` restores health when consumed while hunger remains locked full. Optional food buff stats use normalized keys such as `speed-seconds`, `resistance-seconds`, `regeneration-seconds`, `absorption-seconds`, and matching `*-amplifier`.
+- Mycelia Farm harvest counters persist in camp save state during an active run, but game-over run resets should restock saved Mycelia farms to their current level's full harvest uses.
 - Halls utility `smoke_bomb` clears nearby session monster targets, conceals the user from monster target selection for its duration, emits smoke, applies temporary invisibility, and uses a per-player cooldown instead of being consumed on right-click.
 - Halls utility `warding_totem` gives nearby alive participants Resistance II for 10 seconds and uses a per-player cooldown instead of being consumed on right-click.
 - Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.
@@ -1359,7 +1360,7 @@ SQLite tables:
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
 - `HallsLayoutLoader` tolerates old copied room files by stripping a full `X` perimeter and treating non-`X` marker characters as open cells; this is runtime parsing tolerance, not file migration.
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
-- Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, full item definitions, scrap storage, camps, polished trap visuals/config, persisted sculk state, and polished monster AI/combat are pending.
+- Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, full item definitions, full camp building behavior, persistent floor sculk patches, polished trap visuals/config, and polished monster AI/combat are pending.
 - Exploration doorway selection must reject side offsets where the room mask has `X` at the edge or first inward cell.
 - Howling Corridors room resources are seeded from all bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`.
 - Frozen Halls and Deep Crypt room resources are also seeded from their bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`; use `/hoc reset confirm` to copy newly bundled resource files into an existing server data folder.
@@ -1392,7 +1393,7 @@ SQLite tables:
 - Exploration floor scenario field `traps-per-room.min` / `traps-per-room.max` controls how many normal traps Java attempts inside each trapped room.
 - Hole/pit generation is controlled separately by scenario floor field `holes`.
 - Sculk patch generation is controlled separately by scenario floor field `sculk-patches`.
-- Sculk patches convert floor blocks to sculk and place sculk veins in air; participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/eating-block/darkness thresholds. Sculk generation must avoid trap-reserved cells, including carved pit cells.
+- Sculk patches convert floor blocks to sculk and place sculk veins in air; participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/eating-block/darkness thresholds. The HUD and save schema should keep that pressure per player. Sculk generation must avoid trap-reserved cells, including carved pit cells.
 - Sculk pressure should rise gradually, not spike during short crossings; generated sculk patches may attach veins to floors, walls, and ceilings, but sculk veins must only enable faces attached to solid neighbor blocks and must stay inside generated walkable floor bounds.
 - Sculk pressure at 50% applies Weakness I, at 90% applies Slowness I and blocks consumption directly, and at 100% applies Darkness I; it should not lower the player's hunger bar.
 - Halls ghost mode is Adventure-mode invisible player state, not spectator mode. A lethal hit drops the player's carried gear as session physics drops, blocks inventory/pickup interactions, and revives the player on the next floor.
