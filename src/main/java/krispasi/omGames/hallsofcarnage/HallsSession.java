@@ -104,6 +104,7 @@ public final class HallsSession {
     private int activeGeneratedRooms;
     private boolean transitioning;
     private boolean running;
+    private boolean elevatorChestSnapshotLocked;
     private Location startRoomSpawn;
     private long floorStartedAtMillis;
     private HallsFloorModifiers activeFloorModifiers = HallsFloorModifiers.none();
@@ -333,6 +334,9 @@ public final class HallsSession {
                 coins = Math.max(0, coins - quota);
             }
             boolean leftBehind = markLeftBehindPlayersAsGhosts();
+            captureElevatorChestContents();
+            removeElevatorCompasses();
+            elevatorChestSnapshotLocked = true;
             transitioning = true;
             openElevatorDoors();
             world.playSound(block.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
@@ -760,12 +764,12 @@ public final class HallsSession {
     private void buildCampConnector(int targetX, int y, int targetZ, HallsLevelType levelType) {
         int startZ = origin.z() + ELEVATOR_OUTER_RADIUS + 1;
         int turnZ = Math.min(targetZ, startZ + 2);
-        buildConnector(origin.x(), y, startZ, turnZ, levelType);
+        buildConnector(origin.x(), y, startZ, turnZ, levelType, 1);
         for (int x = Math.min(origin.x(), targetX); x <= Math.max(origin.x(), targetX); x++) {
-            buildCorridorCell(x, y, turnZ, x == origin.x() ? 1 : 0, false, levelType,
+            buildCorridorCell(x, y, turnZ, 1, false, levelType,
                     new Random((((long) x) << 32) ^ turnZ ^ 0xCA6FL));
         }
-        buildConnector(targetX, y, turnZ, targetZ, levelType);
+        buildConnector(targetX, y, turnZ, targetZ, levelType, 1);
     }
 
     private void startStagedFloorBuild(int floor) {
@@ -1303,8 +1307,12 @@ public final class HallsSession {
     }
 
     private void buildConnector(int x, int y, int startZ, int endZ, HallsLevelType levelType) {
+        buildConnector(x, y, startZ, endZ, levelType, 0);
+    }
+
+    private void buildConnector(int x, int y, int startZ, int endZ, HallsLevelType levelType, int baseHalfWidth) {
         for (int z = Math.min(startZ, endZ); z <= Math.max(startZ, endZ); z++) {
-            int halfWidth = z == origin.z() + ELEVATOR_OUTER_RADIUS + 1 ? 1 : 0;
+            int halfWidth = Math.max(baseHalfWidth, z == origin.z() + ELEVATOR_OUTER_RADIUS + 1 ? 1 : 0);
             buildCorridorCell(x, y, z, halfWidth, true, levelType, new Random((((long) x) << 32) ^ z));
         }
     }
@@ -1797,6 +1805,7 @@ public final class HallsSession {
                 int slot = firstAvailableHotbarSlot(player.getInventory());
                 if (slot >= 0) {
                     ItemStack compass = namedItem(Material.COMPASS, "Elevator Compass", NamedTextColor.GREEN);
+                    markElevatorCompass(compass);
                     player.getInventory().setItem(slot, compass);
                 }
             }
@@ -1852,9 +1861,11 @@ public final class HallsSession {
     }
 
     private void captureElevatorChestContents() {
+        if (elevatorChestSnapshotLocked) {
+            return;
+        }
         Container container = elevatorChestContainer();
         if (container == null) {
-            elevatorChestContents = new ItemStack[27];
             return;
         }
         ItemStack[] contents = container.getInventory().getContents();
@@ -1871,6 +1882,55 @@ public final class HallsSession {
             return;
         }
         container.getInventory().setContents(elevatorChestContents);
+        elevatorChestSnapshotLocked = false;
+    }
+
+    private void removeElevatorCompasses() {
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                removeElevatorCompasses(player.getInventory());
+            }
+        }
+        for (int i = 0; i < elevatorChestContents.length; i++) {
+            if (isElevatorCompass(elevatorChestContents[i])) {
+                elevatorChestContents[i] = null;
+            }
+        }
+        Container container = elevatorChestContainer();
+        if (container != null) {
+            removeElevatorCompasses(container.getInventory());
+        }
+    }
+
+    private void removeElevatorCompasses(org.bukkit.inventory.Inventory inventory) {
+        for (int i = 0; i < inventory.getSize(); i++) {
+            if (isElevatorCompass(inventory.getItem(i))) {
+                inventory.setItem(i, null);
+            }
+        }
+    }
+
+    private void markElevatorCompass(ItemStack item) {
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        meta.getPersistentDataContainer().set(new org.bukkit.NamespacedKey(plugin, "hoc_elevator_compass"),
+                PersistentDataType.BYTE, (byte) 1);
+        item.setItemMeta(meta);
+    }
+
+    private boolean isElevatorCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS) {
+            return false;
+        }
+        if (!item.hasItemMeta()) {
+            return true;
+        }
+        return item.getItemMeta().getPersistentDataContainer()
+                .has(new org.bukkit.NamespacedKey(plugin, "hoc_elevator_compass"), PersistentDataType.BYTE)
+                || item.getItemMeta().displayName() != null;
     }
 
     private Container elevatorChestContainer() {
@@ -2167,6 +2227,41 @@ public final class HallsSession {
             }
         }
         return amount;
+    }
+
+    public boolean addStoredScrap(String rawType, int amount) {
+        PropReward scrapType = parseScrapReward(rawType);
+        if (scrapType == null || amount <= 0) {
+            return false;
+        }
+        switch (scrapType) {
+            case WOOD_SCRAP -> woodScrap += amount;
+            case IRON_SCRAP -> ironScrap += amount;
+            case DIAMOND_SCRAP -> diamondScrap += amount;
+            case REDSTONE_SCRAP -> redstoneScrap += amount;
+            default -> {
+                return false;
+            }
+        }
+        coins += multipliedCoins(amount);
+        return true;
+    }
+
+    public static boolean isScrapId(String rawType) {
+        return parseScrapReward(rawType) != null;
+    }
+
+    private static PropReward parseScrapReward(String rawType) {
+        if (rawType == null) {
+            return null;
+        }
+        return switch (rawType.trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_').replace(' ', '_')) {
+            case "wood", "wood_scrap" -> PropReward.WOOD_SCRAP;
+            case "iron", "iron_scrap" -> PropReward.IRON_SCRAP;
+            case "diamond", "diamond_scrap" -> PropReward.DIAMOND_SCRAP;
+            case "redstone", "redstone_scrap" -> PropReward.REDSTONE_SCRAP;
+            default -> null;
+        };
     }
 
     private boolean spendStoredScrap(Map<String, Integer> cost) {
@@ -2489,6 +2584,7 @@ public final class HallsSession {
     private void resetRunState() {
         ghostPlayers.clear();
         elevatorChestContents = new ItemStack[27];
+        elevatorChestSnapshotLocked = false;
         woodScrap = 0;
         ironScrap = 0;
         diamondScrap = 0;
@@ -2910,7 +3006,6 @@ public final class HallsSession {
         }
 
         private void buildElevatorPass() {
-            captureElevatorChestContents();
             buildElevator();
             closeElevatorDoors();
             stage = 3;

@@ -326,7 +326,12 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
             return filter(args[0], "menu", "scenarios", "scenario", "sessions", "top", "shame", "tp", "start", "stop", "floor", "give", "lobby", "reload", "reset");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("give")) {
-            return filter(args[1], manager.getItemIds().toArray(String[]::new));
+            List<String> options = new ArrayList<>(manager.getItemIds());
+            options.add("wood_scrap");
+            options.add("iron_scrap");
+            options.add("diamond_scrap");
+            options.add("redstone_scrap");
+            return filter(args[1], options.toArray(String[]::new));
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
             return filter(args[1], "confirm");

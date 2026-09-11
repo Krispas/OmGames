@@ -8,6 +8,6 @@ scrap-drops:
   - iron_scrap
 parts:
   - material: SPRUCE_FENCE
-    offset: [0, -0.5, 0]
+    offset: [0, -0.8, 0]
   - material: SPRUCE_PRESSURE_PLATE
-    offset: [0, 0.5, 0]
+    offset: [0, 1.2, 0]

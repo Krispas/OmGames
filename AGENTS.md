@@ -1328,7 +1328,7 @@ SQLite tables:
 - Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.txt|*.yml|*.yaml` and seeded from bundled defaults.
 - Building files define `id`, `name`, `size` (`small`, `medium`, `large`), `blueprint`, `implemented`, and `levels.<1|2|3>` with display `parts`, optional `empty-parts`, optional `upgrade-cost` stored-scrap requirements, optional `interaction.give-items` compatibility outputs, and optional `harvest.uses` / `harvest.items` for harvestable buildings.
 - Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker.
-- Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Current building state is session-local and is not yet persisted across save files or game-over restarts.
+- Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Upgrade buttons show the stored-scrap cost plus practical effects such as newly unlocked station recipes or harvest changes. Current building state is session-local and is not yet persisted across save files or game-over restarts.
 - Camp floors connect the elevator corridor to the nearest open north-edge layout cell instead of assuming the layout center is open, and should keep the camp room far enough from the elevator to allow a walkable connector with a sealed corridor-height entrance.
 - Item recipes are parsed as stored-scrap and hotbar item costs. Cooking Pot, Weapon Bench, and Armory list scenario-unlocked recipes by station level and craft them from their building GUI.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility. `melee-damage`, `attack-speed`, and `durability` are also applied to item meta where Bukkit/Paper exposes the relevant component APIs.
@@ -1337,7 +1337,7 @@ SQLite tables:
 - Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, storage lockers by size, mycelia farm, elevator drill, scanner, bounty board, and sculk purifiers by size.
 - Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `ranged`, `utility`, `rare_weapon`, `rare_armor`, `rare_ranged`, and `rare_utility`.
 - The generic `blueprint` loot keyword rolls the scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools.
-- `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions.
+- `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions. If `<item>` is `wood_scrap`, `iron_scrap`, `diamond_scrap`, or `redstone_scrap`, the amount is deposited directly into the caller's active session elevator storage and awards the matching test coins.
 - Halls armor items equip into empty matching armor slots from `/hoc give`; right-click physics-drop pickup still inserts into the selected hotbar slot.
 - Halls coin drops use session-owned physics drops but bypass normal inventory pickup; right-clicking the coin adds it directly to the shared session coin counter even when the hotbar is full.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
@@ -1369,10 +1369,10 @@ SQLite tables:
 - Duplicate modifiers are allowed and their effects stack or multiply.
 - Modifier reveal pacing is intentionally slow enough for players to read each selected modifier during elevator descent.
 - Implemented modifier effects include coin/enemy/trap/loot/sculk multipliers, special enemy pool inclusion, extra rooms, longer corridors, death fog, trap-kind boosts, and Compass.
-- Compass once grants an elevator compass, twice adds exact elevator block distance to the HUD, and three times emits an elevator trail every 5 seconds.
+- Compass once grants an elevator compass, twice adds exact elevator block distance to the HUD, and three times emits an elevator trail every 5 seconds. Elevator compasses are removed from player inventories and the elevator transfer chest before each descent chooses the next floor's modifiers.
 - Session monster spawning clears native/random equipment first, then applies only gear explicitly defined in the monster resource file. Session monsters that fall into generated holes are killed.
 - Session monsters are persistent, have far-away removal disabled, and should prioritize alive participants over ghost players as targets.
-- Session monsters normally acquire targets only at close range; breakable destruction and elevator scrap deposits alert nearby spawned monsters at long range.
+- Session monsters normally acquire targets only at close range; breakable destruction and elevator scrap deposits alert nearby spawned monsters at long range. Smoke Bomb concealment clears and suppresses targeting for its duration, and Creative/Spectator participants are ignored by monster target selection.
 - Exploration monster spawning has no finite total spawn budget. It fills to a live cap, extends that cap periodically based on floor difficulty, reduces the cap by one when an alive participant kills a session monster, and adds one cap slot for each session slime created by slime splitting.
 - Each extra participant after the first adds 33% to the exploration monster live cap and cap-extension speed before modifier multipliers apply.
 - Level type `monsters.common` and `monsters.special` are parsed into runtime pools; exploration floors spawn a first-pass session-local monster flood from the active level type.

@@ -127,128 +127,6 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-- Fixed first-pass trap runtime playtest issues reported in the prior reviewer note.
-- Swinging blades and wall spikes now mark their sword display as movable; wall spikes animate out from the wall instead of staying plastered/static.
-- Wall spikes now use a forward lane check with a default 5-block reach and avoid candidate cells near generated room openings.
-- Falling ice now uses a display-only ceiling fixture instead of a solid ceiling trap block, and falling shards pick a random cell within 1 block of the trap.
-- Falling ice uses per-trap randomized scheduling instead of a shared modulo pulse, reducing repeated synchronized spam.
-- Hole traps now kill lower in the pit, near the configured pit bottom, so players fall before being killed/returned.
-- Poison darts now trigger only when a participant is in the forward lane, use a default 5-block reach, and apply a 3-second per-trap cooldown after firing.
-- Trap fallback defaults in `HallsTrapTypeLoader` were updated to match bundled resource defaults.
-- Deep trap follow-up: placement now validates the actual runtime lane for swinging blades, wall spikes, poison darts, and falling ice instead of only validating the chosen origin cell.
-- Swinging blade candidates now require a full 5-block lane on the selected axis before placement, preventing visible blade traps whose moving sword is hidden inside room walls.
-- Wall spikes now default to a 3-block reach, retract automatically after their active pulse, and clamp their display/damage lane to the first solid wall.
-- Falling ice candidates now require enough open floor around the trap cell, and random falling shards fall only on supported open cells around the trap instead of arbitrary blocked offsets.
-- Trap item displays now force `ItemDisplayTransform.NONE`, avoiding the default angled item transform that made sword traps appear 45 degrees off.
-- Poison darts now clamp their trigger/shooting lane to the first wall and set both entity rotation and directional block data from the mounted wall face.
-- Follow-up trap movement fix: moving trap item displays now animate by updating their `Transformation` translation each tick instead of relying on repeated entity teleports, so ceiling blades and wall spikes have explicit client-visible movement.
-- Swinging blade damage/particles now use the same computed visual position as the moving display transform.
-- Poison dart launcher displays no longer apply an extra entity yaw on top of directional block data, avoiding double-rotation of dispenser-like models.
-- Critical trap clock fix: `HallsSessionTrapRuntime` now uses a session-local tick counter advanced by its own Bukkit task instead of `world.getFullTime()`. This fixes animated/timed traps freezing when the Halls world time is frozen or not advancing normally.
-- Scenario exploration floors now parse `holes` separately from `traps`, so pit generation no longer consumes the normal weighted trap count.
-- Ceiling blade traps now choose a variable lane span from the open room terrain, render rails at that span, and damage players against the moving blade lane volume instead of relying on a small point-radius check.
-- Armor item files now support `armor-model`; Halls writes it through Paper's equippable component while preserving `item-model` for inventory/held item models.
-- Wall spike trap damage detection now uses a narrow lane width separate from poison dart detection, preventing hits on players merely standing next to the trap cell.
-- Hole generation now uses a room-interior mask that may carve through internal blocked cells/pillars instead of requiring a fully open square, while still avoiding corridors and outer room walls.
-- Falling ice traps no longer spawn visible ceiling marker displays when their configured `ceiling-material` is `AIR`.
-- Poison dart traps now have separate trigger and shot lanes: players can bait them from a wider forward lane, but particles and damage stay in one narrow lane.
-- Hole placement may overlap internal room blockers when choosing a rectangular mask, but only open floor cells inside that mask are carved into the actual pit.
-- Swinging blades now damage throughout the whole swing cycle instead of only during the old active window.
-- Swinging blade item displays now apply the requested additional Euler rotation `(90, 0, 45)`, and wall spike blade displays apply `(0, -90, 45)`.
-- Swinging blade and wall spike blade item displays now also apply an additional `(0, 0, 180)` rotation.
-- Temporary swinging-blade hitbox particles and the extra swing blade CRIT particles are disabled.
-- Hole generation no longer avoids room doors; it uses doorway-inclusive hole candidates and tries center-out bridge rows/columns until it finds a wooden bridge that preserves reachability.
-- Bear traps are now one-time use: triggering one clears its block and removes it from the session trap runtime.
-- Poison dart trap triggering now reaches one block farther in the shooting direction while keeping render/damage to the narrow lane.
-- Normal trap placement now biases later traps in the same room toward the room's first trap type, with about a 10% chance to mix in a different type.
-- Scenario exploration floor `traps` now means target trapped rooms rather than raw trap count.
-- Scenario exploration floors now parse `traps-per-room.min` and `traps-per-room.max`, defaulting to 1-2 traps per trapped room.
-- Normal trap placement now groups candidates by room, chooses the configured number of trapped rooms, and then places the configured random trap count inside each chosen room.
-- Exploration floor rebuilds now use an unbound runtime seed instead of mixing in session id and floor id, so repeated `/hoc floor` rebuilds should not replay the same layout.
-- Swinging blade item displays now use separate transform paths for X-axis and Z-axis lanes, with longer non-uniform blade scaling.
-- Wall spike blade displays now face away from their mounted wall into the room.
-- Generated room lamps are now embedded directly into the room ceiling layer instead of occupying the top interior air block.
-- Ceiling swinging blade item display rotation was reset to the requested 135-degree base rotation, with an added 90-degree Y rotation on Z-axis lanes.
-- Ceiling swinging blade item display scaling was reset to double X scale and quadruple Y scale after rotation.
-- Hole placement no longer rejects masks near or intersecting prior hole masks, allowing overlapping pit fields.
-- Hole masks no longer require the full square to fit inside the room interior; they carve only open room floor cells inside the mask, so edge and doorway-centered holes can generate and bridge when they would break reachability.
-- Hole bridge selection now checks room-local traversal from every generated room entrance to every non-hole open cell in that room, including previously carved pits in that room.
-- Existing pit bridges are treated as passable when validating later overlapping hole masks.
-- Wall spike blade facing keeps the working west/east behavior and flips only north/south displays.
-- Ceiling swinging blade item displays now use exact requested `Transformation` values: zero local translation, scale `(2, 4, 2)`, right rotation `(0, 0, -0.38268346, 0.9238795)`, and axis-specific left rotations for X/Z lanes.
-- Ceiling swinging blade movement now uses entity location updates so the exact local transform can keep zero translation.
-- Frozen Halls now uses `corridor-generation: cave` and Deep Crypt now uses `corridor-generation: maze` in bundled defaults and fallback level-type definitions.
-- Exploration generation now reads the level type's corridor generation mode when building a floor.
-- Cave corridor mode widens generated connector paths into rough 3-wide paths with occasional uneven edges while avoiding room interiors, room shells, and the protected elevator footprint.
-- Maze corridor mode adds a connected three-wide local maze field near generated rooms only, keeps it within 10 blocks of a room, and adds extra valid room openings where the maze reaches a room wall.
-- Wall spike black-concrete fixture displays are now half-size.
-- Ceiling swinging blade item displays are positioned 0.75 block higher, and their vertical damage overlap moved up with the visual.
-- Swinging blade lane span now extends as far as the room's open cells allow instead of stopping at a fixed 5-block cap, so generated ceiling blades try to cover the whole room lane without entering corridors.
-- Hole trap masks now include internal room blocker cells in the carved pit volume, and pit building clears the room-height column so old wall/pillar columns do not remain standing inside holes.
-- Pit bridge selection now returns only passable open-room bridge cells and no longer falls back to filling the whole new pit mask as a bridge.
-- Fixed the Frozen Halls cave-generation crash caused by shuffling an immutable `List.of(...)` rough-edge candidate list.
-- Deep Crypt maze rooms now generate closer together, maze coverage is larger, and maze paths widen from the carved cells instead of relying on ordered-path orientation.
-- Hole trap masks once again include room-edge cells while still excluding the generated outer room shell; bridge validation remains based on open room cells so door/room blockage gets a real passable bridge or the pit is skipped.
-- Supported Halls corridor-generation modes are now `normal`, `cave`, `large_corridors`, `maze`, and `open_halls`.
-- `large_corridors` preserves the previous widened orthogonal Frozen Halls cave-corridor behavior.
-- `open_halls` preserves the previous Deep Crypt room-local maze-field behavior.
-- `cave` now builds Frozen Halls-style organic tunnels with biased random-walk connector paths and rough disc widening instead of relying on orthogonal grid-locked routes.
-- `maze` now builds Deep Crypt-style close room clusters with mostly open grid-locked hall fields, some structural pillars/wall ribs, and extra valid room entrances.
-- Deep Crypt `maze` room placement now uses mode-aware close-room spacing so the generator can fill beyond the first room instead of rejecting most nearby candidates with normal corridor spacing.
-- Swinging blade trap placement now prefers the longest valid room-only lane in a candidate room and chooses the longest axis for the trap, while still avoiding corridor extension.
-- Elevator floor transitions now use a staged session-local floor build job instead of doing the whole exploration-floor rebuild in one delayed synchronous call.
-- Staged floor rebuild passes currently plan the floor, clear old blocks in x-column batches, rebuild the elevator, place rooms one room per tick, place corridor shell cells in bounded batches, place traps, place room contents one room per tick, then restore the elevator chest and open the doors.
-- Deep Crypt `maze` planning now uses lower bounded placement and room-loop attempt counts because open-hall generation provides most of that level type's extra connectivity.
-- Staged floor clears now skip the protected elevator footprint so players inside the elevator are not dropped or killed while the surrounding level is unloaded.
-- Active Halls participants now have their respawn location set to the session elevator on start, join, and floor transfer; session stop restores their respawn location to the Halls lobby when a lobby fallback is available.
-- Deep Crypt `maze` trap placement now skips repeated full-floor reachability scans for holes, wall traps, and proximity mines, using room-local hole reachability instead to avoid the end-of-generation spike before breakables spawn.
-- Halls verification workflow is documented in `AGENTS.md`: use Maven compile with tests skipped unless tests are explicitly requested.
-- Floor-transfer teleports now skip players who are already inside the session elevator interior while still refreshing their elevator respawn location and title.
-- Staged floor clear and corridor rendering now preserve the protected elevator transfer vestibule line, including the black-concrete backing in front of closed elevator doors.
-- New overlapping holes no longer build pit edge walls against cells already occupied by existing room-local pits, preventing old internal pit walls from surviving inside merged holes.
-- Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, and poison dart firing.
-- Halls monster archetypes now load from `plugins/OmGames/HallsOfCarnage/monsters/*.txt|*.yml|*.yaml`, seeded by bundled defaults for zombie, creeper, creaking, medium slime, zombie vanguard, skeleton, cave spider, stray, bogged, husk, and breeze.
-- Level type `monsters.common` and `monsters.special` lists are now parsed and used by the first-pass exploration monster flood runtime.
-- `HallsSessionMonsterRuntime` is session-owned and cleans spawned monsters on floor rebuild/session stop.
-- Exploration floors now spawn a bounded first-pass monster flood from walkable cells away from the elevator/players, with max-alive and total budget scaled by room count, participants, and parsed floor difficulty.
-- Custom monster definitions support Bukkit entity type, health, baby state, slime size, main-hand item, and armor slots; `zombie_vanguard` is defined as a 16 HP adult zombie with iron/chainmail armor and an iron sword.
-- Breaking a Halls breakable prop or depositing scrap into the elevator hopper now alerts nearby spawned monsters toward the nearest participant and plays a sound cue.
-- Floor-transfer chest preservation now captures elevator chest contents at the staged rebuild boundary, so items placed into the chest during the short transition window are preserved.
-- Falling ice shards now compute the actual support floor below their chosen cell and continue falling until that impact height instead of shattering early at a fixed offset.
-- Swinging blade sweep sounds now pulse every 20 ticks instead of once per configured movement loop.
-- Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, poison dart firing, and first-pass monster alert.
-- Halls monster alert radius is now 96 blocks.
-- Exploration monster spawning now continues gradually while the live cap allows; there is no finite total spawn budget, and the cap is adjusted by difficulty-timed extensions, player kills, and slime split children.
-- Monster spawn candidates reject nearby player positions and first-person-visible line-of-sight cells instead of falling back to visible cells.
-- Session monsters now drop no loot or XP on death, with equipment drop chances also forced to zero on spawn.
-- First-pass ghost mode is implemented: lethal player damage in a Halls session is cancelled, the player becomes an invisible Adventure-mode ghost, carried gear is dropped as session physics drops, inventory/pickup/elevator/scrap interactions are blocked, and particles mark their location.
-- Ghost players revive automatically on the next floor transfer. If every online participant is a ghost, the run shows a 10-second game-over countdown and rebuilds floor 1.
-- Session start, game-over restart, floor-transfer teleports, and normal Halls exit now teleport directly without a blindness fade.
-- Scenario exploration floors now parse `sculk-patches`, which controls first-pass sculk patch generation separately from holes and traps.
-- Sculk patches are generated from spherical-ish randomized masks, convert about 80% of affected floor blocks to sculk, and attempt bounded sculk veins on floors, walls, and ceilings where an adjacent solid face exists.
-- Participants standing in generated sculk patch geometry gain personal sculk pressure slowly; sculk pressure does not decay during a run and survives floor rebuilds until run reset/game over.
-- Sculk pressure above 35% applies Weakness I, above 80% applies Slowness I, above 90% blocks item consumption without lowering hunger, and at 100% applies Darkness I.
-- Standing in sculk plays a sculk sensor sound and emits sculk soul particles.
-- Monster spawns now check max participant sculk; above 50%, each spawn has `min(sculk - 40, 35)%` chance to spawn a warden.
-- Bundled scenario defaults now include `sculk-patches` on exploration floors, and bundled monster defaults include `warden`.
-- Halls sound-covered features: physics item pickup, coin pickup, blocked non-empty-hand pickup feedback, breakable prop hit, breakable prop break, elevator door open/close, scrap deposit, proximity mine detonation, swinging blade sweep, wall spike extension, bear trap snap, falling ice shatter, poison dart firing, and sculk standing feedback.
-- Halls sound-pending features: future monster attacks/deaths, future combat floor wave terminals, future detailed camp building placement/upgrades/demolition, future storage interactions, future warden warning, and future modifier reveal/selection.
-- Next reviewer slice applied: sculk rises more slowly and can attach veins to valid floor/wall/ceiling faces; transfer-chest interaction is locked during elevator movement and staged builds recapture contents before rebuilding the elevator; level-change blindness fade use was removed; session monsters clear native/random equipment, no longer play an alert sound, and die after falling into holes; `vagabonds_club` is seeded as the starter weapon and granted on start/game-over reset; start-floor players spawn in the start room; game-over reset now clears inventory, counters, sculk, ghosts, and transfer chest state; normal stop and game-over reset teleport players before cleanup to avoid fall damage; new bundled monster files are included in Halls resource seeding; level-type defaults no longer contain obsolete modifier sections.
-- Next development slice applied: Halls weapon attack attributes now write total target damage/speed against player base attributes so low-damage custom weapons no longer cancel out vanilla weapon damage; sculk exposure uses generated patch geometry instead of block-under-player checks; sculk pressure no longer decays and survives floor rebuilds until run reset/game over; sculk vein block data pins only the intended support face; slime split children from session slimes are registered as session monsters; `/hoc sessions` reports alive monsters, base cap, extended cap, and spawned budget; scenario floors parse `coin-quota`; the HUD shows `Coins current/quota` and per-player elevator range as `NEAR`, `MEDIUM`, or `FAR`; elevator descent requires and spends the current floor quota unless the activating player is in Creative; multiplayer participants outside the elevator when descent starts are converted to ghosts with a left-behind message.
-- Next development slice applied: session monsters are now persistent with far-away removal disabled; exploration monster spawning no longer has a finite total budget; the live spawn cap extends periodically with a difficulty-based interval, player kills reduce the cap by one, and slime split children add cap slots as they register; monsters retarget toward alive participants and avoid ghost targets; Halls food item category is active with `stats.heal` restoring health on consume while hunger stays full; bundled food items and breakable food loot entries were added; sculk high-pressure eating suppression now blocks consumption without lowering hunger.
-- Next development slice applied: Halls modifiers now load from `modifiers/*.yml|*.yaml|*.txt`, roll three at a time for exploration floors, reveal during elevator descent with title/sound feedback, and render configured icons on the HUD. Good/bad slot chance is `50 - difficulty` percent for good modifiers, clamped to 0-100. Duplicate modifiers stack/multiply.
-- Implemented modifier effects include double coins, less/more enemies, more traps, less loot, more sculk, special enemy, more rooms, longer corridors, death fog, level-specific trap boosts, and Compass. Compass once grants an elevator compass, twice adds exact elevator block distance to the HUD, and thrice emits an elevator particle trail every 5 seconds.
-- Monster spawning now uses only level-type common monsters unless the special enemy modifier is active; when active, one special monster is selected and added to the spawn roll at a lower effective weight. Spawned monsters no longer target players from long range by default; quiet players should only attract nearby monsters, while breakable destruction and elevator scrap deposits still alert monsters in the existing long radius.
-- Monster live-cap growth now reaches the requested pacing targets: difficulty 10 extends about every 60 seconds, difficulty 80 extends about every 20 seconds, with interpolation between.
-- Trap modifiers now double the weighted chance of their configured trap kind and multiply trap-room count by 1.33; this stacks with the generic more-traps multiplier.
-- Next development slice applied: traps now damage session monsters as well as players through contact, radius, and lane checks for bear traps, proximity mines, swinging blades, wall spikes, falling ice, poison darts, and pit contact.
-- Warden spawning was pushed back and reduced: wardens now begin rolling at 65% max participant sculk, with `min(sculk - 55, 35) / 10%` spawn chance. Sculk punishments now apply Weakness at 50%, Slowness/eating block at 90%, and Darkness at 100%.
-- Elevator descent now delays the destination build/modifier reveal by an extra 5 seconds when multiplayer players are left behind and converted to ghosts, giving them time to read the left-behind message after the doors close.
-- Smoke Bomb and Warding Totem utility behavior is implemented. Smoke Bomb clears nearby session monster targets, emits smoke particles, grants temporary invisibility, and consumes the item. Warding Totem grants nearby alive participants Resistance II for 10 seconds and consumes the item.
-- Exploration monster cap scaling now treats each extra participant after the first as +33% to the base live cap and cap-extension speed before modifier multipliers apply.
-- Breakable loot was centralized into new `breakable_loot_pools/common.yml` and `rare.yml` resources. Breakable files now declare `rarity` and two `scrap-drops`; generic `scrap`/`random_scrap` loot entries pick between those configured scrap drops. Existing per-breakable `loot` remains parser-compatible and overrides the rarity pool.
-- Next development slice applied: trap effects only affect session monsters while a participant is within 20 blocks of the trap effect/contact area; generated room and corridor wall columns now use wall material under the walls instead of floor material; elevator floor arrival heals living players by 6 HP and revives ghosts at 10 HP; right-click physics-drop pickup now inserts into the currently selected empty hand slot; modifier reveal timing and title duration are doubled; exploration content generation now forces exactly one rare breakable per floor and keeps other generated props common; bundled `ender_chest` is registered as its own rare breakable resource.
-- Next development slice applied: camp floors now parse scenario `layout`, load `level/camps/camp_1.txt`, render camp rooms from `X/O/C/N/S/W/E` masks, mark plot floors with oak planks, and add session-owned plot `Interaction` hitboxes.
 - Halls building definitions now load from `plugins/OmGames/HallsOfCarnage/buildings/` and are seeded from bundled defaults for all current blueprint families.
 - Building files define size, blueprint id, implemented flag, level display parts, optional stored-scrap upgrade costs, and optional `interaction.give-items` outputs.
 - Right-clicking a camp plot with a matching blueprint consumes it and spawns the configured level-1 building display. Right-clicking a built plot opens its camp building GUI for functionality, upgrades, and destruction.
@@ -263,15 +141,17 @@ This is the first implementation slice. It focuses on:
 - Cooking Pot, Weapon Bench, and Armory now read scenario `crafting-stations.<station>.<1|2|3>` unlock lists and craft catalog items from their GUI using stored scrap plus optional hotbar item ingredients from item `recipe`.
 - Mycelia Farm now uses per-level `harvest.uses`, `harvest.items`, and `empty-parts`; right-click harvests raw mycelia while stocked, empty farms open the GUI, and upgrades remember previous harvests instead of fully refilling the building.
 - Added `raw_mycelia`, rare meal foods, cooked-mycelia recipe data, and food buff application for speed, resistance, regeneration, and absorption meal stats.
+- Next reviewer slice applied: Smoke Bomb concealment now causes session monster retargeting to drop any current concealed-player target instead of preserving it as valid, and Halls monster target selection now ignores Creative/Spectator participants.
+- Elevator transfer chest preservation now keeps the last saved chest snapshot when the live chest block is temporarily unavailable and staged floor builds no longer recapture an already-cleared chest during the elevator rebuild pass.
+- Camp-floor elevator connectors are now three blocks wide through the offset turn and into the camp entrance, preventing one-block offset joins from sealing the path.
+- Elevator compasses are tagged when granted and are removed from player inventories plus the elevator transfer chest before descent starts, before the next floor's modifiers are selected.
+- `/hoc give <wood_scrap|iron_scrap|diamond_scrap|redstone_scrap> [amount]` now deposits test scrap directly into the caller's active session elevator storage and awards the matching test coins.
+- Camp building upgrade-button lore now shows upgrade costs and practical effects, including newly unlocked crafting-station recipes and Mycelia Farm harvest changes.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 For the next slice (do not remove this line):
-- Smoke bomb is still not working, arent anti-ghost target mechanics overiding the effect? Get to the bottom of this. For example, I was in the elevator in creative and zombie tracked me here from accross the whole floor.
-- Contents of the elevator chest for some reason get deleted when going down a floor
-- Elevator corridor is still impassable on camp floors, as it is offset by one block to allign to a  free wall, but that closes it off since its 1 block wide.
-- Make it so elevator compass gets removed from both player inventories and elevator chest when going down the floor, before modifiers are chosen
-- Make it so /hoc give can give you scraps deposited right into the elevator, preferably with amount argument
-- Make it so when howering over upgrade button in buildings, it tells you the effects of the upgrade. In case of crafting, show new recipies
+- Camp is missing using the normal block pallete of the level type
+- All buildings have an offset and are not centered, its a half block offset on both axis.
 
 Future (not this slice):
 - Continue camp work by adding persistent camp/save-file state so built buildings survive game-over restarts and later save loads. Then replace the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.

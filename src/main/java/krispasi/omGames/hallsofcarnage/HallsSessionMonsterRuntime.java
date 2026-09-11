@@ -416,7 +416,10 @@ final class HallsSessionMonsterRuntime {
             if (current instanceof Player player
                     && player.getWorld().equals(world)
                     && participants.contains(player.getUniqueId())
-                    && aliveParticipantPredicate.test(player.getUniqueId())) {
+                    && aliveParticipantPredicate.test(player.getUniqueId())
+                    && !isConcealed(player.getUniqueId())
+                    && player.getGameMode() != org.bukkit.GameMode.CREATIVE
+                    && player.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
                 continue;
             }
             creature.setTarget(nearestParticipant(creature.getLocation(), 18.0));
@@ -446,7 +449,9 @@ final class HallsSessionMonsterRuntime {
             Player player = Bukkit.getPlayer(playerId);
             if (player == null || !player.getWorld().equals(world)
                     || !aliveParticipantPredicate.test(playerId)
-                    || isConcealed(playerId)) {
+                    || isConcealed(playerId)
+                    || player.getGameMode() == org.bukkit.GameMode.CREATIVE
+                    || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) {
                 continue;
             }
             double distance = player.getLocation().distanceSquared(location);

@@ -864,6 +864,17 @@ public final class HallsOfCarnageManager {
             return Result.fail("Only players can receive Halls items.");
         }
         String itemId = normalizeId(rawItemId);
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (HallsSession.isScrapId(itemId)) {
+            if (session == null) {
+                return Result.fail("You must be in an active Halls session to deposit test scrap.");
+            }
+            if (!session.addStoredScrap(itemId, amount)) {
+                return Result.fail("Unknown Halls scrap type: " + rawItemId + ".");
+            }
+            return Result.ok("Deposited " + amount + " " + itemId.replace('_', ' ') + " into the elevator storage.");
+        }
         HallsItemType type = itemTypes.get(itemId);
         if (type == null) {
             return Result.fail("Unknown Halls item: " + rawItemId + ".");

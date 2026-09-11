@@ -246,7 +246,7 @@ public final class HallsCampRuntime {
         if (plot.level() < 3) {
             HallsBuildingType.Level next = building.level(plot.level() + 1);
             inventory.setItem(22, menuItem(Material.SMITHING_TABLE, "Upgrade", NamedTextColor.YELLOW,
-                    List.of("Cost: " + formatCost(next.upgradeCost())), "upgrade", null));
+                    upgradeLore(building, plot), "upgrade", null));
         } else {
             inventory.setItem(22, menuItem(Material.SMITHING_TABLE, "Max Level", NamedTextColor.GRAY,
                     List.of("This building is already level 3."), null, null));
@@ -400,6 +400,42 @@ public final class HallsCampRuntime {
         return building.id().equals("cooking_pot")
                 || building.id().equals("weapon_bench")
                 || building.id().equals("armory");
+    }
+
+    private List<String> upgradeLore(HallsBuildingType building, Plot plot) {
+        HallsBuildingType.Level next = building.level(plot.level() + 1);
+        List<String> lore = new ArrayList<>();
+        lore.add("Cost: " + formatCost(next.upgradeCost()));
+        if (isCraftingStation(building)) {
+            List<String> currentRecipes = scenario == null ? List.of() : scenario.craftingRecipes(building.id(), plot.level());
+            List<String> nextRecipes = scenario == null ? List.of() : scenario.craftingRecipes(building.id(), plot.level() + 1);
+            List<String> unlocked = nextRecipes.stream()
+                    .filter(itemId -> !currentRecipes.contains(itemId))
+                    .map(this::itemName)
+                    .toList();
+            if (!unlocked.isEmpty()) {
+                lore.add("New recipes:");
+                lore.addAll(unlocked.stream().map(name -> "- " + name).toList());
+            } else {
+                lore.add("No new recipes at this level.");
+            }
+        } else if (building.id().equals("mycelia_farm")) {
+            List<String> harvestItems = next.harvestItems().isEmpty() ? next.giveItems() : next.harvestItems();
+            lore.add("Harvest uses: " + next.harvestUses());
+            if (!harvestItems.isEmpty()) {
+                lore.add("Harvests: " + harvestItems.stream().map(this::itemName).collect(java.util.stream.Collectors.joining(", ")));
+            }
+        } else if (!next.giveItems().isEmpty()) {
+            lore.add("Outputs: " + next.giveItems().stream().map(this::itemName).collect(java.util.stream.Collectors.joining(", ")));
+        } else {
+            lore.add("Improves the building display.");
+        }
+        return lore;
+    }
+
+    private String itemName(String itemId) {
+        HallsItemType itemType = itemTypes.get(itemId);
+        return itemType == null ? itemId.replace('_', ' ') : itemType.name();
     }
 
     private ItemStack menuItem(Material material,
