@@ -163,9 +163,10 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: Load Save entries now document and handle shift-right-click deletion for saves containing the clicking player, with deletion constrained to the Halls saves folder. `/hoc leave` remains a host-only save-and-end command, but is now limited to the start floor and camp floors.
 
 ## Reviewer note (Delete entries once done, but keep the header)
+Do all following for the next slice (and keep this line):
 - Add storage closet (all three sizes) as per GDD
 - Add sculk purifier (all three sizes) as per GDD
-- Add a few more chestplates, weapons and a new utility item which heals 4 hp with a cooldown
+- Add a 4 more chestplates, 3 weapons and a new utility item which heals 4 hp with a cooldown
 
 Future (not this slice):
 - Continue camp work by replacing the decorative placeholder behavior for Storage Lockers, Grindstone, Elevator Drill, Scanner, Bounty Board, and Sculk Purifiers with their real GDD effects.
