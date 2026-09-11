@@ -1,0 +1,15 @@
+id: bone_cleaver
+name: "Bone Cleaver"
+category: weapon
+rarity: normal
+material: IRON_AXE
+max-stack-size: 1
+lore:
+  - "Slow, ugly, and effective against crowded halls."
+stats:
+  melee-damage: 7
+  attack-speed: 1.0
+  durability: 70
+recipe:
+  iron_scrap: 8
+  wood_scrap: 3

@@ -2,7 +2,7 @@ id: storage_locker_small
 name: "Small Storage Locker"
 size: small
 blueprint: storage_locker_small_blueprint
-implemented: false
+implemented: true
 levels:
   1:
     upgrade-cost: {wood: 2, iron: 1}

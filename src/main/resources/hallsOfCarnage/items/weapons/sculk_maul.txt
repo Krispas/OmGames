@@ -1,0 +1,16 @@
+id: sculk_maul
+name: "Sculk Maul"
+category: weapon
+rarity: rare
+material: MACE
+max-stack-size: 1
+lore:
+  - "A dense head of humming salvage and dead sensors."
+stats:
+  melee-damage: 9
+  attack-speed: 0.9
+  durability: 120
+recipe:
+  iron_scrap: 10
+  diamond_scrap: 5
+  redstone_scrap: 6

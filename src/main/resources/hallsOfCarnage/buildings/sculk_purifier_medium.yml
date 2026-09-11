@@ -2,7 +2,7 @@ id: sculk_purifier_medium
 name: "Medium Sculk Purifier"
 size: medium
 blueprint: sculk_purifier_medium_blueprint
-implemented: false
+implemented: true
 levels:
   1:
     upgrade-cost: {diamond: 2, redstone: 4}

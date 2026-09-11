@@ -97,11 +97,16 @@ public record HallsSaveData(File file,
                         building,
                         intValue(row.get("level"), 1),
                         intValue(row.get("harvest-remaining"), 0),
-                        intValue(row.get("harvest-used"), 0)));
+                        intValue(row.get("harvest-used"), 0),
+                        itemArray(listValue(row.get("storage")), 54)));
             }
             camps.put(floor, List.copyOf(plots));
         }
         return Map.copyOf(camps);
+    }
+
+    private static List<?> listValue(Object value) {
+        return value instanceof List<?> list ? list : List.of();
     }
 
     private static ItemStack[] itemArray(List<?> rows, int size) {

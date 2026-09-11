@@ -2,7 +2,7 @@ id: storage_locker_large
 name: "Large Storage Locker"
 size: large
 blueprint: storage_locker_large_blueprint
-implemented: false
+implemented: true
 levels:
   1:
     upgrade-cost: {wood: 5, iron: 4}

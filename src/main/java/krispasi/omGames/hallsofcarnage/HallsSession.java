@@ -170,7 +170,7 @@ public final class HallsSession {
             public boolean spend(Map<String, Integer> cost) {
                 return spendStoredScrap(cost);
             }
-        });
+        }, this::reducePartySculk);
     }
 
     public int id() {
@@ -248,6 +248,10 @@ public final class HallsSession {
 
     public boolean handleCampInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
         return campRuntime.handleInventoryClick(event);
+    }
+
+    public boolean handleCampInventoryClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        return campRuntime.handleInventoryClose(event);
     }
 
     public boolean isSessionMonster(Entity entity) {
@@ -577,6 +581,15 @@ public final class HallsSession {
                 }
                 activateWardingTotem(player, type);
                 applyUtilityCooldown(player, type);
+                yield true;
+            }
+            case "mending_salve" -> {
+                if (isUtilityOnCooldown(player, type)) {
+                    yield true;
+                }
+                if (activateHealingUtility(player, type)) {
+                    applyUtilityCooldown(player, type);
+                }
                 yield true;
             }
             default -> false;
@@ -2216,6 +2229,22 @@ public final class HallsSession {
         world.playSound(player.getLocation(), Sound.ITEM_TOTEM_USE, 0.85f, 1.15f);
     }
 
+    private boolean activateHealingUtility(Player player, HallsItemType type) {
+        double heal = Math.max(0.0, type.stats().getOrDefault("heal", 4.0));
+        double maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH) == null
+                ? player.getMaxHealth()
+                : player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
+        if (player.getHealth() >= maxHealth) {
+            player.sendActionBar(Component.text("You are already at full health.", NamedTextColor.GRAY));
+            return false;
+        }
+        player.setHealth(Math.min(maxHealth, player.getHealth() + heal));
+        world.spawnParticle(Particle.HEART, player.getLocation().add(0.0, 1.2, 0.0), 6, 0.35, 0.35, 0.35, 0.02);
+        world.playSound(player.getLocation(), Sound.ITEM_HONEY_BOTTLE_DRINK, 0.7f, 1.35f);
+        player.sendActionBar(Component.text("Restored " + formatStatAmount(heal) + " health.", NamedTextColor.GREEN));
+        return true;
+    }
+
     private boolean isUtilityOnCooldown(Player player, HallsItemType type) {
         long remainingMillis = utilityCooldowns.getOrDefault(utilityCooldownKey(player, type), 0L) - System.currentTimeMillis();
         if (remainingMillis <= 0L) {
@@ -2318,6 +2347,27 @@ public final class HallsSession {
         }
         coins += multipliedCoins(amount);
         return true;
+    }
+
+    private int reducePartySculk(double amount) {
+        if (amount <= 0.0) {
+            return 0;
+        }
+        int affected = 0;
+        for (UUID playerId : participants) {
+            int current = sculkRuntime.sculkPercent(playerId);
+            if (current <= 0) {
+                continue;
+            }
+            sculkRuntime.setSculk(playerId, Math.max(0.0, current - amount));
+            affected++;
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.sendActionBar(Component.text("Sculk pressure reduced to "
+                        + sculkRuntime.sculkPercent(playerId) + "%.", NamedTextColor.AQUA));
+            }
+        }
+        return affected;
     }
 
     public static boolean isScrapId(String rawType) {
@@ -2772,6 +2822,7 @@ public final class HallsSession {
                 row.put("level", state.level());
                 row.put("harvest-remaining", state.harvestRemaining());
                 row.put("harvest-used", state.harvestUsed());
+                row.put("storage", java.util.Arrays.asList(cloneArray(state.storageContents(), 54)));
                 plots.add(row);
             }
             yaml.set("camps." + entry.getKey() + ".plots", plots);
@@ -2836,7 +2887,8 @@ public final class HallsSession {
                             state.buildingId(),
                             level,
                             building.level(level).harvestUses(),
-                            0));
+                            0,
+                            state.storageContents()));
                     continue;
                 }
                 refreshed.add(state);

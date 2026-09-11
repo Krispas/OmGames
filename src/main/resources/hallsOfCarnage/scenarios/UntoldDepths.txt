@@ -18,13 +18,20 @@ allowed-items:
     - rusty_sword
     - miner_pick
     - poking_stick
+    - bone_cleaver
+    - frost_lance
     - echo_blade
+    - sculk_maul
   ranged:
     - short_bow
     - storm_crossbow
   armor:
     - padded_armor
+    - chainmail_hauberk
+    - ironbound_chestplate
+    - cinderplate
     - reinforced_chestplate
+    - deepguard_plate
   food:
     - raw_mycelia
     - stale_bread
@@ -36,6 +43,7 @@ allowed-items:
     - golden_jerky
   utility:
     - smoke_bomb
+    - mending_salve
     - warding_totem
   blueprint:
     - cooking_pot_blueprint
@@ -100,16 +108,25 @@ crafting-stations:
       - rusty_sword
       - poking_stick
       - smoke_bomb
+      - mending_salve
     2:
       - miner_pick
+      - bone_cleaver
+      - frost_lance
     3:
       - echo_blade
+      - sculk_maul
       - warding_totem
   armory:
     1:
       - padded_armor
+      - chainmail_hauberk
+    2:
+      - ironbound_chestplate
+      - cinderplate
     3:
       - reinforced_chestplate
+      - deepguard_plate
 floors:
   - number: 1
     kind: start

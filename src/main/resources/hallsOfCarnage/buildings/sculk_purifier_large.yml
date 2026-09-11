@@ -2,7 +2,7 @@ id: sculk_purifier_large
 name: "Large Sculk Purifier"
 size: large
 blueprint: sculk_purifier_large_blueprint
-implemented: false
+implemented: true
 levels:
   1:
     upgrade-cost: {diamond: 3, redstone: 6}

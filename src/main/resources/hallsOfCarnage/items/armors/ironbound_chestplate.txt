@@ -1,0 +1,15 @@
+id: ironbound_chestplate
+name: "Ironbound Chestplate"
+category: armor
+rarity: normal
+material: IRON_CHESTPLATE
+max-stack-size: 1
+lore:
+  - "A practical plate hammered into shape at camp."
+stats:
+  armor: 6
+  toughness: 1
+  durability: 90
+recipe:
+  iron_scrap: 10
+  diamond_scrap: 2

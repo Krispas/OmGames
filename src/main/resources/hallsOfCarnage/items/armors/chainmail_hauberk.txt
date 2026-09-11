@@ -1,0 +1,14 @@
+id: chainmail_hauberk
+name: "Chainmail Hauberk"
+category: armor
+rarity: normal
+material: CHAINMAIL_CHESTPLATE
+max-stack-size: 1
+lore:
+  - "Linked scrap rings that catch glancing blows."
+stats:
+  armor: 5
+  durability: 75
+recipe:
+  iron_scrap: 7
+  wood_scrap: 2

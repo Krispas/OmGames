@@ -24,6 +24,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -42,6 +43,10 @@ public final class HallsCampRuntime {
         boolean spend(Map<String, Integer> cost);
     }
 
+    public interface SculkAccount {
+        int reduceAll(double amount);
+    }
+
     private final JavaPlugin plugin;
     private final World world;
     private final HallsScenario scenario;
@@ -49,6 +54,7 @@ public final class HallsCampRuntime {
     private final Map<String, HallsItemType> itemTypes;
     private final Function<HallsItemType, ItemStack> itemFactory;
     private final ScrapAccount scrapAccount;
+    private final SculkAccount sculkAccount;
     private final Map<UUID, Plot> plotsByEntity = new HashMap<>();
     private final Map<Integer, Plot> plotsById = new HashMap<>();
 
@@ -58,7 +64,8 @@ public final class HallsCampRuntime {
                             Map<String, HallsBuildingType> buildingTypes,
                             Map<String, HallsItemType> itemTypes,
                             Function<HallsItemType, ItemStack> itemFactory,
-                            ScrapAccount scrapAccount) {
+                            ScrapAccount scrapAccount,
+                            SculkAccount sculkAccount) {
         this.plugin = plugin;
         this.world = world;
         this.scenario = scenario;
@@ -66,6 +73,7 @@ public final class HallsCampRuntime {
         this.itemTypes = itemTypes == null ? Map.of() : Map.copyOf(itemTypes);
         this.itemFactory = itemFactory;
         this.scrapAccount = scrapAccount;
+        this.sculkAccount = sculkAccount;
     }
 
     public void clear() {
@@ -102,7 +110,7 @@ public final class HallsCampRuntime {
                 continue;
             }
             states.add(new PlotState(plot.id(), plot.buildingId(), plot.level(),
-                    plot.harvestRemaining(), plot.harvestUsed()));
+                    plot.harvestRemaining(), plot.harvestUsed(), cloneStorage(plot.storageContents())));
         }
         return states;
     }
@@ -121,6 +129,7 @@ public final class HallsCampRuntime {
             setBuilding(plot, building, level);
             plot.setHarvestRemaining(state.harvestRemaining());
             plot.setHarvestUsed(state.harvestUsed());
+            plot.setStorageContents(state.storageContents());
             HallsBuildingType.Level buildingLevel = building.level(level);
             if (plot.harvestRemaining() <= 0 && !buildingLevel.emptyParts().isEmpty()) {
                 setDisplays(plot, building, buildingLevel.emptyParts());
@@ -191,8 +200,24 @@ public final class HallsCampRuntime {
                 craftRecipe(player, plot, building, itemId);
                 openBuildingMenu(player, plot);
             }
+            case "storage" -> openStorage(player, plot, building);
+            case "purify" -> {
+                activateSculkPurifier(player, plot, building);
+                openBuildingMenu(player, plot);
+            }
             default -> {
             }
+        }
+        return true;
+    }
+
+    public boolean handleInventoryClose(InventoryCloseEvent event) {
+        if (!(event.getInventory().getHolder() instanceof StorageMenu menu)) {
+            return false;
+        }
+        Plot plot = plotsById.get(menu.plotId());
+        if (plot != null && plot.buildingId() != null && isStorageLocker(plot.buildingId())) {
+            plot.setStorageContents(event.getInventory().getContents());
         }
         return true;
     }
@@ -266,6 +291,14 @@ public final class HallsCampRuntime {
                 }
                 inventory.setItem(RECIPE_SLOTS[recipeIndex++], recipeMenuItem(itemType));
             }
+        } else if (isStorageLocker(building)) {
+            int slots = storageSlots(building, plot.level());
+            inventory.setItem(13, menuItem(Material.CHEST, "Open Storage", NamedTextColor.AQUA,
+                    List.of("Slots: " + slots, "Stored items persist with this camp."), "storage", null));
+        } else if (isSculkPurifier(building)) {
+            inventory.setItem(13, menuItem(Material.CALIBRATED_SCULK_SENSOR, "Purify Sculk", NamedTextColor.AQUA,
+                    List.of("Reduces party sculk pressure by " + formatStatAmount(purifyAmount(building, plot.level())) + "%."),
+                    "purify", null));
         } else if (building.id().equals("mycelia_farm")) {
             inventory.setItem(13, menuItem(Material.DEAD_BUSH, "Farm Empty", NamedTextColor.GRAY,
                     List.of("Upgrade or revisit after a future refresh."), null, null));
@@ -412,6 +445,10 @@ public final class HallsCampRuntime {
     }
 
     private void destroyBuilding(Player player, Plot plot, HallsBuildingType building) {
+        if (isStorageLocker(building) && hasStoredItems(plot)) {
+            player.sendActionBar(Component.text("Empty this locker before destroying it.", NamedTextColor.RED));
+            return;
+        }
         removeDisplays(plot);
         plot.clearBuilding();
         world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_DESTROY, 0.7f, 1.1f);
@@ -461,6 +498,11 @@ public final class HallsCampRuntime {
             if (!harvestItems.isEmpty()) {
                 lore.add("Harvests: " + harvestItems.stream().map(this::itemName).collect(java.util.stream.Collectors.joining(", ")));
             }
+        } else if (isStorageLocker(building)) {
+            lore.add("Storage slots: " + storageSlots(building, plot.level()) + " -> " + storageSlots(building, plot.level() + 1));
+        } else if (isSculkPurifier(building)) {
+            lore.add("Purify amount: " + formatStatAmount(purifyAmount(building, plot.level()))
+                    + "% -> " + formatStatAmount(purifyAmount(building, plot.level() + 1)) + "%");
         } else if (!next.giveItems().isEmpty()) {
             lore.add("Outputs: " + next.giveItems().stream().map(this::itemName).collect(java.util.stream.Collectors.joining(", ")));
         } else {
@@ -513,6 +555,95 @@ public final class HallsCampRuntime {
             }
         }
         return parts.isEmpty() ? "free" : String.join(", ", parts);
+    }
+
+    private void openStorage(Player player, Plot plot, HallsBuildingType building) {
+        int slots = storageSlots(building, plot.level());
+        Inventory inventory = Bukkit.createInventory(new StorageMenu(plot.id()), slots,
+                Component.text(building.name() + " Storage", NamedTextColor.DARK_GREEN));
+        ItemStack[] stored = plot.storageContents();
+        for (int slot = 0; slot < Math.min(slots, stored.length); slot++) {
+            inventory.setItem(slot, cloneOrNull(stored[slot]));
+        }
+        player.openInventory(inventory);
+    }
+
+    private void activateSculkPurifier(Player player, Plot plot, HallsBuildingType building) {
+        if (sculkAccount == null) {
+            player.sendActionBar(Component.text("This purifier is not connected.", NamedTextColor.RED));
+            return;
+        }
+        int affected = sculkAccount.reduceAll(purifyAmount(building, plot.level()));
+        if (affected <= 0) {
+            player.sendActionBar(Component.text("No sculk pressure to purify.", NamedTextColor.GRAY));
+            return;
+        }
+        world.spawnParticle(org.bukkit.Particle.WAX_OFF, player.getLocation().add(0.0, 1.0, 0.0),
+                45, 1.2, 0.7, 1.2, 0.03);
+        world.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.35f);
+        player.sendActionBar(Component.text("Purified sculk pressure for " + affected + " player"
+                + (affected == 1 ? "" : "s") + ".", NamedTextColor.AQUA));
+    }
+
+    private boolean isStorageLocker(HallsBuildingType building) {
+        return building != null && isStorageLocker(building.id());
+    }
+
+    private boolean isStorageLocker(String buildingId) {
+        return buildingId != null && buildingId.startsWith("storage_locker_");
+    }
+
+    private boolean isSculkPurifier(HallsBuildingType building) {
+        return building != null && building.id().startsWith("sculk_purifier_");
+    }
+
+    private int storageSlots(HallsBuildingType building, int level) {
+        int baseRows = switch (building.size()) {
+            case "medium" -> 2;
+            case "large" -> 3;
+            default -> 1;
+        };
+        return Math.max(9, Math.min(54, baseRows * Math.max(1, Math.min(3, level)) * 9));
+    }
+
+    private double purifyAmount(HallsBuildingType building, int level) {
+        double base = switch (building.size()) {
+            case "medium" -> 18.0;
+            case "large" -> 30.0;
+            default -> 10.0;
+        };
+        return base * Math.max(1, Math.min(3, level));
+    }
+
+    private boolean hasStoredItems(Plot plot) {
+        for (ItemStack item : plot.storageContents()) {
+            if (item != null && !item.getType().isAir()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private ItemStack[] cloneStorage(ItemStack[] source) {
+        if (source == null || source.length == 0) {
+            return new ItemStack[0];
+        }
+        ItemStack[] copy = new ItemStack[source.length];
+        for (int i = 0; i < source.length; i++) {
+            copy[i] = cloneOrNull(source[i]);
+        }
+        return copy;
+    }
+
+    private ItemStack cloneOrNull(ItemStack item) {
+        return item == null || item.getType().isAir() ? null : item.clone();
+    }
+
+    private String formatStatAmount(double value) {
+        if (Math.rint(value) == value) {
+            return Integer.toString((int) value);
+        }
+        return String.format(java.util.Locale.ROOT, "%.1f", value);
     }
 
     private Map<String, Integer> scrapCost(Map<String, Integer> cost) {
@@ -734,6 +865,7 @@ public final class HallsCampRuntime {
         private int level;
         private int harvestRemaining;
         private int harvestUsed;
+        private ItemStack[] storageContents = new ItemStack[0];
 
         private Plot(int id, String size, double x, int y, double z, BlockFace facing, UUID interactionId) {
             this.id = id;
@@ -795,6 +927,7 @@ public final class HallsCampRuntime {
             this.level = 0;
             this.harvestRemaining = 0;
             this.harvestUsed = 0;
+            this.storageContents = new ItemStack[0];
         }
 
         private int harvestRemaining() {
@@ -812,14 +945,42 @@ public final class HallsCampRuntime {
         private void setHarvestUsed(int harvestUsed) {
             this.harvestUsed = Math.max(0, harvestUsed);
         }
+
+        private ItemStack[] storageContents() {
+            return storageContents;
+        }
+
+        private void setStorageContents(ItemStack[] storageContents) {
+            if (storageContents == null || storageContents.length == 0) {
+                this.storageContents = new ItemStack[0];
+                return;
+            }
+            this.storageContents = new ItemStack[storageContents.length];
+            for (int i = 0; i < storageContents.length; i++) {
+                this.storageContents[i] = storageContents[i] == null || storageContents[i].getType().isAir()
+                        ? null
+                        : storageContents[i].clone();
+            }
+        }
     }
 
     private static final int[] RECIPE_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 23, 24, 25};
 
-    public record PlotState(int plotId, String buildingId, int level, int harvestRemaining, int harvestUsed) {
+    public record PlotState(int plotId, String buildingId, int level, int harvestRemaining, int harvestUsed,
+                            ItemStack[] storageContents) {
+        public PlotState {
+            storageContents = storageContents == null ? new ItemStack[0] : storageContents.clone();
+        }
     }
 
     private record CampMenu(int plotId) implements InventoryHolder {
+        @Override
+        public Inventory getInventory() {
+            return null;
+        }
+    }
+
+    private record StorageMenu(int plotId) implements InventoryHolder {
         @Override
         public Inventory getInventory() {
             return null;

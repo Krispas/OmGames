@@ -2,7 +2,7 @@ id: storage_locker_medium
 name: "Medium Storage Locker"
 size: medium
 blueprint: storage_locker_medium_blueprint
-implemented: false
+implemented: true
 levels:
   1:
     upgrade-cost: {wood: 3, iron: 2}

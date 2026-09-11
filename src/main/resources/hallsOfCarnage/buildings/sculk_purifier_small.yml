@@ -2,7 +2,7 @@ id: sculk_purifier_small
 name: "Small Sculk Purifier"
 size: small
 blueprint: sculk_purifier_small_blueprint
-implemented: false
+implemented: true
 levels:
   1:
     upgrade-cost: {diamond: 1, redstone: 3}

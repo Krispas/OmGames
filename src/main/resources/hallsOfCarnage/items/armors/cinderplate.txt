@@ -1,0 +1,16 @@
+id: cinderplate
+name: "Cinderplate"
+category: armor
+rarity: rare
+material: GOLDEN_CHESTPLATE
+max-stack-size: 1
+lore:
+  - "Warm salvage plating that keeps panic out."
+stats:
+  armor: 5
+  toughness: 1
+  durability: 80
+  resistance-seconds: 4
+recipe:
+  iron_scrap: 8
+  redstone_scrap: 5

@@ -113,10 +113,17 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/weapons/rusty_sword.txt",
             "hallsOfCarnage/items/weapons/echo_blade.txt",
             "hallsOfCarnage/items/weapons/miner_pick.txt",
+            "hallsOfCarnage/items/weapons/bone_cleaver.txt",
+            "hallsOfCarnage/items/weapons/frost_lance.txt",
+            "hallsOfCarnage/items/weapons/sculk_maul.txt",
             "hallsOfCarnage/items/ranged/short_bow.txt",
             "hallsOfCarnage/items/ranged/storm_crossbow.txt",
             "hallsOfCarnage/items/armors/padded_armor.txt",
             "hallsOfCarnage/items/armors/reinforced_chestplate.txt",
+            "hallsOfCarnage/items/armors/chainmail_hauberk.txt",
+            "hallsOfCarnage/items/armors/ironbound_chestplate.txt",
+            "hallsOfCarnage/items/armors/cinderplate.txt",
+            "hallsOfCarnage/items/armors/deepguard_plate.txt",
             "hallsOfCarnage/items/food/stale_bread.txt",
             "hallsOfCarnage/items/food/raw_mycelia.txt",
             "hallsOfCarnage/items/food/cooked_mycelia.txt",
@@ -127,6 +134,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/food/stonehide_chowder.txt",
             "hallsOfCarnage/items/utility/smoke_bomb.txt",
             "hallsOfCarnage/items/utility/warding_totem.txt",
+            "hallsOfCarnage/items/utility/mending_salve.txt",
             "hallsOfCarnage/items/blueprints/cooking_pot_blueprint.txt",
             "hallsOfCarnage/items/blueprints/weapon_bench_blueprint.txt",
             "hallsOfCarnage/items/blueprints/armory_blueprint.txt",
@@ -684,6 +692,15 @@ public final class HallsOfCarnageManager {
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         return session != null && session.handleCampInventoryClick(event);
+    }
+
+    public boolean handleCampInventoryClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleCampInventoryClose(event);
     }
 
     public boolean handlePlayerDroppedItem(Player player, org.bukkit.entity.Item itemDrop) {
