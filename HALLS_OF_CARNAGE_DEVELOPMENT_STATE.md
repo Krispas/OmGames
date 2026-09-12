@@ -145,8 +145,11 @@ This is the first implementation slice. It focuses on:
 Do all following for the next slice (and keep this line):
 - Proximity mine model is rotated by 90 degrees (not good)
 - Same for the bear traps
+- Make it so each breakable drops 1-3 drops instad of one. The amount is decided during generation. For example if 50 breakables are meant to genearate, the 50 will be split into less actual breakables with more loot to equal 50.
 - In backrooms generation, the room placement seems way too grid-locked right now, make it more random
 - Add more mobs, ravager, hoglin_slow, magma_cube_large. Halve the health of breeze. Give ravager just 15 hp. Give hoglin 40 hp.
 - Add a new enemy called splinter. It is a zombie in leather armor. When killed, it will make more splinters, but smaller (0.7 scale). When those get killed, it will dupe again into small splinters (baby zombies). Making these three different mobs in the file could help.
 - No need to add any of the new mobs into any generation, I'll do that later.
-- Try to figure out a few new modifiers. Not programm them, but write them into a new tmp.md file for me to read. 10 should be enough.
+- Make it so monsters have a 10% chance to drop a coin.
+- Items can get stuck in walls or travel up the walls. Make sure that doesnt happen. If item falls into a hole, delete it.
+- Try to figure out a few new modifiers. Not programm them, but write them into a new tmp.md file for me to read. 10 should be enough. Also into the save file, tell me what items property in scenario file is. It is part of the exploration floor setup, but I cant remember what it does.

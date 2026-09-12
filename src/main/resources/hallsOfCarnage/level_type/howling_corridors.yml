@@ -15,13 +15,10 @@ wall-palettes:
       cracked:
         block: CRACKED_DEEPSLATE_BRICKS
         chance: 0.04
-  cobbled_deepslate:
-    block: COBBLED_DEEPSLATE
+  tuff:
+    block: TUFF_BRICKS
     special-blocks:
-      deepslate: 0.07
-      mossy:
-        block: MOSSY_COBBLESTONE
-        chance: 0.03
+      tuff: 0.07
 pillar-palettes:
   reinforced_deepslate:
     block: REINFORCED_DEEPSLATE

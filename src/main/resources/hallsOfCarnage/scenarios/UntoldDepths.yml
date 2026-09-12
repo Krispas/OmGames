@@ -146,7 +146,7 @@ floors:
     kind: exploration
     level-type: howling_corridors
     difficulty: 10
-    rooms: 16
+    rooms: 6
     items: 8
     breakables: 24
     traps: 7
@@ -154,36 +154,36 @@ floors:
       min: 1
       max: 7
     holes: 5
-    sculk-patches: 3
-    coin-quota: 6
+    sculk-patches: 1
+    coin-quota: 16
   - number: 3
     kind: exploration
     level-type: frozen_halls
     difficulty: 10
-    rooms: 16
+    rooms: 7
     items: 8
-    breakables: 24
+    breakables: 26
     traps: 8
     traps-per-room:
       min: 1
       max: 7
-    holes: 8
-    sculk-patches: 4
-    coin-quota: 8
+    holes: 4
+    sculk-patches: 2
+    coin-quota: 18
   - number: 4
     kind: exploration
     level-type: deep_crypt
     difficulty: 10
-    rooms: 16
+    rooms: 8
     items: 8
-    breakables: 24
+    breakables: 28
     traps: 8
     traps-per-room:
       min: 1
       max: 7
-    holes: 8
-    sculk-patches: 5
-    coin-quota: 10
+    holes: 6
+    sculk-patches: 3
+    coin-quota: 20
   - number: 5
     kind: camp
     level-type: howling_corridors

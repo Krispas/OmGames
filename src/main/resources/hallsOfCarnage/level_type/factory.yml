@@ -3,9 +3,9 @@ name: "Factory"
 corridor-generation: open_halls
 materials:
   floor: SMOOTH_STONE
-  ceiling: IRON_BLOCK
+  ceiling: POLISHED_TUFF
   corridor-floor: POLISHED_ANDESITE
-  corridor-ceiling: IRON_BLOCK
+  corridor-ceiling: POLISHED_TUFF
   light: REDSTONE_LAMP
 wall-palettes:
   iron:
@@ -14,9 +14,6 @@ wall-palettes:
       copper:
         block: COPPER_BLOCK
         chance: 0.07
-      grate:
-        block: COPPER_GRATE
-        chance: 0.04
   andesite:
     block: POLISHED_ANDESITE
     special-blocks:
@@ -25,13 +22,6 @@ wall-palettes:
 pillar-palettes:
   machinery:
     block: DEEPSLATE_TILES
-    special-blocks:
-      copper:
-        block: COPPER_BLOCK
-        chance: 0.07
-      oxidized:
-        block: OXIDIZED_COPPER
-        chance: 0.04
 monsters:
   common:
     - zombie
