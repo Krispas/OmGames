@@ -147,3 +147,6 @@ Do all following for the next slice (and keep this line):
 - Same for the bear traps
 - In backrooms generation, the room placement seems way too grid-locked right now, make it more random
 - Add more mobs, ravager, hoglin_slow, magma_cube_large. Halve the health of breeze. Give ravager just 15 hp. Give hoglin 40 hp.
+- Add a new enemy called splinter. It is a zombie in leather armor. When killed, it will make more splinters, but smaller (0.7 scale). When those get killed, it will dupe again into small splinters (baby zombies). Making these three different mobs in the file could help.
+- No need to add any of the new mobs into any generation, I'll do that later.
+- Try to figure out a few new modifiers. Not programm them, but write them into a new tmp.md file for me to read. 10 should be enough.
