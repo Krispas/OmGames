@@ -32,3 +32,6 @@ monsters:
     - stray
     - cave_spider
     - zombie_vanguard
+vegetation:
+  chance: 0.0
+  types: {}

@@ -82,6 +82,7 @@ public final class HallsSession {
     private final File dataFolder;
     private final Map<String, HallsLevelType> levelTypes;
     private final Map<String, HallsBreakableType> breakableTypes;
+    private final Map<String, HallsVegetationType> vegetationTypes;
     private final Map<String, HallsItemType> itemTypes;
     private final Map<String, HallsTrapType> trapTypes;
     private final Map<String, HallsMonsterType> monsterTypes;
@@ -94,6 +95,7 @@ public final class HallsSession {
     private final HallsSaveData initialSave;
     private final List<BlockSnapshot> snapshots = new ArrayList<>();
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
+    private final Set<UUID> vegetationDisplays = new HashSet<>();
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
     private final Map<String, Long> utilityCooldowns = new HashMap<>();
     private final Map<String, Long> sculkMaulSplashCooldowns = new HashMap<>();
@@ -141,6 +143,7 @@ public final class HallsSession {
                         File dataFolder,
                         Map<String, HallsLevelType> levelTypes,
                         Map<String, HallsBreakableType> breakableTypes,
+                        Map<String, HallsVegetationType> vegetationTypes,
                         Map<String, HallsItemType> itemTypes,
                         Map<String, HallsTrapType> trapTypes,
                         Map<String, HallsMonsterType> monsterTypes,
@@ -160,6 +163,7 @@ public final class HallsSession {
         this.dataFolder = dataFolder;
         this.levelTypes = levelTypes == null ? Map.of() : Map.copyOf(levelTypes);
         this.breakableTypes = breakableTypes == null ? Map.of() : Map.copyOf(breakableTypes);
+        this.vegetationTypes = vegetationTypes == null ? Map.of() : Map.copyOf(vegetationTypes);
         this.itemTypes = itemTypes == null ? Map.of() : Map.copyOf(itemTypes);
         this.trapTypes = trapTypes == null ? Map.of() : Map.copyOf(trapTypes);
         this.monsterTypes = monsterTypes == null ? Map.of() : Map.copyOf(monsterTypes);
@@ -241,7 +245,7 @@ public final class HallsSession {
     public String debugSummary() {
         return "Session " + id + " floor " + currentFloor + ", rooms " + activeGeneratedRooms + "/" + activeTargetRooms
                 + ", breakables " + breakableProps.size() + ", traps " + trapRuntime.activeTrapCount()
-                + ", monsters " + monsterRuntime.debugStatus() + ".";
+                + ", vegetation " + vegetationDisplays.size() + ", monsters " + monsterRuntime.debugStatus() + ".";
     }
 
     public boolean isTransitioning() {
@@ -997,6 +1001,7 @@ public final class HallsSession {
         renderExplorationRooms(build);
         renderExplorationCorridors(build);
         Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build);
+        reservedCells = withReserved(reservedCells, renderExplorationVegetation(build, reservedCells));
         renderExplorationSculk(build, reservedCells);
         renderExplorationContents(build, reservedCells);
         startExplorationMonsters(build);
@@ -1326,6 +1331,51 @@ public final class HallsSession {
                     build.floorDefinition(), build.levelType(), reservedCells, i == rareRoomIndex);
         }
         debugGeneration("contents", started, "breakables " + (new HashSet<>(breakableProps.values()).size() - before));
+    }
+
+    private Set<HallsExplorationGenerator.Cell> renderExplorationVegetation(ExplorationBuild build,
+                                                                            Set<HallsExplorationGenerator.Cell> reservedCells) {
+        if (build == null || build.plan().rooms().isEmpty() || vegetationTypes.isEmpty()
+                || build.levelType().vegetationChance() <= 0.0 || build.levelType().vegetation().isEmpty()) {
+            return Set.of();
+        }
+        long started = System.nanoTime();
+        Set<HallsExplorationGenerator.Cell> occupied = new HashSet<>();
+        for (HallsExplorationGenerator.Room room : build.plan().rooms()) {
+            for (Cell cell : openInteriorCells(room)) {
+                if (build.random().nextDouble() >= build.levelType().vegetationChance()) {
+                    continue;
+                }
+                HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(
+                        room.startX() + cell.x(), room.startZ() + cell.z());
+                if ((reservedCells != null && reservedCells.contains(absolute)) || occupied.contains(absolute)) {
+                    continue;
+                }
+                HallsVegetationType type = weightedVegetation(build.levelType(), build.random());
+                if (type == null) {
+                    continue;
+                }
+                spawnVegetationDisplay(absolute.x(), origin.y(), absolute.z(), type, build.random());
+                occupied.add(absolute);
+            }
+        }
+        debugGeneration("vegetation", started, "displays " + occupied.size());
+        return Set.copyOf(occupied);
+    }
+
+    private Set<HallsExplorationGenerator.Cell> withReserved(Set<HallsExplorationGenerator.Cell> first,
+                                                             Set<HallsExplorationGenerator.Cell> second) {
+        if ((first == null || first.isEmpty()) && (second == null || second.isEmpty())) {
+            return Set.of();
+        }
+        Set<HallsExplorationGenerator.Cell> result = new HashSet<>();
+        if (first != null) {
+            result.addAll(first);
+        }
+        if (second != null) {
+            result.addAll(second);
+        }
+        return Set.copyOf(result);
     }
 
     private int rareBreakableRoomIndex(HallsExplorationGenerator.Plan plan,
@@ -2515,6 +2565,49 @@ public final class HallsSession {
         return display.getUniqueId();
     }
 
+    private HallsVegetationType weightedVegetation(HallsLevelType levelType, Random random) {
+        int totalWeight = levelType.vegetation().stream()
+                .filter(entry -> entry.weight() > 0 && vegetationTypes.containsKey(entry.id()))
+                .mapToInt(HallsLevelType.VegetationEntry::weight)
+                .sum();
+        if (totalWeight <= 0) {
+            return null;
+        }
+        int roll = random.nextInt(totalWeight);
+        for (HallsLevelType.VegetationEntry entry : levelType.vegetation()) {
+            HallsVegetationType type = vegetationTypes.get(entry.id());
+            if (type == null || entry.weight() <= 0) {
+                continue;
+            }
+            roll -= entry.weight();
+            if (roll < 0) {
+                return type;
+            }
+        }
+        return null;
+    }
+
+    private void spawnVegetationDisplay(int x, int y, int z, HallsVegetationType type, Random random) {
+        Location displayLocation = new Location(world, x, y + type.offsetY(), z);
+        BlockDisplay display = world.spawn(displayLocation, BlockDisplay.class, entity -> {
+            entity.setBlock(displayBlockData(type.material(), type.blockData()));
+            entity.setTransformation(vegetationTransformation(type, random));
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_vegetation");
+        });
+        vegetationDisplays.add(display.getUniqueId());
+    }
+
+    private Transformation vegetationTransformation(HallsVegetationType type, Random random) {
+        float scale = randomDisplayScale(type.scale());
+        float yaw = type.randomYaw() ? (float) (random.nextDouble() * Math.PI * 2.0) : 0.0f;
+        return new Transformation(
+                new Vector3f((1.0f - scale) * 0.5f, 0.0f, (1.0f - scale) * 0.5f),
+                new Quaternionf().rotateY(yaw),
+                new Vector3f(scale, scale, scale),
+                new Quaternionf());
+    }
+
     private void breakBreakableProp(BreakableProp prop) {
         Location dropLocation = null;
         Entity interaction = Bukkit.getEntity(prop.interactionId());
@@ -3085,6 +3178,13 @@ public final class HallsSession {
             removeBreakableProp(prop);
         }
         breakableProps.clear();
+        for (UUID displayId : Set.copyOf(vegetationDisplays)) {
+            Entity display = Bukkit.getEntity(displayId);
+            if (display != null) {
+                display.remove();
+            }
+        }
+        vegetationDisplays.clear();
         for (PhysicsDrop drop : Set.copyOf(physicsDrops.values())) {
             removePhysicsDrop(drop);
         }
@@ -4080,6 +4180,7 @@ public final class HallsSession {
 
         private void buildTraps() {
             reservedCells = renderExplorationTraps(build);
+            reservedCells = withReserved(reservedCells, renderExplorationVegetation(build, reservedCells));
             renderExplorationSculk(build, reservedCells);
             rareBreakableRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
             contentStartedNanos = System.nanoTime();

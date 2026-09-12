@@ -19,11 +19,15 @@ public record HallsLevelType(
         List<BlockPalette> walls,
         List<BlockPalette> pillars,
         List<String> commonMonsters,
-        List<String> specialMonsters
+        List<String> specialMonsters,
+        double vegetationChance,
+        List<VegetationEntry> vegetation
 ) {
     public HallsLevelType {
         commonMonsters = List.copyOf(commonMonsters);
         specialMonsters = List.copyOf(specialMonsters);
+        vegetationChance = Math.max(0.0, Math.min(1.0, vegetationChance));
+        vegetation = List.copyOf(vegetation);
     }
 
     public static HallsLevelType fallback(String id) {
@@ -44,7 +48,9 @@ public record HallsLevelType(
                     ),
                     List.of(new BlockPalette(Material.PACKED_ICE, Material.BLUE_ICE, 0.12)),
                     List.of("stray", "zombie"),
-                    List.of("bogged")
+                    List.of("bogged"),
+                    0.01,
+                    List.of(new VegetationEntry("deadbush", 1))
             );
         }
         if (normalizedId.equals("deep_crypt")) {
@@ -63,7 +69,9 @@ public record HallsLevelType(
                     ),
                     List.of(new BlockPalette(Material.CUT_SANDSTONE, Material.CHISELED_SANDSTONE, 0.10)),
                     List.of("husk", "skeleton"),
-                    List.of("breeze")
+                    List.of("breeze"),
+                    0.035,
+                    List.of(new VegetationEntry("deadbush", 3), new VegetationEntry("dry_grass", 2))
             );
         }
         if (normalizedId.equals("infernal_chambers")) {
@@ -82,7 +90,9 @@ public record HallsLevelType(
                     ),
                     List.of(new BlockPalette(Material.BASALT, Material.POLISHED_BASALT, 0.12)),
                     List.of("piglin", "blaze", "breeze", "husk"),
-                    List.of("piglin_brute", "wither_skeleton", "parched")
+                    List.of("piglin_brute", "wither_skeleton", "parched"),
+                    0.008,
+                    List.of(new VegetationEntry("deadbush", 1))
             );
         }
         if (normalizedId.equals("factory")) {
@@ -101,7 +111,9 @@ public record HallsLevelType(
                     ),
                     List.of(new BlockPalette(Material.DEEPSLATE_TILES, Material.COPPER_BLOCK, 0.08)),
                     List.of("zombie", "skeleton", "pillager", "slime_medium"),
-                    List.of("breeze", "creaking")
+                    List.of("breeze", "creaking"),
+                    0.0,
+                    List.of()
             );
         }
         if (normalizedId.equals("backrooms")) {
@@ -120,7 +132,9 @@ public record HallsLevelType(
                     ),
                     List.of(new BlockPalette(Material.STRIPPED_BIRCH_WOOD, Material.YELLOW_TERRACOTTA, 0.10)),
                     List.of("zombie", "skeleton", "silverfish", "creaking"),
-                    List.of("breeze", "witch")
+                    List.of("breeze", "witch"),
+                    0.004,
+                    List.of(new VegetationEntry("deadbush", 1))
             );
         }
         return new HallsLevelType(
@@ -138,7 +152,9 @@ public record HallsLevelType(
                 ),
                 List.of(new BlockPalette(Material.REINFORCED_DEEPSLATE, null, 0.0)),
                 List.of("zombie", "creeper", "creaking", "slime_medium"),
-                List.of("zombie_vanguard", "skeleton", "cave_spider")
+                List.of("zombie_vanguard", "skeleton", "cave_spider"),
+                0.04,
+                List.of(new VegetationEntry("grass", 4), new VegetationEntry("bush", 1))
         );
     }
 
@@ -187,6 +203,13 @@ public record HallsLevelType(
                 }
             }
             return block;
+        }
+    }
+
+    public record VegetationEntry(String id, int weight) {
+        public VegetationEntry {
+            id = id == null ? "" : id;
+            weight = Math.max(0, weight);
         }
     }
 }

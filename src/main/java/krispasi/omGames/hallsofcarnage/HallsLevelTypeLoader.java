@@ -58,8 +58,25 @@ public final class HallsLevelTypeLoader {
                 palettes(config.getConfigurationSection("wall-palettes"), fallback.walls(), plugin, file),
                 palettes(config.getConfigurationSection("pillar-palettes"), fallback.pillars(), plugin, file),
                 normalizedStringList(config.getStringList("monsters.common"), fallback.commonMonsters()),
-                normalizedStringList(config.getStringList("monsters.special"), fallback.specialMonsters())
+                normalizedStringList(config.getStringList("monsters.special"), fallback.specialMonsters()),
+                clamp(config.getDouble("vegetation.chance", fallback.vegetationChance()), 0.0, 1.0),
+                vegetation(config.getConfigurationSection("vegetation.types"), fallback.vegetation())
         );
+    }
+
+    private static List<HallsLevelType.VegetationEntry> vegetation(ConfigurationSection section,
+                                                                   List<HallsLevelType.VegetationEntry> fallback) {
+        if (section == null) {
+            return fallback;
+        }
+        List<HallsLevelType.VegetationEntry> entries = new ArrayList<>();
+        for (String key : section.getKeys(false)) {
+            int weight = section.getInt(key, 0);
+            if (weight > 0) {
+                entries.add(new HallsLevelType.VegetationEntry(normalizeId(key), weight));
+            }
+        }
+        return entries.isEmpty() ? fallback : List.copyOf(entries);
     }
 
     private static List<String> normalizedStringList(List<String> values, List<String> fallback) {

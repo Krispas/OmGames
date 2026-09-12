@@ -33,3 +33,8 @@ monsters:
     - zombie_vanguard
     - skeleton
     - cave_spider
+vegetation:
+  chance: 0.04
+  types:
+    grass: 4
+    bush: 1

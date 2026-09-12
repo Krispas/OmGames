@@ -1268,6 +1268,7 @@ Files:
 - `modifiers/**`
 - `breakables/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
 - `breakable_loot_pools/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
+- `vegetation/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
 - `traps/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
 - `monsters/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
 - `items/**/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
@@ -1288,10 +1289,10 @@ SQLite tables:
 - `/hoc scenario <scenario>` is an OP-only debug command that prints the loaded parsed scenario data and the YAML view copied from the active server data folder.
 - `/hoc debug` is an OP-only player command that toggles per-player Halls debug messages for generation timing, breakable/trap counts, and monster spawn/cap timing.
 - `/hoc recipes` is player-only and requires the caller to be in an active Halls session; it opens a read-only recipe book for that session's scenario with building blueprint locations and station recipe unlock levels.
-- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `breakable_loot_pools`, `traps`, `monsters`, `items`, `buildings`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
+- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `breakable_loot_pools`, `vegetation`, `traps`, `monsters`, `items`, `buildings`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
 - `HallsExplorationGenerator` owns per-rebuild exploration layout planning.
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.yml`; legacy `.txt` and `.yaml` files are still parsed if present.
-- Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, `pillar-palettes`, and monster pools.
+- Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, `pillar-palettes`, monster pools, and `vegetation.chance` / weighted `vegetation.types`.
 - Wall/pillar palette entries support legacy `special-block` / `special-chance` and the preferred `special-blocks` map for multiple weighted special block chances. Generated wall palette selection is grouped in 7x7 X/Z patches, with per-block special block rolls inside that selected palette.
 - Supported Halls `corridor-generation` modes are `normal`, `cave`, `large_corridors`, `maze`, `backrooms`, and `open_halls`.
 - Current exploration floors bake layered room, corridor, shell, and walkable masks in memory before rendering; Java then places room shells, corridor openings, lights, props, and normal corridors around interior-only `level/<level_type>/exploration_*.txt` room masks.
@@ -1323,6 +1324,9 @@ SQLite tables:
 - Generic breakable loot entries `scrap` / `random_scrap` choose randomly from that breakable's configured `scrap-drops`.
 - Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
 - Exploration floors force exactly one rare breakable prop in a random generated room when a rare breakable archetype is available, and normal generated prop slots should use common breakables.
+- Halls vegetation archetypes are loaded from `plugins/OmGames/HallsOfCarnage/vegetation/` and seeded from bundled defaults.
+- Vegetation files define `id`, `material`, optional `block-data`, `offset-y`, `scale`, and `random-yaw`.
+- Exploration vegetation is purely decorative `BlockDisplay` clutter. It must not place normal blocks, interaction entities, or hitboxes, and generation must avoid trap-reserved cells such as holes and ground traps.
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, optional `recipe` cost map, and an optional `stats` map.
 - Halls player item defaults do not include ranged gear; do not add bows, crossbows, tridents, arrows, or fireworks as Halls player items unless the design changes again.

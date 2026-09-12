@@ -3,7 +3,7 @@ name: "Cinderplate"
 category: armor
 rarity: rare
 material: GOLDEN_CHESTPLATE
-armor-model: minecraft:golden
+armor-model: minecraft:gold
 max-stack-size: 1
 lore:
   - "Warm salvage plating that keeps panic out."

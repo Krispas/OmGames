@@ -44,3 +44,7 @@ monsters:
     - piglin_brute
     - wither_skeleton
     - parched
+vegetation:
+  chance: 0.008
+  types:
+    deadbush: 1

@@ -44,3 +44,8 @@ monsters:
     - skeleton
     - parched
     - wither_skeleton
+vegetation:
+  chance: 0.035
+  types:
+    short_dry_grass: 3
+    tall_dry_grass: 2

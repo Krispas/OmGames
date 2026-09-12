@@ -43,3 +43,7 @@ monsters:
     - breeze
     - witch
     - skeleton
+vegetation:
+  chance: 0.004
+  types:
+    deadbush: 1

@@ -66,6 +66,7 @@ Layouts are stored under reources/level and level types under resources/hallsOfC
 Type is like a biome. It defines what kind of modifiers can appear in the type and what kind of mobs do too.
 The layouts contain X for filled, like walls and pillars, of course there is also an unspecified wall around the rooms. O is open space.
 The level type defines from what material the walls, floor and ceiling are built from.
+Level types can also configure decorative vegetation density and weighted vegetation ids from `resources/hallsOfCarnage/vegetation`.
 
 A floor config in scenario sets its size and type and difficulty. Elevator is always in the middle of the floor and everything generates around it. All rooms are then connected with corridors. 
 The generation algorithm for corridors is level type specific, but each room generates a connection point which then tries to be connected. Rooms try to create connection points on nearby rooms when generating too, so they can connect. 
@@ -73,7 +74,7 @@ If corridor intersects another throughout the generation, then it stops expandin
 
 Rooms are 5 blocks tall, corridors 3 blocks tall.
 
-First rooms generate, then corridors, then traps, then items and breakables.
+First rooms generate, then corridors, then traps, then decorative vegetation, then items and breakables.
 
 There are three types of corridor generations which level types can pick from.
 #### Normal
@@ -137,6 +138,7 @@ A special transition floor at the end of the game, which tells players they won 
 Level types define look of the rooms, enemies and possible modifiers, like biomes almost.
 Saved under resources/hallsOfCarnage/level_type
 The doc does't state much as they are in concept stage right now.
+Level types may define decorative vegetation using a chance and weighted vegetation ids. Vegetation is display-only decoration, not normal placed blocks, and should not use interaction entities or hitboxes. It must not generate inside holes or on ground-trap cells.
 ### Howling Corridors
 Your basic minecraft dungeons. Zombies, skeletons and so on.
 ### Frozen Halls
