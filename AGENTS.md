@@ -1146,6 +1146,8 @@ Permissions declared in `plugin.yml`:
 - Keep Fortuna changes isolated from existing BedWars, Egg Hunt, and Chess behavior unless integration is explicitly requested.
 - New Bank accounts are created only for currently online players selected through the `/bank admin` GUI; do not use offline-name chat prompts for account creation.
 - Non-player Bank accounts are named accounts created from `/bank admin`; their editor access is managed by toggling currently online players in the account editor GUI.
+- Non-player Bank accounts can be renamed from their account detail GUI; player accounts cannot be renamed there.
+- Non-player Bank accounts can be deleted from their account detail GUI only through a confirmation menu; deletion removes linked cards, terminals, terminal items, carts, editors, and placed terminal entities.
 - Credit-card items store their card id in item persistent data, but real payment economy is not connected yet.
 - Credit-card items must come from OmVeins ItemDatabase id `credit_card`; OmVeins returns copies, so do not clone again.
 - Credit-card items carry OmVeins persistent data key `om:credit_card` as `BOOLEAN true`; Bank metadata changes must not remove that key.
@@ -1160,7 +1162,7 @@ Permissions declared in `plugin.yml`:
 - The terminal buyer GUI also lists sellable items and can add them directly to the player's cart; checkout debits the selected card account, credits the terminal owner account, and clears the cart.
 - ATM deposits recognize OmVeins ItemDatabase ids `credit1`, `credit10`, `credit50`, `credit100`, `credit1000`, and `credit5000` by `ItemStack#isSimilar`.
 - ATM requires inserting/selecting a valid unfrozen Bank credit card before deposits; deposited credits are credited to that card's owning account.
-- ATM deposit opens a selection GUI so players can deposit all recognized credits or only one chosen credit denomination.
+- ATM deposit opens a deposit inventory; players place recognized credit items into the ATM slots and confirm to deposit the inserted credits.
 - ATM withdrawals require the same valid unfrozen Bank credit card, atomically debit the card account balance, and return OmVeins ItemDatabase credit items for the selected denomination.
 - Terminal deletion is admin-only, available from the admin-opened terminal detail GUI through a confirmation menu, and removes terminal items and carts for that terminal id.
 - Terminal deconstruction is available from the owner menu; it removes placed terminal entities without deleting terminal data and returns the terminal item.

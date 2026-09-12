@@ -1,6 +1,7 @@
 package krispasi.omGames.bank;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -18,6 +19,7 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemFlag;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -194,6 +196,24 @@ public final class BankManager {
         sendPrompt(player, "Napis nazev non-player uctu. Napis cancel pro zruseni.");
     }
 
+    public void beginRenameNonPlayerAccountPrompt(Player player, String accountId) {
+        if (player == null || accountId == null) {
+            return;
+        }
+        BankAccount account = database.getAccount(accountId);
+        if (account == null) {
+            player.sendMessage(Component.text("Bank account not found.", NamedTextColor.RED));
+            return;
+        }
+        if (account.playerAccount()) {
+            player.sendMessage(Component.text("Player accounts cannot be renamed here.", NamedTextColor.RED));
+            return;
+        }
+        prompts.put(player.getUniqueId(), BankPromptSession.renameNonPlayerAccount(accountId));
+        player.closeInventory();
+        sendPrompt(player, "Napis novy nazev non-player uctu. Napis cancel pro zruseni.");
+    }
+
     public boolean hasPrompt(Player player) {
         return player != null && prompts.containsKey(player.getUniqueId());
     }
@@ -217,6 +237,10 @@ public final class BankManager {
         if (input.equalsIgnoreCase("cancel") || input.equalsIgnoreCase("zrusit")) {
             prompts.remove(player.getUniqueId());
             player.sendMessage(Component.text("Bank input cancelled.", NamedTextColor.YELLOW));
+            if (session.mode() == BankPromptSession.Mode.RENAME_NON_PLAYER_ACCOUNT) {
+                openAccountMenu(player, session.accountId());
+                return;
+            }
             if (session.mode() == BankPromptSession.Mode.TERMINAL_ITEM_NAME
                     || session.mode() == BankPromptSession.Mode.TERMINAL_ITEM_PRICE) {
                 openTerminalItemEditMenu(player, session.itemId());
@@ -237,6 +261,13 @@ public final class BankManager {
                 }
             }
             openAdminMenu(player);
+            return;
+        }
+        if (session.mode() == BankPromptSession.Mode.RENAME_NON_PLAYER_ACCOUNT) {
+            Result result = renameNonPlayerAccount(session.accountId(), input);
+            prompts.remove(player.getUniqueId());
+            player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+            openAccountMenu(player, session.accountId());
             return;
         }
         if (session.mode() == BankPromptSession.Mode.TERMINAL_ITEM_NAME) {
@@ -310,6 +341,47 @@ public final class BankManager {
             return Result.fail("Failed to create non-player account.");
         }
         return Result.ok("Created non-player account " + account.displayName() + ".");
+    }
+
+    public Result renameNonPlayerAccount(String accountId, String displayName) {
+        BankAccount account = database.getAccount(accountId);
+        if (account == null) {
+            return Result.fail("Bank account not found.");
+        }
+        if (account.playerAccount()) {
+            return Result.fail("Player accounts cannot be renamed here.");
+        }
+        String name = displayName == null ? "" : displayName.trim();
+        if (name.isBlank() || name.length() > 32) {
+            return Result.fail("Account name must have 1-32 characters.");
+        }
+        BankAccount duplicate = getAccountByName(name);
+        if (duplicate != null && !duplicate.accountId().equals(accountId)) {
+            return Result.fail("A bank account with that name already exists.");
+        }
+        return database.renameNonPlayerAccount(accountId, name)
+                ? Result.ok("Renamed account to " + name + ".")
+                : Result.fail("Failed to rename account.");
+    }
+
+    public Result deleteNonPlayerAccount(String accountId) {
+        BankAccount account = database.getAccount(accountId);
+        if (account == null) {
+            return Result.fail("Bank account not found.");
+        }
+        if (account.playerAccount()) {
+            return Result.fail("Player accounts cannot be deleted here.");
+        }
+        List<String> terminalIds = database.listTerminals(accountId).stream()
+                .map(BankTerminal::terminalId)
+                .toList();
+        if (!database.deleteNonPlayerAccount(accountId)) {
+            return Result.fail("Failed to delete account.");
+        }
+        int removedEntities = placementService.removeTerminalEntities(terminalIds);
+        return Result.ok("Deleted account " + account.displayName()
+                + ". Removed terminal records: " + terminalIds.size()
+                + ", placed terminal entities: " + removedEntities + ".");
     }
 
     public Result createCard(Player receiver, String accountId) {
@@ -886,6 +958,62 @@ public final class BankManager {
             return Result.fail("Unknown credit type.");
         }
         return depositCredits(player, cardId, creditId);
+    }
+
+    public Result depositCreditsFromInventory(Player player, String cardId, Inventory sourceInventory, Collection<Integer> sourceSlots) {
+        if (player == null) {
+            return Result.fail("Only players can deposit credits.");
+        }
+        BankCard card = database.getCard(cardId);
+        if (card == null) {
+            return Result.fail("Insert a valid credit card first.");
+        }
+        if (card.frozen()) {
+            return Result.fail("This credit card is frozen.");
+        }
+        BankAccount account = database.getAccount(card.accountId());
+        if (account == null) {
+            return Result.fail("Card account not found.");
+        }
+        if (sourceInventory == null || sourceSlots == null || sourceSlots.isEmpty()) {
+            return Result.fail("No ATM deposit slots found.");
+        }
+        Map<String, ItemStack> templates = loadCreditTemplates();
+        if (templates.isEmpty()) {
+            return Result.fail("OmVeins credit items are not available.");
+        }
+        long total = 0L;
+        Set<Integer> matchedSlots = new LinkedHashSet<>();
+        for (Integer slot : sourceSlots) {
+            if (slot == null || slot < 0 || slot >= sourceInventory.getSize()) {
+                continue;
+            }
+            ItemStack item = sourceInventory.getItem(slot);
+            if (item == null || item.getType().isAir()) {
+                continue;
+            }
+            String creditId = creditId(item, templates);
+            if (creditId == null) {
+                continue;
+            }
+            Long value = CREDIT_VALUES.get(creditId);
+            if (value == null) {
+                continue;
+            }
+            total += value * item.getAmount();
+            matchedSlots.add(slot);
+        }
+        if (total <= 0L) {
+            return Result.fail("No credit items found in the ATM deposit slots.");
+        }
+        if (!database.deposit(account.accountId(), total)) {
+            return Result.fail("Failed to deposit credits.");
+        }
+        for (Integer slot : matchedSlots) {
+            sourceInventory.setItem(slot, null);
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+        return Result.ok("Deposited " + total + " credits. Balance: " + accountBalance(account.accountId()) + ".");
     }
 
     public Result withdrawCreditType(Player player, String cardId, String creditId, int itemAmount) {

@@ -14,10 +14,12 @@ public final class BankAccountMenu implements BankInventoryMenu {
     private static final int BACK_SLOT = 18;
     private static final int CREATE_CARD_SLOT = 10;
     private static final int CARDS_SLOT = 11;
+    private static final int RENAME_SLOT = 12;
     private static final int CREATE_TERMINAL_SLOT = 13;
     private static final int TERMINALS_SLOT = 14;
     private static final int EDITORS_SLOT = 15;
     private static final int SUMMARY_SLOT = 16;
+    private static final int DELETE_SLOT = 26;
 
     private final BankManager manager;
     private final String accountId;
@@ -74,6 +76,20 @@ public final class BankAccountMenu implements BankInventoryMenu {
             if (account != null && !account.playerAccount()) {
                 manager.openAccountEditorsMenu(player, accountId);
             }
+            return;
+        }
+        if (slot == RENAME_SLOT) {
+            BankAccount account = manager.getAccount(accountId);
+            if (account != null && !account.playerAccount()) {
+                manager.beginRenameNonPlayerAccountPrompt(player, accountId);
+            }
+            return;
+        }
+        if (slot == DELETE_SLOT) {
+            BankAccount account = manager.getAccount(accountId);
+            if (account != null && !account.playerAccount()) {
+                new BankAccountDeleteConfirmMenu(manager, accountId).open(player);
+            }
         }
     }
 
@@ -112,10 +128,26 @@ public final class BankAccountMenu implements BankInventoryMenu {
                 List.of(Component.text("Terminals: " + manager.listTerminals(accountId).size(), NamedTextColor.GRAY))
         ));
         if (!account.playerAccount()) {
+            inventory.setItem(RENAME_SLOT, BankMenuItems.item(
+                    Material.NAME_TAG,
+                    Component.text("Rename Account", NamedTextColor.AQUA),
+                    List.of(
+                            Component.text(account.displayName(), NamedTextColor.GRAY),
+                            Component.text("Click to enter a new name.", NamedTextColor.DARK_GRAY)
+                    )
+            ));
             inventory.setItem(EDITORS_SLOT, BankMenuItems.item(
                     Material.NAME_TAG,
                     Component.text("Manage Editors", NamedTextColor.AQUA),
                     List.of(Component.text("Editors: " + manager.listEditors(accountId).size(), NamedTextColor.GRAY))
+            ));
+            inventory.setItem(DELETE_SLOT, BankMenuItems.item(
+                    Material.REDSTONE_BLOCK,
+                    Component.text("Delete Account", NamedTextColor.RED),
+                    List.of(
+                            Component.text("Requires confirmation.", NamedTextColor.GRAY),
+                            Component.text("Removes cards, terminals, items, carts, and editors.", NamedTextColor.DARK_GRAY)
+                    )
             ));
         }
         inventory.setItem(SUMMARY_SLOT, BankMenuItems.item(

@@ -105,7 +105,7 @@ public final class BankAtmMenu implements BankInventoryMenu {
                         ? List.of(Component.text("Insert a credit card first.", NamedTextColor.GRAY))
                         : List.of(
                                 Component.text("Deposits credits to this card account.", NamedTextColor.GRAY),
-                                Component.text("Choose which credit type to deposit.", NamedTextColor.DARK_GRAY)
+                                Component.text("Insert credit items into the ATM deposit slots.", NamedTextColor.DARK_GRAY)
                         )
         ));
         inventory.setItem(BALANCE_SLOT, BankMenuItems.item(

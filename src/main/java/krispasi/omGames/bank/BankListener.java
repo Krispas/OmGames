@@ -7,6 +7,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
@@ -50,8 +51,18 @@ public final class BankListener implements Listener {
     public void onInventoryDrag(InventoryDragEvent event) {
         safeHandle("onInventoryDrag", () -> {
             Inventory topInventory = event.getView().getTopInventory();
-            if (topInventory.getHolder() instanceof BankInventoryMenu) {
-                event.setCancelled(true);
+            if (topInventory.getHolder() instanceof BankInventoryMenu menu) {
+                menu.handleDrag(event);
+            }
+        });
+    }
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent event) {
+        safeHandle("onInventoryClose", () -> {
+            Inventory topInventory = event.getView().getTopInventory();
+            if (topInventory.getHolder() instanceof BankInventoryMenu menu) {
+                menu.handleClose(event);
             }
         });
     }

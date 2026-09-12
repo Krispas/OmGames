@@ -241,6 +241,96 @@ public final class BankDatabaseService {
         return accounts;
     }
 
+    public boolean renameNonPlayerAccount(String accountId, String displayName) {
+        if (connection == null || accountId == null || accountId.isBlank() || displayName == null || displayName.isBlank()) {
+            return false;
+        }
+        boolean previousAutoCommit = true;
+        try {
+            previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try (PreparedStatement updateAccount = connection.prepareStatement(
+                         "UPDATE bank_account_profiles SET display_name = ? WHERE account_id = ? AND account_type = 'non_player'");
+                 PreparedStatement updateCards = connection.prepareStatement(
+                         "UPDATE bank_cards SET owner_name = ? WHERE owner_account_id = ?");
+                 PreparedStatement updateTerminals = connection.prepareStatement(
+                         "UPDATE bank_terminals SET owner_name = ? WHERE owner_account_id = ?")) {
+                updateAccount.setString(1, displayName);
+                updateAccount.setString(2, accountId);
+                if (updateAccount.executeUpdate() <= 0) {
+                    connection.rollback();
+                    return false;
+                }
+                updateCards.setString(1, displayName);
+                updateCards.setString(2, accountId);
+                updateCards.executeUpdate();
+                updateTerminals.setString(1, displayName);
+                updateTerminals.setString(2, accountId);
+                updateTerminals.executeUpdate();
+                connection.commit();
+                return true;
+            }
+        } catch (SQLException ex) {
+            rollbackQuietly("non-player account rename");
+            logger.log(Level.WARNING, "Failed to rename Bank account " + accountId + ".", ex);
+            return false;
+        } finally {
+            restoreAutoCommit(previousAutoCommit);
+        }
+    }
+
+    public boolean deleteNonPlayerAccount(String accountId) {
+        if (connection == null || accountId == null || accountId.isBlank()) {
+            return false;
+        }
+        boolean previousAutoCommit = true;
+        try {
+            previousAutoCommit = connection.getAutoCommit();
+            connection.setAutoCommit(false);
+            try (PreparedStatement deleteCart = connection.prepareStatement("""
+                         DELETE FROM bank_cart_lines
+                         WHERE terminal_id IN (
+                           SELECT terminal_id FROM bank_terminals WHERE owner_account_id = ?
+                         )
+                         """);
+                 PreparedStatement deleteTerminalItems = connection.prepareStatement("""
+                         DELETE FROM bank_terminal_items
+                         WHERE terminal_id IN (
+                           SELECT terminal_id FROM bank_terminals WHERE owner_account_id = ?
+                         )
+                         """);
+                 PreparedStatement deleteTerminals = connection.prepareStatement(
+                         "DELETE FROM bank_terminals WHERE owner_account_id = ?");
+                 PreparedStatement deleteCards = connection.prepareStatement(
+                         "DELETE FROM bank_cards WHERE owner_account_id = ?");
+                 PreparedStatement deleteEditors = connection.prepareStatement(
+                         "DELETE FROM bank_account_editors WHERE account_id = ?");
+                 PreparedStatement deleteAccount = connection.prepareStatement(
+                         "DELETE FROM bank_account_profiles WHERE account_id = ? AND account_type = 'non_player'")) {
+                deleteCart.setString(1, accountId);
+                deleteCart.executeUpdate();
+                deleteTerminalItems.setString(1, accountId);
+                deleteTerminalItems.executeUpdate();
+                deleteTerminals.setString(1, accountId);
+                deleteTerminals.executeUpdate();
+                deleteCards.setString(1, accountId);
+                deleteCards.executeUpdate();
+                deleteEditors.setString(1, accountId);
+                deleteEditors.executeUpdate();
+                deleteAccount.setString(1, accountId);
+                int deleted = deleteAccount.executeUpdate();
+                connection.commit();
+                return deleted > 0;
+            }
+        } catch (SQLException ex) {
+            rollbackQuietly("non-player account deletion");
+            logger.log(Level.WARNING, "Failed to delete Bank account " + accountId + ".", ex);
+            return false;
+        } finally {
+            restoreAutoCommit(previousAutoCommit);
+        }
+    }
+
     public boolean deposit(String accountId, long amount) {
         if (connection == null || accountId == null || accountId.isBlank() || amount <= 0L) {
             return false;

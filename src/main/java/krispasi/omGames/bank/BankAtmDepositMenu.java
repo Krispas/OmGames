@@ -1,36 +1,42 @@
 package krispasi.omGames.bank;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 
 public final class BankAtmDepositMenu implements BankInventoryMenu {
-    private static final int SIZE = 27;
-    private static final int ALL_SLOT = 10;
-    private static final int BACK_SLOT = 18;
-    private static final int OPTION_START_SLOT = 11;
+    private static final int SIZE = 54;
+    private static final int BACK_SLOT = 45;
+    private static final int CONFIRM_SLOT = 49;
+    private static final int INFO_SLOT = 53;
+    private static final List<Integer> DEPOSIT_SLOTS = List.of(
+            10, 11, 12, 13, 14, 15, 16,
+            19, 20, 21, 22, 23, 24, 25,
+            28, 29, 30, 31, 32, 33, 34,
+            37, 38, 39, 40, 41, 42, 43
+    );
 
     private final BankManager manager;
     private final String cardId;
     private final Inventory inventory;
-    private final Map<Integer, String> creditSlots = new HashMap<>();
 
     public BankAtmDepositMenu(BankManager manager, String cardId) {
         this.manager = manager;
         this.cardId = cardId;
         this.inventory = Bukkit.createInventory(this, SIZE, Component.text("ATM Deposit", NamedTextColor.GOLD));
-        refresh(null);
+        refreshControls();
     }
 
     public void open(Player player) {
-        refresh(player);
+        refreshControls();
         player.openInventory(inventory);
     }
 
@@ -40,83 +46,138 @@ public final class BankAtmDepositMenu implements BankInventoryMenu {
     }
 
     @Override
+    public boolean handlesPlayerInventoryClick() {
+        return true;
+    }
+
+    @Override
     public void handleClick(InventoryClickEvent event) {
-        event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player)) {
+            event.setCancelled(true);
             return;
         }
         int slot = event.getRawSlot();
+        if (slot >= inventory.getSize()) {
+            if (event.isShiftClick()) {
+                event.setCancelled(true);
+                shiftMoveIntoDeposit(event);
+                refreshControls();
+                return;
+            }
+            event.setCancelled(false);
+            return;
+        }
+        if (DEPOSIT_SLOTS.contains(slot)) {
+            event.setCancelled(false);
+            return;
+        }
+        event.setCancelled(true);
         if (slot == BACK_SLOT) {
+            returnDepositedItems(player);
             manager.openAtm(player, cardId);
             return;
         }
-        BankManager.Result result = null;
-        if (slot == ALL_SLOT) {
-            result = manager.depositHeldCredits(player, cardId);
-        } else {
-            String creditId = creditSlots.get(slot);
-            if (creditId != null) {
-                result = manager.depositCreditType(player, cardId, creditId);
-            }
+        if (slot != CONFIRM_SLOT) {
+            return;
         }
-        if (result != null) {
-            player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
-            if (result.success()) {
-                manager.openAtm(player, cardId);
-            } else {
-                refresh(player);
-            }
+        BankManager.Result result = manager.depositCreditsFromInventory(player, cardId, inventory, DEPOSIT_SLOTS);
+        player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+        if (result.success()) {
+            returnDepositedItems(player);
+            manager.openAtm(player, cardId);
+        } else {
+            refreshControls();
         }
     }
 
-    private void refresh(Player player) {
-        inventory.clear();
-        creditSlots.clear();
-
-        List<BankManager.CreditDepositOption> options = player == null ? List.of() : manager.getDepositOptions(player);
-        long total = 0L;
-        for (BankManager.CreditDepositOption option : options) {
-            total += option.total();
+    @Override
+    public void handleDrag(InventoryDragEvent event) {
+        for (int slot : event.getRawSlots()) {
+            if (slot < inventory.getSize() && !DEPOSIT_SLOTS.contains(slot)) {
+                event.setCancelled(true);
+                return;
+            }
         }
-        inventory.setItem(ALL_SLOT, BankMenuItems.item(
-                Material.HOPPER,
-                Component.text("Deposit All", NamedTextColor.GREEN),
+        event.setCancelled(false);
+    }
+
+    @Override
+    public void handleClose(InventoryCloseEvent event) {
+        if (event.getPlayer() instanceof Player player) {
+            returnDepositedItems(player);
+        }
+    }
+
+    private void refreshControls() {
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            if (!DEPOSIT_SLOTS.contains(slot)) {
+                inventory.setItem(slot, null);
+            }
+        }
+        inventory.setItem(CONFIRM_SLOT, BankMenuItems.item(
+                Material.EMERALD_BLOCK,
+                Component.text("Deposit Inserted Credits", NamedTextColor.GREEN),
                 List.of(
-                        Component.text("Total: " + total, NamedTextColor.GRAY),
-                        Component.text("Deposits every recognized credit item.", NamedTextColor.DARK_GRAY)
+                        Component.text("Credits placed in the slots above will be deposited.", NamedTextColor.GRAY),
+                        Component.text("Unrecognized items are returned.", NamedTextColor.DARK_GRAY)
                 )
         ));
-
-        int slot = OPTION_START_SLOT;
-        for (BankManager.CreditDepositOption option : options) {
-            if (slot >= 17) {
-                break;
-            }
-            inventory.setItem(slot, BankMenuItems.item(
-                    Material.GOLD_INGOT,
-                    Component.text(option.creditId(), NamedTextColor.GOLD),
-                    List.of(
-                            Component.text("Value each: " + option.value(), NamedTextColor.GRAY),
-                            Component.text("Amount: " + option.amount(), NamedTextColor.GRAY),
-                            Component.text("Deposit total: " + option.total(), NamedTextColor.GREEN),
-                            Component.text("Click to deposit only this type.", NamedTextColor.DARK_GRAY)
-                    )
-            ));
-            creditSlots.put(slot, option.creditId());
-            slot++;
-        }
-
-        if (options.isEmpty()) {
-            inventory.setItem(13, BankMenuItems.item(
-                    Material.BARRIER,
-                    Component.text("No Credits Found", NamedTextColor.RED),
-                    List.of(Component.text("Your inventory has no recognized OmVeins credits.", NamedTextColor.GRAY))
-            ));
-        }
         inventory.setItem(BACK_SLOT, BankMenuItems.item(
                 Material.ARROW,
                 Component.text("Back", NamedTextColor.YELLOW),
                 List.of(Component.text("Return to ATM.", NamedTextColor.GRAY))
         ));
+        inventory.setItem(INFO_SLOT, BankMenuItems.item(
+                Material.HOPPER,
+                Component.text("Deposit Slots", NamedTextColor.GOLD),
+                List.of(
+                        Component.text("Put OmVeins credit items into the empty slots.", NamedTextColor.GRAY),
+                        Component.text("Then click the emerald block.", NamedTextColor.DARK_GRAY)
+                )
+        ));
+    }
+
+    private void shiftMoveIntoDeposit(InventoryClickEvent event) {
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || clicked.getType().isAir()) {
+            return;
+        }
+        ItemStack remaining = clicked.clone();
+        for (int slot : DEPOSIT_SLOTS) {
+            ItemStack target = inventory.getItem(slot);
+            if (target == null || target.getType().isAir()) {
+                inventory.setItem(slot, remaining);
+                event.setCurrentItem(null);
+                return;
+            }
+            if (!target.isSimilar(remaining)) {
+                continue;
+            }
+            int maxStackSize = Math.min(target.getMaxStackSize(), inventory.getMaxStackSize());
+            int space = maxStackSize - target.getAmount();
+            if (space <= 0) {
+                continue;
+            }
+            int moved = Math.min(space, remaining.getAmount());
+            target.setAmount(target.getAmount() + moved);
+            remaining.setAmount(remaining.getAmount() - moved);
+            if (remaining.getAmount() <= 0) {
+                event.setCurrentItem(null);
+                return;
+            }
+        }
+        clicked.setAmount(remaining.getAmount());
+        event.setCurrentItem(clicked);
+    }
+
+    private void returnDepositedItems(Player player) {
+        for (int slot : DEPOSIT_SLOTS) {
+            ItemStack item = inventory.getItem(slot);
+            if (item == null || item.getType().isAir()) {
+                continue;
+            }
+            inventory.setItem(slot, null);
+            manager.giveOrDrop(player, item);
+        }
     }
 }
