@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.IdentityHashMap;
 import java.util.function.DoubleSupplier;
+import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -48,6 +49,7 @@ final class HallsSessionTrapRuntime {
     private final World world;
     private final HallsConfig.BlockPoint origin;
     private final Set<UUID> participants;
+    private final Predicate<UUID> aliveParticipant;
     private final BlockSetter blockSetter;
     private final Map<String, HallsTrapType> trapTypes;
     private final DoubleSupplier trapDamageMultiplier;
@@ -62,6 +64,7 @@ final class HallsSessionTrapRuntime {
                             World world,
                             HallsConfig.BlockPoint origin,
                             Set<UUID> participants,
+                            Predicate<UUID> aliveParticipant,
                             BlockSetter blockSetter,
                             Map<String, HallsTrapType> trapTypes,
                             DoubleSupplier trapDamageMultiplier) {
@@ -69,6 +72,7 @@ final class HallsSessionTrapRuntime {
         this.world = world;
         this.origin = origin;
         this.participants = participants;
+        this.aliveParticipant = aliveParticipant == null ? ignored -> true : aliveParticipant;
         this.blockSetter = blockSetter;
         this.trapTypes = trapTypes == null ? Map.of() : Map.copyOf(trapTypes);
         this.trapDamageMultiplier = trapDamageMultiplier == null ? () -> 1.0 : trapDamageMultiplier;
@@ -103,6 +107,9 @@ final class HallsSessionTrapRuntime {
 
     boolean handlePlayerMove(Player player, boolean running) {
         if (player == null || !running || !participants.contains(player.getUniqueId()) || !player.getWorld().equals(world)) {
+            return false;
+        }
+        if (!isAliveParticipant(player)) {
             return false;
         }
         checkPlayerTrapContact(player);
@@ -913,7 +920,7 @@ final class HallsSessionTrapRuntime {
         }
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
-            if (player != null && player.getWorld().equals(world)) {
+            if (player != null && player.getWorld().equals(world) && isAliveParticipant(player)) {
                 checkPlayerTrapContact(player);
             }
         }
@@ -1000,6 +1007,9 @@ final class HallsSessionTrapRuntime {
     }
 
     private void checkPlayerTrapContact(Player player) {
+        if (!isAliveParticipant(player)) {
+            return;
+        }
         int x = player.getLocation().getBlockX();
         int z = player.getLocation().getBlockZ();
         for (HallsTrap trap : List.copyOf(traps)) {
@@ -1287,6 +1297,7 @@ final class HallsSessionTrapRuntime {
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)
+                    && isAliveParticipant(player)
                     && isLocationInLine(trap, player.getLocation(), radius, width)) {
                 players.add(player);
             }
@@ -1365,6 +1376,7 @@ final class HallsSessionTrapRuntime {
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)
+                    && isAliveParticipant(player)
                     && player.getLocation().distanceSquared(center) <= radiusSquared) {
                 players.add(player);
             }
@@ -1568,7 +1580,7 @@ final class HallsSessionTrapRuntime {
         boolean eastWest = trap.face() == BlockFace.EAST || trap.face() == BlockFace.WEST;
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
-            if (player == null || !player.getWorld().equals(world)) {
+            if (player == null || !player.getWorld().equals(world) || !isAliveParticipant(player)) {
                 continue;
             }
             Location location = player.getLocation();
@@ -1619,6 +1631,10 @@ final class HallsSessionTrapRuntime {
         return world.getLivingEntities().stream()
                 .filter(entity -> entity.getScoreboardTags().contains("omgames_hoc_monster"))
                 .toList();
+    }
+
+    private boolean isAliveParticipant(Player player) {
+        return player != null && aliveParticipant.test(player.getUniqueId());
     }
 
     private double bladeHalfAlong() {

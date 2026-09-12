@@ -173,7 +173,8 @@ public final class HallsSession {
         for (Player player : players) {
             participants.add(player.getUniqueId());
         }
-        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::setBlock, this.trapTypes,
+        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::isAliveParticipant,
+                this::setBlock, this.trapTypes,
                 () -> activeFloorModifiers.trapDamageMultiplier());
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
                 this::isAliveParticipant);
@@ -3001,7 +3002,7 @@ public final class HallsSession {
             entity.setTeleportDuration(DISPLAY_TELEPORT_DURATION_TICKS);
             entity.setBillboard(Display.Billboard.FIXED);
             entity.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
-            entity.setTransformation(sessionDropTransformation());
+            entity.setTransformation(sessionDropTransformation(stack));
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_physics_drop");
         });
@@ -3019,16 +3020,24 @@ public final class HallsSession {
         startPhysicsDropTask();
     }
 
-    private Transformation sessionDropTransformation() {
+    private Transformation sessionDropTransformation(ItemStack stack) {
         float yaw = (float) (Math.random() * Math.PI * 2.0);
-        Quaternionf rotation = new Quaternionf()
-                .rotateY(yaw)
-                .rotateX((float) Math.toRadians(90.0));
+        Quaternionf rotation = new Quaternionf().rotateY(yaw);
+        Vector3f translation = new Vector3f();
+        if (!usesUprightDropTransform(stack)) {
+            rotation.rotateX((float) Math.toRadians(90.0));
+        } else {
+            translation.y = 0.28f;
+        }
         return new Transformation(
-                new Vector3f(),
+                translation,
                 rotation,
                 new Vector3f(randomDisplayScale(0.75f), randomDisplayScale(0.75f), randomDisplayScale(0.75f)),
                 new Quaternionf());
+    }
+
+    private boolean usesUprightDropTransform(ItemStack stack) {
+        return stack != null && stack.getType() == Material.TRIDENT;
     }
 
     private Transformation smallRandomScaleTransformation() {
@@ -3184,7 +3193,8 @@ public final class HallsSession {
     private void dropPlayerSessionInventory(Player player) {
         Location location = player.getLocation().clone().add(0.0, 0.4, 0.0);
         PlayerInventory inventory = player.getInventory();
-        for (ItemStack item : inventory.getContents()) {
+        for (int slot = 0; slot <= 8; slot++) {
+            ItemStack item = inventory.getItem(slot);
             if (item != null && !item.getType().isAir() && !isLockedSlotItem(plugin, item)) {
                 dropSessionItem(location, item.clone(), new Vector(Math.random() - 0.5, 0.2, Math.random() - 0.5));
             }
