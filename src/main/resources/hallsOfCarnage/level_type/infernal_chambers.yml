@@ -38,8 +38,8 @@ monsters:
   common:
     - piglin
     - blaze
-    - breeze
-    - husk
+    - magma_cube
+    - hoglin_slow
   special:
     - piglin_brute
     - wither_skeleton

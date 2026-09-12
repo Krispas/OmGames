@@ -1,0 +1,11 @@
+id: splinter
+name: "Splinter"
+entity-type: ZOMBIE
+health: 14
+baby: false
+equipment:
+  armor:
+    helmet: LEATHER_HELMET
+    chestplate: LEATHER_CHESTPLATE
+    leggings: LEATHER_LEGGINGS
+    boots: LEATHER_BOOTS

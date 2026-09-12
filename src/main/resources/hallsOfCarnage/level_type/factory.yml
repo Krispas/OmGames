@@ -24,10 +24,10 @@ pillar-palettes:
     block: DEEPSLATE_TILES
 monsters:
   common:
-    - zombie
+    - splinter
     - silverfish
     - creaking
-    - vindicator
+    - ravager
   special:
     - stray
     - cave_spider

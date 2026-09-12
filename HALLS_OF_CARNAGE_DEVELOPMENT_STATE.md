@@ -127,6 +127,7 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
+- Next reviewer slice applied: bear trap and proximity mine item-display models receive an extra 90-degree correction, generated breakable counts now represent loot rolls bundled into fewer physical props with 1-3 drops each, Backrooms room placement uses more varied anchor offsets, Halls monster defaults now include ravager, slow hoglin, large magma cube, and three Splinter stages, Breeze health was halved, session monsters have a 10% coin drop chance, Splinters split into smaller stages on death, physics drops are blocked from climbing into wall solids and are deleted when falling below the floor plane, and `tmp.md` records ten future modifier ideas plus the current reserved meaning of scenario floor `items`.
 - Next reviewer slice applied: game-over restarts now restock saved Mycelia Farms, Halls save files persist sculk pressure per player, HUD sculk display shows each player's own value, rotated camp building displays use facing-aware centering corrections, and normal/Howling Corridors generation no longer adds decorative dead-end branch corridors.
 - Next reviewer slice applied: Load Save entries now document and handle shift-right-click deletion for saves containing the clicking player, with deletion constrained to the Halls saves folder. `/hoc leave` remains a host-only save-and-end command, but is now limited to the start floor and camp floors.
 - Next reviewer slice applied: Storage Locker buildings now open persisted camp-plot inventories sized by locker size and level, save/load their contents, and block destruction while non-empty. Sculk Purifier buildings now reduce active party sculk pressure from the camp GUI. Added four chestplates (`chainmail_hauberk`, `ironbound_chestplate`, `cinderplate`, `deepguard_plate`), three weapons (`bone_cleaver`, `frost_lance`, `sculk_maul`), and a reusable cooldown utility (`mending_salve`) that heals 4 health.
@@ -143,13 +144,15 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Proximity mine model is rotated by 90 degrees (not good)
-- Same for the bear traps
-- Make it so each breakable drops 1-3 drops instad of one. The amount is decided during generation. For example if 50 breakables are meant to genearate, the 50 will be split into less actual breakables with more loot to equal 50.
-- In backrooms generation, the room placement seems way too grid-locked right now, make it more random
-- Add more mobs, ravager, hoglin_slow, magma_cube_large. Halve the health of breeze. Give ravager just 15 hp. Give hoglin 40 hp.
-- Add a new enemy called splinter. It is a zombie in leather armor. When killed, it will make more splinters, but smaller (0.7 scale). When those get killed, it will dupe again into small splinters (baby zombies). Making these three different mobs in the file could help.
-- No need to add any of the new mobs into any generation, I'll do that later.
-- Make it so monsters have a 10% chance to drop a coin.
-- Items can get stuck in walls or travel up the walls. Make sure that doesnt happen. If item falls into a hole, delete it.
-- Try to figure out a few new modifiers. Not programm them, but write them into a new tmp.md file for me to read. 10 should be enough. Also into the save file, tell me what items property in scenario file is. It is part of the exploration floor setup, but I cant remember what it does.
+- Remove the items property from scenario floors file.
+- Disable frienldy fire
+- The models of bear traps and mines are still wrong, they are rotated 90 degrees into the ground for some reason.
+- Make it so spawned piglins and hoglins dont turn into their infected counterparts
+- Reduce the damage of ravagers to 6
+- Make backrooms generation even more random (and by that I mean room placements)
+- I edited the tmp.md you wrote. Implement the new modifiers which are described in it.
+- Go through all recipes and edit them using following logic
+Buildings: use diamonds for upgrades
+Utilities: use redstone and little bit of wood (depends on the item)
+Weapons and armor: Use iron and better ones use a little bit of redstone
+Foods: use wood

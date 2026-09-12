@@ -1132,6 +1132,9 @@ final class HallsSessionTrapRuntime {
             rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
         } else {
             rotation.rotateX((float) Math.toRadians(90.0));
+            if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE) {
+                rotation.rotateZ((float) Math.toRadians(90.0));
+            }
         }
         return new Transformation(translation, rotation, trapModelScale(kind, face, scale), new Quaternionf());
     }

@@ -36,9 +36,10 @@ pillar-palettes:
 monsters:
   common:
     - zombie
-    - skeleton
+    - splinter
     - silverfish
     - creaking
   special:
     - breeze
     - witch
+    - skeleton

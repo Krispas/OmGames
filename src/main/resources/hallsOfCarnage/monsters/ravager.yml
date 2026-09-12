@@ -1,0 +1,4 @@
+id: ravager
+name: "Ravager"
+entity-type: RAVAGER
+health: 15

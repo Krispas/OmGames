@@ -1,0 +1,4 @@
+id: hoglin_slow
+name: "Slow Hoglin"
+entity-type: HOGLIN
+health: 40

@@ -166,6 +166,12 @@ final class HallsExplorationGenerator {
             return null;
         }
         Room anchor = anchors.get(random.nextInt(anchors.size()));
+        if (corridorMode == CorridorMode.BACKROOMS) {
+            RoomConnection backroomsConnection = randomBackroomsRoomConnection(layout, anchor);
+            if (backroomsConnection != null) {
+                return backroomsConnection;
+            }
+        }
         List<BlockFace> faces = availableFaces(anchor);
         Collections.shuffle(faces, random);
         BlockFace face = faces.getFirst();
@@ -193,6 +199,41 @@ final class HallsExplorationGenerator {
                 face,
                 roomFace,
                 doorOffset(anchor.layout(), face),
+                doorOffset(layout, roomFace)
+        );
+    }
+
+    private RoomConnection randomBackroomsRoomConnection(HallsLayout layout, Room anchor) {
+        int distance = 12 + random.nextInt(34);
+        int dx = random.nextInt(distance * 2 + 1) - distance;
+        int dz = random.nextInt(distance * 2 + 1) - distance;
+        if (Math.abs(dx) + Math.abs(dz) < 10) {
+            dz += dz < 0 ? -10 : 10;
+        }
+        Room room = new Room(layout,
+                anchor.centerX() + dx - layout.width() / 2,
+                anchor.centerZ() + dz - layout.depth() / 2);
+        int centerDx = room.centerX() - anchor.centerX();
+        int centerDz = room.centerZ() - anchor.centerZ();
+        BlockFace anchorFace;
+        if (Math.abs(centerDx) > Math.abs(centerDz)) {
+            anchorFace = centerDx >= 0 ? BlockFace.EAST : BlockFace.WEST;
+        } else {
+            anchorFace = centerDz >= 0 ? BlockFace.SOUTH : BlockFace.NORTH;
+        }
+        if (!availableFaces(anchor).contains(anchorFace)) {
+            return null;
+        }
+        BlockFace roomFace = anchorFace.getOppositeFace();
+        if (validDoorOffsets(anchor.layout(), anchorFace).isEmpty() || validDoorOffsets(layout, roomFace).isEmpty()) {
+            return null;
+        }
+        return new RoomConnection(
+                anchor,
+                room,
+                anchorFace,
+                roomFace,
+                doorOffset(anchor.layout(), anchorFace),
                 doorOffset(layout, roomFace)
         );
     }

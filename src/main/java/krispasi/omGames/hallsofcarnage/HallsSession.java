@@ -174,7 +174,8 @@ public final class HallsSession {
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
                 this::isAliveParticipant);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
-                sculkRuntime::maxSculkPercent, this::isAliveParticipant, this::debug);
+                sculkRuntime::maxSculkPercent, this::isAliveParticipant,
+                location -> dropSessionItem(location, coinItem(1)), this::debug);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
                 type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
             @Override
@@ -845,7 +846,7 @@ public final class HallsSession {
                 origin.y() + 1.0, roomStartZ + layout.depth() / 2.0 + 0.5, 0.0f, 0.0f);
         Cell blueprintCell = firstOpenStartFloorCell(layout);
         spawnBreakableProp(roomStartX + blueprintCell.x(), origin.y(), roomStartZ + blueprintCell.z(),
-                breakableType("barrel"), 3, List.of(new HallsBreakableType.LootEntry("rare_blueprint", 1, 1, 1)));
+                breakableType("barrel"), 3, List.of(new HallsBreakableType.LootEntry("rare_blueprint", 1, 1, 1)), 1);
         closeElevatorDoors();
     }
 
@@ -1868,13 +1869,13 @@ public final class HallsSession {
         if (cells.isEmpty()) {
             return;
         }
-        int baseProps = Math.max(1, floorDefinition.breakables() / Math.max(1, floorDefinition.rooms()));
-        int props = Math.min(cells.size(), baseProps + (roomIndex < floorDefinition.breakables() % Math.max(1, floorDefinition.rooms()) ? 1 : 0));
-        for (int i = 0; i < props; i++) {
+        List<Integer> propLootRolls = bundledBreakableLootRolls(
+                targetBreakableDropsForRoom(floorDefinition, roomIndex), cells.size(), random);
+        for (int i = 0; i < propLootRolls.size(); i++) {
             Cell cell = cells.get(random.nextInt(cells.size()));
             spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
                     propArchetype(i, roomIndex, HallsLevelType.fallback("howling_corridors")),
-                    propHealth(i));
+                    propHealth(i), propLootRolls.get(i));
         }
     }
 
@@ -1890,8 +1891,8 @@ public final class HallsSession {
         if (cells.isEmpty()) {
             return;
         }
-        int baseProps = Math.max(1, floorDefinition.breakables() / Math.max(1, floorDefinition.rooms()));
-        int props = Math.min(cells.size(), baseProps + (roomIndex < floorDefinition.breakables() % Math.max(1, floorDefinition.rooms()) ? 1 : 0));
+        List<Integer> propLootRolls = bundledBreakableLootRolls(
+                targetBreakableDropsForRoom(floorDefinition, roomIndex), cells.size(), random);
         Set<HallsExplorationGenerator.Cell> usedCells = new HashSet<>();
         if (forceRareBreakable) {
             Cell cell = randomFreeContentCell(cells, room, random, reservedCells, usedCells);
@@ -1900,18 +1901,45 @@ public final class HallsSession {
             }
             usedCells.add(new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()));
             spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
-                    rarePropArchetype(levelType), propHealth(0));
-            props--;
+                    rarePropArchetype(levelType), propHealth(0), 1);
+            if (!propLootRolls.isEmpty()) {
+                propLootRolls.removeFirst();
+            }
         }
-        for (int i = 0; i < props; i++) {
+        for (int i = 0; i < propLootRolls.size(); i++) {
             Cell cell = randomFreeContentCell(cells, room, random, reservedCells, usedCells);
             if (cell == null) {
                 return;
             }
             usedCells.add(new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()));
             spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
-                    commonPropArchetype(i, roomIndex, levelType), propHealth(i));
+                    commonPropArchetype(i, roomIndex, levelType), propHealth(i), propLootRolls.get(i));
         }
+    }
+
+    private int targetBreakableDropsForRoom(HallsScenario.FloorDefinition floorDefinition, int roomIndex) {
+        int rooms = Math.max(1, floorDefinition.rooms());
+        int baseDrops = Math.max(1, floorDefinition.breakables() / rooms);
+        return baseDrops + (roomIndex < floorDefinition.breakables() % rooms ? 1 : 0);
+    }
+
+    private List<Integer> bundledBreakableLootRolls(int targetDrops, int availableCells, Random random) {
+        int remainingDrops = Math.max(0, targetDrops);
+        int remainingProps = Math.min(Math.max(0, availableCells), (remainingDrops + 1) / 2);
+        List<Integer> rolls = new ArrayList<>();
+        while (remainingDrops > 0 && remainingProps > 0) {
+            int minForThis = Math.max(1, remainingDrops - (remainingProps - 1) * 3);
+            int maxForThis = Math.min(3, remainingDrops - (remainingProps - 1));
+            int count = minForThis;
+            if (maxForThis > minForThis) {
+                count += random.nextInt(maxForThis - minForThis + 1);
+            }
+            rolls.add(count);
+            remainingDrops -= count;
+            remainingProps--;
+        }
+        java.util.Collections.shuffle(rolls, random);
+        return rolls;
     }
 
     private Cell randomFreeContentCell(List<Cell> cells,
@@ -2347,7 +2375,11 @@ public final class HallsSession {
     }
 
     private void spawnBreakableProp(int x, int y, int z, HallsBreakableType archetype, int health) {
-        spawnBreakableProp(x, y, z, archetype, health, archetype.loot());
+        spawnBreakableProp(x, y, z, archetype, health, 1);
+    }
+
+    private void spawnBreakableProp(int x, int y, int z, HallsBreakableType archetype, int health, int lootRolls) {
+        spawnBreakableProp(x, y, z, archetype, health, archetype.loot(), lootRolls);
     }
 
     private void spawnBreakableProp(int x,
@@ -2355,7 +2387,8 @@ public final class HallsSession {
                                     int z,
                                     HallsBreakableType archetype,
                                     int health,
-                                    List<HallsBreakableType.LootEntry> loot) {
+                                    List<HallsBreakableType.LootEntry> loot,
+                                    int lootRolls) {
         List<UUID> displayIds = new ArrayList<>();
         for (HallsBreakableType.Part part : archetype.parts()) {
             displayIds.add(spawnPropDisplay(x + part.offsetX(), y + part.offsetY(), z + part.offsetZ(), part));
@@ -2369,7 +2402,7 @@ public final class HallsSession {
             entity.addScoreboardTag("omgames_hoc_breakable");
         });
         BreakableProp prop = new BreakableProp(interaction.getUniqueId(), displayIds, x, y, z, health,
-                archetype.particleMaterial(), archetype.scrapDrops(), loot, archetype.breakMessage());
+                archetype.particleMaterial(), archetype.scrapDrops(), loot, Math.max(1, lootRolls), archetype.breakMessage());
         breakableProps.put(interaction.getUniqueId(), prop);
         for (UUID displayId : displayIds) {
             breakableProps.put(displayId, prop);
@@ -2398,7 +2431,9 @@ public final class HallsSession {
         if (dropLocation != null) {
             world.playSound(dropLocation, Sound.BLOCK_WOOD_BREAK, 0.8f, 1.0f);
             monsterRuntime.alert(dropLocation);
-            applyLoot(prop.loot(), prop.scrapDrops(), dropLocation);
+            for (int i = 0; i < prop.lootRolls(); i++) {
+                applyLoot(prop.loot(), prop.scrapDrops(), dropLocation);
+            }
         }
     }
 
@@ -3490,6 +3525,16 @@ public final class HallsSession {
             return;
         }
         Location next = drop.location().clone().add(drop.velocity());
+        if (next.getY() < origin.y() - 0.5) {
+            removePhysicsDrop(drop);
+            return;
+        }
+        if (isDropInsideSolid(next)) {
+            next.setX(drop.location().getX());
+            next.setZ(drop.location().getZ());
+            drop.velocity().setX(0.0);
+            drop.velocity().setZ(0.0);
+        }
         Optional<Double> supportY = supportYBelow(next);
         if (supportY.isPresent()) {
             next.setY(supportY.get() + DROP_DISPLAY_SUPPORT_OFFSET);
@@ -3513,6 +3558,12 @@ public final class HallsSession {
         drop.location().setZ(next.getZ());
         display.teleport(next);
         interaction.teleport(next.clone().add(0.0, -0.15, 0.0));
+    }
+
+    private boolean isDropInsideSolid(Location location) {
+        int blockY = (int) Math.floor(location.getY() - 0.08);
+        Block block = world.getBlockAt(location.getBlockX(), blockY, location.getBlockZ());
+        return block.getType().isSolid();
     }
 
     private Optional<Double> supportYBelow(Location location) {
@@ -4032,6 +4083,7 @@ public final class HallsSession {
         private final Material material;
         private final List<String> scrapDrops;
         private final List<HallsBreakableType.LootEntry> loot;
+        private final int lootRolls;
         private final String breakMessage;
         private int health;
 
@@ -4044,6 +4096,7 @@ public final class HallsSession {
                               Material material,
                               List<String> scrapDrops,
                               List<HallsBreakableType.LootEntry> loot,
+                              int lootRolls,
                               String breakMessage) {
             this.interactionId = interactionId;
             this.displayIds = List.copyOf(displayIds);
@@ -4054,6 +4107,7 @@ public final class HallsSession {
             this.material = material;
             this.scrapDrops = List.copyOf(scrapDrops);
             this.loot = List.copyOf(loot);
+            this.lootRolls = Math.max(1, lootRolls);
             this.breakMessage = breakMessage;
         }
 
@@ -4091,6 +4145,10 @@ public final class HallsSession {
 
         private List<HallsBreakableType.LootEntry> loot() {
             return loot;
+        }
+
+        private int lootRolls() {
+            return lootRolls;
         }
 
         private String breakMessage() {

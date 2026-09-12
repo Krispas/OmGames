@@ -91,6 +91,15 @@ final class HallsMonsterTypeLoader {
         if (normalizeId(value).equals("parched")) {
             return EntityType.HUSK;
         }
+        if (normalizeId(value).equals("hoglin_slow")) {
+            return EntityType.HOGLIN;
+        }
+        if (normalizeId(value).equals("magma_cube_large")) {
+            return EntityType.MAGMA_CUBE;
+        }
+        if (normalizeId(value).startsWith("splinter")) {
+            return EntityType.ZOMBIE;
+        }
         try {
             return EntityType.valueOf(normalizeId(value).toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
@@ -111,7 +120,10 @@ final class HallsMonsterTypeLoader {
             case CREEPER -> 20.0;
             case SLIME -> 16.0;
             case CAVE_SPIDER -> 12.0;
-            case BREEZE -> 30.0;
+            case BREEZE -> 15.0;
+            case RAVAGER -> 15.0;
+            case HOGLIN -> 40.0;
+            case MAGMA_CUBE -> 24.0;
             default -> 20.0;
         };
     }
@@ -143,7 +155,8 @@ final class HallsMonsterTypeLoader {
         private static final java.util.List<String> DEFAULT_MONSTERS = java.util.List.of(
                 "zombie", "creeper", "creaking", "skeleton", "cave_spider", "stray", "bogged", "husk", "breeze",
                 "vindicator", "silverfish", "pillager", "witch", "wither_skeleton", "piglin", "blaze",
-                "piglin_brute", "parched"
+                "piglin_brute", "parched", "ravager", "hoglin_slow", "magma_cube_large",
+                "splinter", "splinter_small", "splinter_baby"
         );
     }
 }

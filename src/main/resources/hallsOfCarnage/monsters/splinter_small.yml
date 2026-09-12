@@ -1,0 +1,11 @@
+id: splinter_small
+name: "Small Splinter"
+entity-type: ZOMBIE
+health: 7
+baby: false
+equipment:
+  armor:
+    helmet: LEATHER_HELMET
+    chestplate: LEATHER_CHESTPLATE
+    leggings: LEATHER_LEGGINGS
+    boots: LEATHER_BOOTS

@@ -29,6 +29,8 @@ import org.bukkit.entity.Slime;
 import org.bukkit.entity.Zombie;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.NamespacedKey;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -42,7 +44,9 @@ final class HallsSessionMonsterRuntime {
     private final Map<String, HallsMonsterType> monsterTypes;
     private final IntSupplier maxSculkSupplier;
     private final Predicate<UUID> aliveParticipantPredicate;
+    private final Consumer<Location> coinDropSink;
     private final Consumer<String> debugSink;
+    private final NamespacedKey monsterTypeKey;
     private final Set<UUID> spawnedMonsters = new HashSet<>();
     private final Map<UUID, Long> concealedParticipants = new java.util.HashMap<>();
     private List<HallsExplorationGenerator.Cell> spawnCells = List.of();
@@ -64,6 +68,7 @@ final class HallsSessionMonsterRuntime {
                                Map<String, HallsMonsterType> monsterTypes,
                                IntSupplier maxSculkSupplier,
                                Predicate<UUID> aliveParticipantPredicate,
+                               Consumer<Location> coinDropSink,
                                Consumer<String> debugSink) {
         this.plugin = plugin;
         this.world = world;
@@ -72,7 +77,9 @@ final class HallsSessionMonsterRuntime {
         this.monsterTypes = monsterTypes == null ? Map.of() : Map.copyOf(monsterTypes);
         this.maxSculkSupplier = maxSculkSupplier == null ? () -> 0 : maxSculkSupplier;
         this.aliveParticipantPredicate = aliveParticipantPredicate == null ? id -> true : aliveParticipantPredicate;
+        this.coinDropSink = coinDropSink == null ? ignored -> { } : coinDropSink;
         this.debugSink = debugSink == null ? ignored -> { } : debugSink;
+        this.monsterTypeKey = new NamespacedKey(plugin, "hoc_monster_type");
     }
 
     void startExplorationFloor(HallsExplorationGenerator.Plan plan,
@@ -153,9 +160,47 @@ final class HallsSessionMonsterRuntime {
         if (entity == null || !spawnedMonsters.remove(entity.getUniqueId())) {
             return;
         }
+        if (random.nextInt(100) < 10) {
+            coinDropSink.accept(entity.getLocation().clone().add(0.0, 0.35, 0.0));
+        }
+        spawnSplinterChildren(entity);
         if (killer != null && participants.contains(killer.getUniqueId()) && aliveParticipantPredicate.test(killer.getUniqueId())) {
             maxAlive = Math.max(0, maxAlive - 1);
         }
+    }
+
+    private void spawnSplinterChildren(LivingEntity entity) {
+        String typeId = entity.getPersistentDataContainer().get(monsterTypeKey, PersistentDataType.STRING);
+        if (typeId == null) {
+            return;
+        }
+        String childId = switch (typeId) {
+            case "splinter" -> "splinter_small";
+            case "splinter_small" -> "splinter_baby";
+            default -> "";
+        };
+        if (childId.isBlank()) {
+            return;
+        }
+        HallsMonsterType childType = monsterTypes.get(childId);
+        if (childType == null) {
+            return;
+        }
+        int spawned = 0;
+        Location base = entity.getLocation();
+        for (int i = 0; i < 2; i++) {
+            Location spawn = base.clone().add((i == 0 ? -0.35 : 0.35), 0.0, 0.0);
+            Entity child = world.spawnEntity(spawn, childType.entityType());
+            if (child instanceof LivingEntity living) {
+                configureLivingMonster(living, childType);
+                spawnedMonsters.add(living.getUniqueId());
+                spawnedThisFloor++;
+                spawned++;
+            } else {
+                child.remove();
+            }
+        }
+        maxAlive += spawned;
     }
 
     void alert(Location location) {
@@ -250,11 +295,13 @@ final class HallsSessionMonsterRuntime {
             mob.setRemoveWhenFarAway(false);
         }
         living.addScoreboardTag("omgames_hoc_monster");
+        living.getPersistentDataContainer().set(monsterTypeKey, PersistentDataType.STRING, type.id());
         AttributeInstance maxHealth = living.getAttribute(Attribute.MAX_HEALTH);
         if (maxHealth != null) {
             maxHealth.setBaseValue(type.health());
             living.setHealth(type.health());
         }
+        applyTypeSpecificAttributes(living, type);
         if (living instanceof Zombie zombie) {
             zombie.setBaby(type.baby());
         } else if (living instanceof Ageable ageable) {
@@ -270,6 +317,21 @@ final class HallsSessionMonsterRuntime {
         applyEquipment(living.getEquipment(), type);
         if (living instanceof Creature creature) {
             creature.setTarget(nearestParticipant(living.getLocation(), 18.0));
+        }
+    }
+
+    private void applyTypeSpecificAttributes(LivingEntity living, HallsMonsterType type) {
+        if (type.id().equals("hoglin_slow")) {
+            AttributeInstance speed = living.getAttribute(Attribute.MOVEMENT_SPEED);
+            if (speed != null) {
+                speed.setBaseValue(speed.getBaseValue() * 0.55);
+            }
+        }
+        if (type.id().equals("splinter_small")) {
+            AttributeInstance scale = living.getAttribute(Attribute.SCALE);
+            if (scale != null) {
+                scale.setBaseValue(0.7);
+            }
         }
     }
 

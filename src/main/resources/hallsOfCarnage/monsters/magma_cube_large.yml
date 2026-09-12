@@ -1,0 +1,5 @@
+id: magma_cube_large
+name: "Large Magma Cube"
+entity-type: MAGMA_CUBE
+health: 24
+slime-size: 4
