@@ -1290,9 +1290,9 @@ SQLite tables:
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.yml`; legacy `.txt` and `.yaml` files are still parsed if present.
 - Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, `pillar-palettes`, and monster pools.
 - Wall/pillar palette entries support legacy `special-block` / `special-chance` and the preferred `special-blocks` map for multiple weighted special block chances. Generated wall palette selection is grouped in 7x7 X/Z patches, with per-block special block rolls inside that selected palette.
-- Supported Halls `corridor-generation` modes are `normal`, `cave`, `large_corridors`, `maze`, and `open_halls`.
+- Supported Halls `corridor-generation` modes are `normal`, `cave`, `large_corridors`, `maze`, `backrooms`, and `open_halls`.
 - Current exploration floors bake layered room, corridor, shell, and walkable masks in memory before rendering; Java then places room shells, corridor openings, lights, props, and normal corridors around interior-only `level/<level_type>/exploration_*.txt` room masks.
-- Level type `corridor-generation` is active for exploration floors: `normal` keeps one-block orthogonal corridors, `cave` builds organic tunnel paths, `large_corridors` builds simple 3-wide orthogonal corridors without organic side roughness or branch corridors, `maze` builds close open grid halls, and `open_halls` keeps the old room-local maze field. `large_corridors` and `open_halls` room entrances are carved 3 blocks wide.
+- Level type `corridor-generation` is active for exploration floors: `normal` keeps one-block orthogonal corridors, `cave` builds organic tunnel paths, `large_corridors` builds simple 3-wide orthogonal corridors without organic side roughness or branch corridors, `maze` builds close open grid halls, `backrooms` copies the maze-style open-grid halls and then adds long reachability-checked wall runs, and `open_halls` keeps the old room-local maze field. `large_corridors` and `open_halls` room entrances are carved 3 blocks wide.
 - Generated room and corridor wall columns should use wall material down through their foundation block instead of placing floor material under walls.
 - Room lighting should be embedded directly in generated room ceilings.
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
@@ -1377,12 +1377,12 @@ SQLite tables:
 - Exploration doorway selection must reject side offsets where the room mask has `X` at the edge or first inward cell.
 - Howling Corridors room resources are seeded from all bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`.
 - Frozen Halls and Deep Crypt room resources are also seeded from their bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`; use `/hoc reset confirm` to copy newly bundled resource files into an existing server data folder.
-- Exploration floors have first-pass session-owned trap generation/runtime for holes, bridged holes, bear traps, proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, and Deep Crypt poison darts.
+- Exploration floors have first-pass session-owned trap generation/runtime for holes, bridged holes, model-display bear traps, model-display proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, Deep Crypt poison darts, and Factory steam vents.
 - Trap placement uses the generated walkable mask and BFS reachability before accepting an unbridged pit; pits that would disconnect traversal receive a spruce bridge.
 - Halls trap animation/cooldown logic must use `HallsSessionTrapRuntime`'s session-local scheduler tick, not world time, because the Halls dimension may have frozen or nonstandard time progression.
 - Halls traps should damage session monsters as well as players when monsters enter their contact, radius, or lane checks, but only while a participant is within 20 blocks of the trap effect/contact area.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
-- Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth.
+- Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth. Bear traps and proximity mines render through item-display models instead of placed physical floor blocks.
 - Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults.
 - Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
 - Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
@@ -1424,7 +1424,9 @@ SQLite tables:
 - Wall spikes animate a sword display inward from the wall and check a forward lane through both extension and retraction, up to their configured radius, defaulting to 3 blocks and stopping at walls.
 - Falling ice traps may use display-only ceiling fixtures when configured, spawn temporary falling block-display shards around the trap cell, and must not place solid trap blocks; `ceiling-material: AIR` keeps the trap position hidden.
 - Poison darts trigger from a wider forward warning lane with one extra block of reach, but the rendered dart line and damage use one narrow forward lane, defaulting to 5 blocks with a 3-second cooldown.
+- Steam vents are Factory-only timed floor traps. They render as a display fixture and alternate between safe and harmful intervals; during the harmful interval they emit smoke/cloud particles and damage players and nearby session monsters in a 3x3 area.
 - Frozen Halls defaults to `cave` corridor generation, which uses organic biased tunnel paths. `large_corridors` is reserved for simple 3-wide orthogonal corridors.
 - Deep Crypt defaults to `maze` corridor generation, which uses close room placement plus mostly open grid-locked halls with some pillars/wall ribs and extra entrances. The prior room-local maze field remains available as `open_halls`.
 - Infernal Chambers defaults to `large_corridors` corridor generation and currently has one bundled exploration room for testing.
 - Factory defaults to `open_halls` corridor generation and currently has one bundled exploration room for testing.
+- Backrooms defaults to `backrooms` corridor generation and currently has one bundled exploration room for testing.

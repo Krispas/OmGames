@@ -216,7 +216,21 @@ floors:
     holes: 2
     sculk-patches: 4
     coin-quota: 14
-  - number: 8-9
+  - number: 8
+    kind: exploration
+    level-type: backrooms
+    difficulty: 18
+    rooms: 20
+    items: 10
+    breakables: 32
+    traps: 7
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 2
+    sculk-patches: 4
+    coin-quota: 14
+  - number: 9
     kind: exploration
     level-type: howling_corridors
     difficulty: 18

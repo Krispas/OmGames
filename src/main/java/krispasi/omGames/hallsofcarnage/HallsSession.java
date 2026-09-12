@@ -1088,6 +1088,7 @@ public final class HallsSession {
             revealFloorModifiers(activeFloorModifiers);
         }
         HallsScenario.FloorDefinition floorDefinition = activeFloorModifiers.adjustFloor(rawFloorDefinition, random);
+        debugModifierAdjustments(rawFloorDefinition, floorDefinition, activeFloorModifiers, levelType);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = Math.max(1, floorDefinition.rooms());
         activeGeneratedRooms = 0;
@@ -1131,7 +1132,48 @@ public final class HallsSession {
     }
 
     private int maxPlanningExpansions(HallsLevelType levelType) {
-        return "maze".equalsIgnoreCase(levelType.corridorGeneration()) ? 1 : 4;
+        String mode = levelType.corridorGeneration();
+        if (mode != null) {
+            String normalized = mode.trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_');
+            if (normalized.equals("maze") || normalized.equals("backrooms")) {
+                return 1;
+            }
+        }
+        return 4;
+    }
+
+    private void debugModifierAdjustments(HallsScenario.FloorDefinition before,
+                                          HallsScenario.FloorDefinition after,
+                                          HallsFloorModifiers modifiers,
+                                          HallsLevelType levelType) {
+        if (before == null || after == null || modifiers == null || modifiers.empty()) {
+            return;
+        }
+        String corridorMode = levelType == null ? "" : levelType.corridorGeneration();
+        String details = "modifiers " + modifiers.displaySummary()
+                + "; rooms " + before.rooms() + " -> " + after.rooms()
+                + ", breakables " + before.breakables() + " -> " + after.breakables()
+                + ", trapped rooms " + before.trappedRooms() + " -> " + after.trappedRooms()
+                + ", traps/room " + before.minTrapsPerRoom() + "-" + before.maxTrapsPerRoom()
+                + " -> " + after.minTrapsPerRoom() + "-" + after.maxTrapsPerRoom()
+                + ", holes " + before.holes() + " -> " + after.holes()
+                + ", sculk patches " + before.sculkPatches() + " -> " + after.sculkPatches()
+                + ", coin quota " + before.coinQuota() + " -> " + after.coinQuota()
+                + ", enemy x" + formatMultiplier(modifiers.enemySpawnMultiplier())
+                + ", loot x" + formatMultiplier(modifiers.lootMultiplier())
+                + ", traps x" + formatMultiplier(modifiers.trapMultiplier())
+                + ", sculk x" + formatMultiplier(modifiers.sculkMultiplier())
+                + ", coins x" + formatMultiplier(modifiers.coinMultiplier())
+                + ", corridor distance x" + formatMultiplier(modifiers.corridorDistanceMultiplier(corridorMode));
+        List<String> boostedTraps = modifiers.trapBoostKinds();
+        if (!boostedTraps.isEmpty()) {
+            details += ", boosted traps " + String.join(",", boostedTraps);
+        }
+        debug(details);
+    }
+
+    private String formatMultiplier(double value) {
+        return String.format(java.util.Locale.ROOT, "%.2f", value);
     }
 
     private void debugGeneration(String phase, long startedNanos, String details) {

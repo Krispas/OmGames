@@ -1,8 +1,8 @@
 id: bear_trap
 kind: bear_trap
 weight: 4
-block-material: IRON_TRAPDOOR
-model-material: IRON_NUGGET
+block-material: AIR
+model-material: IRON_TRAPDOOR
 item-model: ""
 model-scale: 1.0
 damage: 8

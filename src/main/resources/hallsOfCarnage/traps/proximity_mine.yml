@@ -1,8 +1,8 @@
 id: proximity_mine
 kind: proximity_mine
 weight: 3
-block-material: STONE_PRESSURE_PLATE
-model-material: IRON_NUGGET
+block-material: AIR
+model-material: HEAVY_WEIGHTED_PRESSURE_PLATE
 item-model: ""
 model-scale: 1.0
 damage: 6

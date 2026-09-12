@@ -115,6 +115,8 @@ final class HallsExplorationGenerator {
         addRoomToRoomLoops();
         if (corridorMode == CorridorMode.MAZE) {
             addGridOpenHalls();
+        } else if (corridorMode == CorridorMode.BACKROOMS) {
+            addBackroomsGridOpenHalls();
         } else if (corridorMode == CorridorMode.OPEN_HALLS) {
             addRoomLocalOpenHalls();
         } else if (corridorMode == CorridorMode.CAVE) {
@@ -325,7 +327,7 @@ final class HallsExplorationGenerator {
         return switch (corridorMode) {
             case CAVE -> 44;
             case LARGE_CORRIDORS -> 2;
-            case MAZE -> 18;
+            case MAZE, BACKROOMS -> 18;
             default -> CONNECTOR_CANDIDATE_ATTEMPTS;
         };
     }
@@ -563,7 +565,7 @@ final class HallsExplorationGenerator {
         Set<Cell> carved = switch (corridorMode) {
             case CAVE -> naturalCaveCorridorCells(path);
             case LARGE_CORRIDORS -> largeCorridorCells(path);
-            case MAZE, OPEN_HALLS -> openHallConnectorCells(path);
+            case MAZE, BACKROOMS, OPEN_HALLS -> openHallConnectorCells(path);
             case NORMAL -> new HashSet<>(path);
         };
         corridorCells.addAll(carved);
@@ -837,6 +839,87 @@ final class HallsExplorationGenerator {
         addOpenHallRoomOpenings(openCells);
     }
 
+    private void addBackroomsGridOpenHalls() {
+        Set<Cell> openCells = cellsWithinRoomDistance(9);
+        openCells.removeIf(this::isBackroomsColumnBlock);
+        addBackroomsLongWalls(openCells);
+        if (openCells.isEmpty()) {
+            return;
+        }
+        corridorCells.addAll(openCells);
+        networkCells.addAll(openCells);
+        for (Cell point : openCells) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    corridorShellCells.add(new Cell(point.x() + dx, point.z() + dz));
+                }
+            }
+        }
+        addOpenHallRoomOpenings(openCells);
+    }
+
+    private boolean isBackroomsColumnBlock(Cell cell) {
+        int gridX = Math.floorMod(cell.x(), 11);
+        int gridZ = Math.floorMod(cell.z(), 11);
+        return gridX == 0 && gridZ == 0 && random.nextInt(100) < 55;
+    }
+
+    private void addBackroomsLongWalls(Set<Cell> openCells) {
+        if (openCells.isEmpty()) {
+            return;
+        }
+        int targetWalls = Math.max(8, rooms.size() * 3);
+        int added = 0;
+        int attempts = 0;
+        List<Cell> starts = new ArrayList<>(openCells);
+        while (added < targetWalls && attempts++ < targetWalls * 18) {
+            Cell start = starts.get(random.nextInt(starts.size()));
+            boolean eastWest = random.nextBoolean();
+            int length = 5 + random.nextInt(12);
+            Set<Cell> wall = new HashSet<>();
+            for (int step = 0; step < length; step++) {
+                Cell cell = eastWest
+                        ? new Cell(start.x() + step, start.z())
+                        : new Cell(start.x(), start.z() + step);
+                if (openCells.contains(cell) && !nearRoomDoor(cell)) {
+                    wall.add(cell);
+                }
+            }
+            if (wall.size() < 4) {
+                continue;
+            }
+            List<Cell> ordered = new ArrayList<>(wall);
+            ordered.sort(eastWest
+                    ? java.util.Comparator.comparingInt(Cell::x)
+                    : java.util.Comparator.comparingInt(Cell::z));
+            if (ordered.size() >= 7) {
+                wall.remove(ordered.get(2 + random.nextInt(ordered.size() - 4)));
+            }
+            Set<Cell> trialOpen = new HashSet<>(openCells);
+            trialOpen.removeAll(wall);
+            Set<Cell> trialWalkable = new HashSet<>(roomInteriorCells);
+            trialWalkable.addAll(corridorCells);
+            trialWalkable.addAll(trialOpen);
+            if (allRoomsReachable(trialWalkable)) {
+                openCells.clear();
+                openCells.addAll(trialOpen);
+                added++;
+            }
+        }
+    }
+
+    private boolean nearRoomDoor(Cell cell) {
+        for (Room room : rooms) {
+            for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
+                Cell door = doorCell(room, opening.getKey(), opening.getValue());
+                if (manhattanDistance(cell, door) <= 2 || manhattanDistance(cell, step(door, opening.getKey())) <= 2) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private boolean isOpenHallStructuralBlock(Cell cell) {
         int gridX = Math.floorMod(cell.x(), 7);
         int gridZ = Math.floorMod(cell.z(), 7);
@@ -954,12 +1037,14 @@ final class HallsExplorationGenerator {
     }
 
     private int roomPlacementAttemptLimit(int targetRooms) {
-        return targetRooms * (corridorMode == CorridorMode.MAZE ? 260 : 1000);
+        return targetRooms * ((corridorMode == CorridorMode.MAZE || corridorMode == CorridorMode.BACKROOMS) ? 260 : 1000);
     }
 
     private int roomLoopAttemptLimit() {
         int roomCount = Math.max(1, rooms.size());
-        return corridorMode == CorridorMode.MAZE ? roomCount * 18 : roomCount * roomCount * 5;
+        return (corridorMode == CorridorMode.MAZE || corridorMode == CorridorMode.BACKROOMS)
+                ? roomCount * 18
+                : roomCount * roomCount * 5;
     }
 
     private BlockFace directionBetween(Cell from, Cell to) {
@@ -1199,6 +1284,7 @@ final class HallsExplorationGenerator {
         CAVE,
         LARGE_CORRIDORS,
         MAZE,
+        BACKROOMS,
         OPEN_HALLS;
 
         private static CorridorMode from(String value) {
@@ -1209,6 +1295,7 @@ final class HallsExplorationGenerator {
                 case "cave", "caves", "natural" -> CAVE;
                 case "large_corridors", "large_corridor", "wide", "wide_corridors" -> LARGE_CORRIDORS;
                 case "maze", "mazelike", "deep_crypt" -> MAZE;
+                case "backrooms", "backroom" -> BACKROOMS;
                 case "open_halls", "open_hall", "legacy_maze" -> OPEN_HALLS;
                 default -> NORMAL;
             };

@@ -81,6 +81,8 @@ Straight corridors with 90 degree turns are created between the rooms, they are 
 Natural bendy corridors generate between the rooms. They are 1-3 blocks wide per need and must allow passage on bends.
 #### Maze
 A maze is generated and the rooms are set into it, allowing entrance on the connection points.
+#### Backrooms
+A maze-like open hall field is generated, then long internal wall runs are added while preserving reachability.
 
 ### Elevator
 Elevator is a 5x4x5 inside area with walls around it, making the total shell footprint 7x4x7. Walls:
@@ -144,6 +146,8 @@ Desert temple.
 Nether-blackstone halls with wider corridors, heat-lit walls, and harsher monster pools.
 ### Factory
 Industrial open halls with machinery-like pillars and room-local open-hall generation.
+### Backrooms
+Yellowed liminal halls with maze-style open spaces, long wall runs, and sparse unsettling monster pools.
 ### Other levels
 Of course, other types will be implemented throughout development.
 ## Traps
@@ -158,6 +162,8 @@ Just a bear trap, must not generate in a way that restricts access. Deals a lot 
 Generates on the walls, spikes periodically pierce entities in front of it, dealing a lot of damage.
 ### Proximity mine
 Bear trap, but better.
+### Steam vent
+Factory-only floor vent that alternates between safe and harmful intervals. During the harmful interval it fills a 3x3 area with steam/smoke and damages players and monsters passing through it.
 ## Modifiers
 Exploration floors have modifiers, these are defined by level types, allowing unique modifiers for specific types.
 However most are shared. There are good and bad modifiers. Good are yellow, bad are red. They are picked based on the difficulty, higher difficulty means lower chance for good ones.
@@ -178,6 +184,7 @@ They are not defined in the resource files, so please add resource files for the
 - Death fog - Deadly fumes build up, resulting in wither effect after 10 minutes of entering the floor. Players will be warned throughout.
 - Falling ice - In some rooms, icycles periodically fall from the ceiling as a special trap. Unique to Frozen Halls.
 - Poison darts - Adds a new poison dart trap. Unique to Deep Crypt.
+- Steam vents - Makes Factory steam vent traps more common.
 ## Buildings
 Players can build buildings in camps. To build a building a blueprint is needed. Buildings have sizes of small, medium and large (1x1, 3x3, 5x5).
 They can be built on special spots in camps. Smaller buildings can be built on larger spots. These buildings last over game overs and offer a way to outpace the increasing difficulty of the game.

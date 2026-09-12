@@ -73,6 +73,7 @@ public final class HallsTrapTypeLoader {
             case "bear_trap", "wall_spikes" -> 12.0;
             case "proximity_mine" -> 18.0;
             case "poison_darts" -> 4.0;
+            case "steam_vent" -> 5.0;
             default -> 200.0;
         };
     }
@@ -80,6 +81,7 @@ public final class HallsTrapTypeLoader {
     private static double defaultRadius(String kind) {
         return switch (kind) {
             case "poison_darts" -> 5.0;
+            case "steam_vent" -> 1.75;
             case "wall_spikes" -> 3.0;
             case "swinging_blade" -> 1.15;
             default -> 1.0;
@@ -91,6 +93,7 @@ public final class HallsTrapTypeLoader {
             case "wall_spikes" -> 70;
             case "falling_ice" -> 55;
             case "poison_darts" -> 60;
+            case "steam_vent" -> 100;
             default -> 60;
         };
     }
@@ -98,6 +101,7 @@ public final class HallsTrapTypeLoader {
     private static int defaultActiveTicks(String kind) {
         return switch (kind) {
             case "wall_spikes" -> 12;
+            case "steam_vent" -> 35;
             default -> 16;
         };
     }
@@ -131,6 +135,7 @@ public final class HallsTrapTypeLoader {
         add(types, "wall_spikes", "wall_spikes", 6, List.of(), Material.BLACK_CONCRETE, Material.AIR, Material.IRON_SWORD, "", 1.1f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 3.0, 70, 12, 2.4f);
         add(types, "falling_ice", "falling_ice", 9, List.of("frozen_halls"), Material.AIR, Material.POINTED_DRIPSTONE, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.0, 55, 1, 2.4f);
         add(types, "poison_darts", "poison_darts", 9, List.of("deep_crypt"), Material.DISPENSER, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 5.0, 60, 1, 2.4f);
+        add(types, "steam_vent", "steam_vent", 9, List.of("factory"), Material.HEAVY_WEIGHTED_PRESSURE_PLATE, Material.AIR, Material.HEAVY_WEIGHTED_PRESSURE_PLATE, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 5.0, 1.75, 100, 35, 2.4f);
         return Map.copyOf(types);
     }
 

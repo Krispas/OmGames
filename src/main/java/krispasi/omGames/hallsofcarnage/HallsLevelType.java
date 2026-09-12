@@ -104,6 +104,25 @@ public record HallsLevelType(
                     List.of("breeze", "creaking")
             );
         }
+        if (normalizedId.equals("backrooms")) {
+            return new HallsLevelType(
+                    normalizedId,
+                    "Backrooms",
+                    "backrooms",
+                    Material.YELLOW_TERRACOTTA,
+                    Material.SMOOTH_SANDSTONE,
+                    Material.YELLOW_TERRACOTTA,
+                    Material.SMOOTH_SANDSTONE,
+                    Material.OCHRE_FROGLIGHT,
+                    List.of(
+                            new BlockPalette(Material.YELLOW_TERRACOTTA, Material.STRIPPED_BIRCH_WOOD, 0.06),
+                            new BlockPalette(Material.END_STONE_BRICKS, Material.SMOOTH_SANDSTONE, 0.08)
+                    ),
+                    List.of(new BlockPalette(Material.STRIPPED_BIRCH_WOOD, Material.YELLOW_TERRACOTTA, 0.10)),
+                    List.of("zombie", "skeleton", "silverfish", "creaking"),
+                    List.of("breeze", "witch")
+            );
+        }
         return new HallsLevelType(
                 normalizedId,
                 "Howling Corridors",

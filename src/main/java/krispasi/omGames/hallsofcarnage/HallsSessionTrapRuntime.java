@@ -261,7 +261,8 @@ final class HallsSessionTrapRuntime {
             return true;
         }
         String mode = levelType.corridorGeneration().trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_');
-        return !mode.equals("maze") && !mode.equals("open_halls") && !mode.equals("open_hall");
+        return !mode.equals("maze") && !mode.equals("backrooms")
+                && !mode.equals("open_halls") && !mode.equals("open_hall");
     }
 
     private List<TrapCandidate> trapCandidates(HallsExplorationGenerator.Plan plan) {
@@ -664,13 +665,13 @@ final class HallsSessionTrapRuntime {
     private List<UUID> buildTrap(TrapKind kind, HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type, int laneSpan) {
         return switch (kind) {
             case BEAR_TRAP, PROXIMITY_MINE -> {
-                setBlock(cell.x(), origin.y(), cell.z(), type.blockMaterial());
-                yield List.of();
+                yield List.of(spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 0.0));
             }
             case SWINGING_BLADE -> buildSwingingBlade(cell, face, type, laneSpan);
             case WALL_SPIKES -> buildWallSpikes(cell, face, type);
             case FALLING_ICE -> type.ceilingMaterial().isAir() ? List.of() : List.of(spawnCeilingBlockDisplay(cell, type.ceilingMaterial()));
             case POISON_DARTS -> buildPoisonDartLauncher(cell, face, type);
+            case STEAM_VENT -> List.of(spawnFloorBlockDisplay(cell, type.blockMaterial(), type.modelScale()));
             default -> List.of();
         };
     }
@@ -733,6 +734,26 @@ final class HallsSessionTrapRuntime {
                     new Vector3f(-0.18f, -0.55f, -0.18f),
                     new Quaternionf(),
                     new Vector3f(0.36f, 1.1f, 0.36f),
+                    new Quaternionf()));
+        });
+        return display.getUniqueId();
+    }
+
+    private UUID spawnFloorBlockDisplay(HallsExplorationGenerator.Cell cell, Material material, float scale) {
+        Material displayMaterial = material == null || material.isAir() ? Material.IRON_TRAPDOOR : material;
+        float normalizedScale = Math.max(0.2f, scale);
+        Location location = new Location(world, cell.x() + 0.5, origin.y() + 0.03, cell.z() + 0.5);
+        BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
+            entity.setBlock(displayMaterial.createBlockData());
+            entity.setBillboard(Display.Billboard.FIXED);
+            entity.setInterpolationDelay(1);
+            entity.setTeleportDuration(2);
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_trap");
+            entity.setTransformation(new Transformation(
+                    new Vector3f(-0.4f * normalizedScale, 0.0f, -0.4f * normalizedScale),
+                    new Quaternionf(),
+                    new Vector3f(0.8f * normalizedScale, 0.06f, 0.8f * normalizedScale),
                     new Quaternionf()));
         });
         return display.getUniqueId();
@@ -913,9 +934,28 @@ final class HallsSessionTrapRuntime {
                     trapNextTriggerTicks.put(trap, tick + Math.max(60L, trap.type().intervalTicks()));
                 }
             }
+            case STEAM_VENT -> {
+                long activeAge = age % trap.type().intervalTicks();
+                if (activeAge < trap.type().activeTicks()) {
+                    spawnSteamVentSmoke(trap);
+                    if (activeAge % 10L == 0L) {
+                        world.playSound(center, Sound.BLOCK_FIRE_EXTINGUISH, 0.45f, 0.75f);
+                    }
+                    damagePlayersNear(center, trap.type().radius(), trap.type().damage(), "Scalding steam fills the passage.");
+                    damageMonstersNear(center, trap.type().radius(), trap.type().damage());
+                } else if (activeAge == trap.type().activeTicks()) {
+                    world.playSound(center, Sound.BLOCK_IRON_TRAPDOOR_OPEN, 0.45f, 0.65f);
+                }
+            }
             default -> {
             }
         }
+    }
+
+    private void spawnSteamVentSmoke(HallsTrap trap) {
+        Location center = new Location(world, trap.x() + 0.5, origin.y() + 0.35, trap.z() + 0.5);
+        world.spawnParticle(Particle.CLOUD, center, 8, 1.05, 0.2, 1.05, 0.03);
+        world.spawnParticle(Particle.SMOKE, center.clone().add(0.0, 0.55, 0.0), 12, 1.0, 0.45, 1.0, 0.02);
     }
 
     private void checkPlayerTrapContact(Player player) {
@@ -972,8 +1012,7 @@ final class HallsSessionTrapRuntime {
         world.spawnParticle(Particle.SMOKE, location.clone().add(0.0, 0.35, 0.0), 30, 0.9, 0.35, 0.9, 0.03);
         damagePlayersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage(), "A proximity mine detonates.");
         damageMonstersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage());
-        setBlock(trap.x(), origin.y(), trap.z(), Material.AIR);
-        traps.removeIf(candidate -> candidate == trap);
+        removeTrap(trap);
     }
 
     private void triggerBearTrap(HallsTrap trap, LivingEntity trigger) {
@@ -985,8 +1024,18 @@ final class HallsSessionTrapRuntime {
         } else {
             damageMonsterFromTrap(trigger, trap.type().damage());
         }
-        setBlock(trap.x(), origin.y(), trap.z(), Material.AIR);
+        removeTrap(trap);
+    }
+
+    private void removeTrap(HallsTrap trap) {
+        for (UUID displayId : trap.displayIds()) {
+            Entity display = Bukkit.getEntity(displayId);
+            if (display != null) {
+                display.remove();
+            }
+        }
         traps.removeIf(candidate -> candidate == trap);
+        trapNextTriggerTicks.remove(trap);
     }
 
     private java.util.Optional<Location> moveTrapDisplay(HallsTrap trap, long age) {
@@ -1315,6 +1364,7 @@ final class HallsSessionTrapRuntime {
             case "wall_spikes" -> TrapKind.WALL_SPIKES;
             case "falling_ice" -> TrapKind.FALLING_ICE;
             case "poison_darts" -> TrapKind.POISON_DARTS;
+            case "steam_vent" -> TrapKind.STEAM_VENT;
             default -> null;
         };
     }
@@ -1542,6 +1592,7 @@ final class HallsSessionTrapRuntime {
         SWINGING_BLADE,
         WALL_SPIKES,
         FALLING_ICE,
-        POISON_DARTS
+        POISON_DARTS,
+        STEAM_VENT
     }
 }
