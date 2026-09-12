@@ -13,5 +13,5 @@ stats:
   radius: 8
   ward-strength: 2
 recipe:
-  diamond_scrap: 4
-  redstone_scrap: 8
+  redstone_scrap: 9
+  wood_scrap: 2

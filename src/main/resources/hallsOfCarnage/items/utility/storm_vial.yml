@@ -11,5 +11,5 @@ stats:
   monster-damage: 6
   radius: 5
 recipe:
-  diamond_scrap: 3
-  redstone_scrap: 7
+  redstone_scrap: 8
+  wood_scrap: 2

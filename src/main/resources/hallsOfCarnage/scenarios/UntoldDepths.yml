@@ -147,7 +147,6 @@ floors:
     level-type: howling_corridors
     difficulty: 10
     rooms: 6
-    items: 8
     breakables: 24
     traps: 7
     traps-per-room:
@@ -161,7 +160,6 @@ floors:
     level-type: frozen_halls
     difficulty: 10
     rooms: 7
-    items: 8
     breakables: 26
     traps: 8
     traps-per-room:
@@ -175,7 +173,6 @@ floors:
     level-type: deep_crypt
     difficulty: 10
     rooms: 8
-    items: 8
     breakables: 28
     traps: 8
     traps-per-room:
@@ -193,7 +190,6 @@ floors:
     level-type: infernal_chambers
     difficulty: 18
     rooms: 20
-    items: 10
     breakables: 32
     traps: 7
     traps-per-room:
@@ -207,7 +203,6 @@ floors:
     level-type: factory
     difficulty: 18
     rooms: 20
-    items: 10
     breakables: 32
     traps: 7
     traps-per-room:
@@ -221,7 +216,6 @@ floors:
     level-type: backrooms
     difficulty: 18
     rooms: 20
-    items: 10
     breakables: 32
     traps: 7
     traps-per-room:
@@ -235,7 +229,6 @@ floors:
     level-type: howling_corridors
     difficulty: 18
     rooms: 20
-    items: 10
     breakables: 32
     traps: 7
     traps-per-room:
@@ -253,7 +246,6 @@ floors:
     level-type: deep_crypt
     difficulty: "20 + floor"
     rooms: 24
-    items: 12
     breakables: 40
     traps: 9
     traps-per-room:

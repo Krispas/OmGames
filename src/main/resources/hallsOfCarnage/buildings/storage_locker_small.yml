@@ -5,13 +5,13 @@ blueprint: storage_locker_small_blueprint
 implemented: true
 levels:
   1:
-    upgrade-cost: {wood: 2, iron: 1}
+    upgrade-cost: {diamond: 1}
     parts:
       - material: BARREL
         offset: [0, 0, 0]
         scale: [0.8, 0.8, 0.8]
   2:
-    upgrade-cost: {wood: 3, iron: 2}
+    upgrade-cost: {diamond: 2}
     parts:
       - material: BARREL
         offset: [0, 0, 0]

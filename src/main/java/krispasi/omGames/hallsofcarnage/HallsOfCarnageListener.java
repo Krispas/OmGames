@@ -10,6 +10,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityTransformEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.block.Action;
@@ -21,6 +22,7 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
+import org.bukkit.event.player.PlayerItemDamageEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -126,6 +128,13 @@ public final class HallsOfCarnageListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onEntityTransform(EntityTransformEvent event) {
+        if (manager.isSessionMonster(event.getEntity())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onPrePlayerAttackEntity(PrePlayerAttackEntityEvent event) {
         if (manager.handleSessionEntityAttack(event.getPlayer(), event.getAttacked())) {
             event.setCancelled(true);
@@ -135,13 +144,22 @@ public final class HallsOfCarnageListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player player)) {
+            manager.handleSessionFriendlyFire(event);
+            return;
+        }
+        if (manager.handleSessionFriendlyFire(event)) {
             return;
         }
         if (manager.handleSessionEntityAttack(player, event.getEntity())) {
             event.setCancelled(true);
             return;
         }
-        manager.handleSessionWeaponHit(player, event.getEntity());
+        manager.handleSessionWeaponHit(player, event.getEntity(), event);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerItemDamage(PlayerItemDamageEvent event) {
+        manager.handleSessionItemDamage(event);
     }
 
     @EventHandler(ignoreCancelled = true)

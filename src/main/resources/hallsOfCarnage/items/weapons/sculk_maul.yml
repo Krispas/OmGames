@@ -14,6 +14,5 @@ stats:
   aoe-radius: 2.75
   durability: 120
 recipe:
-  iron_scrap: 10
-  diamond_scrap: 5
-  redstone_scrap: 6
+  iron_scrap: 14
+  redstone_scrap: 8

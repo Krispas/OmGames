@@ -5,7 +5,7 @@ blueprint: health_totem_blueprint
 implemented: true
 levels:
   1:
-    upgrade-cost: {diamond: 3, redstone: 3}
+    upgrade-cost: {diamond: 3}
     harvest:
       uses: 1
     parts:
@@ -16,7 +16,7 @@ levels:
         offset: [0, 1, 0]
         scale: [0.65, 0.65, 0.65]
   2:
-    upgrade-cost: {diamond: 5, redstone: 5}
+    upgrade-cost: {diamond: 6}
     harvest:
       uses: 1
     parts:

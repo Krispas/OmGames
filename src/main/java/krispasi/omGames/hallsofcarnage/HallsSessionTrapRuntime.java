@@ -9,6 +9,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.IdentityHashMap;
+import java.util.function.DoubleSupplier;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
@@ -49,6 +50,7 @@ final class HallsSessionTrapRuntime {
     private final Set<UUID> participants;
     private final BlockSetter blockSetter;
     private final Map<String, HallsTrapType> trapTypes;
+    private final DoubleSupplier trapDamageMultiplier;
     private final List<HallsTrap> traps = new ArrayList<>();
     private final Map<UUID, Long> trapDamageCooldowns = new java.util.HashMap<>();
     private final Map<HallsTrap, Long> trapNextTriggerTicks = new IdentityHashMap<>();
@@ -61,13 +63,15 @@ final class HallsSessionTrapRuntime {
                             HallsConfig.BlockPoint origin,
                             Set<UUID> participants,
                             BlockSetter blockSetter,
-                            Map<String, HallsTrapType> trapTypes) {
+                            Map<String, HallsTrapType> trapTypes,
+                            DoubleSupplier trapDamageMultiplier) {
         this.plugin = plugin;
         this.world = world;
         this.origin = origin;
         this.participants = participants;
         this.blockSetter = blockSetter;
         this.trapTypes = trapTypes == null ? Map.of() : Map.copyOf(trapTypes);
+        this.trapDamageMultiplier = trapDamageMultiplier == null ? () -> 1.0 : trapDamageMultiplier;
     }
 
     void clear() {
@@ -145,7 +149,7 @@ final class HallsSessionTrapRuntime {
             if (holeType == null) {
                 continue;
             }
-            if (placeHole(candidate, plan, random, holeType, occupied, globalReachabilityChecks)) {
+            if (placeHole(candidate, plan, random, holeType, occupied, globalReachabilityChecks, modifiers)) {
                 holesPlaced++;
             }
         }
@@ -234,13 +238,14 @@ final class HallsSessionTrapRuntime {
                               Random random,
                               HallsTrapType type,
                               Set<HallsExplorationGenerator.Cell> occupied,
-                              boolean globalReachabilityChecks) {
+                              boolean globalReachabilityChecks,
+                              HallsFloorModifiers modifiers) {
         Set<HallsExplorationGenerator.Cell> pitCells = pitMask(candidate, random, type);
         if (pitCells.isEmpty()) {
             return false;
         }
         Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(candidate, plan.walkableCells(),
-                pitCells, globalReachabilityChecks);
+                pitCells, globalReachabilityChecks, modifiers);
         if (bridgeCells == null) {
             return false;
         }
@@ -440,9 +445,10 @@ final class HallsSessionTrapRuntime {
     }
 
     private Set<HallsExplorationGenerator.Cell> bridgeCellsIfNeeded(TrapCandidate candidate,
-                                                                    Set<HallsExplorationGenerator.Cell> walkable,
-                                                                    Set<HallsExplorationGenerator.Cell> pitCells,
-                                                                    boolean globalReachabilityChecks) {
+                                                      Set<HallsExplorationGenerator.Cell> walkable,
+                                                      Set<HallsExplorationGenerator.Cell> pitCells,
+                                                      boolean globalReachabilityChecks,
+                                                      HallsFloorModifiers modifiers) {
         Set<HallsExplorationGenerator.Cell> existingPits = roomPitCells(candidate);
         Set<HallsExplorationGenerator.Cell> allPitCells = new HashSet<>(existingPits);
         allPitCells.addAll(pitCells);
@@ -458,20 +464,55 @@ final class HallsSessionTrapRuntime {
         int centerZ = (minZ + maxZ) / 2;
         if ((maxX - minX) >= (maxZ - minZ)) {
             Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, walkable, allPitCells, pitCells,
-                    horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ), globalReachabilityChecks);
+                    widenBridgeOptions(horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ), pitCells, modifiers),
+                    globalReachabilityChecks);
             if (bridge != null) {
                 return bridge;
             }
             return firstReachableBridge(candidate, walkable, allPitCells, pitCells,
-                    verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX), globalReachabilityChecks);
+                    widenBridgeOptions(verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX), pitCells, modifiers),
+                    globalReachabilityChecks);
         } else {
             Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, walkable, allPitCells, pitCells,
-                    verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX), globalReachabilityChecks);
+                    widenBridgeOptions(verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX), pitCells, modifiers),
+                    globalReachabilityChecks);
             if (bridge != null) {
                 return bridge;
             }
             return firstReachableBridge(candidate, walkable, allPitCells, pitCells,
-                    horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ), globalReachabilityChecks);
+                    widenBridgeOptions(horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ), pitCells, modifiers),
+                    globalReachabilityChecks);
+        }
+    }
+
+    private List<Set<HallsExplorationGenerator.Cell>> widenBridgeOptions(List<Set<HallsExplorationGenerator.Cell>> options,
+                                                                         Set<HallsExplorationGenerator.Cell> pitCells,
+                                                                         HallsFloorModifiers modifiers) {
+        int extra = modifiers == null ? 0 : modifiers.holeBridgeExtraWidth();
+        if (extra <= 0) {
+            return options;
+        }
+        List<Set<HallsExplorationGenerator.Cell>> widened = new ArrayList<>();
+        for (Set<HallsExplorationGenerator.Cell> option : options) {
+            Set<HallsExplorationGenerator.Cell> cells = new HashSet<>(option);
+            for (HallsExplorationGenerator.Cell cell : option) {
+                for (int offset = 1; offset <= extra; offset++) {
+                    addIfPit(cells, pitCells, new HallsExplorationGenerator.Cell(cell.x() + offset, cell.z()));
+                    addIfPit(cells, pitCells, new HallsExplorationGenerator.Cell(cell.x() - offset, cell.z()));
+                    addIfPit(cells, pitCells, new HallsExplorationGenerator.Cell(cell.x(), cell.z() + offset));
+                    addIfPit(cells, pitCells, new HallsExplorationGenerator.Cell(cell.x(), cell.z() - offset));
+                }
+            }
+            widened.add(cells);
+        }
+        return widened;
+    }
+
+    private void addIfPit(Set<HallsExplorationGenerator.Cell> cells,
+                          Set<HallsExplorationGenerator.Cell> pitCells,
+                          HallsExplorationGenerator.Cell candidate) {
+        if (pitCells.contains(candidate)) {
+            cells.add(candidate);
         }
     }
 
@@ -1130,11 +1171,10 @@ final class HallsSessionTrapRuntime {
             rotation.rotateZ((float) Math.toRadians(180.0));
         } else if (requiresWall(kind)) {
             rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
+        } else if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE) {
+            rotation.rotateZ((float) Math.toRadians(90.0));
         } else {
             rotation.rotateX((float) Math.toRadians(90.0));
-            if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE) {
-                rotation.rotateZ((float) Math.toRadians(90.0));
-            }
         }
         return new Transformation(translation, rotation, trapModelScale(kind, face, scale), new Quaternionf());
     }
@@ -1335,7 +1375,7 @@ final class HallsSessionTrapRuntime {
         }
         trapDamageCooldowns.put(player.getUniqueId(), now + 900L);
         player.sendActionBar(Component.text(message, NamedTextColor.RED));
-        player.damage(damage);
+        player.damage(damage * Math.max(0.0, trapDamageMultiplier.getAsDouble()));
     }
 
     private void damageMonsterFromTrap(LivingEntity monster, double damage) {

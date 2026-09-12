@@ -40,6 +40,8 @@ import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.player.PlayerItemDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -106,6 +108,7 @@ public final class HallsSession {
     private final Set<UUID> ghostPlayers = new HashSet<>();
     private final Map<UUID, Integer> healthTotemLevels = new HashMap<>();
     private final Map<UUID, Integer> speedTotemLevels = new HashMap<>();
+    private boolean firstGhostCoinCacheDropped;
     private BukkitTask hudTask;
     private BukkitTask physicsDropTask;
     private BukkitTask floorBuildTask;
@@ -170,7 +173,8 @@ public final class HallsSession {
         for (Player player : players) {
             participants.add(player.getUniqueId());
         }
-        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::setBlock, this.trapTypes);
+        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::setBlock, this.trapTypes,
+                () -> activeFloorModifiers.trapDamageMultiplier());
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
                 this::isAliveParticipant);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
@@ -542,6 +546,9 @@ public final class HallsSession {
             return true;
         }
         applyArmorHitEffects(player);
+        if (activeFloorModifiers.armorDamageMultiplier() != 1.0 && hasHallsArmor(player)) {
+            event.setDamage(event.getDamage() * Math.max(0.0, activeFloorModifiers.armorDamageMultiplier()));
+        }
         if (player.getHealth() - event.getFinalDamage() > 0.0) {
             return false;
         }
@@ -550,11 +557,27 @@ public final class HallsSession {
         return true;
     }
 
-    public boolean handleWeaponHit(Player player, Entity target) {
+    public boolean handleFriendlyFire(EntityDamageByEntityEvent event) {
+        if (event == null || !(event.getEntity() instanceof Player target) || !participants.contains(target.getUniqueId())) {
+            return false;
+        }
+        Player attacker = attackingPlayer(event.getDamager());
+        if (attacker == null || !participants.contains(attacker.getUniqueId()) || !attacker.getWorld().equals(world)) {
+            return false;
+        }
+        event.setCancelled(true);
+        attacker.sendActionBar(Component.text("Friendly fire is disabled in Halls.", NamedTextColor.GRAY));
+        return true;
+    }
+
+    public boolean handleWeaponHit(Player player, Entity target, EntityDamageByEntityEvent event) {
         if (player == null || target == null || !running || !participants.contains(player.getUniqueId())
                 || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())
                 || !(target instanceof LivingEntity living) || !monsterRuntime.isSessionMonster(living)) {
             return false;
+        }
+        if (event != null && activeFloorModifiers.meleeDamageMultiplier() != 1.0) {
+            event.setDamage(event.getDamage() * Math.max(0.0, activeFloorModifiers.meleeDamageMultiplier()));
         }
         HallsItemType type = itemType(player.getInventory().getItemInMainHand());
         if (type == null || !type.id().equals("sculk_maul")) {
@@ -591,6 +614,48 @@ public final class HallsSession {
             world.playSound(center, Sound.BLOCK_SCULK_SENSOR_CLICKING, 0.18f, 0.75f);
         }
         return hits > 0;
+    }
+
+    public boolean handleItemDamage(PlayerItemDamageEvent event) {
+        if (event == null || !running || !participants.contains(event.getPlayer().getUniqueId())
+                || !event.getPlayer().getWorld().equals(world)) {
+            return false;
+        }
+        HallsItemType type = itemType(event.getItem());
+        if (type == null || !type.category().equals("weapon")) {
+            return false;
+        }
+        double multiplier = activeFloorModifiers.weaponDurabilityLossMultiplier();
+        if (multiplier <= 1.0) {
+            return false;
+        }
+        event.setDamage(Math.max(1, (int) Math.ceil(event.getDamage() * multiplier)));
+        return true;
+    }
+
+    private Player attackingPlayer(Entity damager) {
+        if (damager instanceof Player player) {
+            return player;
+        }
+        if (damager instanceof org.bukkit.projectiles.ProjectileSource sourceHolder
+                && sourceHolder instanceof Player player) {
+            return player;
+        }
+        if (damager instanceof org.bukkit.entity.Projectile projectile
+                && projectile.getShooter() instanceof Player player) {
+            return player;
+        }
+        return null;
+    }
+
+    private boolean hasHallsArmor(Player player) {
+        for (ItemStack armor : player.getInventory().getArmorContents()) {
+            HallsItemType type = itemType(armor);
+            if (type != null && type.category().equals("armor")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean canTriggerSculkMaulSplash(Player player, LivingEntity target) {
@@ -641,7 +706,8 @@ public final class HallsSession {
         if (type == null || !type.category().equals("food")) {
             return false;
         }
-        double heal = Math.max(0.0, type.stats().getOrDefault("heal", 0.0));
+        double heal = Math.max(0.0, type.stats().getOrDefault("heal", 0.0)
+                * activeFloorModifiers.foodHealMultiplier());
         if (heal <= 0.0) {
             return true;
         }
@@ -2167,7 +2233,12 @@ public final class HallsSession {
     }
 
     private int currentCoinQuota() {
-        return adjustedDifficulty(scenario.floor(currentFloor)).coinQuota();
+        HallsScenario.FloorDefinition floor = adjustedDifficulty(scenario.floor(currentFloor));
+        int quota = floor.coinQuota();
+        if ("exploration".equalsIgnoreCase(floor.kind()) && !activeFloorModifiers.empty()) {
+            quota = Math.max(0, (int) Math.round(quota * activeFloorModifiers.coinQuotaMultiplier()));
+        }
+        return quota;
     }
 
     private int nextFloorAfterCampDrill() {
@@ -2485,10 +2556,10 @@ public final class HallsSession {
             case "normal_blueprint" -> dropSessionItem(dropLocation, blueprintFromScenario("normal", 0));
             case "rare_blueprint" -> dropSessionItem(dropLocation, blueprintFromScenario("rare", 0));
             case "coin", "coins" -> dropSessionItem(dropLocation, coinItem(amount));
-            case "wood_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD, PropReward.WOOD_SCRAP, amount));
-            case "iron_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY, PropReward.IRON_SCRAP, amount));
-            case "diamond_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.DIAMOND, "Diamond Scrap", NamedTextColor.AQUA, PropReward.DIAMOND_SCRAP, amount));
-            case "redstone_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED, PropReward.REDSTONE_SCRAP, amount));
+            case "wood_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD, PropReward.WOOD_SCRAP, multipliedScrap(amount)));
+            case "iron_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY, PropReward.IRON_SCRAP, multipliedScrap(amount)));
+            case "diamond_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.DIAMOND, "Diamond Scrap", NamedTextColor.AQUA, PropReward.DIAMOND_SCRAP, multipliedScrap(amount)));
+            case "redstone_scrap" -> dropSessionItem(dropLocation, scrapItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED, PropReward.REDSTONE_SCRAP, multipliedScrap(amount)));
             case "random_scrap", "scrap" -> {
                 PropReward[] scraps = {PropReward.WOOD_SCRAP, PropReward.IRON_SCRAP, PropReward.DIAMOND_SCRAP, PropReward.REDSTONE_SCRAP};
                 PropReward selected = scraps[new Random().nextInt(scraps.length)];
@@ -2512,6 +2583,10 @@ public final class HallsSession {
             case "rare_food" -> randomAllowedItem("food", "rare", amount);
             default -> null;
         };
+    }
+
+    private int multipliedScrap(int amount) {
+        return Math.max(1, (int) Math.round(amount * activeFloorModifiers.scrapDropMultiplier()));
     }
 
     private ItemStack randomAllowedItem(String category, String rarity, int amount) {
@@ -3011,6 +3086,7 @@ public final class HallsSession {
     private void makeGhost(Player player) {
         ghostPlayers.add(player.getUniqueId());
         dropPlayerSessionInventory(player);
+        dropFirstGhostCoinCache(player);
         applyGhostState(player);
         player.setHealth(1.0);
         player.sendTitle("You are a ghost", "Wait for the next floor.", 10, 50, 20);
@@ -3018,6 +3094,15 @@ public final class HallsSession {
         if (allParticipantsGhosts()) {
             scheduleGameOver();
         }
+    }
+
+    private void dropFirstGhostCoinCache(Player player) {
+        int amount = activeFloorModifiers.firstGhostCoinCache();
+        if (firstGhostCoinCacheDropped || amount <= 0 || player == null) {
+            return;
+        }
+        firstGhostCoinCacheDropped = true;
+        dropSessionItem(player.getLocation().clone().add(0.0, 0.35, 0.0), coinItem(amount));
     }
 
     private void applyGhostState(Player player) {
@@ -3181,6 +3266,7 @@ public final class HallsSession {
         redstoneScrap = Math.max(0, save.redstoneScrap());
         coins = Math.max(0, save.coins());
         activeFloorModifiers = HallsFloorModifiers.none();
+        firstGhostCoinCacheDropped = false;
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
         sculkMaulSplashCooldowns.clear();
@@ -3301,6 +3387,7 @@ public final class HallsSession {
         redstoneScrap = 0;
         coins = 0;
         activeFloorModifiers = HallsFloorModifiers.none();
+        firstGhostCoinCacheDropped = false;
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
         sculkMaulSplashCooldowns.clear();

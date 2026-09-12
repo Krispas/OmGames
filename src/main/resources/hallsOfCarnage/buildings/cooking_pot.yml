@@ -5,9 +5,7 @@ blueprint: cooking_pot_blueprint
 implemented: true
 levels:
   1:
-    upgrade-cost:
-      wood: 3
-      iron: 1
+    upgrade-cost: {diamond: 2}
     parts:
       - material: CAULDRON
         offset: [0, 0, 0]
@@ -16,9 +14,7 @@ levels:
         offset: [0, -0.05, 0]
         scale: [0.8, 0.35, 0.8]
   2:
-    upgrade-cost:
-      wood: 5
-      iron: 3
+    upgrade-cost: {diamond: 4}
     parts:
       - material: CAULDRON
         offset: [0, 0, 0]

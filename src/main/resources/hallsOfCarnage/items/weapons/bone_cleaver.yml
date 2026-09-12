@@ -12,4 +12,4 @@ stats:
   durability: 70
 recipe:
   iron_scrap: 8
-  wood_scrap: 3
+  redstone_scrap: 1

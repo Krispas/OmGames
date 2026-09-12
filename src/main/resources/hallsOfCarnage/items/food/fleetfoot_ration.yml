@@ -11,5 +11,4 @@ stats:
   speed-seconds: 20
   speed-amplifier: 1
 recipe:
-  cooked_mycelia: 1
-  redstone_scrap: 3
+  wood_scrap: 4

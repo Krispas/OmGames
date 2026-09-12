@@ -11,5 +11,5 @@ stats:
   toughness: 1
   durability: 90
 recipe:
-  iron_scrap: 10
-  diamond_scrap: 2
+  iron_scrap: 12
+  redstone_scrap: 2

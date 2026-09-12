@@ -12,5 +12,5 @@ stats:
   attack-speed: 1.4
   durability: 85
 recipe:
-  iron_scrap: 7
-  diamond_scrap: 2
+  iron_scrap: 9
+  redstone_scrap: 2

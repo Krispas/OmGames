@@ -10,5 +10,4 @@ stats:
   armor: 5
   durability: 75
 recipe:
-  iron_scrap: 7
-  wood_scrap: 2
+  iron_scrap: 8

@@ -26,6 +26,21 @@ modifiers:
     weight: 4
     effects:
       compass: true
+  scrap_bloom:
+    type: good
+    display-name: "Scrap Bloom"
+    icon: "S"
+    weight: 4
+    effects:
+      scrap-drop-multiplier: 2.0
+      coin-quota-multiplier: 1.35
+  mercy_cache:
+    type: good
+    display-name: "Mercy Cache"
+    icon: "M"
+    weight: 3
+    effects:
+      first-ghost-coin-cache: 5
   more_enemies:
     type: bad
     display-name: "More Enemies"
@@ -84,3 +99,35 @@ modifiers:
     weight: 3
     effects:
       wither-after-seconds: 600
+  glass_bones:
+    type: bad
+    display-name: "Glass Bones"
+    icon: "G"
+    weight: 4
+    effects:
+      melee-damage-multiplier: 1.25
+      trap-damage-multiplier: 1.5
+  spoiled_air:
+    type: bad
+    display-name: "Spoiled Air"
+    icon: "A"
+    weight: 4
+    effects:
+      food-heal-multiplier: 0.5
+      monster-coin-drop-chance-multiplier: 1.5
+  thin_floor:
+    type: bad
+    display-name: "Thin Floor"
+    icon: "H"
+    weight: 4
+    effects:
+      hole-multiplier: 1.6
+      hole-bridge-extra-width: 1
+  rust_rot:
+    type: bad
+    display-name: "Rust Rot"
+    icon: "U"
+    weight: 4
+    effects:
+      weapon-durability-loss-multiplier: 2.0
+      armor-damage-multiplier: 0.9

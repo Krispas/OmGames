@@ -11,4 +11,4 @@ stats:
   attack-speed: 3.0
   durability: 40
 recipe:
-  wood_scrap: 5
+  iron_scrap: 3

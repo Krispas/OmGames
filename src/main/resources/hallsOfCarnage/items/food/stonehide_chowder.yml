@@ -11,6 +11,4 @@ stats:
   resistance-seconds: 40
   resistance-amplifier: 1
 recipe:
-  cooked_mycelia: 1
-  diamond_scrap: 1
-  iron_scrap: 3
+  wood_scrap: 4

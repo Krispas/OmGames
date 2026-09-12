@@ -11,6 +11,4 @@ stats:
   absorption-seconds: 30
   absorption-amplifier: 1
 recipe:
-  cooked_mycelia: 1
-  diamond_scrap: 2
-  redstone_scrap: 2
+  wood_scrap: 6

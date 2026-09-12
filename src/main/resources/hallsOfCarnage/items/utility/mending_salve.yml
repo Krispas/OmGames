@@ -10,5 +10,5 @@ stats:
   heal: 4
   cooldown-seconds: 45
 recipe:
-  wood_scrap: 2
-  redstone_scrap: 2
+  redstone_scrap: 3
+  wood_scrap: 1

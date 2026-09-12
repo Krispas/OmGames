@@ -5,9 +5,7 @@ blueprint: armory_blueprint
 implemented: true
 levels:
   1:
-    upgrade-cost:
-      wood: 3
-      iron: 3
+    upgrade-cost: {diamond: 2}
     parts:
       - material: IRON_BLOCK
         offset: [0, 0, 0]
@@ -16,9 +14,7 @@ levels:
         offset: [0.7, 0, 0]
         scale: [0.7, 0.7, 0.7]
   2:
-    upgrade-cost:
-      wood: 4
-      iron: 6
+    upgrade-cost: {diamond: 4}
     parts:
       - material: IRON_BLOCK
         offset: [0, 0, 0]

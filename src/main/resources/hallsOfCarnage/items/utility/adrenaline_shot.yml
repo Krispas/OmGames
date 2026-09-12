@@ -12,5 +12,5 @@ stats:
   speed-seconds: 8
   speed-amplifier: 2
 recipe:
-  redstone_scrap: 3
-  wood_scrap: 2
+  redstone_scrap: 4
+  wood_scrap: 1

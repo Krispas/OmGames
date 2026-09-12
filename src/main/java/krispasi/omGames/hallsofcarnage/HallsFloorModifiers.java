@@ -55,6 +55,54 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
         return multipliedEffect("coin_multiplier", 1.0);
     }
 
+    public double coinQuotaMultiplier() {
+        return multipliedEffect("coin_quota_multiplier", 1.0);
+    }
+
+    public double scrapDropMultiplier() {
+        return multipliedEffect("scrap_drop_multiplier", 1.0);
+    }
+
+    public double foodHealMultiplier() {
+        return multipliedEffect("food_heal_multiplier", 1.0);
+    }
+
+    public double meleeDamageMultiplier() {
+        return multipliedEffect("melee_damage_multiplier", 1.0);
+    }
+
+    public double trapDamageMultiplier() {
+        return multipliedEffect("trap_damage_multiplier", 1.0);
+    }
+
+    public double armorDamageMultiplier() {
+        return multipliedEffect("armor_damage_multiplier", 1.0);
+    }
+
+    public double weaponDurabilityLossMultiplier() {
+        return multipliedEffect("weapon_durability_loss_multiplier", 1.0);
+    }
+
+    public double monsterCoinDropChanceMultiplier() {
+        return multipliedEffect("monster_coin_drop_chance_multiplier", 1.0);
+    }
+
+    public int holeBridgeExtraWidth() {
+        int extraWidth = 0;
+        for (HallsModifierType modifier : selected) {
+            extraWidth += intEffect(modifier, "hole_bridge_extra_width", 0);
+        }
+        return Math.max(0, extraWidth);
+    }
+
+    public int firstGhostCoinCache() {
+        int coins = 0;
+        for (HallsModifierType modifier : selected) {
+            coins += intEffect(modifier, "first_ghost_coin_cache", 0);
+        }
+        return Math.max(0, coins);
+    }
+
     public double corridorDistanceMultiplier(String corridorGeneration) {
         boolean maze = corridorGeneration != null && corridorGeneration.toLowerCase(Locale.ROOT).contains("maze");
         String key = maze ? "maze_corridor_distance_multiplier" : "corridor_distance_multiplier";
@@ -93,7 +141,9 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
         int rooms = Math.max(1, floor.rooms() + extraRooms);
         int breakables = Math.max(0, (int) Math.round(floor.breakables() * lootMultiplier()));
         int trappedRooms = Math.max(0, (int) Math.round(floor.trappedRooms() * trapMultiplier()));
+        int holes = Math.max(0, (int) Math.round(floor.holes() * multipliedEffect("hole_multiplier", 1.0)));
         int sculkPatches = Math.max(0, (int) Math.round(floor.sculkPatches() * sculkMultiplier()));
+        int coinQuota = Math.max(0, (int) Math.round(floor.coinQuota() * coinQuotaMultiplier()));
         return new HallsScenario.FloorDefinition(
                 floor.firstFloor(),
                 floor.lastFloor(),
@@ -106,9 +156,9 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
                 trappedRooms,
                 floor.minTrapsPerRoom(),
                 floor.maxTrapsPerRoom(),
-                floor.holes(),
+                holes,
                 sculkPatches,
-                floor.coinQuota(),
+                coinQuota,
                 floor.layout()
         );
     }

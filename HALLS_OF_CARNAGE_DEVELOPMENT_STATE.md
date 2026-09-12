@@ -141,18 +141,13 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: Echo Lure was removed from bundled resources, scenario unlocks, utility runtime, and monster lure handling. Utility cooldowns now refresh use-cooldown metadata on the used stack before setting grouped/item/material cooldowns, covering Smoke Bomb and Adrenaline Shot. `/hoc debug` toggles OP-only per-player diagnostics for generation timings, breakable/trap counts, and monster spawn/cap timers. `large_corridors` now generates simple 3-wide orthogonal corridors without organic side roughness or branch corridors. Sculk pressure now rises twice as fast and only contributes to warden spawn chance; potion/eating penalties are removed. Elevator chest save refreshes are non-destructive outside the rebuild boundary. Wall/pillar palette selection is grouped in 7x7 patches for exploration and camp floors, and level-type palettes support multiple weighted `special-blocks`.
 - Next reviewer slice applied: wall and pillar palettes still choose a grouped 7x7 base palette, but `special-blocks` now roll per vertical block instead of replacing an entire wall column. `large_corridors` and `open_halls` generation now choose only room door offsets that can support a 3-block-wide opening, and room rendering carves those entrances 3 blocks wide. Open-hall trap placement skips expensive whole-floor reachability checks while preserving room-local pit/bridge reachability validation.
 - Next reviewer slice applied: bear traps and proximity mines now render as item-display model fixtures instead of physical floor blocks and clean up their displays when triggered. Added the Factory-only `steam_vent` trap with timed harmful smoke intervals and a level-specific Factory modifier that boosts it. `/hoc debug` now reports selected modifiers with before/after floor-generation values and multipliers. Added the `backrooms` level type, `backrooms` maze-style corridor mode with reachability-checked long internal wall runs, one bundled Backrooms exploration template, and Untold Depths floor 8 for test coverage.
+- Next reviewer slice applied: scenario floor `items` fields were removed from bundled Untold Depths, Halls player friendly fire is cancelled, bear-trap/proximity-mine item displays no longer receive the floor-tilting transform, session piglins/hoglins are made immune to zombification and session monster transforms are cancelled, ravagers have attack damage clamped to `6`, Backrooms room placement now uses radial randomized offsets with more attempts, and all six current `tmp.md` modifiers are implemented through shared modifier resources plus runtime effects. Bundled item recipes now follow the requested material families, and bundled building upgrade costs use only diamond scrap.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Remove the items property from scenario floors file.
-- Disable frienldy fire
-- The models of bear traps and mines are still wrong, they are rotated 90 degrees into the ground for some reason.
-- Make it so spawned piglins and hoglins dont turn into their infected counterparts
-- Reduce the damage of ravagers to 6
-- Make backrooms generation even more random (and by that I mean room placements)
-- I edited the tmp.md you wrote. Implement the new modifiers which are described in it.
-- Go through all recipes and edit them using following logic
-Buildings: use diamonds for upgrades
-Utilities: use redstone and little bit of wood (depends on the item)
-Weapons and armor: Use iron and better ones use a little bit of redstone
-Foods: use wood
+- Okay this is the third time I am telling you beartraps and proximity mines are rotated into the floor yet they havent been fixed yet
+- Rename recently added modifiers "scrap bloom" -> "messy floor", "spoiled air" -> "rotting air", "thin floor" -> "falling apart", "rust rot" -> "rusty tools"
+- Give the recently added modifiers new unicode icons instead of stupid letters
+- Give all these new modifiers weight of 2, set the fog modifier also to weight 2
+- Make it so certain blueprints can only drop in certain level types. DO this in scenario file, where each level type will have certain normal and rare blueprints available there. One blueprint can appear accross multiple types.
+- Look at the floors 2,3,4 and their settings, make floors 6,7,8,9 have simillar settings but progressively harder.

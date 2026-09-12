@@ -12,5 +12,5 @@ stats:
   resistance-seconds: 5
   resistance-amplifier: 5
 recipe:
-  iron_scrap: 4
-  redstone_scrap: 2
+  redstone_scrap: 5
+  wood_scrap: 1

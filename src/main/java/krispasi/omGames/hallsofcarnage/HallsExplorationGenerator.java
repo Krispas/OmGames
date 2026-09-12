@@ -204,38 +204,48 @@ final class HallsExplorationGenerator {
     }
 
     private RoomConnection randomBackroomsRoomConnection(HallsLayout layout, Room anchor) {
-        int distance = 12 + random.nextInt(34);
-        int dx = random.nextInt(distance * 2 + 1) - distance;
-        int dz = random.nextInt(distance * 2 + 1) - distance;
-        if (Math.abs(dx) + Math.abs(dz) < 10) {
-            dz += dz < 0 ? -10 : 10;
-        }
-        Room room = new Room(layout,
-                anchor.centerX() + dx - layout.width() / 2,
-                anchor.centerZ() + dz - layout.depth() / 2);
-        int centerDx = room.centerX() - anchor.centerX();
-        int centerDz = room.centerZ() - anchor.centerZ();
-        BlockFace anchorFace;
-        if (Math.abs(centerDx) > Math.abs(centerDz)) {
-            anchorFace = centerDx >= 0 ? BlockFace.EAST : BlockFace.WEST;
-        } else {
-            anchorFace = centerDz >= 0 ? BlockFace.SOUTH : BlockFace.NORTH;
-        }
-        if (!availableFaces(anchor).contains(anchorFace)) {
+        List<BlockFace> available = availableFaces(anchor);
+        if (available.isEmpty()) {
             return null;
         }
-        BlockFace roomFace = anchorFace.getOppositeFace();
-        if (validDoorOffsets(anchor.layout(), anchorFace).isEmpty() || validDoorOffsets(layout, roomFace).isEmpty()) {
-            return null;
+        for (int attempt = 0; attempt < 8; attempt++) {
+            double angle = random.nextDouble() * Math.PI * 2.0;
+            int distance = 14 + random.nextInt(58);
+            int dx = (int) Math.round(Math.cos(angle) * distance) + random.nextInt(17) - 8;
+            int dz = (int) Math.round(Math.sin(angle) * distance) + random.nextInt(17) - 8;
+            if (Math.abs(dx) + Math.abs(dz) < 14) {
+                dz += dz < 0 ? -14 : 14;
+            }
+            Room room = new Room(layout,
+                    anchor.centerX() + dx - layout.width() / 2,
+                    anchor.centerZ() + dz - layout.depth() / 2);
+            int centerDx = room.centerX() - anchor.centerX();
+            int centerDz = room.centerZ() - anchor.centerZ();
+            BlockFace anchorFace;
+            if (Math.abs(Math.abs(centerDx) - Math.abs(centerDz)) <= 6 && random.nextBoolean()) {
+                anchorFace = centerDx >= 0 ? BlockFace.EAST : BlockFace.WEST;
+            } else if (Math.abs(centerDx) > Math.abs(centerDz)) {
+                anchorFace = centerDx >= 0 ? BlockFace.EAST : BlockFace.WEST;
+            } else {
+                anchorFace = centerDz >= 0 ? BlockFace.SOUTH : BlockFace.NORTH;
+            }
+            if (!available.contains(anchorFace)) {
+                continue;
+            }
+            BlockFace roomFace = anchorFace.getOppositeFace();
+            if (validDoorOffsets(anchor.layout(), anchorFace).isEmpty() || validDoorOffsets(layout, roomFace).isEmpty()) {
+                continue;
+            }
+            return new RoomConnection(
+                    anchor,
+                    room,
+                    anchorFace,
+                    roomFace,
+                    doorOffset(anchor.layout(), anchorFace),
+                    doorOffset(layout, roomFace)
+            );
         }
-        return new RoomConnection(
-                anchor,
-                room,
-                anchorFace,
-                roomFace,
-                doorOffset(anchor.layout(), anchorFace),
-                doorOffset(layout, roomFace)
-        );
+        return null;
     }
 
     private Room randomRoomAnywhere(HallsLayout layout) {
@@ -1078,7 +1088,10 @@ final class HallsExplorationGenerator {
     }
 
     private int roomPlacementAttemptLimit(int targetRooms) {
-        return targetRooms * ((corridorMode == CorridorMode.MAZE || corridorMode == CorridorMode.BACKROOMS) ? 260 : 1000);
+        if (corridorMode == CorridorMode.BACKROOMS) {
+            return targetRooms * 420;
+        }
+        return targetRooms * (corridorMode == CorridorMode.MAZE ? 260 : 1000);
     }
 
     private int roomLoopAttemptLimit() {

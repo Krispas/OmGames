@@ -5,9 +5,7 @@ blueprint: forge_blueprint
 implemented: true
 levels:
   1:
-    upgrade-cost:
-      iron: 5
-      redstone: 2
+    upgrade-cost: {diamond: 2}
     harvest:
       uses: 1
     parts:
@@ -18,10 +16,7 @@ levels:
         offset: [0.8, 0, 0]
         scale: [0.75, 0.75, 0.75]
   2:
-    upgrade-cost:
-      iron: 8
-      diamond: 2
-      redstone: 4
+    upgrade-cost: {diamond: 4}
     harvest:
       uses: 1
     parts:

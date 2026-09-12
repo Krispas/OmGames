@@ -22,8 +22,10 @@ import org.bukkit.entity.Ageable;
 import org.bukkit.entity.Creature;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Hoglin;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
+import org.bukkit.entity.PiglinAbstract;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Slime;
 import org.bukkit.entity.Zombie;
@@ -52,6 +54,7 @@ final class HallsSessionMonsterRuntime {
     private List<HallsExplorationGenerator.Cell> spawnCells = List.of();
     private List<HallsMonsterType> commonPool = List.of();
     private HallsMonsterType activeSpecialType;
+    private int monsterCoinDropChancePercent = 10;
     private Random random = new Random();
     private BukkitTask spawnTask;
     private int maxAlive;
@@ -98,6 +101,8 @@ final class HallsSessionMonsterRuntime {
         int difficulty = parseDifficulty(floor == null ? "0" : floor.difficulty(), floor == null ? 1 : floor.firstFloor());
         int rooms = Math.max(1, floor == null ? 1 : floor.rooms());
         double enemyMultiplier = modifiers == null ? 1.0 : modifiers.enemySpawnMultiplier();
+        monsterCoinDropChancePercent = Math.max(0, (int) Math.round(10.0
+                * (modifiers == null ? 1.0 : modifiers.monsterCoinDropChanceMultiplier())));
         double playerStack = participantStackMultiplier();
         this.baseMaxAlive = Math.max(2, Math.min(36, (int) Math.round((1 + rooms / 4.0 + difficulty / 15.0) * playerStack * enemyMultiplier)));
         this.maxAlive = baseMaxAlive;
@@ -132,6 +137,7 @@ final class HallsSessionMonsterRuntime {
         maxAlive = 0;
         capExtensionCooldownTicks = 0;
         capExtensionIntervalTicks = 0;
+        monsterCoinDropChancePercent = 10;
     }
 
     String debugStatus() {
@@ -160,7 +166,7 @@ final class HallsSessionMonsterRuntime {
         if (entity == null || !spawnedMonsters.remove(entity.getUniqueId())) {
             return;
         }
-        if (random.nextInt(100) < 10) {
+        if (random.nextInt(100) < monsterCoinDropChancePercent) {
             coinDropSink.accept(entity.getLocation().clone().add(0.0, 0.35, 0.0));
         }
         spawnSplinterChildren(entity);
@@ -294,6 +300,12 @@ final class HallsSessionMonsterRuntime {
         if (living instanceof Mob mob) {
             mob.setRemoveWhenFarAway(false);
         }
+        if (living instanceof PiglinAbstract piglin) {
+            piglin.setImmuneToZombification(true);
+        }
+        if (living instanceof Hoglin hoglin) {
+            hoglin.setImmuneToZombification(true);
+        }
         living.addScoreboardTag("omgames_hoc_monster");
         living.getPersistentDataContainer().set(monsterTypeKey, PersistentDataType.STRING, type.id());
         AttributeInstance maxHealth = living.getAttribute(Attribute.MAX_HEALTH);
@@ -325,6 +337,12 @@ final class HallsSessionMonsterRuntime {
             AttributeInstance speed = living.getAttribute(Attribute.MOVEMENT_SPEED);
             if (speed != null) {
                 speed.setBaseValue(speed.getBaseValue() * 0.55);
+            }
+        }
+        if (type.id().equals("ravager")) {
+            AttributeInstance attackDamage = living.getAttribute(Attribute.ATTACK_DAMAGE);
+            if (attackDamage != null) {
+                attackDamage.setBaseValue(6.0);
             }
         }
         if (type.id().equals("splinter_small")) {

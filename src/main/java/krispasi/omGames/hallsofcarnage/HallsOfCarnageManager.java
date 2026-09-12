@@ -693,15 +693,33 @@ public final class HallsOfCarnageManager {
         return isSessionEntity(entity);
     }
 
-    public void handleSessionWeaponHit(Player player, Entity entity) {
+    public void handleSessionWeaponHit(Player player, Entity entity, org.bukkit.event.entity.EntityDamageByEntityEvent event) {
         if (player == null || entity == null) {
             return;
         }
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         if (session != null) {
-            session.handleWeaponHit(player, entity);
+            session.handleWeaponHit(player, entity, event);
         }
+    }
+
+    public boolean handleSessionFriendlyFire(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
+        if (event == null || !(event.getEntity() instanceof Player player)) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleFriendlyFire(event);
+    }
+
+    public boolean handleSessionItemDamage(org.bukkit.event.player.PlayerItemDamageEvent event) {
+        if (event == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(event.getPlayer().getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleItemDamage(event);
     }
 
     public boolean handlePhysicsDropPickup(Player player, Entity entity) {
