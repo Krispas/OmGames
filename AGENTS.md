@@ -1315,7 +1315,7 @@ SQLite tables:
 - Halls floor loot/drop placeholders should use session-owned physics drops (`ItemDisplay` plus `Interaction`) instead of vanilla dropped item entities; players pick them up by right-clicking with an empty hand.
 - Halls physics item displays are fixed, flat item displays with randomized yaw so dropped items read as lying on the floor instead of upright.
 - Halls physics-drop pickup inserts the item into the player's currently selected hotbar slot; it should not scan ahead to another empty hotbar slot.
-- Halls physics item displays and breakable prop block displays use tiny random per-axis scale jitter to reduce display z-fighting.
+- Halls physics item displays and breakable prop block displays use tiny random per-axis scale jitter to reduce display z-fighting. Trident-based physics drops should use the GUI item-display transform instead of a raised upright offset.
 - Halls breakable props are session-owned display/interactions and may be multi-part prop archetypes such as barrels, chests, tables, chairs, stools, radiators, and metal barrels; keep cleanup routed through `HallsSession`.
 - Halls breakable prop archetypes are loaded from `plugins/OmGames/HallsOfCarnage/breakables/` and seeded from bundled defaults.
 - Breakable files define `id`, `rarity`, `break-message`, `hitbox-height`, `particle-material`, `scrap-drops`, and `parts`.
@@ -1326,7 +1326,8 @@ SQLite tables:
 - Exploration floors force exactly one rare breakable prop in a random generated room when a rare breakable archetype is available, and normal generated prop slots should use common breakables.
 - Halls vegetation archetypes are loaded from `plugins/OmGames/HallsOfCarnage/vegetation/` and seeded from bundled defaults.
 - Vegetation files define `id`, `material`, optional `block-data`, `offset-y`, `scale`, and `random-yaw`.
-- Exploration vegetation is purely decorative `BlockDisplay` clutter. It must not place normal blocks, interaction entities, or hitboxes, and generation must avoid trap-reserved cells such as holes and ground traps.
+- Exploration vegetation is purely decorative `BlockDisplay` clutter. It may generate in rooms and corridors, must not place normal blocks, interaction entities, or hitboxes, and generation must avoid trap-reserved cells such as holes and ground traps.
+- Vegetation yaw must compensate for `BlockDisplay`'s lower-corner origin so random rotation pivots around the cell center.
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, optional `recipe` cost map, and an optional `stats` map.
 - Halls player item defaults do not include ranged gear; do not add bows, crossbows, tridents, arrows, or fireworks as Halls player items unless the design changes again.
@@ -1392,7 +1393,7 @@ SQLite tables:
 - Halls traps should damage session monsters as well as players when monsters enter their contact, radius, or lane checks, but only while a participant is within 20 blocks of the trap effect/contact area.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth. Bear traps and proximity mines render through item-display models instead of placed physical floor blocks.
-- Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults.
+- Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults. Ravagers are intentionally weaker than vanilla for Halls; bundled health is `10` and runtime attack damage is clamped to `4`.
 - Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `scale`, optional `movement-speed-multiplier`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
 - Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
 - Modifier files define `modifiers.<id>.type`, `display-name`, `icon`, `weight`, and `effects`.

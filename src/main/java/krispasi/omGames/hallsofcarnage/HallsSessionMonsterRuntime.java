@@ -344,7 +344,7 @@ final class HallsSessionMonsterRuntime {
         if (type.id().equals("ravager")) {
             AttributeInstance attackDamage = living.getAttribute(Attribute.ATTACK_DAMAGE);
             if (attackDamage != null) {
-                attackDamage.setBaseValue(6.0);
+                attackDamage.setBaseValue(4.0);
             }
         }
     }

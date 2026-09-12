@@ -1341,26 +1341,53 @@ public final class HallsSession {
         }
         long started = System.nanoTime();
         Set<HallsExplorationGenerator.Cell> occupied = new HashSet<>();
-        for (HallsExplorationGenerator.Room room : build.plan().rooms()) {
-            for (Cell cell : openInteriorCells(room)) {
-                if (build.random().nextDouble() >= build.levelType().vegetationChance()) {
-                    continue;
-                }
-                HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(
-                        room.startX() + cell.x(), room.startZ() + cell.z());
-                if ((reservedCells != null && reservedCells.contains(absolute)) || occupied.contains(absolute)) {
-                    continue;
-                }
-                HallsVegetationType type = weightedVegetation(build.levelType(), build.random());
-                if (type == null) {
-                    continue;
-                }
-                spawnVegetationDisplay(absolute.x(), origin.y(), absolute.z(), type, build.random());
-                occupied.add(absolute);
-            }
-        }
+        placeVegetationInCells(build, vegetationRoomCells(build), reservedCells, occupied, 1.0);
+        placeVegetationInCells(build, vegetationCorridorCells(build), reservedCells, occupied, 0.5);
         debugGeneration("vegetation", started, "displays " + occupied.size());
         return Set.copyOf(occupied);
+    }
+
+    private void placeVegetationInCells(ExplorationBuild build,
+                                        List<HallsExplorationGenerator.Cell> cells,
+                                        Set<HallsExplorationGenerator.Cell> reservedCells,
+                                        Set<HallsExplorationGenerator.Cell> occupied,
+                                        double chanceMultiplier) {
+        if (cells.isEmpty()) {
+            return;
+        }
+        java.util.Collections.shuffle(cells, build.random());
+        double chance = Math.max(0.0, Math.min(1.0, build.levelType().vegetationChance() * chanceMultiplier));
+        for (HallsExplorationGenerator.Cell absolute : cells) {
+            if (build.random().nextDouble() >= chance) {
+                continue;
+            }
+            if ((reservedCells != null && reservedCells.contains(absolute)) || occupied.contains(absolute)) {
+                continue;
+            }
+            HallsVegetationType type = weightedVegetation(build.levelType(), build.random());
+            if (type == null) {
+                continue;
+            }
+            spawnVegetationDisplay(absolute.x(), origin.y(), absolute.z(), type, build.random());
+            occupied.add(absolute);
+        }
+    }
+
+    private List<HallsExplorationGenerator.Cell> vegetationRoomCells(ExplorationBuild build) {
+        List<HallsExplorationGenerator.Cell> cells = new ArrayList<>();
+        for (HallsExplorationGenerator.Room room : build.plan().rooms()) {
+            for (Cell cell : openInteriorCells(room)) {
+                cells.add(new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()));
+            }
+        }
+        return cells;
+    }
+
+    private List<HallsExplorationGenerator.Cell> vegetationCorridorCells(ExplorationBuild build) {
+        return build.plan().corridorCells().stream()
+                .filter(cell -> Math.abs(cell.x() - origin.x()) + Math.abs(cell.z() - origin.z()) > 12)
+                .filter(cell -> !isInsideGeneratedRoomShell(cell, build.plan().rooms()))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
     }
 
     private Set<HallsExplorationGenerator.Cell> withReserved(Set<HallsExplorationGenerator.Cell> first,
@@ -2601,8 +2628,10 @@ public final class HallsSession {
     private Transformation vegetationTransformation(HallsVegetationType type, Random random) {
         float scale = randomDisplayScale(type.scale());
         float yaw = type.randomYaw() ? (float) (random.nextDouble() * Math.PI * 2.0) : 0.0f;
+        Vector3f pivot = new Vector3f(0.5f, 0.0f, 0.5f);
+        Vector3f transformedPivot = new Vector3f(pivot).mul(scale).rotate(new Quaternionf().rotateY(yaw));
         return new Transformation(
-                new Vector3f((1.0f - scale) * 0.5f, 0.0f, (1.0f - scale) * 0.5f),
+                new Vector3f(pivot).sub(transformedPivot),
                 new Quaternionf().rotateY(yaw),
                 new Vector3f(scale, scale, scale),
                 new Quaternionf());
@@ -3094,7 +3123,7 @@ public final class HallsSession {
             entity.setInterpolationDelay(DISPLAY_INTERPOLATION_DELAY_TICKS);
             entity.setTeleportDuration(DISPLAY_TELEPORT_DURATION_TICKS);
             entity.setBillboard(Display.Billboard.FIXED);
-            entity.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+            entity.setItemDisplayTransform(sessionDropDisplayTransform(stack));
             entity.setTransformation(sessionDropTransformation(stack));
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_physics_drop");
@@ -3116,20 +3145,21 @@ public final class HallsSession {
     private Transformation sessionDropTransformation(ItemStack stack) {
         float yaw = (float) (Math.random() * Math.PI * 2.0);
         Quaternionf rotation = new Quaternionf().rotateY(yaw);
-        Vector3f translation = new Vector3f();
-        if (!usesUprightDropTransform(stack)) {
+        if (!usesGuiDropDisplay(stack)) {
             rotation.rotateX((float) Math.toRadians(90.0));
-        } else {
-            translation.y = 0.28f;
         }
         return new Transformation(
-                translation,
+                new Vector3f(),
                 rotation,
                 new Vector3f(randomDisplayScale(0.75f), randomDisplayScale(0.75f), randomDisplayScale(0.75f)),
                 new Quaternionf());
     }
 
-    private boolean usesUprightDropTransform(ItemStack stack) {
+    private ItemDisplay.ItemDisplayTransform sessionDropDisplayTransform(ItemStack stack) {
+        return usesGuiDropDisplay(stack) ? ItemDisplay.ItemDisplayTransform.GUI : ItemDisplay.ItemDisplayTransform.NONE;
+    }
+
+    private boolean usesGuiDropDisplay(ItemStack stack) {
         return stack != null && stack.getType() == Material.TRIDENT;
     }
 

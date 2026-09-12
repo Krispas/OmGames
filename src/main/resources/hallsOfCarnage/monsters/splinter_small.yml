@@ -1,7 +1,7 @@
 id: splinter_small
 name: "Small Splinter"
 entity-type: ZOMBIE
-health: 7
+health: 6
 baby: false
 scale: 0.7
 movement-speed-multiplier: 0.72

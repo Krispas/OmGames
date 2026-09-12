@@ -138,7 +138,7 @@ A special transition floor at the end of the game, which tells players they won 
 Level types define look of the rooms, enemies and possible modifiers, like biomes almost.
 Saved under resources/hallsOfCarnage/level_type
 The doc does't state much as they are in concept stage right now.
-Level types may define decorative vegetation using a chance and weighted vegetation ids. Vegetation is display-only decoration, not normal placed blocks, and should not use interaction entities or hitboxes. It must not generate inside holes or on ground-trap cells.
+Level types may define decorative vegetation using a chance and weighted vegetation ids. Vegetation is display-only decoration, not normal placed blocks, and should not use interaction entities or hitboxes. It can appear in rooms and corridors, but must not generate inside holes or on ground-trap cells.
 ### Howling Corridors
 Your basic minecraft dungeons. Zombies, skeletons and so on.
 ### Frozen Halls
@@ -277,6 +277,7 @@ Monsters slowly flood the dungeon. The amount and max current spawns are defined
 On exploration floors, monsters spawn in places not visible by players currently. If possible on technical level, when player interacts with stuff such as breaking or depositing scrap, they should be alerted of the location and walk there for a small period of time until loosing interest.
 Monster types are based on the level type. Level type also defines pool of special mobs, but those dont spawn unless modifiers are active.
 On fight floors, monsters "come in" (spawn) through fake doors on the walls.
+Large monsters such as ravagers should be tuned below vanilla lethality so they act as pressure enemies instead of instant run-ending walls.
 ## Sculk
 Based on difficulty, sculk patches can appear and replace parts of the levels. Standing on sculk blocks or veins raises the player's sculk pressure. Sculk is saved between floor and save loads. High sculk adds a chance for warden to spawn instead of normal enemies; it should not directly apply potion effects, hunger changes, or item-use restrictions.
 ## Hunger
