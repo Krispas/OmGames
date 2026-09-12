@@ -460,6 +460,9 @@ final class HallsSessionMonsterRuntime {
                 continue;
             }
             LivingEntity current = creature.getTarget();
+            if (isActiveLureTarget(current)) {
+                continue;
+            }
             if (current instanceof Player player
                     && player.getWorld().equals(world)
                     && participants.contains(player.getUniqueId())
@@ -471,6 +474,21 @@ final class HallsSessionMonsterRuntime {
             }
             creature.setTarget(nearestParticipant(creature.getLocation(), 18.0));
         }
+    }
+
+    private boolean isActiveLureTarget(LivingEntity target) {
+        if (target == null) {
+            return false;
+        }
+        UUID targetId = target.getUniqueId();
+        if (!lureTargets.contains(targetId)) {
+            return false;
+        }
+        if (target.isDead() || !target.isValid()) {
+            lureTargets.remove(targetId);
+            return false;
+        }
+        return true;
     }
 
     private int capExtensionIntervalTicks(int difficulty) {

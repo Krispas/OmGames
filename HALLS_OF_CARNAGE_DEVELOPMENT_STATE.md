@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-11
+Last updated: 2026-09-12
 
 ## Implemented
 
@@ -49,11 +49,11 @@ Last updated: 2026-09-11
 - Exploration room placement now uses wider randomized gaps and lateral offsets to reduce visible grid alignment when viewing generated floors from outside the dungeon bounds.
 - Bundled Howling Corridors resources now include eight seeded exploration room templates, including three larger 13x14+ templates.
 - Halls physics item displays and breakable prop block displays receive tiny random per-axis scale jitter to reduce display z-fighting.
-- Breakable prop archetypes now load from `plugins/OmGames/HallsOfCarnage/breakables/*.txt|*.yml|*.yaml`, seeded by bundled files for barrel, chest, table, chair, stool, radiator, and metal barrel.
+- Breakable prop archetypes now load from `plugins/OmGames/HallsOfCarnage/breakables/*.yml`, with old `.txt` files still tolerated by the loader; bundled defaults cover barrel, chest, ender chest, table, chair, stool, radiator, and metal barrel.
 - Breakable resource files define display parts, hitbox height, particle material, break message, and weighted loot entries.
 - Breakable loot now rolls from each prop's configured loot table and supports placeholder scrap, random scrap, blueprint keywords, and coin drops.
 - Coin drops are session-owned physics items that add directly to the shared session coin counter on right-click pickup, bypassing normal hotbar capacity.
-- Item definitions now load recursively from `plugins/OmGames/HallsOfCarnage/items/**/*.txt|*.yml|*.yaml`, seeded by bundled defaults for normal/rare weapons, armors, utility items, and building blueprints grouped by category folder.
+- Item definitions now load recursively from `plugins/OmGames/HallsOfCarnage/items/**/*.yml`, with old `.txt` files still tolerated by the loader; bundled defaults cover normal/rare weapons, armors, food, utility items, and building blueprints grouped by category folder.
 - Item resource files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, `max-stack-size`, and `lore`; non-blueprint items may also define recipe costs for camp crafting.
 - Item resource files now support `stats`; stats are written into item PDC as `hoc_stat_<stat_id>` and rendered in lore for test visibility.
 - Scenarios now parse `allowed-items` by category and `blueprint-pools.normal` / `blueprint-pools.rare`.
@@ -69,7 +69,7 @@ Last updated: 2026-09-11
 - Exploration floors now place first-pass trap hazards: holes, bridged holes, bear traps, proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, and Deep Crypt poison darts.
 - Trap placement uses the exploration walkable mask and reruns BFS-style reachability checks before leaving a pit unbridged. If removing the pit cell would disconnect the generated floor, the pit receives a spruce bridge instead.
 - Trap runtime is session-owned through `HallsSessionTrapRuntime` and cleaned up with floor rebuilds/session stop. Player movement and the trap tick both check hazards so pressure traps feel responsive while timed traps can pulse independently.
-- Trap definitions are loaded from `plugins/OmGames/HallsOfCarnage/traps/*.txt|*.yml|*.yaml`, seeded by bundled defaults.
+- Trap definitions are loaded from `plugins/OmGames/HallsOfCarnage/traps/*.yml`, with old `.txt` files still tolerated by the loader; bundled defaults are seeded from `.yml`.
 - Trap files define kind, weight, level-type restrictions, block/display model materials, optional item model id, damage/radius, timing, mine explosion power, and hole sizing/depth.
 - Scenario exploration floors now parse `traps`, which controls generated trapped-room count for that floor/range.
 - Hole traps now choose a configurable 5x5-15x15 rectangular room mask and carve only open room floor cells inside that mask instead of a single floor block.
@@ -136,9 +136,16 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: `open_halls` area generation now precomputes room-distance candidate cells instead of repeatedly scanning every room per candidate, reducing generation cost. Added bundled `infernal_chambers` (`large_corridors`) and `factory` (`open_halls`) level types with one exploration room each, seeded them through `HallsOfCarnageManager.RESOURCE_FILES`, and split Untold Depths floors 6 and 7 for test coverage.
 - Next reviewer slice applied: redstone lamp level lights now place as lit lamps, so Factory/lab-style rooms are illuminated. Removed the separate ranged item category by moving bow/crossbow defaults into weapons and keeping stale `ranged` loot keywords as weapon aliases. Cinderplate now grants its configured 4-second Resistance effect when hit, Sculk Maul has configurable monster AoE damage on hit, and Frost Lance receives Loyalty III with enchantment glint disabled. Added four utility items (`adrenaline_shot`, `ironhide_salve`, `storm_vial`, `echo_lure`) with runtime effects, and added bundled/fallback monster support for piglin, blaze, piglin brute, and parched.
 - Next reviewer slice applied: player bow/crossbow defaults were fully removed from bundled Halls resources, resource seeding, scenario allowed items, crafting station unlocks, and old ranged loot aliases. Sculk Maul splash now has a per-attacker/target throttle, blocks recursive splash chaining, uses quieter effects, has lower bundled AoE defaults, and cannot kill secondary monsters by itself. Echo Lure now spawns a temporary invisible lure target and retargets nearby monsters to it instead of re-alerting them to a player. Adrenaline Shot and Ironhide Salve now write use-cooldown metadata onto generated items and apply grouped player cooldowns; Ironhide Salve now grants Resistance V for 5 seconds. Corridor generation caches valid doorway offsets and precomputes open-hall maze step candidates to reduce repeated work in the newer corridor modes.
+- Next reviewer slice applied: bundled non-layout Halls resources were renamed from `.txt` to `.yml`, leaving only `hallsOfCarnage/level/**` room/layout masks as `.txt`; `HallsOfCarnageManager.RESOURCE_FILES` now seeds the new `.yml` paths while loaders still tolerate existing server `.txt` resources. Adrenaline Shot and Ironhide Salve cooldowns now apply to the exact used item plus its material as a visual fallback. Echo Lure targets are now preserved by the monster target refresh loop until the lure expires.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- rework all .txt resources into .yml resources with exception of the level folder, keep that one as .txt
-- Adrenaline shot and ironhide salve still dont have visual cooldown on the item
-- When used the echo lure, the zombie gave up on me for like a second and then began to chase me again
+- For some reason, the item use cooldown still doesnt show on smoke bomb, adrenaline shot.
+- Remove echo lure.
+- Make it so wide corridor generation generates just 3 wide corridors with no natural bending like now to save on performance.
+- Add /hoc debug, which toggles debug mode for the player, if debug is only, useful info like how long each generation pass takes, when monster spawns and what the next monster timer is, how many breakables generated, how many traps generated
+- Make sculk 2 times faster
+- Remove all effects of sculk except warden spawning
+- For some reason, when going to or from camps, the elevator chest gets deleted, that shouldnt happen
+- Make it so when column wall palletes apply, that they apply in groups, by that I mean it should no longer be completely random, but use some type of noise or something.
+- Special blocks in wall pallets no longer generate. If not already possible, make it so more than 1 special block can be selected with variying chances.

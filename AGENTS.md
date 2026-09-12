@@ -1260,15 +1260,15 @@ Halls runtime files live in:
 
 Files:
 - `halls-of-carnage.yml`
-- `scenarios/*.txt|*.yml|*.yaml`
+- `scenarios/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
 - `level/**`
 - `level_type/**`
 - `modifiers/**`
-- `breakables/*.txt|*.yml|*.yaml`
-- `breakable_loot_pools/*.txt|*.yml|*.yaml`
-- `traps/*.txt|*.yml|*.yaml`
-- `monsters/*.txt|*.yml|*.yaml`
-- `items/**/*.txt|*.yml|*.yaml`
+- `breakables/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
+- `breakable_loot_pools/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
+- `traps/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
+- `monsters/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
+- `items/**/*.yml` (legacy `.txt` and `.yaml` are still parsed if present)
 
 SQLite tables:
 - `hoc_shame`
@@ -1286,7 +1286,7 @@ SQLite tables:
 - `/hoc scenario <scenario>` is an OP-only debug command that prints the loaded parsed scenario data and the YAML view copied from the active server data folder.
 - `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `breakable_loot_pools`, `traps`, `monsters`, `items`, `buildings`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
 - `HallsExplorationGenerator` owns per-rebuild exploration layout planning.
-- Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.txt|*.yml|*.yaml`.
+- Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.yml`; legacy `.txt` and `.yaml` files are still parsed if present.
 - Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, and `pillar-palettes`; monster/modifier sections may exist in resource files for future systems.
 - Supported Halls `corridor-generation` modes are `normal`, `cave`, `large_corridors`, `maze`, and `open_halls`.
 - Current exploration floors bake layered room, corridor, shell, and walkable masks in memory before rendering; Java then places room shells, corridor openings, lights, props, and normal corridors around interior-only `level/<level_type>/exploration_*.txt` room masks.
@@ -1327,7 +1327,7 @@ SQLite tables:
 - Camp layout files preserve `X`, `O`, `C`, and `N/S/W/E`: `X` is solid, every other marker is open floor, `C` expands a build plot, and `N/S/W/E` marks the plot anchor/facing.
 - Camp room walls use the active level type wall palette, camp corner/internal pillar-like columns use the pillar palette, and camp ceilings receive multiple embedded light blocks.
 - Camp build-spot floors are rendered as oak planks for visibility and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
-- Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.txt|*.yml|*.yaml` and seeded from bundled defaults.
+- Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.yml`; legacy `.txt` and `.yaml` files are still parsed if present.
 - Building files define `id`, `name`, `size` (`small`, `medium`, `large`), `blueprint`, `implemented`, and `levels.<1|2|3>` with display `parts`, optional `empty-parts`, optional `upgrade-cost` stored-scrap requirements, optional `interaction.give-items` compatibility outputs, and optional `harvest.uses` / `harvest.items` for harvestable buildings.
 - Storage Locker buildings open persisted camp-plot inventories sized by building size and level: small lockers provide `1/2/3` usable slots, medium lockers provide `2/4/6`, and large lockers provide `4/8/12`; unused Bukkit row slots are locked filler, and lockers cannot be destroyed until emptied.
 - Sculk Purifier buildings have `3` charges per run, reduce only the clicking player's current sculk pressure from their camp GUI, and scale the amount by purifier size and level.

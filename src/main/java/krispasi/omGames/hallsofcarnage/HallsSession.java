@@ -677,7 +677,7 @@ public final class HallsSession {
                     yield true;
                 }
                 activateSmokeBomb(player, type);
-                applyUtilityCooldown(player, type);
+                applyUtilityCooldown(player, item, type);
                 yield true;
             }
             case "warding_totem" -> {
@@ -685,7 +685,7 @@ public final class HallsSession {
                     yield true;
                 }
                 activateWardingTotem(player, type);
-                applyUtilityCooldown(player, type);
+                applyUtilityCooldown(player, item, type);
                 yield true;
             }
             case "mending_salve" -> {
@@ -693,7 +693,7 @@ public final class HallsSession {
                     yield true;
                 }
                 if (activateHealingUtility(player, type)) {
-                    applyUtilityCooldown(player, type);
+                    applyUtilityCooldown(player, item, type);
                 }
                 yield true;
             }
@@ -702,7 +702,7 @@ public final class HallsSession {
                     yield true;
                 }
                 activateSelfBuffUtility(player, type, PotionEffectType.SPEED, "speed", "Adrenaline floods your legs.", Sound.ENTITY_RABBIT_JUMP);
-                applyUtilityCooldown(player, type);
+                applyUtilityCooldown(player, item, type);
                 yield true;
             }
             case "ironhide_salve" -> {
@@ -710,7 +710,7 @@ public final class HallsSession {
                     yield true;
                 }
                 activateSelfBuffUtility(player, type, PotionEffectType.RESISTANCE, "resistance", "Ironhide seals your skin.", Sound.BLOCK_ANVIL_USE);
-                applyUtilityCooldown(player, type);
+                applyUtilityCooldown(player, item, type);
                 yield true;
             }
             case "storm_vial" -> {
@@ -719,7 +719,7 @@ public final class HallsSession {
                 }
                 activateMonsterPulseUtility(player, type, Particle.ELECTRIC_SPARK, Sound.ENTITY_LIGHTNING_BOLT_THUNDER,
                         "The vial bursts into chained sparks.");
-                applyUtilityCooldown(player, type);
+                applyUtilityCooldown(player, item, type);
                 yield true;
             }
             case "echo_lure" -> {
@@ -727,7 +727,7 @@ public final class HallsSession {
                     yield true;
                 }
                 if (activateEchoLure(player, type)) {
-                    applyUtilityCooldown(player, type);
+                    applyUtilityCooldown(player, item, type);
                 }
                 yield true;
             }
@@ -2514,7 +2514,7 @@ public final class HallsSession {
         return true;
     }
 
-    private void applyUtilityCooldown(Player player, HallsItemType type) {
+    private void applyUtilityCooldown(Player player, ItemStack usedItem, HallsItemType type) {
         int cooldownTicks = Math.max(0, (int) Math.round(type.stats().getOrDefault("cooldown_seconds", 0.0) * 20.0));
         if (cooldownTicks <= 0) {
             return;
@@ -2522,7 +2522,11 @@ public final class HallsSession {
         utilityCooldowns.put(utilityCooldownKey(player, type), System.currentTimeMillis() + cooldownTicks * 50L);
         org.bukkit.NamespacedKey cooldownKey = new org.bukkit.NamespacedKey(plugin, "hoc_" + type.id());
         player.setCooldown(cooldownKey, cooldownTicks);
-        player.setCooldown(player.getInventory().getItemInMainHand(), cooldownTicks);
+        ItemStack cooldownItem = usedItem == null || usedItem.getType().isAir()
+                ? player.getInventory().getItemInMainHand()
+                : usedItem;
+        player.setCooldown(cooldownItem, cooldownTicks);
+        player.setCooldown(cooldownItem.getType(), cooldownTicks);
     }
 
     private String utilityCooldownKey(Player player, HallsItemType type) {
