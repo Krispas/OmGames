@@ -1,6 +1,6 @@
 id: bogged
 name: "Bogged"
 entity-type: BOGGED
-health: 16
+health: 6
 equipment:
   main-hand: BOW

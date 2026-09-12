@@ -1106,6 +1106,11 @@ final class HallsSessionTrapRuntime {
         double x = cell.x() + 0.5;
         double y = origin.y() + 0.08;
         double z = cell.z() + 0.5;
+
+        if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE) {
+            y += 0.4;
+        }
+
         if (kind == TrapKind.SWINGING_BLADE) {
             y = origin.y() + 2.85;
             if (face == BlockFace.EAST || face == BlockFace.WEST) {

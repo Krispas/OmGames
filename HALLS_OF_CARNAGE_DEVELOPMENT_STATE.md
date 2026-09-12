@@ -151,3 +151,8 @@ Do all following for the next slice (and keep this line):
 - Make it so raw mycelia is edible.
 - Does the cinderplate effect actually work? If not, add it and do taking damage as the trigger.
 - Add sounds to all buildings and the whole building system
+- Make splinter babies slow. Make it so one can define scale and slowness as monster properties instead of them being hardcoded
+- Make sure not to spawn big monsters like ravagers inside of walls.
+- Add a new poison bomb utility item. It has classic cooldown like other utils. When used, it deploys a damaging cloud around the player. The cloud doesnt damage players.
+- Give ghosts ability to use creative flight
+- Increase building upgrade costs for all buildings based on their projected usefulness.

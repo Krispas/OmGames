@@ -1,7 +1,7 @@
 id: splinter_baby
 name: "Baby Splinter"
 entity-type: ZOMBIE
-health: 4
+health: 2
 baby: true
 equipment:
   armor:

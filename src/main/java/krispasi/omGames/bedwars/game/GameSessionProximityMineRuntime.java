@@ -28,7 +28,7 @@ final class GameSessionProximityMineRuntime {
     private static final long PROXIMITY_MINE_ARM_DELAY_TICKS = 5L * 20L;
     private static final long PROXIMITY_MINE_DISPLAY_UPDATE_TICKS = 5L;
     private static final int PROXIMITY_MINE_BAR_SEGMENTS = 10;
-    private static final double PROXIMITY_MINE_DISPLAY_Y_OFFSET = 1.2;
+    private static final double PROXIMITY_MINE_DISPLAY_Y_OFFSET = 2.2;
     private static final double PROXIMITY_MINE_TRIGGER_HEIGHT = 0.8;
     private static final String PROXIMITY_MINE_DISPLAY_TAG = "bw_proximity_mine_display";
 
