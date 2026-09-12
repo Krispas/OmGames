@@ -60,7 +60,22 @@ public final class HallsLevelTypeLoader {
                 normalizedStringList(config.getStringList("monsters.common"), fallback.commonMonsters()),
                 normalizedStringList(config.getStringList("monsters.special"), fallback.specialMonsters()),
                 clamp(config.getDouble("vegetation.chance", fallback.vegetationChance()), 0.0, 1.0),
-                vegetation(config.getConfigurationSection("vegetation.types"), fallback.vegetation())
+                vegetation(config.getConfigurationSection("vegetation.types"), fallback.vegetation()),
+                liquid(config.getConfigurationSection("liquid"), fallback.liquid(), plugin, file)
+        );
+    }
+
+    private static HallsLevelType.LiquidSettings liquid(ConfigurationSection section,
+                                                        HallsLevelType.LiquidSettings fallback,
+                                                        JavaPlugin plugin,
+                                                        File file) {
+        if (section == null) {
+            return fallback;
+        }
+        return new HallsLevelType.LiquidSettings(
+                section.getBoolean("enabled", fallback.enabled()),
+                material(section.getString("material"), fallback.material(), plugin, file),
+                clamp(section.getDouble("room-coverage", fallback.roomCoverage()), 0.0, 1.0)
         );
     }
 

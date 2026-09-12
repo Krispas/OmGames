@@ -21,13 +21,15 @@ public record HallsLevelType(
         List<String> commonMonsters,
         List<String> specialMonsters,
         double vegetationChance,
-        List<VegetationEntry> vegetation
+        List<VegetationEntry> vegetation,
+        LiquidSettings liquid
 ) {
     public HallsLevelType {
         commonMonsters = List.copyOf(commonMonsters);
         specialMonsters = List.copyOf(specialMonsters);
         vegetationChance = Math.max(0.0, Math.min(1.0, vegetationChance));
         vegetation = List.copyOf(vegetation);
+        liquid = liquid == null ? LiquidSettings.none() : liquid;
     }
 
     public static HallsLevelType fallback(String id) {
@@ -50,7 +52,8 @@ public record HallsLevelType(
                     List.of("stray", "zombie"),
                     List.of("bogged"),
                     0.01,
-                    List.of(new VegetationEntry("deadbush", 1))
+                    List.of(new VegetationEntry("deadbush", 1)),
+                    LiquidSettings.none()
             );
         }
         if (normalizedId.equals("deep_crypt")) {
@@ -71,7 +74,8 @@ public record HallsLevelType(
                     List.of("husk", "skeleton"),
                     List.of("breeze"),
                     0.035,
-                    List.of(new VegetationEntry("deadbush", 3), new VegetationEntry("dry_grass", 2))
+                    List.of(new VegetationEntry("deadbush", 3), new VegetationEntry("dry_grass", 2)),
+                    LiquidSettings.none()
             );
         }
         if (normalizedId.equals("infernal_chambers")) {
@@ -92,7 +96,8 @@ public record HallsLevelType(
                     List.of("piglin", "blaze", "breeze", "husk"),
                     List.of("piglin_brute", "wither_skeleton", "parched"),
                     0.008,
-                    List.of(new VegetationEntry("deadbush", 1))
+                    List.of(new VegetationEntry("deadbush", 1)),
+                    LiquidSettings.none()
             );
         }
         if (normalizedId.equals("factory")) {
@@ -113,7 +118,8 @@ public record HallsLevelType(
                     List.of("zombie", "skeleton", "pillager", "slime_medium"),
                     List.of("breeze", "creaking"),
                     0.0,
-                    List.of()
+                    List.of(),
+                    LiquidSettings.none()
             );
         }
         if (normalizedId.equals("backrooms")) {
@@ -134,7 +140,30 @@ public record HallsLevelType(
                     List.of("zombie", "skeleton", "silverfish", "creaking"),
                     List.of("breeze", "witch"),
                     0.004,
-                    List.of(new VegetationEntry("deadbush", 1))
+                    List.of(new VegetationEntry("deadbush", 1)),
+                    LiquidSettings.none()
+            );
+        }
+        if (normalizedId.equals("sewer")) {
+            return new HallsLevelType(
+                    normalizedId,
+                    "Sewer",
+                    "sewer",
+                    Material.MUD_BRICKS,
+                    Material.DEEPSLATE_BRICKS,
+                    Material.MUD_BRICKS,
+                    Material.DEEPSLATE_BRICKS,
+                    Material.SEA_LANTERN,
+                    List.of(
+                            new BlockPalette(Material.MOSSY_STONE_BRICKS, Material.CRACKED_STONE_BRICKS, 0.08),
+                            new BlockPalette(Material.DEEPSLATE_BRICKS, Material.MOSSY_COBBLESTONE, 0.10)
+                    ),
+                    List.of(new BlockPalette(Material.MOSSY_COBBLESTONE, Material.COBBLESTONE, 0.08)),
+                    List.of("zombie", "slime_medium", "silverfish", "creaking"),
+                    List.of("bogged", "cave_spider", "warden"),
+                    0.015,
+                    List.of(new VegetationEntry("bush", 1)),
+                    new LiquidSettings(true, Material.WATER, 0.80)
             );
         }
         return new HallsLevelType(
@@ -154,7 +183,8 @@ public record HallsLevelType(
                 List.of("zombie", "creeper", "creaking", "slime_medium"),
                 List.of("zombie_vanguard", "skeleton", "cave_spider"),
                 0.04,
-                List.of(new VegetationEntry("grass", 4), new VegetationEntry("bush", 1))
+                List.of(new VegetationEntry("grass", 4), new VegetationEntry("bush", 1)),
+                LiquidSettings.none()
         );
     }
 
@@ -210,6 +240,17 @@ public record HallsLevelType(
         public VegetationEntry {
             id = id == null ? "" : id;
             weight = Math.max(0, weight);
+        }
+    }
+
+    public record LiquidSettings(boolean enabled, Material material, double roomCoverage) {
+        public LiquidSettings {
+            material = material == null || !material.isBlock() ? Material.WATER : material;
+            roomCoverage = Math.max(0.0, Math.min(1.0, roomCoverage));
+        }
+
+        public static LiquidSettings none() {
+            return new LiquidSettings(false, Material.WATER, 0.0);
         }
     }
 }

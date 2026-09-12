@@ -3,7 +3,7 @@ name: "Baby Splinter"
 entity-type: ZOMBIE
 health: 2
 baby: true
-movement-speed-multiplier: 0.55
+movement-speed-multiplier: 0.75
 equipment:
   armor:
     helmet: LEATHER_HELMET

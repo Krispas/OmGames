@@ -33,6 +33,7 @@ final class HallsExplorationGenerator {
     private final List<Room> rooms = new ArrayList<>();
     private final Set<Cell> corridorCells = new HashSet<>();
     private final Set<Cell> corridorShellCells = new HashSet<>();
+    private final Set<Cell> liquidCells = new HashSet<>();
     private final Set<Cell> roomShellCells = new HashSet<>();
     private final Set<Cell> roomInteriorCells = new HashSet<>();
     private final Set<Cell> networkCells = new HashSet<>();
@@ -616,6 +617,7 @@ final class HallsExplorationGenerator {
         Set<Cell> carved = switch (corridorMode) {
             case CAVE -> naturalCaveCorridorCells(path);
             case LARGE_CORRIDORS -> largeCorridorCells(path);
+            case SEWER -> sewerCorridorCells(path);
             case MAZE, BACKROOMS, OPEN_HALLS -> openHallConnectorCells(path);
             case NORMAL -> new HashSet<>(path);
         };
@@ -641,6 +643,34 @@ final class HallsExplorationGenerator {
             for (Cell cell : widened) {
                 if (canWidenCorridorInto(cell)) {
                     cells.add(cell);
+                }
+            }
+        }
+        return cells;
+    }
+
+    private Set<Cell> sewerCorridorCells(List<Cell> path) {
+        Set<Cell> cells = new HashSet<>(path);
+        for (int i = 0; i < path.size(); i++) {
+            Cell current = path.get(i);
+            if (i < 3 || i > path.size() - 4) {
+                cells.add(current);
+                continue;
+            }
+            boolean eastWest = isEastWestSegment(path, i);
+            int dxMin = eastWest ? 0 : -2;
+            int dxMax = eastWest ? 0 : 2;
+            int dzMin = eastWest ? -2 : 0;
+            int dzMax = eastWest ? 2 : 0;
+            for (int dx = dxMin; dx <= dxMax; dx++) {
+                for (int dz = dzMin; dz <= dzMax; dz++) {
+                    Cell cell = new Cell(current.x() + dx, current.z() + dz);
+                    if (cell.equals(current) || canWidenCorridorInto(cell)) {
+                        cells.add(cell);
+                        if (Math.abs(eastWest ? dz : dx) <= 1) {
+                            liquidCells.add(cell);
+                        }
+                    }
                 }
             }
         }
@@ -1219,6 +1249,7 @@ final class HallsExplorationGenerator {
                 List.copyOf(rooms),
                 Set.copyOf(corridorCells),
                 Set.copyOf(corridorShellCells),
+                Set.copyOf(liquidCells),
                 Set.copyOf(walkable),
                 allRoomsReachable(walkable)
         );
@@ -1256,6 +1287,7 @@ final class HallsExplorationGenerator {
     record Plan(List<Room> rooms,
                 Set<Cell> corridorCells,
                 Set<Cell> corridorShellCells,
+                Set<Cell> liquidCells,
                 Set<Cell> walkableCells,
                 boolean reachable) {
     }
@@ -1339,7 +1371,8 @@ final class HallsExplorationGenerator {
         LARGE_CORRIDORS,
         MAZE,
         BACKROOMS,
-        OPEN_HALLS;
+        OPEN_HALLS,
+        SEWER;
 
         private static CorridorMode from(String value) {
             if (value == null) {
@@ -1351,6 +1384,7 @@ final class HallsExplorationGenerator {
                 case "maze", "mazelike", "deep_crypt" -> MAZE;
                 case "backrooms", "backroom" -> BACKROOMS;
                 case "open_halls", "open_hall", "legacy_maze" -> OPEN_HALLS;
+                case "sewer", "sewers" -> SEWER;
                 default -> NORMAL;
             };
         }

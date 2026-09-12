@@ -151,6 +151,8 @@ Nether-blackstone halls with wider corridors, heat-lit walls, and harsher monste
 Industrial open halls with machinery-like pillars and room-local open-hall generation.
 ### Backrooms
 Yellowed liminal halls with maze-style open spaces, long wall runs, and sparse unsettling monster pools.
+### Sewer
+Wet brick service tunnels with wide 5-block corridors and a 3-block liquid channel. Rooms can generate broad contiguous puddles; liquid is configured by level type so water is used now and lava can be used by future content. Bear traps and proximity mines are blacklisted from this level type.
 ### Other levels
 Of course, other types will be implemented throughout development.
 ## Traps

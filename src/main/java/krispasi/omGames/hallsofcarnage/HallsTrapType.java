@@ -8,6 +8,7 @@ public record HallsTrapType(
         String kind,
         int weight,
         List<String> levelTypes,
+        List<String> blacklistedLevelTypes,
         Material blockMaterial,
         Material ceilingMaterial,
         Material modelMaterial,
@@ -25,6 +26,7 @@ public record HallsTrapType(
 ) {
     public HallsTrapType {
         levelTypes = List.copyOf(levelTypes);
+        blacklistedLevelTypes = List.copyOf(blacklistedLevelTypes);
         itemModel = itemModel == null ? "" : itemModel;
         weight = Math.max(0, weight);
         modelScale = Math.max(0.1f, modelScale);
@@ -39,6 +41,7 @@ public record HallsTrapType(
     }
 
     public boolean allowedForLevelType(String levelTypeId) {
-        return levelTypes.isEmpty() || levelTypes.contains(levelTypeId);
+        return !blacklistedLevelTypes.contains(levelTypeId)
+                && (levelTypes.isEmpty() || levelTypes.contains(levelTypeId));
     }
 }

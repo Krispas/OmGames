@@ -1,6 +1,8 @@
 id: bear_trap
 kind: bear_trap
 weight: 4
+blacklisted-level-types:
+  - sewer
 block-material: AIR
 model-material: IRON_TRAPDOOR
 item-model: ""

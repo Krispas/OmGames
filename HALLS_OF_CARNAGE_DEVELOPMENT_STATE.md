@@ -148,23 +148,15 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: lethal Halls damage now drops only hotbar contents plus armor/offhand once, preventing offhand and armor duplication when players become ghosts. Halls trap runtime now receives the session alive-participant predicate, so ghosts do not trigger bear traps, proximity mines, pits, dart checks, steam/falling-ice area damage, or swinging-blade collision. Session physics drops now keep trident-based items such as Frost Lance upright with a small upward display offset so the vanilla trident model no longer renders under the floor.
 - Next reviewer slice applied: added resource-driven decorative vegetation under `hallsOfCarnage/vegetation`, loaded independently from breakables/traps and seeded by `/hoc reset confirm`. Level types now define `vegetation.chance` plus weighted vegetation ids. Exploration floors spawn vegetation as passive `BlockDisplay` entities only, with no interaction entities or hitboxes, skip trap-reserved cells such as holes and ground traps, reserve their own cells so breakables do not overlap them, and clean displays on floor rebuild/session stop. Bundled defaults include grass, deadbush, dry grass, and bush, with biome-appropriate level-type weights.
 - Next reviewer slice applied: vegetation now also samples corridor cells at reduced density, while still skipping trap-reserved cells and reserving its own display cells. Vegetation yaw now compensates for the lower-corner BlockDisplay origin so random rotation pivots around the cell center. Trident-based physics drops now use the built-in GUI item-display transform instead of a raised upright custom transform. Ravagers were weakened by lowering bundled health to `10` and runtime attack damage to `4`.
+- Next reviewer slice applied: added the `sewer` level type, bundled Sewer room template, and Untold Depths floor 9 test coverage. Level types now support optional `liquid.enabled`, `liquid.material`, and `liquid.room-coverage`; Sewer renders 5-wide corridors with 3-cell, 2-block-deep liquid channels, short dry one-cell offshoots into rooms/elevator, and room puddles generated after holes/traps while avoiding reserved cells, hole/trap neighbors, and corridor neighbors. Trap files now support `blacklisted-level-types`, and bundled bear traps/proximity mines blacklist `sewer`.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-Add a new level type: SEWER.
-This one is a little bit more tricky, first we need to blacklist some traps, add a new blacklist property to trap where you can blacklist them from certain level types. We're talking proximity mines and beartraps.
-Second this level will use something new, liquid. This type will use water, but make sure lava can be used too for future content.
-It works simillarly to holes, by defining another mask, although liquid generates in puddles rather than squares and takes most of the room (80% blocks, but not random, more like puddles). Liquids are generated after holes, if liquid would be neighbour with a hole or a corridor, dont place it there, just use normal floor.
-Liquids are 2 blocks deep and have walls, for walls they just use the wall pallete.
-When it comes to the corridor generation of the sewers, use something simillar to wide generation. However the corridors will be 5 blocks wide and the 3 inner blocks will always have liquid. the upper corners are also filled with corridor ceiling material. Like this
-
-COOOC
-OOOOO
-OOOOO
-OOOOO
-XLLLX
-XLLLX
-XXXXX
-
-Where C is ceiling, O is air, X is ground and L is liquid. Instead of this main corridor leading into rooms, small offshoots in size of the normal corridor type will extend to rooms, the main corridor will just be like a big hub. The main corridor can still split into junctions, turn and so on.
-More custom features for this level type will be requested later, but this is a good start.
+- Armors seem to not reflect their armor value in the actual ingame attribute
+- Make it so specifically in sewer type generation, elevator doesnt lead into a room but into the main corridors.
+- Add a new trap type to sewer. It is a water trap called bubbles, it has magma block model and it creates bubble particles on it. Touching that block causes damage. The trap should be marked as impassable for room gen.
+- Add a new trap type to sewer. It is a water trap called geyser. It has soul sand model. It has a cooldown, when it fires it creates geyser particles (yes, those exist in 26.2, check the docs) and applies large knockback to all players/monsters near
+- Puddles in sewers are way too rare. Make them generate WAY more. Puddles are not impassable, they can generate in bad places.
+- Add new monster, drowned.
+- Add a new trap type to sewer. It is a water trap called Pufferfish. Its just that, it spawns pufferfish at that location. Pufferfish can be killed of course.
+- Add three new modifiers unique to sewers, all are traps modifiers and work like other unique trap modifiers.

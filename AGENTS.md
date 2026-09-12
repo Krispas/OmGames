@@ -1393,6 +1393,7 @@ SQLite tables:
 - Halls traps should damage session monsters as well as players when monsters enter their contact, radius, or lane checks, but only while a participant is within 20 blocks of the trap effect/contact area.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth. Bear traps and proximity mines render through item-display models instead of placed physical floor blocks.
+- Trap files may define `blacklisted-level-types`; blacklisted level type ids are rejected even when `level-types` is empty. Bundled bear traps and proximity mines are blacklisted from `sewer`.
 - Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults. Ravagers are intentionally weaker than vanilla for Halls; bundled health is `10` and runtime attack damage is clamped to `4`.
 - Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `scale`, optional `movement-speed-multiplier`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
 - Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
@@ -1440,3 +1441,4 @@ SQLite tables:
 - Infernal Chambers defaults to `large_corridors` corridor generation and currently has one bundled exploration room for testing.
 - Factory defaults to `open_halls` corridor generation and currently has one bundled exploration room for testing.
 - Backrooms defaults to `backrooms` corridor generation and currently has one bundled exploration room for testing.
+- Sewer defaults to `sewer` corridor generation and water liquid generation. Sewer corridors are 5 blocks wide with the 3 inner cells rendered as 2-block-deep liquid channels, with short dry one-cell offshoots into rooms/elevator; Sewer rooms generate contiguous puddles after holes/traps while avoiding trap-reserved cells, hole neighbors, and corridor neighbors.

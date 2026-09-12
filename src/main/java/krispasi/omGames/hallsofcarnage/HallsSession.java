@@ -1001,6 +1001,7 @@ public final class HallsSession {
         renderExplorationRooms(build);
         renderExplorationCorridors(build);
         Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build);
+        reservedCells = withReserved(reservedCells, renderExplorationLiquids(build, reservedCells));
         reservedCells = withReserved(reservedCells, renderExplorationVegetation(build, reservedCells));
         renderExplorationSculk(build, reservedCells);
         renderExplorationContents(build, reservedCells);
@@ -1345,6 +1346,104 @@ public final class HallsSession {
         placeVegetationInCells(build, vegetationCorridorCells(build), reservedCells, occupied, 0.5);
         debugGeneration("vegetation", started, "displays " + occupied.size());
         return Set.copyOf(occupied);
+    }
+
+    private Set<HallsExplorationGenerator.Cell> renderExplorationLiquids(ExplorationBuild build,
+                                                                         Set<HallsExplorationGenerator.Cell> reservedCells) {
+        if (build == null || build.plan().rooms().isEmpty() || !build.levelType().liquid().enabled()) {
+            return Set.of();
+        }
+        long started = System.nanoTime();
+        Set<HallsExplorationGenerator.Cell> liquidCells = new HashSet<>(build.plan().liquidCells());
+        for (HallsExplorationGenerator.Room room : build.plan().rooms()) {
+            liquidCells.addAll(roomLiquidCells(build, room, reservedCells, liquidCells));
+        }
+        for (HallsExplorationGenerator.Cell cell : liquidCells) {
+            renderLiquidCell(cell, build.levelType(), liquidCells);
+        }
+        debugGeneration("liquids", started, "cells " + liquidCells.size());
+        return Set.copyOf(liquidCells);
+    }
+
+    private Set<HallsExplorationGenerator.Cell> roomLiquidCells(ExplorationBuild build,
+                                                                HallsExplorationGenerator.Room room,
+                                                                Set<HallsExplorationGenerator.Cell> reservedCells,
+                                                                Set<HallsExplorationGenerator.Cell> existingLiquid) {
+        List<HallsExplorationGenerator.Cell> candidates = openInteriorCells(room).stream()
+                .map(cell -> new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()))
+                .filter(cell -> canPlaceRoomLiquid(cell, build.plan(), reservedCells, existingLiquid))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        if (candidates.isEmpty()) {
+            return Set.of();
+        }
+        int target = Math.max(1, (int) Math.round(candidates.size() * build.levelType().liquid().roomCoverage()));
+        HallsExplorationGenerator.Cell start = candidates.get(build.random().nextInt(candidates.size()));
+        Set<HallsExplorationGenerator.Cell> candidateSet = new HashSet<>(candidates);
+        Set<HallsExplorationGenerator.Cell> result = new HashSet<>();
+        java.util.ArrayDeque<HallsExplorationGenerator.Cell> queue = new java.util.ArrayDeque<>();
+        queue.add(start);
+        result.add(start);
+        while (!queue.isEmpty() && result.size() < target) {
+            HallsExplorationGenerator.Cell current = queue.remove();
+            List<HallsExplorationGenerator.Cell> nextCells = new ArrayList<>();
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                HallsExplorationGenerator.Cell next = new HallsExplorationGenerator.Cell(
+                        current.x() + face.getModX(),
+                        current.z() + face.getModZ());
+                if (candidateSet.contains(next) && !result.contains(next)) {
+                    nextCells.add(next);
+                }
+            }
+            java.util.Collections.shuffle(nextCells, build.random());
+            for (HallsExplorationGenerator.Cell next : nextCells) {
+                result.add(next);
+                queue.add(next);
+                if (result.size() >= target) {
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    private boolean canPlaceRoomLiquid(HallsExplorationGenerator.Cell cell,
+                                       HallsExplorationGenerator.Plan plan,
+                                       Set<HallsExplorationGenerator.Cell> reservedCells,
+                                       Set<HallsExplorationGenerator.Cell> existingLiquid) {
+        if (plan.corridorCells().contains(cell) || existingLiquid.contains(cell)
+                || (reservedCells != null && reservedCells.contains(cell))) {
+            return false;
+        }
+        for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+            HallsExplorationGenerator.Cell side = new HallsExplorationGenerator.Cell(
+                    cell.x() + face.getModX(),
+                    cell.z() + face.getModZ());
+            if (plan.corridorCells().contains(side) || (reservedCells != null && reservedCells.contains(side))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void renderLiquidCell(HallsExplorationGenerator.Cell cell,
+                                  HallsLevelType levelType,
+                                  Set<HallsExplorationGenerator.Cell> liquidCells) {
+        Material liquid = levelType.liquid().material();
+        setBlock(cell.x(), origin.y() - 1, cell.z(), liquid);
+        setBlock(cell.x(), origin.y() - 2, cell.z(), liquid);
+        setBlock(cell.x(), origin.y() - 3, cell.z(), wallMaterial(levelType, cell.x(), origin.y() - 3, cell.z(), false, 0xA710));
+        for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+            HallsExplorationGenerator.Cell side = new HallsExplorationGenerator.Cell(
+                    cell.x() + face.getModX(),
+                    cell.z() + face.getModZ());
+            if (liquidCells.contains(side)) {
+                continue;
+            }
+            setBlock(side.x(), origin.y() - 2, side.z(),
+                    wallMaterial(levelType, side.x(), origin.y() - 2, side.z(), false, 0xA710));
+            setBlock(side.x(), origin.y() - 3, side.z(),
+                    wallMaterial(levelType, side.x(), origin.y() - 3, side.z(), false, 0xA710));
+        }
     }
 
     private void placeVegetationInCells(ExplorationBuild build,
@@ -1928,8 +2027,13 @@ public final class HallsSession {
             return;
         }
         setBlock(point.x(), origin.y() - 1, point.z(), open
-                ? levelType.corridorFloor()
+                ? (plan.liquidCells().contains(point) ? levelType.liquid().material() : levelType.corridorFloor())
                 : corridorWallMaterial(levelType, point, origin.y() - 1, openCells));
+        if (open && plan.liquidCells().contains(point)) {
+            setBlock(point.x(), origin.y() - 2, point.z(), levelType.liquid().material());
+            setBlock(point.x(), origin.y() - 3, point.z(),
+                    corridorWallMaterial(levelType, point, origin.y() - 3, openCells));
+        }
         if (!insideRoomShell) {
             setBlock(point.x(), origin.y() + 3, point.z(),
                     open && isCorridorLightCell(point.x(), point.z()) ? levelType.light() : levelType.corridorCeiling());
@@ -4210,6 +4314,7 @@ public final class HallsSession {
 
         private void buildTraps() {
             reservedCells = renderExplorationTraps(build);
+            reservedCells = withReserved(reservedCells, renderExplorationLiquids(build, reservedCells));
             reservedCells = withReserved(reservedCells, renderExplorationVegetation(build, reservedCells));
             renderExplorationSculk(build, reservedCells);
             rareBreakableRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());

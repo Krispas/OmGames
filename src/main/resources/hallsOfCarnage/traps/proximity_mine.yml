@@ -1,6 +1,8 @@
 id: proximity_mine
 kind: proximity_mine
 weight: 3
+blacklisted-level-types:
+  - sewer
 block-material: AIR
 model-material: HEAVY_WEIGHTED_PRESSURE_PLATE
 item-model: ""

@@ -1,0 +1,50 @@
+id: sewer
+name: "Sewer"
+corridor-generation: sewer
+materials:
+  floor: MUD_BRICKS
+  ceiling: DEEPSLATE_BRICKS
+  corridor-floor: MUD_BRICKS
+  corridor-ceiling: DEEPSLATE_BRICKS
+  light: SEA_LANTERN
+liquid:
+  enabled: true
+  material: WATER
+  room-coverage: 0.80
+wall-palettes:
+  mossy_stone:
+    block: MOSSY_STONE_BRICKS
+    special-blocks:
+      cracked:
+        block: CRACKED_STONE_BRICKS
+        chance: 0.08
+      stone:
+        block: STONE_BRICKS
+        chance: 0.06
+  deepslate:
+    block: DEEPSLATE_BRICKS
+    special-blocks:
+      mossy:
+        block: MOSSY_COBBLESTONE
+        chance: 0.10
+pillar-palettes:
+  mossy_cobble:
+    block: MOSSY_COBBLESTONE
+    special-blocks:
+      cobble:
+        block: COBBLESTONE
+        chance: 0.08
+monsters:
+  common:
+    - zombie
+    - slime_medium
+    - silverfish
+    - creaking
+  special:
+    - bogged
+    - cave_spider
+    - warden
+vegetation:
+  chance: 0.015
+  types:
+    bush: 1

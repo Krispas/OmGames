@@ -176,6 +176,19 @@ blueprint-pools:
       - storage_locker_large_blueprint
       - health_totem_blueprint
       - speed_totem_blueprint
+  sewer:
+    normal:
+      - cooking_pot_blueprint
+      - forge_blueprint
+      - storage_locker_small_blueprint
+      - storage_locker_medium_blueprint
+      - mycelia_farm_blueprint
+      - sculk_purifier_small_blueprint
+    rare:
+      - elevator_drill_blueprint
+      - storage_locker_large_blueprint
+      - health_totem_blueprint
+      - sculk_purifier_medium_blueprint
 crafting-stations:
   cooking_pot:
     1:
@@ -305,7 +318,7 @@ floors:
     coin-quota: 26
   - number: 9
     kind: exploration
-    level-type: howling_corridors
+    level-type: sewer
     difficulty: 20
     rooms: 12
     breakables: 36

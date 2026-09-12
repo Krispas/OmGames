@@ -51,6 +51,7 @@ public final class HallsTrapTypeLoader {
                 kind,
                 yaml.getInt("weight", 1),
                 yaml.getStringList("level-types").stream().map(HallsTrapTypeLoader::normalizeId).filter(value -> !value.isBlank()).toList(),
+                yaml.getStringList("blacklisted-level-types").stream().map(HallsTrapTypeLoader::normalizeId).filter(value -> !value.isBlank()).toList(),
                 material(yaml.getString("block-material"), Material.IRON_TRAPDOOR),
                 material(yaml.getString("ceiling-material"), Material.POINTED_DRIPSTONE),
                 material(yaml.getString("model-material"), Material.IRON_NUGGET),
@@ -128,14 +129,14 @@ public final class HallsTrapTypeLoader {
 
     private static Map<String, HallsTrapType> fallbackTypes() {
         Map<String, HallsTrapType> types = new LinkedHashMap<>();
-        add(types, "hole", "hole", 3, List.of(), Material.AIR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 5, 15, 10, 200.0, 1.0, 60, 16, 2.4f);
-        add(types, "bear_trap", "bear_trap", 4, List.of(), Material.IRON_TRAPDOOR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 1.0, 60, 16, 2.4f);
-        add(types, "proximity_mine", "proximity_mine", 3, List.of(), Material.STONE_PRESSURE_PLATE, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 18.0, 3.0, 60, 16, 2.4f);
-        add(types, "swinging_blade", "swinging_blade", 3, List.of(), Material.IRON_BARS, Material.AIR, Material.IRON_SWORD, "", 1.4f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.15, 60, 16, 2.4f);
-        add(types, "wall_spikes", "wall_spikes", 6, List.of(), Material.BLACK_CONCRETE, Material.AIR, Material.IRON_SWORD, "", 1.1f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 3.0, 70, 12, 2.4f);
-        add(types, "falling_ice", "falling_ice", 9, List.of("frozen_halls"), Material.AIR, Material.POINTED_DRIPSTONE, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.0, 55, 1, 2.4f);
-        add(types, "poison_darts", "poison_darts", 9, List.of("deep_crypt"), Material.DISPENSER, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 5.0, 60, 1, 2.4f);
-        add(types, "steam_vent", "steam_vent", 9, List.of("factory"), Material.HEAVY_WEIGHTED_PRESSURE_PLATE, Material.AIR, Material.HEAVY_WEIGHTED_PRESSURE_PLATE, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 5.0, 1.75, 100, 35, 2.4f);
+        add(types, "hole", "hole", 3, List.of(), List.of(), Material.AIR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 5, 15, 10, 200.0, 1.0, 60, 16, 2.4f);
+        add(types, "bear_trap", "bear_trap", 4, List.of(), List.of("sewer"), Material.IRON_TRAPDOOR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 1.0, 60, 16, 2.4f);
+        add(types, "proximity_mine", "proximity_mine", 3, List.of(), List.of("sewer"), Material.STONE_PRESSURE_PLATE, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 18.0, 3.0, 60, 16, 2.4f);
+        add(types, "swinging_blade", "swinging_blade", 3, List.of(), List.of(), Material.IRON_BARS, Material.AIR, Material.IRON_SWORD, "", 1.4f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.15, 60, 16, 2.4f);
+        add(types, "wall_spikes", "wall_spikes", 6, List.of(), List.of(), Material.BLACK_CONCRETE, Material.AIR, Material.IRON_SWORD, "", 1.1f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 3.0, 70, 12, 2.4f);
+        add(types, "falling_ice", "falling_ice", 9, List.of("frozen_halls"), List.of(), Material.AIR, Material.POINTED_DRIPSTONE, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.0, 55, 1, 2.4f);
+        add(types, "poison_darts", "poison_darts", 9, List.of("deep_crypt"), List.of(), Material.DISPENSER, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 5.0, 60, 1, 2.4f);
+        add(types, "steam_vent", "steam_vent", 9, List.of("factory"), List.of(), Material.HEAVY_WEIGHTED_PRESSURE_PLATE, Material.AIR, Material.HEAVY_WEIGHTED_PRESSURE_PLATE, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 5.0, 1.75, 100, 35, 2.4f);
         return Map.copyOf(types);
     }
 
@@ -144,6 +145,7 @@ public final class HallsTrapTypeLoader {
                             String kind,
                             int weight,
                             List<String> levelTypes,
+                            List<String> blacklistedLevelTypes,
                             Material blockMaterial,
                             Material ceilingMaterial,
                             Material modelMaterial,
@@ -158,7 +160,7 @@ public final class HallsTrapTypeLoader {
                             int intervalTicks,
                             int activeTicks,
                             float explosionPower) {
-        types.put(id, new HallsTrapType(id, kind, weight, levelTypes, blockMaterial, ceilingMaterial,
+        types.put(id, new HallsTrapType(id, kind, weight, levelTypes, blacklistedLevelTypes, blockMaterial, ceilingMaterial,
                 modelMaterial, itemModel, modelScale, bridgeMaterial, minSize, maxSize, depth, damage,
                 radius, intervalTicks, activeTicks, explosionPower));
     }
