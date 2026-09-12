@@ -2603,13 +2603,13 @@ public final class HallsSession {
 
     private ItemStack blueprintFromScenario(String preferredPool, int rareChancePercent) {
         String pool = preferredPool;
-        if (rareChancePercent > 0 && !scenario.blueprintPool("rare").isEmpty()
+        if (rareChancePercent > 0 && !scenario.blueprintPool("rare", activeLevelTypeId).isEmpty()
                 && new Random().nextInt(100) < rareChancePercent) {
             pool = "rare";
         }
-        List<String> ids = scenario.blueprintPool(pool);
+        List<String> ids = scenario.blueprintPool(pool, activeLevelTypeId);
         if (ids.isEmpty() && !pool.equals("normal")) {
-            ids = scenario.blueprintPool("normal");
+            ids = scenario.blueprintPool("normal", activeLevelTypeId);
         }
         if (ids.isEmpty()) {
             return blueprintPlaceholder();

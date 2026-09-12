@@ -98,6 +98,83 @@ blueprint-pools:
     - sculk_purifier_small_blueprint
     - sculk_purifier_medium_blueprint
     - sculk_purifier_large_blueprint
+  howling_corridors:
+    normal:
+      - cooking_pot_blueprint
+      - weapon_bench_blueprint
+      - storage_locker_small_blueprint
+      - storage_locker_medium_blueprint
+      - mycelia_farm_blueprint
+      - scanner_blueprint
+    rare:
+      - grindstone_blueprint
+      - storage_locker_large_blueprint
+      - health_totem_blueprint
+      - speed_totem_blueprint
+      - sculk_purifier_small_blueprint
+  frozen_halls:
+    normal:
+      - cooking_pot_blueprint
+      - forge_blueprint
+      - storage_locker_small_blueprint
+      - storage_locker_medium_blueprint
+      - mycelia_farm_blueprint
+      - sculk_purifier_small_blueprint
+    rare:
+      - storage_locker_large_blueprint
+      - speed_totem_blueprint
+      - sculk_purifier_medium_blueprint
+      - sculk_purifier_large_blueprint
+  deep_crypt:
+    normal:
+      - weapon_bench_blueprint
+      - armory_blueprint
+      - forge_blueprint
+      - scanner_blueprint
+      - sculk_purifier_small_blueprint
+      - sculk_purifier_medium_blueprint
+    rare:
+      - grindstone_blueprint
+      - elevator_drill_blueprint
+      - health_totem_blueprint
+      - sculk_purifier_large_blueprint
+  infernal_chambers:
+    normal:
+      - weapon_bench_blueprint
+      - armory_blueprint
+      - forge_blueprint
+      - storage_locker_medium_blueprint
+      - health_totem_blueprint
+    rare:
+      - grindstone_blueprint
+      - storage_locker_large_blueprint
+      - elevator_drill_blueprint
+      - health_totem_blueprint
+  factory:
+    normal:
+      - weapon_bench_blueprint
+      - armory_blueprint
+      - forge_blueprint
+      - storage_locker_medium_blueprint
+      - scanner_blueprint
+    rare:
+      - elevator_drill_blueprint
+      - grindstone_blueprint
+      - storage_locker_large_blueprint
+      - speed_totem_blueprint
+  backrooms:
+    normal:
+      - cooking_pot_blueprint
+      - storage_locker_small_blueprint
+      - storage_locker_medium_blueprint
+      - mycelia_farm_blueprint
+      - scanner_blueprint
+      - speed_totem_blueprint
+    rare:
+      - elevator_drill_blueprint
+      - storage_locker_large_blueprint
+      - health_totem_blueprint
+      - speed_totem_blueprint
 crafting-stations:
   cooking_pot:
     1:
@@ -188,55 +265,55 @@ floors:
   - number: 6
     kind: exploration
     level-type: infernal_chambers
-    difficulty: 18
-    rooms: 20
-    breakables: 32
-    traps: 7
+    difficulty: 14
+    rooms: 9
+    breakables: 30
+    traps: 9
     traps-per-room:
       min: 1
       max: 7
-    holes: 2
-    sculk-patches: 4
-    coin-quota: 14
+    holes: 6
+    sculk-patches: 3
+    coin-quota: 22
   - number: 7
     kind: exploration
     level-type: factory
-    difficulty: 18
-    rooms: 20
+    difficulty: 16
+    rooms: 10
     breakables: 32
-    traps: 7
+    traps: 10
     traps-per-room:
       min: 1
       max: 7
-    holes: 2
+    holes: 5
     sculk-patches: 4
-    coin-quota: 14
+    coin-quota: 24
   - number: 8
     kind: exploration
     level-type: backrooms
     difficulty: 18
-    rooms: 20
-    breakables: 32
-    traps: 7
+    rooms: 11
+    breakables: 34
+    traps: 10
     traps-per-room:
       min: 1
       max: 7
-    holes: 2
+    holes: 5
     sculk-patches: 4
-    coin-quota: 14
+    coin-quota: 26
   - number: 9
     kind: exploration
     level-type: howling_corridors
-    difficulty: 18
-    rooms: 20
-    breakables: 32
-    traps: 7
+    difficulty: 20
+    rooms: 12
+    breakables: 36
+    traps: 11
     traps-per-room:
       min: 1
       max: 7
-    holes: 2
-    sculk-patches: 4
-    coin-quota: 14
+    holes: 7
+    sculk-patches: 5
+    coin-quota: 28
   - number: 10
     kind: camp
     level-type: frozen_halls

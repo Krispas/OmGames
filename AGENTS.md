@@ -1354,10 +1354,11 @@ SQLite tables:
 - Item recipes are parsed as stored-scrap and hotbar item costs. Cooking Pot, Weapon Bench, and Armory list scenario-unlocked recipes by station level and craft them from their building GUI.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility. `melee-damage`, `attack-speed`, and `durability` are also applied to item meta where Bukkit/Paper exposes the relevant component APIs.
 - `vagabonds_club` is the default starter weapon. Every participant receives it when a Halls run starts or fully restarts after game over.
-- Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control blueprint keyword drops.
+- Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control global fallback blueprint keyword drops.
+- Scenario blueprint pools may also be restricted by level type with `blueprint-pools.<level-type>.normal` and `blueprint-pools.<level-type>.rare`; runtime uses the active floor level type first and falls back to the global rarity pool when no level-specific pool exists.
 - Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, forge, storage lockers by size, mycelia farm, elevator drill, scanner, health totem, speed totem, and sculk purifiers by size.
 - Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `utility`, `rare_weapon`, `rare_armor`, and `rare_utility`; `ranged` / `rare_ranged` are no longer supported Halls loot keywords.
-- The generic `blueprint` loot keyword rolls the scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools.
+- The generic `blueprint` loot keyword rolls the active level type's scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools, falling back to global scenario pools when no level-specific pool exists.
 - `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions. If `<item>` is `wood_scrap`, `iron_scrap`, `diamond_scrap`, or `redstone_scrap`, the amount is deposited directly into the caller's active session elevator storage and awards the matching test coins.
 - Halls armor items equip into empty matching armor slots from `/hoc give`; right-click physics-drop pickup still inserts into the selected hotbar slot.
 - Halls coin drops use session-owned physics drops but bypass normal inventory pickup; right-clicking the coin adds it directly to the shared session coin counter even when the hotbar is full.

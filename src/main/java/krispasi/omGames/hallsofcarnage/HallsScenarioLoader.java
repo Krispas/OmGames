@@ -52,6 +52,8 @@ public final class HallsScenarioLoader {
         int maxPlayers = players == null ? 6 : clamp(players.getInt("max", 6), minPlayers, 6);
         Map<String, List<String>> allowedItems = loadStringListMap(config.getConfigurationSection("allowed-items"));
         Map<String, List<String>> blueprintPools = loadStringListMap(config.getConfigurationSection("blueprint-pools"));
+        Map<String, Map<String, List<String>>> levelTypeBlueprintPools =
+                loadNestedStringListMap(config.getConfigurationSection("blueprint-pools"));
         Map<String, Map<Integer, List<String>>> craftingStations = loadCraftingStations(config.getConfigurationSection("crafting-stations"));
         List<HallsScenario.FloorDefinition> floors = loadFloors(config);
         int floorCount = floors.stream().mapToInt(HallsScenario.FloorDefinition::lastFloor).max().orElse(0);
@@ -60,7 +62,8 @@ public final class HallsScenarioLoader {
             return null;
         }
         return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers,
-                floorCount, allowedItems, blueprintPools, craftingStations, List.copyOf(floors), debugLines(file, config, floors));
+                floorCount, allowedItems, blueprintPools, levelTypeBlueprintPools,
+                craftingStations, List.copyOf(floors), debugLines(file, config, floors));
     }
 
     private static Map<String, List<String>> loadStringListMap(ConfigurationSection section) {
@@ -69,10 +72,31 @@ public final class HallsScenarioLoader {
         }
         Map<String, List<String>> values = new LinkedHashMap<>();
         for (String key : section.getKeys(false)) {
-            values.put(normalizeId(key), section.getStringList(key).stream()
+            List<String> entries = section.getStringList(key).stream()
                     .map(HallsScenarioLoader::normalizeId)
                     .filter(value -> !value.isBlank())
-                    .toList());
+                    .toList();
+            if (!entries.isEmpty()) {
+                values.put(normalizeId(key), entries);
+            }
+        }
+        return Map.copyOf(values);
+    }
+
+    private static Map<String, Map<String, List<String>>> loadNestedStringListMap(ConfigurationSection section) {
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, Map<String, List<String>>> values = new LinkedHashMap<>();
+        for (String key : section.getKeys(false)) {
+            ConfigurationSection nested = section.getConfigurationSection(key);
+            if (nested == null) {
+                continue;
+            }
+            Map<String, List<String>> pools = loadStringListMap(nested);
+            if (!pools.isEmpty()) {
+                values.put(normalizeId(key), pools);
+            }
         }
         return Map.copyOf(values);
     }

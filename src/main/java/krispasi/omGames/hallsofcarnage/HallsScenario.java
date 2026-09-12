@@ -13,6 +13,7 @@ public record HallsScenario(
         int floorCount,
         Map<String, List<String>> allowedItems,
         Map<String, List<String>> blueprintPools,
+        Map<String, Map<String, List<String>>> levelTypeBlueprintPools,
         Map<String, Map<Integer, List<String>>> craftingStations,
         List<FloorDefinition> floors,
         List<String> debugLines
@@ -20,6 +21,7 @@ public record HallsScenario(
     public HallsScenario {
         allowedItems = Map.copyOf(allowedItems);
         blueprintPools = Map.copyOf(blueprintPools);
+        levelTypeBlueprintPools = deepCopyBlueprintPools(levelTypeBlueprintPools);
         craftingStations = deepCopyCraftingStations(craftingStations);
     }
 
@@ -29,6 +31,16 @@ public record HallsScenario(
 
     public List<String> blueprintPool(String rarity) {
         return blueprintPools.getOrDefault(rarity, List.of());
+    }
+
+    public List<String> blueprintPool(String rarity, String levelType) {
+        String normalizedLevelType = normalize(levelType);
+        Map<String, List<String>> levelPools = levelTypeBlueprintPools.get(normalizedLevelType);
+        if (levelPools == null) {
+            return blueprintPool(rarity);
+        }
+        List<String> ids = levelPools.getOrDefault(normalize(rarity), List.of());
+        return ids.isEmpty() ? blueprintPool(rarity) : ids;
     }
 
     public List<String> craftingRecipes(String stationId, int level) {
@@ -107,6 +119,19 @@ public record HallsScenario(
                 levels.put(level.getKey(), List.copyOf(level.getValue()));
             }
             copy.put(normalize(station.getKey()), Map.copyOf(levels));
+        }
+        return Map.copyOf(copy);
+    }
+
+    private static Map<String, Map<String, List<String>>> deepCopyBlueprintPools(
+            Map<String, Map<String, List<String>>> source) {
+        Map<String, Map<String, List<String>>> copy = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, List<String>>> levelType : source.entrySet()) {
+            Map<String, List<String>> pools = new java.util.LinkedHashMap<>();
+            for (Map.Entry<String, List<String>> pool : levelType.getValue().entrySet()) {
+                pools.put(normalize(pool.getKey()), List.copyOf(pool.getValue()));
+            }
+            copy.put(normalize(levelType.getKey()), Map.copyOf(pools));
         }
         return Map.copyOf(copy);
     }

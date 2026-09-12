@@ -44,6 +44,7 @@ They are located under resources/hallsOfCarnage/scenarios. There is already one 
 It contains how the campaign is structured. While each dive attempt randomizes the floors by generating a new seed, the level types and camps stay the same.
 
 Also contains item types which are present in the scenario, choosing whitelist approach for which gear can appear/be crafted during the scenario. Same goes for camp buildings
+Blueprint drop pools are scenario-owned. A scenario may define global normal/rare blueprint pools and may override those pools per level type, so specific building blueprints can be found only in certain dungeon themes.
 ## Multiplayer
 Game can be played in 1-6 players. When player dies in a multiplayer game, they become a ghost (not spectator, I dont want them to go out of bounds). And can explore the level still. However the inventory is blocked and all stuff dropped on the ground. Can damage monsters using hand. They are also still in adventure mode, but invisible. Particles are displayed in their place.
 ## Save Files
