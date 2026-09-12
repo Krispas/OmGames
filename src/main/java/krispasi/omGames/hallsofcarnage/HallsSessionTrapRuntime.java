@@ -257,7 +257,11 @@ final class HallsSessionTrapRuntime {
     }
 
     private boolean globalReachabilityChecks(HallsLevelType levelType) {
-        return levelType == null || !"maze".equalsIgnoreCase(levelType.corridorGeneration());
+        if (levelType == null || levelType.corridorGeneration() == null) {
+            return true;
+        }
+        String mode = levelType.corridorGeneration().trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_');
+        return !mode.equals("maze") && !mode.equals("open_halls") && !mode.equals("open_hall");
     }
 
     private List<TrapCandidate> trapCandidates(HallsExplorationGenerator.Plan plan) {

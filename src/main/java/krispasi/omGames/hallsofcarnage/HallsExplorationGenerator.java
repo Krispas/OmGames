@@ -258,6 +258,26 @@ final class HallsExplorationGenerator {
     }
 
     private boolean isValidDoorOffset(HallsLayout layout, BlockFace face, int offset) {
+        if (wideRoomOpenings()) {
+            if (offset <= 1) {
+                return false;
+            }
+            int span = face == BlockFace.NORTH || face == BlockFace.SOUTH ? layout.width() : layout.depth();
+            if (offset >= span - 2) {
+                return false;
+            }
+            return isSingleDoorOffsetOpen(layout, face, offset - 1)
+                    && isSingleDoorOffsetOpen(layout, face, offset)
+                    && isSingleDoorOffsetOpen(layout, face, offset + 1);
+        }
+        return isSingleDoorOffsetOpen(layout, face, offset);
+    }
+
+    private boolean wideRoomOpenings() {
+        return corridorMode == CorridorMode.LARGE_CORRIDORS || corridorMode == CorridorMode.OPEN_HALLS;
+    }
+
+    private boolean isSingleDoorOffsetOpen(HallsLayout layout, BlockFace face, int offset) {
         return switch (face) {
             case NORTH -> layout.at(offset, 0) == 'O' && layout.at(offset, 1) == 'O';
             case SOUTH -> layout.at(offset, layout.depth() - 1) == 'O' && layout.at(offset, layout.depth() - 2) == 'O';

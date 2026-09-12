@@ -1533,21 +1533,25 @@ public final class HallsSession {
         for (int z = -1; z <= layout.depth(); z++) {
             for (int x = -1; x <= layout.width(); x++) {
                 boolean border = x < 0 || z < 0 || x >= layout.width() || z >= layout.depth();
-                boolean opening = border && isRoomOpening(layout, x, z, openings);
+                boolean opening = border && isRoomOpening(layout, x, z, openings, levelType);
                 char cell = border ? 'X' : layout.at(x, z);
                 int blockX = startX + x;
                 int blockZ = startZ + z;
-                Material wall = roomWallMaterial(levelType, layout, x, z, blockX, blockZ);
                 boolean wallColumn = !opening && (border || cell == 'X');
-                setBlock(blockX, y - 1, blockZ, wallColumn ? wall : floor);
+                setBlock(blockX, y - 1, blockZ, wallColumn
+                        ? roomWallMaterial(levelType, layout, x, z, blockX, y - 1, blockZ)
+                        : floor);
                 setBlock(blockX, y + ROOM_HEIGHT, blockZ, ceiling);
                 if (wallColumn) {
                     for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
-                        setBlock(blockX, y + dy, blockZ, wall);
+                        setBlock(blockX, y + dy, blockZ,
+                                roomWallMaterial(levelType, layout, x, z, blockX, y + dy, blockZ));
                     }
                 } else {
                     for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
-                        setBlock(blockX, y + dy, blockZ, opening && dy >= 3 ? wall : Material.AIR);
+                        setBlock(blockX, y + dy, blockZ, opening && dy >= 3
+                                ? roomWallMaterial(levelType, layout, x, z, blockX, y + dy, blockZ)
+                                : Material.AIR);
                     }
                 }
             }
@@ -1555,22 +1559,37 @@ public final class HallsSession {
         placeRoomCeilingLights(layout, startX, y, startZ, levelType, random);
     }
 
-    private boolean isRoomOpening(HallsLayout layout, int x, int z, Map<BlockFace, Integer> openings) {
+    private boolean isRoomOpening(HallsLayout layout,
+                                  int x,
+                                  int z,
+                                  Map<BlockFace, Integer> openings,
+                                  HallsLevelType levelType) {
         int centerX = layout.width() / 2;
         int centerZ = layout.depth() / 2;
+        int halfWidth = wideRoomOpenings(levelType) ? 1 : 0;
         if (z == -1) {
-            return x == openings.getOrDefault(BlockFace.NORTH, centerX + 1000);
+            return Math.abs(x - openings.getOrDefault(BlockFace.NORTH, centerX + 1000)) <= halfWidth;
         }
         if (z == layout.depth()) {
-            return x == openings.getOrDefault(BlockFace.SOUTH, centerX + 1000);
+            return Math.abs(x - openings.getOrDefault(BlockFace.SOUTH, centerX + 1000)) <= halfWidth;
         }
         if (x == -1) {
-            return z == openings.getOrDefault(BlockFace.WEST, centerZ + 1000);
+            return Math.abs(z - openings.getOrDefault(BlockFace.WEST, centerZ + 1000)) <= halfWidth;
         }
         if (x == layout.width()) {
-            return z == openings.getOrDefault(BlockFace.EAST, centerZ + 1000);
+            return Math.abs(z - openings.getOrDefault(BlockFace.EAST, centerZ + 1000)) <= halfWidth;
         }
         return false;
+    }
+
+    private boolean wideRoomOpenings(HallsLevelType levelType) {
+        if (levelType == null || levelType.corridorGeneration() == null) {
+            return false;
+        }
+        String mode = levelType.corridorGeneration().trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_');
+        return mode.equals("large_corridors") || mode.equals("large_corridor")
+                || mode.equals("wide") || mode.equals("wide_corridors")
+                || mode.equals("open_halls") || mode.equals("open_hall");
     }
 
     private void buildConnector(int x, int y, int startZ, int endZ) {
@@ -1616,11 +1635,15 @@ public final class HallsSession {
                 continue;
             }
             boolean path = offset >= pathMin && offset <= pathMax;
-            Material wall = corridorWallMaterial(levelType, new HallsExplorationGenerator.Cell(blockX, blockZ), openCells);
-            setBlock(blockX, y - 1, blockZ, path ? floor : wall);
+            HallsExplorationGenerator.Cell wallCell = new HallsExplorationGenerator.Cell(blockX, blockZ);
+            setBlock(blockX, y - 1, blockZ, path
+                    ? floor
+                    : corridorWallMaterial(levelType, wallCell, y - 1, openCells));
             setBlock(blockX, y + 3, blockZ, path && isCorridorLightCell(blockX, blockZ) ? levelType.light() : ceiling);
             for (int dy = 0; dy < 3; dy++) {
-                setBlock(blockX, y + dy, blockZ, path ? Material.AIR : wall);
+                setBlock(blockX, y + dy, blockZ, path
+                        ? Material.AIR
+                        : corridorWallMaterial(levelType, wallCell, y + dy, openCells));
             }
         }
     }
@@ -1643,17 +1666,18 @@ public final class HallsSession {
         return (northOpen || southOpen) && (eastOpen || westOpen);
     }
 
-    private Material roomWallMaterial(HallsLevelType levelType, HallsLayout layout, int x, int z, int blockX, int blockZ) {
-        return wallMaterial(levelType, blockX, blockZ, isRoomPillarColumn(layout, x, z), 0x5A17);
+    private Material roomWallMaterial(HallsLevelType levelType, HallsLayout layout, int x, int z, int blockX, int y, int blockZ) {
+        return wallMaterial(levelType, blockX, y, blockZ, isRoomPillarColumn(layout, x, z), 0x5A17);
     }
 
     private Material corridorWallMaterial(HallsLevelType levelType,
                                           HallsExplorationGenerator.Cell point,
+                                          int y,
                                           Set<HallsExplorationGenerator.Cell> openCells) {
-        return wallMaterial(levelType, point.x(), point.z(), isCorridorPillarColumn(point, openCells), 0xC011);
+        return wallMaterial(levelType, point.x(), y, point.z(), isCorridorPillarColumn(point, openCells), 0xC011);
     }
 
-    private Material wallMaterial(HallsLevelType levelType, int x, int z, boolean pillar, long salt) {
+    private Material wallMaterial(HallsLevelType levelType, int x, int y, int z, boolean pillar, long salt) {
         int groupX = Math.floorDiv(x, 7);
         int groupZ = Math.floorDiv(z, 7);
         Random paletteRandom = new Random((((long) groupX) * 341873128712L)
@@ -1665,6 +1689,7 @@ public final class HallsSession {
                 ? levelType.pillarPalette(paletteRandom)
                 : levelType.wallPalette(paletteRandom);
         Random columnRandom = new Random((((long) x) * 341873128712L)
+                ^ (((long) y) * 42317861L)
                 ^ (((long) z) * 132897987541L)
                 ^ (((long) id) << 24)
                 ^ (((long) currentFloor) << 8)
@@ -1692,14 +1717,17 @@ public final class HallsSession {
         if (!open && insideRoomShell) {
             return;
         }
-        Material wall = corridorWallMaterial(levelType, point, openCells);
-        setBlock(point.x(), origin.y() - 1, point.z(), open ? levelType.corridorFloor() : wall);
+        setBlock(point.x(), origin.y() - 1, point.z(), open
+                ? levelType.corridorFloor()
+                : corridorWallMaterial(levelType, point, origin.y() - 1, openCells));
         if (!insideRoomShell) {
             setBlock(point.x(), origin.y() + 3, point.z(),
                     open && isCorridorLightCell(point.x(), point.z()) ? levelType.light() : levelType.corridorCeiling());
         }
         for (int dy = 0; dy < 3; dy++) {
-            setBlock(point.x(), origin.y() + dy, point.z(), open ? Material.AIR : wall);
+            setBlock(point.x(), origin.y() + dy, point.z(), open
+                    ? Material.AIR
+                    : corridorWallMaterial(levelType, point, origin.y() + dy, openCells));
         }
     }
 
@@ -1775,14 +1803,16 @@ public final class HallsSession {
         HallsLevelType levelType = activeLevelType();
         for (int x = -2; x <= 2; x++) {
             int blockX = origin.x() + x;
-            Material wall = wallMaterial(levelType, blockX, z, Math.abs(x) == 2, 0xE1E7A7);
             setBlock(blockX, origin.y() - 1, z, levelType.corridorFloor());
             setBlock(blockX, origin.y() + 3, z, levelType.corridorCeiling());
-            setBlock(blockX, origin.y() + 4, z, wall);
+            setBlock(blockX, origin.y() + 4, z,
+                    wallMaterial(levelType, blockX, origin.y() + 4, z, Math.abs(x) == 2, 0xE1E7A7));
             boolean sideWall = Math.abs(x) == 2;
             for (int y = 0; y <= 2; y++) {
                 setBlock(blockX, origin.y() + y, z,
-                        sideWall ? wall : open ? Material.AIR : Material.BLACK_CONCRETE);
+                        sideWall
+                                ? wallMaterial(levelType, blockX, origin.y() + y, z, true, 0xE1E7A7)
+                                : open ? Material.AIR : Material.BLACK_CONCRETE);
             }
         }
     }

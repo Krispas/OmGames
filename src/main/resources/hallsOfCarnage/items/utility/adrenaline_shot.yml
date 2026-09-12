@@ -2,7 +2,7 @@ id: adrenaline_shot
 name: "Adrenaline Shot"
 category: utility
 rarity: normal
-material: EXPERIENCE_BOTTLE
+material: FIREWORK_STAR
 item-model: minecraft:rabbit_foot
 max-stack-size: 1
 lore:
