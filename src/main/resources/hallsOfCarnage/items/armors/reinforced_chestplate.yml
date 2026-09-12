@@ -9,7 +9,7 @@ max-stack-size: 1
 lore:
   - "A rare plate patched with dense salvage."
 stats:
-  armor: 7
+  armor: 14
   toughness: 2
   durability: 95
 recipe:

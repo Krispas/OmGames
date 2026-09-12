@@ -148,3 +148,6 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- When players die, their offhand and armor slots are duped when dropped
+- Dropping the frost lance renders it as trident model, making the visible model fall below the ground, is there a way we can fix that?
+- Ghosts shouldnt be able to trigger traps

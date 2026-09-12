@@ -3,11 +3,12 @@ name: "Ironbound Chestplate"
 category: armor
 rarity: normal
 material: IRON_CHESTPLATE
+armor-model: minecraft:iron
 max-stack-size: 1
 lore:
   - "A practical plate hammered into shape at camp."
 stats:
-  armor: 6
+  armor: 12
   toughness: 1
   durability: 90
 recipe:
