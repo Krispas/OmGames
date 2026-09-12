@@ -41,6 +41,13 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                 manager.openMainMenu(player);
                 return true;
             }
+            case "recipes" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("Only players can open Halls recipes.", NamedTextColor.RED));
+                    return true;
+                }
+                result = manager.openRecipeBook(player);
+            }
             case "scenarios" -> {
                 sendScenarios(sender);
                 return true;
@@ -334,13 +341,13 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
     }
 
     private Component usage() {
-        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc debug | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc leave | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc give <item> [amount] | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload | /hoc reset confirm", NamedTextColor.YELLOW);
+        return Component.text("Usage: /hoc menu | /hoc recipes | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc debug | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc leave | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc give <item> [amount] | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload | /hoc reset confirm", NamedTextColor.YELLOW);
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(args[0], "menu", "scenarios", "scenario", "sessions", "debug", "top", "shame", "tp", "leave", "start", "stop", "floor", "give", "lobby", "reload", "reset");
+            return filter(args[0], "menu", "recipes", "scenarios", "scenario", "sessions", "debug", "top", "shame", "tp", "leave", "start", "stop", "floor", "give", "lobby", "reload", "reset");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("give")) {
             List<String> options = new ArrayList<>(manager.getItemIds());

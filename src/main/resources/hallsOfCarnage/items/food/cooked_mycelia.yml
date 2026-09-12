@@ -9,4 +9,5 @@ lore:
 stats:
   heal: 5
 recipe:
-  wood_scrap: 2
+  raw_mycelia: 1
+  wood_scrap: 1

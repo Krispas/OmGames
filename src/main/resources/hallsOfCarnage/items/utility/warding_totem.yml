@@ -3,7 +3,6 @@ name: "Warding Totem"
 category: utility
 rarity: rare
 material: TOTEM_OF_UNDYING
-item-model: om:hoc_warding_totem
 max-stack-size: 1
 lore:
   - "Grants nearby players Resistance II for 10 seconds."

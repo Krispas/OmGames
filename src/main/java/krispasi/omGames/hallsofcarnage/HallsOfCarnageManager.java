@@ -403,6 +403,59 @@ public final class HallsOfCarnageManager {
         HallsMainMenu.openMain(plugin, player, shameService.getLeaderboard(10), savesFor(player).size());
     }
 
+    public Result openRecipeBook(Player player) {
+        HallsSession session = activeSession(player);
+        if (session == null) {
+            return Result.fail("You must be in an active Halls session to view recipes.");
+        }
+        HallsRecipeBookMenu.openIndex(plugin, player, session.scenario());
+        return Result.ok("Opened Halls recipes.");
+    }
+
+    public boolean handleRecipeBookClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        HallsRecipeBookMenu.MenuHolder holder = HallsRecipeBookMenu.holder(event.getInventory());
+        if (holder == null) {
+            return false;
+        }
+        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player player)
+                || event.getClickedInventory() == null
+                || event.getClickedInventory() != event.getView().getTopInventory()) {
+            return true;
+        }
+        HallsSession session = activeSession(player);
+        if (session == null) {
+            player.closeInventory();
+            player.sendActionBar(Component.text("You are no longer in a Halls session.", NamedTextColor.RED));
+            return true;
+        }
+        String action = HallsRecipeBookMenu.action(plugin, event.getCurrentItem());
+        String value = HallsRecipeBookMenu.value(plugin, event.getCurrentItem());
+        if (action == null) {
+            return true;
+        }
+        switch (action) {
+            case HallsRecipeBookMenu.ACTION_BUILDINGS ->
+                    HallsRecipeBookMenu.openBuildings(plugin, player, session.scenario(), buildingTypes, itemTypes);
+            case HallsRecipeBookMenu.ACTION_CRAFTING ->
+                    HallsRecipeBookMenu.openCrafting(plugin, player, session.scenario(), buildingTypes, itemTypes);
+            case HallsRecipeBookMenu.ACTION_BUILDING_DETAIL -> {
+                HallsBuildingType building = buildingTypes.get(normalizeId(value));
+                if (building == null) {
+                    player.sendActionBar(Component.text("That building is no longer loaded.", NamedTextColor.RED));
+                    HallsRecipeBookMenu.openBuildings(plugin, player, session.scenario(), buildingTypes, itemTypes);
+                } else {
+                    HallsRecipeBookMenu.openBuildingDetail(plugin, player, session.scenario(), building, itemTypes);
+                }
+            }
+            case HallsRecipeBookMenu.ACTION_BACK ->
+                    HallsRecipeBookMenu.openIndex(plugin, player, session.scenario());
+            default -> {
+            }
+        }
+        return true;
+    }
+
     public boolean handleMainMenuClick(org.bukkit.event.inventory.InventoryClickEvent event) {
         HallsMainMenu.MenuHolder holder = HallsMainMenu.holder(event.getInventory());
         if (holder == null) {
@@ -670,11 +723,15 @@ public final class HallsOfCarnageManager {
     }
 
     public boolean isActiveSessionParticipant(Player player) {
+        return activeSession(player) != null;
+    }
+
+    private HallsSession activeSession(Player player) {
         if (player == null) {
-            return false;
+            return null;
         }
         Integer sessionId = playerSessions.get(player.getUniqueId());
-        return sessionId != null && activeSessions.containsKey(sessionId);
+        return sessionId == null ? null : activeSessions.get(sessionId);
     }
 
     public boolean isLockedInventorySlotItem(org.bukkit.inventory.ItemStack item) {

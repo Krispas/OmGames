@@ -1230,11 +1230,13 @@ Behavior notes:
 
 Public subcommands:
 - `/hoc menu`
+- `/hoc recipes`
 - `/hoc scenarios`
 - `/hoc sessions`
 - `/hoc top`
 - `/hoc shame [player]`
 - `/hoc tp`
+- `/hoc leave`
 
 Operator subcommands:
 - `/hoc start <scenario> [player...]`
@@ -1285,6 +1287,7 @@ SQLite tables:
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
 - `/hoc scenario <scenario>` is an OP-only debug command that prints the loaded parsed scenario data and the YAML view copied from the active server data folder.
 - `/hoc debug` is an OP-only player command that toggles per-player Halls debug messages for generation timing, breakable/trap counts, and monster spawn/cap timing.
+- `/hoc recipes` is player-only and requires the caller to be in an active Halls session; it opens a read-only recipe book for that session's scenario with building blueprint locations and station recipe unlock levels.
 - `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `breakable_loot_pools`, `traps`, `monsters`, `items`, `buildings`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
 - `HallsExplorationGenerator` owns per-rebuild exploration layout planning.
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.yml`; legacy `.txt` and `.yaml` files are still parsed if present.
@@ -1352,6 +1355,7 @@ SQLite tables:
 - Difficulty options are Normal/Hard/Extreme with multipliers `1.0`, `1.5`, and `2.0`; the first-pass implementation scales floor difficulty, coin quota, trapped-room count, holes, and sculk patch count.
 - Camp floors connect the elevator corridor to the nearest open north-edge layout cell instead of assuming the layout center is open, and should keep the camp room far enough from the elevator to allow a walkable connector with a sealed corridor-height entrance.
 - Item recipes are parsed as stored-scrap and hotbar item costs. Cooking Pot, Weapon Bench, and Armory list scenario-unlocked recipes by station level and craft them from their building GUI.
+- The `/hoc recipes` GUI reads the active scenario's `allowed-items.buildings`, global and level-type blueprint pools, and crafting-station recipe unlocks; it should remain informational and should not craft or mutate state.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility. `melee-damage`, `attack-speed`, and `durability` are also applied to item meta where Bukkit/Paper exposes the relevant component APIs.
 - `vagabonds_club` is the default starter weapon. Every participant receives it when a Halls run starts or fully restarts after game over.
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control global fallback blueprint keyword drops.

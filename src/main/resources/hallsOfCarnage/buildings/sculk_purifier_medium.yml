@@ -5,7 +5,6 @@ blueprint: sculk_purifier_medium_blueprint
 implemented: true
 levels:
   1:
-    upgrade-cost: {diamond: 2}
     harvest:
       uses: 3
     parts:
@@ -16,7 +15,7 @@ levels:
         offset: [0.45, 0, 0]
         scale: [0.65, 0.65, 0.65]
   2:
-    upgrade-cost: {diamond: 4}
+    upgrade-cost: {diamond: 2}
     harvest:
       uses: 3
     parts:
@@ -27,6 +26,7 @@ levels:
         offset: [0.45, 0, 0]
         scale: [0.75, 0.75, 0.75]
   3:
+    upgrade-cost: {diamond: 4}
     harvest:
       uses: 3
     parts:

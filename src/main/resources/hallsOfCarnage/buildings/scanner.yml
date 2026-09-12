@@ -5,13 +5,12 @@ blueprint: scanner_blueprint
 implemented: true
 levels:
   1:
-    upgrade-cost: {diamond: 1}
     parts:
       - material: LODESTONE
         offset: [0, 0, 0]
         scale: [0.8, 0.8, 0.8]
   2:
-    upgrade-cost: {diamond: 2}
+    upgrade-cost: {diamond: 1}
     parts:
       - material: LODESTONE
         offset: [0, 0, 0]
@@ -20,6 +19,7 @@ levels:
         offset: [0, 0.6, 0]
         scale: [0.45, 0.45, 0.45]
   3:
+    upgrade-cost: {diamond: 2}
     parts:
       - material: LODESTONE
         offset: [0, 0, 0]

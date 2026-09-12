@@ -5,7 +5,6 @@ blueprint: mycelia_farm_blueprint
 implemented: true
 levels:
   1:
-    upgrade-cost: {diamond: 1}
     harvest:
       uses: 1
       items:
@@ -22,7 +21,7 @@ levels:
         offset: [0, 0, 0]
         scale: [1, 0.25, 1]
   2:
-    upgrade-cost: {diamond: 2}
+    upgrade-cost: {diamond: 1}
     harvest:
       uses: 2
       items:
@@ -45,6 +44,7 @@ levels:
         offset: [0.15, 0.2, 0.1]
         scale: [0.55, 0.55, 0.55]
   3:
+    upgrade-cost: {diamond: 2}
     harvest:
       uses: 3
       items:

@@ -231,6 +231,9 @@ public final class HallsOfCarnageListener implements Listener {
         if (manager.handleMainMenuClick(event)) {
             return;
         }
+        if (manager.handleRecipeBookClick(event)) {
+            return;
+        }
         if (manager.handleCampInventoryClick(event)) {
             return;
         }
