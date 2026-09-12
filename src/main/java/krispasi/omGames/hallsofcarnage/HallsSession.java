@@ -695,6 +695,14 @@ public final class HallsSession {
     }
 
     public boolean handleItemConsume(Player player, ItemStack item) {
+        return eatHallsFood(player, item, false);
+    }
+
+    public boolean handleFoodUse(Player player, ItemStack item) {
+        return eatHallsFood(player, item, true);
+    }
+
+    private boolean eatHallsFood(Player player, ItemStack item, boolean consumeHeld) {
         if (player == null || item == null || !running || !participants.contains(player.getUniqueId())
                 || !player.getWorld().equals(world)) {
             return false;
@@ -717,6 +725,9 @@ public final class HallsSession {
         double nextHealth = Math.min(maxHealth, player.getHealth() + heal);
         player.setHealth(nextHealth);
         applyFoodBuffs(player, type);
+        if (consumeHeld) {
+            consumeOneHeldItem(player);
+        }
         world.playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 0.6f, 1.25f);
         player.sendActionBar(Component.text("Restored " + formatStatAmount(heal) + " health.", NamedTextColor.GREEN));
         return true;
@@ -798,6 +809,14 @@ public final class HallsSession {
                 applyUtilityCooldown(player, item, type);
                 yield true;
             }
+            case "poison_bomb" -> {
+                if (isUtilityOnCooldown(player, type)) {
+                    yield true;
+                }
+                activatePoisonBomb(player, type);
+                applyUtilityCooldown(player, item, type);
+                yield true;
+            }
             default -> false;
         };
     }
@@ -866,6 +885,8 @@ public final class HallsSession {
                 player.getInventory().clear();
                 player.setRespawnLocation(fallback, true);
                 player.setInvisible(false);
+                player.setFlying(false);
+                player.setAllowFlight(false);
                 player.removePotionEffect(PotionEffectType.INVISIBILITY);
                 clearTotemBuffs(player);
                 player.teleport(fallback);
@@ -875,6 +896,8 @@ public final class HallsSession {
                 restoreInventoryLimit(player);
                 player.getInventory().clear();
                 player.setInvisible(false);
+                player.setFlying(false);
+                player.setAllowFlight(false);
                 player.removePotionEffect(PotionEffectType.INVISIBILITY);
                 clearTotemBuffs(player);
                 if (fallback != null) {
@@ -2712,6 +2735,30 @@ public final class HallsSession {
         player.sendActionBar(Component.text(message, NamedTextColor.AQUA));
     }
 
+    private void activatePoisonBomb(Player player, HallsItemType type) {
+        double radius = Math.max(1.0, type.stats().getOrDefault("radius", 4.0));
+        double damage = Math.max(0.0, type.stats().getOrDefault("monster_damage", 3.0));
+        int poisonTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("poison_seconds", 5.0) * 20.0));
+        int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("poison_amplifier", 1.0)) - 1);
+        Location center = player.getLocation();
+        for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
+            if (nearby instanceof LivingEntity living
+                    && monsterRuntime.isSessionMonster(living)
+                    && living.getLocation().distanceSquared(center) <= radius * radius) {
+                living.addPotionEffect(new PotionEffect(PotionEffectType.POISON, poisonTicks, amplifier, true, true, true));
+                if (damage > 0.0) {
+                    living.damage(damage, player);
+                }
+            }
+        }
+        world.spawnParticle(Particle.ENTITY_EFFECT, center.clone().add(0.0, 1.0, 0.0),
+                90, radius * 0.35, 0.65, radius * 0.35, 0.08);
+        world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, center.clone().add(0.0, 0.6, 0.0),
+                70, radius * 0.3, 0.45, radius * 0.3, 0.04);
+        world.playSound(center, Sound.ENTITY_SPLASH_POTION_BREAK, 0.8f, 0.75f);
+        player.sendActionBar(Component.text("Poison vapor eats into nearby monsters.", NamedTextColor.DARK_GREEN));
+    }
+
     private boolean isUtilityOnCooldown(Player player, HallsItemType type) {
         long remainingMillis = utilityCooldowns.getOrDefault(utilityCooldownKey(player, type), 0L) - System.currentTimeMillis();
         if (remainingMillis <= 0L) {
@@ -3108,7 +3155,8 @@ public final class HallsSession {
     private void applyGhostState(Player player) {
         player.setGameMode(GameMode.ADVENTURE);
         player.setInvisible(true);
-        player.setAllowFlight(false);
+        player.setAllowFlight(true);
+        player.setFlying(true);
         player.getInventory().clear();
         applyInventoryLimit(player);
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, PotionEffect.INFINITE_DURATION, 0, true, false, false));
@@ -3120,6 +3168,8 @@ public final class HallsSession {
         }
         ghostPlayers.remove(player.getUniqueId());
         player.setInvisible(false);
+        player.setFlying(false);
+        player.setAllowFlight(false);
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
     }
 

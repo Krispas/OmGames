@@ -1389,7 +1389,7 @@ SQLite tables:
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth. Bear traps and proximity mines render through item-display models instead of placed physical floor blocks.
 - Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults.
-- Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
+- Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `scale`, optional `movement-speed-multiplier`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
 - Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
 - Modifier files define `modifiers.<id>.type`, `display-name`, `icon`, `weight`, and `effects`.
 - Shared modifiers live in `modifiers/shared.yml`; level-specific modifier files such as `frozen_halls.yml` and `deep_crypt.yml` are restricted to that level type by filename.

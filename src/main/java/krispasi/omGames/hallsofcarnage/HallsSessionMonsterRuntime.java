@@ -274,11 +274,11 @@ final class HallsSessionMonsterRuntime {
         if (spawnedMonsters.size() >= maxAlive) {
             return;
         }
-        HallsExplorationGenerator.Cell cell = spawnCellAwayFromPlayers();
+        HallsMonsterType type = rollMonsterType();
+        HallsExplorationGenerator.Cell cell = spawnCellAwayFromPlayers(type);
         if (cell == null) {
             return;
         }
-        HallsMonsterType type = rollMonsterType();
         Location location = new Location(world, cell.x() + 0.5, origin.y(), cell.z() + 0.5);
         Entity entity = world.spawnEntity(location, type.entityType());
         if (entity instanceof LivingEntity living) {
@@ -333,22 +333,18 @@ final class HallsSessionMonsterRuntime {
     }
 
     private void applyTypeSpecificAttributes(LivingEntity living, HallsMonsterType type) {
-        if (type.id().equals("hoglin_slow")) {
-            AttributeInstance speed = living.getAttribute(Attribute.MOVEMENT_SPEED);
-            if (speed != null) {
-                speed.setBaseValue(speed.getBaseValue() * 0.55);
-            }
+        AttributeInstance scale = living.getAttribute(Attribute.SCALE);
+        if (scale != null && type.scale() != 1.0) {
+            scale.setBaseValue(type.scale());
+        }
+        AttributeInstance speed = living.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (speed != null && type.movementSpeedMultiplier() != 1.0) {
+            speed.setBaseValue(speed.getBaseValue() * type.movementSpeedMultiplier());
         }
         if (type.id().equals("ravager")) {
             AttributeInstance attackDamage = living.getAttribute(Attribute.ATTACK_DAMAGE);
             if (attackDamage != null) {
                 attackDamage.setBaseValue(6.0);
-            }
-        }
-        if (type.id().equals("splinter_small")) {
-            AttributeInstance scale = living.getAttribute(Attribute.SCALE);
-            if (scale != null) {
-                scale.setBaseValue(0.7);
             }
         }
     }
@@ -444,19 +440,53 @@ final class HallsSessionMonsterRuntime {
         if (configured != null) {
             return configured;
         }
-        return new HallsMonsterType("warden", "Warden", EntityType.WARDEN, 500.0, false, 0, Material.AIR, Map.of());
+        return new HallsMonsterType("warden", "Warden", EntityType.WARDEN, 500.0, false, 0, 1.0, 1.0, Material.AIR, Map.of());
     }
 
-    private HallsExplorationGenerator.Cell spawnCellAwayFromPlayers() {
+    private HallsExplorationGenerator.Cell spawnCellAwayFromPlayers(HallsMonsterType type) {
         List<HallsExplorationGenerator.Cell> shuffled = new ArrayList<>(spawnCells);
         java.util.Collections.shuffle(shuffled, random);
+        Set<HallsExplorationGenerator.Cell> open = Set.copyOf(spawnCells);
         for (HallsExplorationGenerator.Cell cell : shuffled) {
             Location location = new Location(world, cell.x() + 0.5, origin.y(), cell.z() + 0.5);
-            if (nearestParticipant(location, 14.0) == null && !isVisibleToParticipant(location)) {
+            if (nearestParticipant(location, 14.0) == null
+                    && !isVisibleToParticipant(location)
+                    && hasSpawnClearance(cell, type, open)) {
                 return cell;
             }
         }
         return null;
+    }
+
+    private boolean hasSpawnClearance(HallsExplorationGenerator.Cell cell,
+                                      HallsMonsterType type,
+                                      Set<HallsExplorationGenerator.Cell> open) {
+        int radius = spawnClearanceRadius(type);
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                HallsExplorationGenerator.Cell candidate = new HallsExplorationGenerator.Cell(cell.x() + dx, cell.z() + dz);
+                if (!open.contains(candidate)) {
+                    return false;
+                }
+                for (int dy = 0; dy <= 2; dy++) {
+                    if (!world.getBlockAt(candidate.x(), origin.y() + dy, candidate.z()).getType().isAir()) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    private int spawnClearanceRadius(HallsMonsterType type) {
+        if (type == null) {
+            return 0;
+        }
+        if (type.entityType() == EntityType.RAVAGER || type.entityType() == EntityType.HOGLIN
+                || type.scale() > 1.2 || type.slimeSize() >= 4) {
+            return 1;
+        }
+        return 0;
     }
 
     private boolean isVisibleToParticipant(Location location) {

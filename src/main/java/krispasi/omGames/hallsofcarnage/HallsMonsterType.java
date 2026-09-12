@@ -11,10 +11,14 @@ record HallsMonsterType(
         double health,
         boolean baby,
         int slimeSize,
+        double scale,
+        double movementSpeedMultiplier,
         Material mainHand,
         Map<String, Material> armor
 ) {
     HallsMonsterType {
+        scale = Math.max(0.1, scale);
+        movementSpeedMultiplier = Math.max(0.0, movementSpeedMultiplier);
         armor = Map.copyOf(armor);
     }
 }

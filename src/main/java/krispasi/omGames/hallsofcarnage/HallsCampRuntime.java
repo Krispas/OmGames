@@ -171,6 +171,7 @@ public final class HallsCampRuntime {
         if (building != null && building.id().equals("mycelia_farm") && plot.harvestRemaining() > 0) {
             return harvestMycelia(player, plot, building);
         }
+        playBuildingSound(player, building, BuildingSound.OPEN);
         openBuildingMenu(player, plot);
         return true;
     }
@@ -311,7 +312,7 @@ public final class HallsCampRuntime {
         setBuilding(plot, building, 1);
         initializeHarvest(plot, building);
         player.sendMessage(Component.text("Built " + building.name() + ".", NamedTextColor.GREEN));
-        world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_PLACE, 0.7f, 1.25f);
+        playBuildingSound(player, building, BuildingSound.BUILD);
         return true;
     }
 
@@ -332,7 +333,7 @@ public final class HallsCampRuntime {
         setBuilding(plot, building, plot.level() + 1);
         refreshHarvestForLevel(plot, building);
         player.sendMessage(Component.text("Upgraded " + building.name() + " to level " + plot.level() + ".", NamedTextColor.GREEN));
-        world.playSound(player.getLocation(), Sound.BLOCK_SMITHING_TABLE_USE, 0.8f, 1.1f);
+        playBuildingSound(player, building, BuildingSound.UPGRADE);
         return true;
     }
 
@@ -478,7 +479,7 @@ public final class HallsCampRuntime {
         } else {
             player.getInventory().setItem(outputSlot, crafted);
         }
-        world.playSound(player.getLocation(), Sound.BLOCK_SMITHING_TABLE_USE, 0.8f, 1.25f);
+        playBuildingSound(player, building, BuildingSound.USE);
         player.sendActionBar(Component.text("Crafted " + itemType.name() + ".", NamedTextColor.GREEN));
     }
 
@@ -507,7 +508,7 @@ public final class HallsCampRuntime {
         if (plot.harvestRemaining() <= 0) {
             setDisplays(plot, building, level.emptyParts().isEmpty() ? level.parts() : level.emptyParts());
         }
-        world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.35f);
+        playBuildingSound(player, building, BuildingSound.USE);
         player.sendActionBar(Component.text("Harvested " + given + " mycelia.", NamedTextColor.GREEN));
         return true;
     }
@@ -549,7 +550,7 @@ public final class HallsCampRuntime {
         }
         removeDisplays(plot);
         plot.clearBuilding();
-        world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_DESTROY, 0.7f, 1.1f);
+        playBuildingSound(player, building, BuildingSound.DESTROY);
         player.sendMessage(Component.text("Destroyed " + building.name() + ".", NamedTextColor.RED));
     }
 
@@ -689,6 +690,7 @@ public final class HallsCampRuntime {
                 inventory.setItem(slot, locked);
             }
         }
+        playBuildingSound(player, building, BuildingSound.OPEN);
         player.openInventory(inventory);
     }
 
@@ -710,7 +712,7 @@ public final class HallsCampRuntime {
         plot.setHarvestUsed(plot.harvestUsed() + 1);
         world.spawnParticle(org.bukkit.Particle.WAX_OFF, player.getLocation().add(0.0, 1.0, 0.0),
                 45, 1.2, 0.7, 1.2, 0.03);
-        world.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.35f);
+        playBuildingSound(player, building, BuildingSound.USE);
         player.sendActionBar(Component.text("Purified your sculk pressure. Charges left: "
                 + plot.harvestRemaining() + ".", NamedTextColor.AQUA));
     }
@@ -755,7 +757,7 @@ public final class HallsCampRuntime {
         item.setItemMeta(meta);
         plot.setHarvestRemaining(plot.harvestRemaining() - 1);
         plot.setHarvestUsed(plot.harvestUsed() + 1);
-        world.playSound(player.getLocation(), Sound.BLOCK_GRINDSTONE_USE, 0.8f, 1.0f);
+        playBuildingSound(player, building, BuildingSound.USE);
         player.sendActionBar(Component.text("Sharpened weapon to " + formatStatAmount(nextDamage)
                 + " melee damage.", NamedTextColor.GREEN));
     }
@@ -787,7 +789,7 @@ public final class HallsCampRuntime {
         item.setItemMeta((ItemMeta) damageable);
         plot.setHarvestRemaining(plot.harvestRemaining() - 1);
         plot.setHarvestUsed(plot.harvestUsed() + 1);
-        world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 0.8f, 1.2f);
+        playBuildingSound(player, building, BuildingSound.USE);
         player.sendActionBar(Component.text("Repaired " + Math.min(repair, currentDamage)
                 + " durability. Charges left: " + plot.harvestRemaining() + ".", NamedTextColor.GREEN));
     }
@@ -806,7 +808,8 @@ public final class HallsCampRuntime {
         for (String line : lines) {
             player.sendMessage(Component.text("- " + line, NamedTextColor.GRAY));
         }
-        world.playSound(player.getLocation(), Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.8f, 1.55f);
+        HallsBuildingType building = buildingTypes.get(plot.buildingId());
+        playBuildingSound(player, building, BuildingSound.USE);
     }
 
     private void activateHealthTotem(Player player, Plot plot) {
@@ -825,7 +828,8 @@ public final class HallsCampRuntime {
         plot.setHarvestUsed(plot.harvestUsed() + 1);
         world.spawnParticle(org.bukkit.Particle.HEART, player.getLocation().add(0.0, 1.0, 0.0),
                 10, 0.45, 0.55, 0.45, 0.02);
-        world.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 1.0f);
+        HallsBuildingType building = buildingTypes.get(plot.buildingId());
+        playBuildingSound(player, building, BuildingSound.USE);
         player.sendActionBar(Component.text("Vitality increased. Charges left: "
                 + plot.harvestRemaining() + ".", NamedTextColor.GREEN));
     }
@@ -846,7 +850,8 @@ public final class HallsCampRuntime {
         plot.setHarvestUsed(plot.harvestUsed() + 1);
         world.spawnParticle(org.bukkit.Particle.CLOUD, player.getLocation().add(0.0, 0.2, 0.0),
                 24, 0.55, 0.1, 0.55, 0.03);
-        world.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 1.55f);
+        HallsBuildingType building = buildingTypes.get(plot.buildingId());
+        playBuildingSound(player, building, BuildingSound.USE);
         player.sendActionBar(Component.text("Speed increased. Charges left: "
                 + plot.harvestRemaining() + ".", NamedTextColor.GREEN));
     }
@@ -939,6 +944,42 @@ public final class HallsCampRuntime {
 
     private int speedTotemPercent(int level) {
         return 5 * Math.max(1, Math.min(3, level));
+    }
+
+    private void playBuildingSound(Player player, HallsBuildingType building, BuildingSound sound) {
+        if (player == null) {
+            return;
+        }
+        String id = building == null ? "" : building.id();
+        switch (sound) {
+            case OPEN -> world.playSound(player.getLocation(), Sound.BLOCK_WOODEN_TRAPDOOR_OPEN, 0.45f, 1.2f);
+            case BUILD -> world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_PLACE, 0.7f, 1.25f);
+            case UPGRADE -> world.playSound(player.getLocation(), Sound.BLOCK_SMITHING_TABLE_USE, 0.8f, 1.1f);
+            case DESTROY -> world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_DESTROY, 0.7f, 1.1f);
+            case USE -> {
+                if (id.equals("cooking_pot") || id.equals("mycelia_farm")) {
+                    world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.35f);
+                } else if (id.equals("weapon_bench") || id.equals("armory")) {
+                    world.playSound(player.getLocation(), Sound.BLOCK_SMITHING_TABLE_USE, 0.8f, 1.25f);
+                } else if (id.equals("grindstone")) {
+                    world.playSound(player.getLocation(), Sound.BLOCK_GRINDSTONE_USE, 0.8f, 1.0f);
+                } else if (id.equals("forge")) {
+                    world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_USE, 0.8f, 1.2f);
+                } else if (id.equals("scanner")) {
+                    world.playSound(player.getLocation(), Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.8f, 1.55f);
+                } else if (id.equals("health_totem")) {
+                    world.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 1.0f);
+                } else if (id.equals("speed_totem")) {
+                    world.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 1.55f);
+                } else if (id.startsWith("sculk_purifier_")) {
+                    world.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.35f);
+                } else if (id.startsWith("storage_locker_")) {
+                    world.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 0.6f, 1.0f);
+                } else {
+                    world.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.5f, 1.2f);
+                }
+            }
+        }
     }
 
     private boolean hasStoredItems(Plot plot) {
@@ -1350,6 +1391,14 @@ public final class HallsCampRuntime {
     }
 
     private static final int[] RECIPE_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 23, 24, 25};
+
+    private enum BuildingSound {
+        OPEN,
+        BUILD,
+        UPGRADE,
+        DESTROY,
+        USE
+    }
 
     public record PlotState(int plotId, String buildingId, int level, int harvestRemaining, int harvestUsed,
                             ItemStack[] storageContents) {

@@ -156,6 +156,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/utility/adrenaline_shot.yml",
             "hallsOfCarnage/items/utility/ironhide_salve.yml",
             "hallsOfCarnage/items/utility/storm_vial.yml",
+            "hallsOfCarnage/items/utility/poison_bomb.yml",
             "hallsOfCarnage/items/blueprints/cooking_pot_blueprint.yml",
             "hallsOfCarnage/items/blueprints/weapon_bench_blueprint.yml",
             "hallsOfCarnage/items/blueprints/armory_blueprint.yml",
@@ -831,6 +832,15 @@ public final class HallsOfCarnageManager {
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         return session != null && session.handleItemConsume(player, item);
+    }
+
+    public boolean handleFoodUse(Player player, org.bukkit.inventory.ItemStack item) {
+        if (player == null || item == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleFoodUse(player, item);
     }
 
     public boolean handleUtilityUse(Player player, org.bukkit.inventory.ItemStack item) {

@@ -12,7 +12,7 @@ levels:
         offset: [0, 0, 0]
         scale: [0.75, 0.75, 0.75]
   2:
-    upgrade-cost: {diamond: 1}
+    upgrade-cost: {diamond: 2}
     harvest:
       uses: 3
     parts:
@@ -20,7 +20,7 @@ levels:
         offset: [0, 0, 0]
         scale: [0.9, 0.9, 0.9]
   3:
-    upgrade-cost: {diamond: 2}
+    upgrade-cost: {diamond: 5}
     harvest:
       uses: 3
     parts:

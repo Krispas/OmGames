@@ -15,7 +15,7 @@ levels:
         offset: [0, 0, 0.7]
         scale: [1, 0.6, 1]
   2:
-    upgrade-cost: {diamond: 3}
+    upgrade-cost: {diamond: 6}
     parts:
       - material: POINTED_DRIPSTONE
         block-data: "vertical_direction=down,thickness=tip"
@@ -26,7 +26,7 @@ levels:
         offset: [0, 0, 0.7]
         scale: [1.2, 0.7, 1.2]
   3:
-    upgrade-cost: {diamond: 6}
+    upgrade-cost: {diamond: 12}
     parts:
       - material: POINTED_DRIPSTONE
         block-data: "vertical_direction=down,thickness=tip"

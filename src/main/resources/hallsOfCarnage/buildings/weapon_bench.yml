@@ -10,7 +10,7 @@ levels:
         offset: [0, 0, 0]
         scale: [1.2, 0.8, 1.2]
   2:
-    upgrade-cost: {diamond: 2}
+    upgrade-cost: {diamond: 4}
     parts:
       - material: SMITHING_TABLE
         offset: [0, 0, 0]
@@ -19,7 +19,7 @@ levels:
         offset: [0.7, 0.2, 0]
         scale: [0.65, 0.65, 0.65]
   3:
-    upgrade-cost: {diamond: 4}
+    upgrade-cost: {diamond: 9}
     parts:
       - material: SMITHING_TABLE
         offset: [0, 0, 0]

@@ -3,6 +3,8 @@ name: "Small Splinter"
 entity-type: ZOMBIE
 health: 7
 baby: false
+scale: 0.7
+movement-speed-multiplier: 0.72
 equipment:
   armor:
     helmet: LEATHER_HELMET

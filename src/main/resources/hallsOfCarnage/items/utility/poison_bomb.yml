@@ -1,0 +1,18 @@
+id: poison_bomb
+name: "Poison Bomb"
+category: utility
+rarity: rare
+material: SPLASH_POTION
+item-model: minecraft:spider_eye
+max-stack-size: 1
+lore:
+  - "Deploys a toxic cloud that hurts monsters, not players."
+stats:
+  cooldown-seconds: 75
+  monster-damage: 3
+  poison-seconds: 6
+  poison-amplifier: 2
+  radius: 4
+recipe:
+  redstone_scrap: 7
+  wood_scrap: 2

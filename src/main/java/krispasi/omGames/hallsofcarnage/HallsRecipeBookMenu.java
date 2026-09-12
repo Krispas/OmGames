@@ -39,7 +39,7 @@ final class HallsRecipeBookMenu {
         Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.INDEX, null), 27,
                 Component.text("Halls Recipes", NamedTextColor.DARK_RED));
         inventory.setItem(11, item(plugin, Material.BRICKS, "Buildings", NamedTextColor.GOLD,
-                List.of("Blueprint locations for this run.", "Shows normal, rare, and level-specific pools."),
+                List.of("Blueprint locations for this run."),
                 ACTION_BUILDINGS, null));
         inventory.setItem(15, item(plugin, Material.CRAFTING_TABLE, "Crafting", NamedTextColor.AQUA,
                 List.of("Station recipes and the building level that unlocks them."),
@@ -90,7 +90,7 @@ final class HallsRecipeBookMenu {
         inventory.setItem(11, blueprint == null
                 ? item(plugin, Material.PAPER, readable(building.blueprint()), NamedTextColor.AQUA,
                 List.of("Blueprint item is not loaded."), null, null)
-                : previewItem(plugin, blueprint, List.of("Find: " + blueprintLocations(scenario, building.blueprint()))));
+                : previewItem(plugin, blueprint, blueprintLocationLore(scenario, building.blueprint())));
         inventory.setItem(13, item(plugin, Material.OAK_SIGN, "Plot Size", NamedTextColor.YELLOW,
                 List.of(capitalize(building.size()) + " plot or larger."), null, null));
         inventory.setItem(15, item(plugin, Material.SMITHING_TABLE, "Upgrade Costs", NamedTextColor.YELLOW,
@@ -165,8 +165,7 @@ final class HallsRecipeBookMenu {
         Material material = blueprint == null ? Material.PAPER : blueprint.material();
         List<String> lore = new ArrayList<>();
         lore.add("Size: " + capitalize(building.size()));
-        lore.add("Blueprint: " + (blueprint == null ? readable(building.blueprint()) : blueprint.name()));
-        lore.add("Find: " + blueprintLocations(scenario, building.blueprint()));
+        lore.addAll(blueprintLocationLore(scenario, building.blueprint()));
         lore.add("Click for details.");
         return item(plugin, material, building.name(), NamedTextColor.GOLD, lore, ACTION_BUILDING_DETAIL, building.id());
     }
@@ -213,21 +212,30 @@ final class HallsRecipeBookMenu {
         return lore;
     }
 
-    private static String blueprintLocations(HallsScenario scenario, String blueprintId) {
-        List<String> locations = new ArrayList<>();
-        for (String rarity : List.of("normal", "rare")) {
-            if (scenario.blueprintPool(rarity).contains(blueprintId)) {
-                locations.add(rarity);
-            }
+    private static List<String> blueprintLocationLore(HallsScenario scenario, String blueprintId) {
+        List<String> locations = blueprintLocations(scenario, blueprintId);
+        if (locations.isEmpty()) {
+            return List.of("Found in:", "- Not listed in scenario pools");
+        }
+        List<String> lore = new ArrayList<>();
+        lore.add("Found in:");
+        locations.stream().map(location -> "- " + location).forEach(lore::add);
+        return lore;
+    }
+
+    private static List<String> blueprintLocations(HallsScenario scenario, String blueprintId) {
+        Set<String> locations = new java.util.LinkedHashSet<>();
+        if (scenario.blueprintPool("normal").contains(blueprintId)
+                || scenario.blueprintPool("rare").contains(blueprintId)) {
+            locations.add("Any level");
         }
         for (Map.Entry<String, Map<String, List<String>>> levelType : scenario.levelTypeBlueprintPools().entrySet()) {
-            for (String rarity : List.of("normal", "rare")) {
-                if (levelType.getValue().getOrDefault(rarity, List.of()).contains(blueprintId)) {
-                    locations.add(readable(levelType.getKey()) + " " + rarity);
-                }
+            if (levelType.getValue().getOrDefault("normal", List.of()).contains(blueprintId)
+                    || levelType.getValue().getOrDefault("rare", List.of()).contains(blueprintId)) {
+                locations.add(readable(levelType.getKey()));
             }
         }
-        return locations.isEmpty() ? "not listed in scenario pools" : String.join(", ", locations);
+        return List.copyOf(locations);
     }
 
     private static String formatCost(Map<String, Integer> cost) {

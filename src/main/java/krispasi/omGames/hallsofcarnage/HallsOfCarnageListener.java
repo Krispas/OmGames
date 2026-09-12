@@ -197,6 +197,11 @@ public final class HallsOfCarnageListener implements Listener {
             event.setCancelled(true);
             return;
         }
+        if ((event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK)
+                && manager.handleFoodUse(event.getPlayer(), event.getItem())) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.isCancelled()) {
             return;
         }

@@ -10,13 +10,13 @@ levels:
         offset: [0, 0, 0]
         scale: [0.8, 0.8, 0.8]
   2:
-    upgrade-cost: {diamond: 1}
+    upgrade-cost: {diamond: 2}
     parts:
       - material: BARREL
         offset: [0, 0, 0]
         scale: [0.95, 0.95, 0.95]
   3:
-    upgrade-cost: {diamond: 2}
+    upgrade-cost: {diamond: 5}
     parts:
       - material: CHEST
         offset: [0, 0, 0]
