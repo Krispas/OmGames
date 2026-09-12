@@ -117,7 +117,7 @@ final class HallsExplorationGenerator {
             addGridOpenHalls();
         } else if (corridorMode == CorridorMode.OPEN_HALLS) {
             addRoomLocalOpenHalls();
-        } else if (corridorMode != CorridorMode.NORMAL) {
+        } else if (corridorMode == CorridorMode.CAVE) {
             addMazeBranches(Math.max(rooms.size() / 2, 4));
         }
     }
@@ -304,6 +304,7 @@ final class HallsExplorationGenerator {
     private int connectorCandidateAttempts() {
         return switch (corridorMode) {
             case CAVE -> 44;
+            case LARGE_CORRIDORS -> 2;
             case MAZE -> 18;
             default -> CONNECTOR_CANDIDATE_ATTEMPTS;
         };
@@ -329,7 +330,7 @@ final class HallsExplorationGenerator {
     private List<Cell> orthogonalCandidatePath(Cell start, Cell target, int attempt) {
         List<Cell> waypoints = new ArrayList<>();
         boolean horizontalFirst = attempt % 2 == 0;
-        int detour = attempt < 4 ? 0 : 2 + random.nextInt(9);
+        int detour = corridorMode == CorridorMode.LARGE_CORRIDORS || attempt < 4 ? 0 : 2 + random.nextInt(9);
         if (detour == 0) {
             waypoints.add(horizontalFirst ? new Cell(target.x(), start.z()) : new Cell(start.x(), target.z()));
         } else if (horizontalFirst) {
@@ -567,16 +568,6 @@ final class HallsExplorationGenerator {
             for (Cell cell : widened) {
                 if (canWidenCorridorInto(cell)) {
                     cells.add(cell);
-                }
-            }
-            if (random.nextInt(100) < 28) {
-                List<Cell> roughEdges = new ArrayList<>(eastWest
-                        ? List.of(new Cell(current.x(), current.z() - 2), new Cell(current.x(), current.z() + 2))
-                        : List.of(new Cell(current.x() - 2, current.z()), new Cell(current.x() + 2, current.z())));
-                Collections.shuffle(roughEdges, random);
-                Cell rough = roughEdges.getFirst();
-                if (canWidenCorridorInto(rough)) {
-                    cells.add(rough);
                 }
             }
         }

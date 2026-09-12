@@ -1,6 +1,9 @@
 package krispasi.omGames.hallsofcarnage;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.bukkit.Material;
 
@@ -135,7 +138,15 @@ public record HallsLevelType(
         return palettes.get(random.nextInt(palettes.size()));
     }
 
-    public record BlockPalette(Material block, Material specialBlock, double specialChance) {
+    public record BlockPalette(Material block, Map<Material, Double> specialBlocks) {
+        public BlockPalette(Material block, Material specialBlock, double specialChance) {
+            this(block, specialBlock == null || specialChance <= 0.0 ? Map.of() : Map.of(specialBlock, specialChance));
+        }
+
+        public BlockPalette {
+            specialBlocks = specialBlocks == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(specialBlocks));
+        }
+
         public static BlockPalette fallbackWall() {
             return new BlockPalette(Material.DEEPSLATE_BRICKS, Material.DEEPSLATE, 0.08);
         }
@@ -145,8 +156,16 @@ public record HallsLevelType(
         }
 
         public Material material(Random random) {
-            if (specialBlock != null && specialChance > 0.0 && random.nextDouble() < specialChance) {
-                return specialBlock;
+            double roll = random.nextDouble();
+            double cumulative = 0.0;
+            for (Map.Entry<Material, Double> entry : specialBlocks.entrySet()) {
+                if (entry.getKey() == null || entry.getValue() <= 0.0) {
+                    continue;
+                }
+                cumulative += entry.getValue();
+                if (roll < cumulative) {
+                    return entry.getKey();
+                }
             }
             return block;
         }

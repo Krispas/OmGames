@@ -93,6 +93,10 @@ final class HallsSessionTrapRuntime {
         stopTrapTask();
     }
 
+    int activeTrapCount() {
+        return traps.size();
+    }
+
     boolean handlePlayerMove(Player player, boolean running) {
         if (player == null || !running || !participants.contains(player.getUniqueId()) || !player.getWorld().equals(world)) {
             return false;

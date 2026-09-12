@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -89,20 +90,39 @@ public final class HallsLevelTypeLoader {
             if (block == null) {
                 continue;
             }
-            palettes.add(new HallsLevelType.BlockPalette(
-                    block,
-                    material(row.getString("special-block"), null, plugin, file),
-                    clamp(row.getDouble("special-chance", 0.0), 0.0, 1.0)
-            ));
+            Map<Material, Double> specialBlocks = specialBlocks(row, plugin, file);
+            Material legacySpecial = material(row.getString("special-block"), null, plugin, file);
+            if (legacySpecial != null) {
+                specialBlocks.putIfAbsent(legacySpecial, clamp(row.getDouble("special-chance", 0.0), 0.0, 1.0));
+            }
+            palettes.add(new HallsLevelType.BlockPalette(block, specialBlocks));
         }
         return palettes.isEmpty() ? fallback : List.copyOf(palettes);
+    }
+
+    private static Map<Material, Double> specialBlocks(ConfigurationSection row, JavaPlugin plugin, File file) {
+        ConfigurationSection section = row.getConfigurationSection("special-blocks");
+        if (section == null) {
+            return new LinkedHashMap<>();
+        }
+        Map<Material, Double> specialBlocks = new LinkedHashMap<>();
+        for (String key : section.getKeys(false)) {
+            ConfigurationSection entry = section.getConfigurationSection(key);
+            String materialName = entry == null ? key : entry.getString("block", key);
+            double chance = entry == null ? section.getDouble(key, 0.0) : entry.getDouble("chance", 0.0);
+            Material material = material(materialName, null, plugin, file);
+            if (material != null) {
+                specialBlocks.put(material, clamp(chance, 0.0, 1.0));
+            }
+        }
+        return specialBlocks;
     }
 
     private static Material material(String value, Material fallback, JavaPlugin plugin, File file) {
         if (value == null || value.isBlank()) {
             return fallback;
         }
-        Material material = Material.matchMaterial(value.trim());
+        Material material = Material.matchMaterial(value.trim().toUpperCase(Locale.ROOT));
         if (material == null || !material.isBlock()) {
             plugin.getLogger().warning("Invalid Halls level type material '" + value + "' in " + file.getName() + ".");
             return fallback;

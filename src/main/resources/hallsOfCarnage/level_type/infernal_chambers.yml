@@ -10,17 +10,30 @@ materials:
 wall-palettes:
   blackstone:
     block: POLISHED_BLACKSTONE_BRICKS
-    special-block: MAGMA_BLOCK
-    special-chance: 0.08
+    special-blocks:
+      magma:
+        block: MAGMA_BLOCK
+        chance: 0.08
+      cracked:
+        block: CRACKED_POLISHED_BLACKSTONE_BRICKS
+        chance: 0.05
   nether_bricks:
     block: NETHER_BRICKS
-    special-block: RED_NETHER_BRICKS
-    special-chance: 0.10
+    special-blocks:
+      red:
+        block: RED_NETHER_BRICKS
+        chance: 0.08
+      cracked:
+        block: CRACKED_NETHER_BRICKS
+        chance: 0.04
 pillar-palettes:
   basalt:
     block: BASALT
-    special-block: POLISHED_BASALT
-    special-chance: 0.12
+    special-blocks:
+      polished_basalt: 0.10
+      magma:
+        block: MAGMA_BLOCK
+        chance: 0.04
 monsters:
   common:
     - piglin

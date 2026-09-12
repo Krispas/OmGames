@@ -109,8 +109,18 @@ public final class HallsCampFloorBuilder {
     }
 
     private Material wallMaterial(HallsLevelType levelType, int x, int z, boolean pillar) {
-        Random random = new Random((x * 341873128712L) ^ (z * 132897987541L) ^ 0xCA4F);
-        return (pillar ? levelType.pillarPalette(random) : levelType.wallPalette(random)).material(random);
+        int groupX = Math.floorDiv(x, 7);
+        int groupZ = Math.floorDiv(z, 7);
+        Random paletteRandom = new Random((((long) groupX) * 341873128712L)
+                ^ (((long) groupZ) * 132897987541L)
+                ^ 0xCA4F);
+        HallsLevelType.BlockPalette palette = pillar
+                ? levelType.pillarPalette(paletteRandom)
+                : levelType.wallPalette(paletteRandom);
+        Random columnRandom = new Random((((long) x) * 341873128712L)
+                ^ (((long) z) * 132897987541L)
+                ^ 0x51EC1A7EL);
+        return palette.material(columnRandom);
     }
 
     private void renderCampPlots(HallsCampLayout layout, int roomStartX, int y, int roomStartZ) {

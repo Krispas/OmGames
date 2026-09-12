@@ -10,17 +10,30 @@ materials:
 wall-palettes:
   sandstone:
     block: SANDSTONE
-    special-block: CHISELED_SANDSTONE
-    special-chance: 0.08
+    special-blocks:
+      chiseled:
+        block: CHISELED_SANDSTONE
+        chance: 0.07
+      CUT_SANDSTONE: 0.04
   red_sandstone:
     block: RED_SANDSTONE
-    special-block: CHISELED_RED_SANDSTONE
-    special-chance: 0.06
+    special-blocks:
+      chiseled:
+        block: CHISELED_RED_SANDSTONE
+        chance: 0.05
+      cut:
+        block: CUT_RED_SANDSTONE
+        chance: 0.04
 pillar-palettes:
   cut_sandstone:
     block: CUT_SANDSTONE
-    special-block: CHISELED_SANDSTONE
-    special-chance: 0.10
+    special-blocks:
+      chiseled:
+        block: CHISELED_SANDSTONE
+        chance: 0.08
+      smooth:
+        block: SMOOTH_SANDSTONE
+        chance: 0.04
 monsters:
   common:
     - husk

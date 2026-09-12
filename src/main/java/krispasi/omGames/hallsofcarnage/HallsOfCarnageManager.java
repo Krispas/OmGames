@@ -9,9 +9,11 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -144,7 +146,6 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/utility/adrenaline_shot.yml",
             "hallsOfCarnage/items/utility/ironhide_salve.yml",
             "hallsOfCarnage/items/utility/storm_vial.yml",
-            "hallsOfCarnage/items/utility/echo_lure.yml",
             "hallsOfCarnage/items/blueprints/cooking_pot_blueprint.yml",
             "hallsOfCarnage/items/blueprints/weapon_bench_blueprint.yml",
             "hallsOfCarnage/items/blueprints/armory_blueprint.yml",
@@ -196,6 +197,7 @@ public final class HallsOfCarnageManager {
     private final Map<UUID, Integer> playerSessions = new HashMap<>();
     private final Map<Integer, BukkitTask> disconnectGraceTasks = new HashMap<>();
     private final Map<UUID, PendingSession> pendingSessions = new HashMap<>();
+    private final Set<UUID> debugPlayers = new HashSet<>();
     private HallsConfig config;
     private List<HallsScenario> scenarios = List.of();
     private Map<String, HallsLevelType> levelTypes = Map.of();
@@ -914,7 +916,8 @@ public final class HallsOfCarnageManager {
         DifficultyOption selectedDifficulty = difficulty == null ? NORMAL_DIFFICULTY : difficulty;
         HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot),
                 getDataFolder(), levelTypes, breakableTypes, itemTypes, trapTypes, monsterTypes, modifierTypes,
-                buildingTypes, hostId, selectedDifficulty.id(), selectedDifficulty.multiplier(), saveData, players);
+                buildingTypes, hostId, selectedDifficulty.id(), selectedDifficulty.multiplier(), saveData, players,
+                debugPlayers::contains);
         try {
             closeOpenHallsMenus(players);
             session.start();
@@ -1245,6 +1248,20 @@ public final class HallsOfCarnageManager {
         }
         player.getInventory().setItem(slot, item);
         return Result.ok("Gave " + type.name() + ".");
+    }
+
+    public Result toggleDebug(Player player) {
+        if (player == null) {
+            return Result.fail("Only players can toggle Halls debug mode.");
+        }
+        if (!debugPlayers.add(player.getUniqueId())) {
+            debugPlayers.remove(player.getUniqueId());
+            return Result.ok("Halls debug mode disabled.");
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        String suffix = session == null ? "" : " " + session.debugSummary();
+        return Result.ok("Halls debug mode enabled." + suffix);
     }
 
     private boolean tryEquipEmptyArmorSlot(PlayerInventory inventory, ItemStack item) {

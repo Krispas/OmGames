@@ -45,7 +45,6 @@ allowed-items:
     - adrenaline_shot
     - ironhide_salve
     - storm_vial
-    - echo_lure
   blueprint:
     - cooking_pot_blueprint
     - weapon_bench_blueprint
@@ -127,7 +126,6 @@ crafting-stations:
       - sculk_maul
       - warding_totem
       - storm_vial
-      - echo_lure
   armory:
     1:
       - padded_armor

@@ -8,8 +8,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -19,13 +17,11 @@ import org.bukkit.World;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 
 final class HallsSessionSculkRuntime {
     private static final int ROOM_HEIGHT = 5;
-    private static final double SCULK_GAIN_PER_SECOND = 0.75;
+    private static final double SCULK_GAIN_PER_SECOND = 1.5;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -127,7 +123,7 @@ final class HallsSessionSculkRuntime {
     }
 
     boolean blocksEating(Player player) {
-        return sculkPercent(player) >= 90;
+        return false;
     }
 
     private void carvePatch(HallsExplorationGenerator.Cell center,
@@ -202,7 +198,7 @@ final class HallsSessionSculkRuntime {
             double current = playerSculk.getOrDefault(playerId, 0.0);
             double next = inSculk ? Math.min(100.0, current + SCULK_GAIN_PER_SECOND) : current;
             playerSculk.put(playerId, next);
-            applySculkEffects(player, next, inSculk);
+            playSculkFeedback(player, inSculk);
         }
     }
 
@@ -223,23 +219,13 @@ final class HallsSessionSculkRuntime {
         return false;
     }
 
-    private void applySculkEffects(Player player, double sculk, boolean inSculk) {
+    private void playSculkFeedback(Player player, boolean inSculk) {
         if (inSculk) {
             player.playSound(player.getLocation(), Sound.BLOCK_SCULK_SENSOR_CLICKING, 0.45f, 0.7f);
             world.spawnParticle(Particle.SCULK_SOUL, player.getLocation().add(0.0, 0.15, 0.0), 3, 0.35, 0.1, 0.35, 0.0);
         }
-        if (sculk >= 50.0) {
-            player.addPotionEffect(new PotionEffect(PotionEffectType.WEAKNESS, 45, 0, true, false, true));
-        }
-        if (sculk >= 90.0) {
-            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 45, 0, true, false, true));
-        }
         player.setFoodLevel(20);
         player.setSaturation(20.0f);
-        if (sculk >= 100.0) {
-            player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 45, 0, true, false, true));
-            player.sendActionBar(Component.text("The sculk has taken hold.", NamedTextColor.DARK_AQUA));
-        }
     }
 
     @FunctionalInterface

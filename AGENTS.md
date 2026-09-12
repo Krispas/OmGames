@@ -1284,13 +1284,15 @@ SQLite tables:
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
 - `/hoc scenario <scenario>` is an OP-only debug command that prints the loaded parsed scenario data and the YAML view copied from the active server data folder.
+- `/hoc debug` is an OP-only player command that toggles per-player Halls debug messages for generation timing, breakable/trap counts, and monster spawn/cap timing.
 - `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `breakable_loot_pools`, `traps`, `monsters`, `items`, `buildings`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
 - `HallsExplorationGenerator` owns per-rebuild exploration layout planning.
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.yml`; legacy `.txt` and `.yaml` files are still parsed if present.
-- Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, and `pillar-palettes`; monster/modifier sections may exist in resource files for future systems.
+- Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, `pillar-palettes`, and monster pools.
+- Wall/pillar palette entries support legacy `special-block` / `special-chance` and the preferred `special-blocks` map for multiple weighted special block chances. Generated wall palette selection is grouped in 7x7 X/Z patches, with per-column special block rolls inside that selected palette.
 - Supported Halls `corridor-generation` modes are `normal`, `cave`, `large_corridors`, `maze`, and `open_halls`.
 - Current exploration floors bake layered room, corridor, shell, and walkable masks in memory before rendering; Java then places room shells, corridor openings, lights, props, and normal corridors around interior-only `level/<level_type>/exploration_*.txt` room masks.
-- Level type `corridor-generation` is active for exploration floors: `normal` keeps one-block orthogonal corridors, `cave` builds organic tunnel paths, `large_corridors` keeps the old widened orthogonal cave style, `maze` builds close open grid halls, and `open_halls` keeps the old room-local maze field.
+- Level type `corridor-generation` is active for exploration floors: `normal` keeps one-block orthogonal corridors, `cave` builds organic tunnel paths, `large_corridors` builds simple 3-wide orthogonal corridors without organic side roughness or branch corridors, `maze` builds close open grid halls, and `open_halls` keeps the old room-local maze field.
 - Generated room and corridor wall columns should use wall material down through their foundation block instead of placing floor material under walls.
 - Room lighting should be embedded directly in generated room ceilings.
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
@@ -1363,7 +1365,7 @@ SQLite tables:
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
 - Halls food items are catalog items with category `food`; `stats.heal` restores health when consumed while hunger remains locked full. Optional food buff stats use normalized keys such as `speed-seconds`, `resistance-seconds`, `regeneration-seconds`, `absorption-seconds`, and matching `*-amplifier`.
 - Mycelia Farm harvest counters persist in camp save state during an active run, but game-over run resets should restock saved Mycelia farms to their current level's full harvest uses.
-- Halls utility `smoke_bomb` clears nearby session monster targets, conceals the user from monster target selection for its duration, emits smoke, applies temporary invisibility, and uses a per-player cooldown instead of being consumed on right-click.
+- Halls utility `smoke_bomb` clears nearby session monster targets, conceals the user from monster target selection for its duration, emits smoke, applies temporary invisibility, refreshes item use-cooldown metadata on use, and uses a per-player cooldown instead of being consumed on right-click.
 - Halls utility `warding_totem` gives nearby alive participants Resistance II for 10 seconds and uses a per-player cooldown instead of being consumed on right-click.
 - Halls utility `mending_salve` heals `4` health on right-click and uses a per-player cooldown instead of being consumed.
 - Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.
@@ -1405,9 +1407,9 @@ SQLite tables:
 - Exploration floor scenario field `traps-per-room.min` / `traps-per-room.max` controls how many normal traps Java attempts inside each trapped room.
 - Hole/pit generation is controlled separately by scenario floor field `holes`.
 - Sculk patch generation is controlled separately by scenario floor field `sculk-patches`.
-- Sculk patches convert floor blocks to sculk and place sculk veins in air; alive participants standing in a sculk patch accumulate personal sculk pressure with weakness/slowness/eating-block/darkness thresholds. Ghosts do not gain sculk. The HUD and save schema should keep that pressure per player. Sculk generation must avoid trap-reserved cells, including carved pit cells.
+- Sculk patches convert floor blocks to sculk and place sculk veins in air; alive participants standing in a sculk patch accumulate personal sculk pressure used for warden-spawn chance only. Ghosts do not gain sculk. The HUD and save schema should keep that pressure per player. Sculk generation must avoid trap-reserved cells, including carved pit cells.
 - Sculk pressure should rise gradually, not spike during short crossings; generated sculk patches may attach veins to floors, walls, and ceilings, but sculk veins must only enable faces attached to solid neighbor blocks and must stay inside generated walkable floor bounds.
-- Sculk pressure at 50% applies Weakness I, at 90% applies Slowness I and blocks consumption directly, and at 100% applies Darkness I; it should not lower the player's hunger bar.
+- Sculk pressure no longer applies Weakness, Slowness, Darkness, eating blocks, or hunger changes; keep those effects out unless the design changes again.
 - Halls ghost mode is Adventure-mode invisible player state, not spectator mode. A lethal hit drops the player's carried gear as session physics drops, blocks inventory/pickup interactions, and revives the player on the next floor.
 - If all online session participants are ghosts, the run restarts from floor 1 after 10 seconds.
 - Exploration floor layout templates are loaded with runtime rotations so repeated room files can appear in different orientations.
@@ -1422,7 +1424,7 @@ SQLite tables:
 - Wall spikes animate a sword display inward from the wall and check a forward lane through both extension and retraction, up to their configured radius, defaulting to 3 blocks and stopping at walls.
 - Falling ice traps may use display-only ceiling fixtures when configured, spawn temporary falling block-display shards around the trap cell, and must not place solid trap blocks; `ceiling-material: AIR` keeps the trap position hidden.
 - Poison darts trigger from a wider forward warning lane with one extra block of reach, but the rendered dart line and damage use one narrow forward lane, defaulting to 5 blocks with a 3-second cooldown.
-- Frozen Halls defaults to `cave` corridor generation, which uses organic biased tunnel paths. The prior widened orthogonal cave style remains available as `large_corridors`.
+- Frozen Halls defaults to `cave` corridor generation, which uses organic biased tunnel paths. `large_corridors` is reserved for simple 3-wide orthogonal corridors.
 - Deep Crypt defaults to `maze` corridor generation, which uses close room placement plus mostly open grid-locked halls with some pillars/wall ribs and extra entrances. The prior room-local maze field remains available as `open_halls`.
 - Infernal Chambers defaults to `large_corridors` corridor generation and currently has one bundled exploration room for testing.
 - Factory defaults to `open_halls` corridor generation and currently has one bundled exploration room for testing.

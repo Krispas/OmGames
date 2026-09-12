@@ -10,12 +10,18 @@ materials:
 wall-palettes:
   deepslate_bricks:
     block: DEEPSLATE_BRICKS
-    special-block: DEEPSLATE
-    special-chance: 0.08
+    special-blocks:
+      deepslate: 0.06
+      cracked:
+        block: CRACKED_DEEPSLATE_BRICKS
+        chance: 0.04
   cobbled_deepslate:
     block: COBBLED_DEEPSLATE
-    special-block: DEEPSLATE
-    special-chance: 0.08
+    special-blocks:
+      deepslate: 0.07
+      mossy:
+        block: MOSSY_COBBLESTONE
+        chance: 0.03
 pillar-palettes:
   reinforced_deepslate:
     block: REINFORCED_DEEPSLATE

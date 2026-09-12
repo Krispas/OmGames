@@ -102,6 +102,7 @@ public final class HallsSession {
     private final HallsSessionMonsterRuntime monsterRuntime;
     private final HallsSessionSculkRuntime sculkRuntime;
     private final HallsCampRuntime campRuntime;
+    private final java.util.function.Predicate<UUID> debugEnabled;
     private final Set<UUID> ghostPlayers = new HashSet<>();
     private final Map<UUID, Integer> healthTotemLevels = new HashMap<>();
     private final Map<UUID, Integer> speedTotemLevels = new HashMap<>();
@@ -146,7 +147,8 @@ public final class HallsSession {
                         String difficultyId,
                         double difficultyMultiplier,
                         HallsSaveData initialSave,
-                        List<Player> players) {
+                        List<Player> players,
+                        java.util.function.Predicate<UUID> debugEnabled) {
         this.plugin = plugin;
         this.id = id;
         this.scenario = scenario;
@@ -172,7 +174,7 @@ public final class HallsSession {
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
                 this::isAliveParticipant);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
-                sculkRuntime::maxSculkPercent, this::isAliveParticipant);
+                sculkRuntime::maxSculkPercent, this::isAliveParticipant, this::debug);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
                 type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
             @Override
@@ -195,6 +197,7 @@ public final class HallsSession {
                 return HallsSession.this.applySpeedTotem(player, level);
             }
         }, this::scanUpcomingFloors);
+        this.debugEnabled = debugEnabled == null ? ignored -> false : debugEnabled;
     }
 
     public int id() {
@@ -227,6 +230,12 @@ public final class HallsSession {
 
     public String monsterDebugStatus() {
         return monsterRuntime.debugStatus();
+    }
+
+    public String debugSummary() {
+        return "Session " + id + " floor " + currentFloor + ", rooms " + activeGeneratedRooms + "/" + activeTargetRooms
+                + ", breakables " + breakableProps.size() + ", traps " + trapRuntime.activeTrapCount()
+                + ", monsters " + monsterRuntime.debugStatus() + ".";
     }
 
     public boolean isTransitioning() {
@@ -722,15 +731,6 @@ public final class HallsSession {
                 applyUtilityCooldown(player, item, type);
                 yield true;
             }
-            case "echo_lure" -> {
-                if (isUtilityOnCooldown(player, type)) {
-                    yield true;
-                }
-                if (activateEchoLure(player, type)) {
-                    applyUtilityCooldown(player, item, type);
-                }
-                yield true;
-            }
             default -> false;
         };
     }
@@ -1077,6 +1077,7 @@ public final class HallsSession {
     }
 
     private ExplorationBuild planExplorationBuild(int floor) {
+        long started = System.nanoTime();
         HallsScenario.FloorDefinition rawFloorDefinition = adjustedDifficulty(scenario.floor(floor));
         HallsLevelType levelType = levelTypeFor(rawFloorDefinition);
         Random random = floorRandom();
@@ -1120,14 +1121,38 @@ public final class HallsSession {
             );
         }
         if (plan.rooms().isEmpty()) {
+            debugGeneration("plan", started, "rooms 0/" + activeTargetRooms + ", reachable " + plan.reachable());
             return new ExplorationBuild(floor, floorDefinition, levelType, random, plan);
         }
         activeGeneratedRooms = plan.rooms().size();
+        debugGeneration("plan", started, "rooms " + activeGeneratedRooms + "/" + activeTargetRooms
+                + ", corridors " + plan.corridorCells().size() + ", reachable " + plan.reachable());
         return new ExplorationBuild(floor, floorDefinition, levelType, random, plan);
     }
 
     private int maxPlanningExpansions(HallsLevelType levelType) {
         return "maze".equalsIgnoreCase(levelType.corridorGeneration()) ? 1 : 4;
+    }
+
+    private void debugGeneration(String phase, long startedNanos, String details) {
+        long elapsedMillis = Math.max(0L, (System.nanoTime() - startedNanos) / 1_000_000L);
+        debug("Generation " + phase + " took " + elapsedMillis + "ms; " + details + ".");
+    }
+
+    private void debug(String message) {
+        if (message == null || message.isBlank()) {
+            return;
+        }
+        Component component = Component.text("[HoC Debug] " + message, NamedTextColor.GRAY);
+        for (UUID playerId : participants) {
+            if (!debugEnabled.test(playerId)) {
+                continue;
+            }
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.sendMessage(component);
+            }
+        }
     }
 
     private void renderExplorationRooms(ExplorationBuild build) {
@@ -1152,15 +1177,22 @@ public final class HallsSession {
         if (build.plan().rooms().isEmpty()) {
             return Set.of();
         }
-        return trapRuntime.placeGeneratedTraps(build.plan(), build.random(), build.floorDefinition(), build.levelType(), activeFloorModifiers);
+        long started = System.nanoTime();
+        Set<HallsExplorationGenerator.Cell> reserved = trapRuntime.placeGeneratedTraps(build.plan(), build.random(),
+                build.floorDefinition(), build.levelType(), activeFloorModifiers);
+        debugGeneration("traps", started, "traps " + trapRuntime.activeTrapCount() + ", reserved cells " + reserved.size());
+        return reserved;
     }
 
     private void renderExplorationContents(ExplorationBuild build, Set<HallsExplorationGenerator.Cell> reservedCells) {
+        long started = System.nanoTime();
+        int before = new HashSet<>(breakableProps.values()).size();
         int rareRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
         for (int i = 0; i < build.plan().rooms().size(); i++) {
             placeGeneratedRoomContents(build.plan().rooms().get(i), build.random(), build.floor(), i,
                     build.floorDefinition(), build.levelType(), reservedCells, i == rareRoomIndex);
         }
+        debugGeneration("contents", started, "breakables " + (new HashSet<>(breakableProps.values()).size() - before));
     }
 
     private int rareBreakableRoomIndex(HallsExplorationGenerator.Plan plan,
@@ -1182,6 +1214,7 @@ public final class HallsSession {
             monsterRuntime.clear();
             return;
         }
+        debug("Starting monster runtime on floor " + build.floor() + ": " + build.levelType().id() + ".");
         monsterRuntime.startExplorationFloor(build.plan(), build.floorDefinition(), build.levelType(), activeFloorModifiers, build.random());
     }
 
@@ -1621,14 +1654,22 @@ public final class HallsSession {
     }
 
     private Material wallMaterial(HallsLevelType levelType, int x, int z, boolean pillar, long salt) {
-        Random columnRandom = new Random((((long) x) * 341873128712L)
-                ^ (((long) z) * 132897987541L)
+        int groupX = Math.floorDiv(x, 7);
+        int groupZ = Math.floorDiv(z, 7);
+        Random paletteRandom = new Random((((long) groupX) * 341873128712L)
+                ^ (((long) groupZ) * 132897987541L)
                 ^ (((long) id) << 24)
                 ^ (((long) currentFloor) << 8)
                 ^ salt);
         HallsLevelType.BlockPalette palette = pillar
-                ? levelType.pillarPalette(columnRandom)
-                : levelType.wallPalette(columnRandom);
+                ? levelType.pillarPalette(paletteRandom)
+                : levelType.wallPalette(paletteRandom);
+        Random columnRandom = new Random((((long) x) * 341873128712L)
+                ^ (((long) z) * 132897987541L)
+                ^ (((long) id) << 24)
+                ^ (((long) currentFloor) << 8)
+                ^ salt
+                ^ 0x51EC1A7EL);
         return palette.material(columnRandom);
     }
 
@@ -2140,6 +2181,10 @@ public final class HallsSession {
     }
 
     private void captureElevatorChestContents() {
+        captureElevatorChestContents(true);
+    }
+
+    private void captureElevatorChestContents(boolean clearContainer) {
         if (elevatorChestSnapshotLocked) {
             return;
         }
@@ -2152,7 +2197,9 @@ public final class HallsSession {
         for (int i = 0; i < contents.length; i++) {
             elevatorChestContents[i] = contents[i] == null ? null : contents[i].clone();
         }
-        container.getInventory().clear();
+        if (clearContainer) {
+            container.getInventory().clear();
+        }
     }
 
     private void closeOpenElevatorChestViewers() {
@@ -2483,27 +2530,6 @@ public final class HallsSession {
         player.sendActionBar(Component.text(message, NamedTextColor.AQUA));
     }
 
-    private boolean activateEchoLure(Player player, HallsItemType type) {
-        double radius = Math.max(6.0, type.stats().getOrDefault("radius", 12.0));
-        int durationTicks = Math.max(40, (int) Math.round(type.stats().getOrDefault("duration_seconds", 8.0) * 20.0));
-        Vector direction = player.getLocation().getDirection().clone();
-        direction.setY(0.0);
-        if (direction.lengthSquared() < 0.01) {
-            direction = new Vector(0.0, 0.0, 1.0);
-        }
-        direction.normalize();
-        Location lure = player.getLocation().clone().add(direction.multiply(radius * 0.75));
-        lure.setY(origin.y());
-        if (!monsterRuntime.lure(player.getLocation(), lure, radius, durationTicks)) {
-            player.sendActionBar(Component.text("No monsters hear the lure.", NamedTextColor.GRAY));
-            return false;
-        }
-        world.spawnParticle(Particle.NOTE, lure.clone().add(0.0, 1.0, 0.0), 24, 0.7, 0.45, 0.7, 0.02);
-        world.playSound(lure, Sound.BLOCK_NOTE_BLOCK_BELL, 1.0f, 0.75f);
-        player.sendActionBar(Component.text("Echoes pull nearby monsters away.", NamedTextColor.LIGHT_PURPLE));
-        return true;
-    }
-
     private boolean isUtilityOnCooldown(Player player, HallsItemType type) {
         long remainingMillis = utilityCooldowns.getOrDefault(utilityCooldownKey(player, type), 0L) - System.currentTimeMillis();
         if (remainingMillis <= 0L) {
@@ -2519,6 +2545,7 @@ public final class HallsSession {
         if (cooldownTicks <= 0) {
             return;
         }
+        ensureUseCooldownMetadata(usedItem, type);
         utilityCooldowns.put(utilityCooldownKey(player, type), System.currentTimeMillis() + cooldownTicks * 50L);
         org.bukkit.NamespacedKey cooldownKey = new org.bukkit.NamespacedKey(plugin, "hoc_" + type.id());
         player.setCooldown(cooldownKey, cooldownTicks);
@@ -2527,6 +2554,34 @@ public final class HallsSession {
                 : usedItem;
         player.setCooldown(cooldownItem, cooldownTicks);
         player.setCooldown(cooldownItem.getType(), cooldownTicks);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!running || !player.isOnline()) {
+                return;
+            }
+            player.setCooldown(cooldownKey, cooldownTicks);
+            player.setCooldown(cooldownItem, cooldownTicks);
+            player.setCooldown(cooldownItem.getType(), cooldownTicks);
+        });
+    }
+
+    private void ensureUseCooldownMetadata(ItemStack item, HallsItemType type) {
+        if (item == null || item.getType().isAir()) {
+            return;
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        org.bukkit.NamespacedKey cooldownKey = new org.bukkit.NamespacedKey(plugin, "hoc_" + type.id());
+        org.bukkit.inventory.meta.components.UseCooldownComponent cooldown = meta.getUseCooldown();
+        if (cooldown.getCooldownSeconds() <= 0.0f
+                || cooldown.getCooldownGroup() == null
+                || !cooldown.getCooldownGroup().equals(cooldownKey)) {
+            cooldown.setCooldownSeconds((float) Math.max(0.0, type.stats().getOrDefault("cooldown_seconds", 0.0)));
+            cooldown.setCooldownGroup(cooldownKey);
+            meta.setUseCooldown(cooldown);
+            item.setItemMeta(meta);
+        }
     }
 
     private String utilityCooldownKey(Player player, HallsItemType type) {
@@ -2975,7 +3030,7 @@ public final class HallsSession {
         try {
             captureCurrentCampState();
             if (!elevatorChestSnapshotLocked) {
-                captureElevatorChestContents();
+                captureElevatorChestContents(false);
             }
             File folder = new File(dataFolder, "saves");
             if (!folder.exists() && !folder.mkdirs()) {
@@ -3679,6 +3734,8 @@ public final class HallsSession {
         private ExplorationBuild build;
         private List<HallsExplorationGenerator.Cell> corridorShellCells = List.of();
         private Set<HallsExplorationGenerator.Cell> reservedCells = Set.of();
+        private long contentStartedNanos;
+        private int contentBreakablesBefore;
 
         private FloorBuildJob(int floor, int clearRadius) {
             this.floor = floor;
@@ -3755,11 +3812,15 @@ public final class HallsSession {
             reservedCells = renderExplorationTraps(build);
             renderExplorationSculk(build, reservedCells);
             rareBreakableRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
+            contentStartedNanos = System.nanoTime();
+            contentBreakablesBefore = new HashSet<>(breakableProps.values()).size();
             stage = 6;
         }
 
         private void buildNextRoomContents() {
             if (contentRoomIndex >= build.plan().rooms().size()) {
+                debugGeneration("contents", contentStartedNanos,
+                        "breakables " + (new HashSet<>(breakableProps.values()).size() - contentBreakablesBefore));
                 startExplorationMonsters(build);
                 stage = 7;
                 return;

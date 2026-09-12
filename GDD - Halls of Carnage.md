@@ -268,7 +268,7 @@ On exploration floors, monsters spawn in places not visible by players currently
 Monster types are based on the level type. Level type also defines pool of special mobs, but those dont spawn unless modifiers are active.
 On fight floors, monsters "come in" (spawn) through fake doors on the walls.
 ## Sculk
-Based on difficulty, sculk patches can appear and replace parts of the levels. Standing on sculk blocks or veins will slowly raise the sculk stats. Sculk is saved between floor and save loads. High sculk adds a chance for warden to spawn instead of normal enemies.
+Based on difficulty, sculk patches can appear and replace parts of the levels. Standing on sculk blocks or veins raises the player's sculk pressure. Sculk is saved between floor and save loads. High sculk adds a chance for warden to spawn instead of normal enemies; it should not directly apply potion effects, hunger changes, or item-use restrictions.
 ## Hunger
 Hunger is not present in the game. Make it so the bar is always full so player can sprint and disable natural regen.
 ## Compass

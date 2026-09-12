@@ -10,17 +10,22 @@ materials:
 wall-palettes:
   ice_bricks:
     block: POLISHED_DIORITE
-    special-block: PRISMARINE
-    special-chance: 0.10
+    special-blocks:
+      prismarine: 0.08
+      frosted:
+        block: LIGHT_BLUE_CONCRETE
+        chance: 0.03
   frozen_stone:
     block: TUFF_BRICKS
-    special-block: BLUE_ICE
-    special-chance: 0.06
+    special-blocks:
+      blue_ice: 0.05
+      calcite: 0.04
 pillar-palettes:
   packed_ice:
     block: PACKED_ICE
-    special-block: BLUE_ICE
-    special-chance: 0.12
+    special-blocks:
+      blue_ice: 0.10
+      ice: 0.05
 monsters:
   common:
     - zombie

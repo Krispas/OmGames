@@ -2,7 +2,8 @@ id: adrenaline_shot
 name: "Adrenaline Shot"
 category: utility
 rarity: normal
-material: RABBIT_FOOT
+material: EXPERIENCE_BOTTLE
+item-model: minecraft:rabbit_foot
 max-stack-size: 1
 lore:
   - "Reusable stimulant for sprinting through bad rooms."

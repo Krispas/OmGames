@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
@@ -18,7 +19,6 @@ import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Ageable;
-import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Creature;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
@@ -42,8 +42,8 @@ final class HallsSessionMonsterRuntime {
     private final Map<String, HallsMonsterType> monsterTypes;
     private final IntSupplier maxSculkSupplier;
     private final Predicate<UUID> aliveParticipantPredicate;
+    private final Consumer<String> debugSink;
     private final Set<UUID> spawnedMonsters = new HashSet<>();
-    private final Set<UUID> lureTargets = new HashSet<>();
     private final Map<UUID, Long> concealedParticipants = new java.util.HashMap<>();
     private List<HallsExplorationGenerator.Cell> spawnCells = List.of();
     private List<HallsMonsterType> commonPool = List.of();
@@ -63,7 +63,8 @@ final class HallsSessionMonsterRuntime {
                                Set<UUID> participants,
                                Map<String, HallsMonsterType> monsterTypes,
                                IntSupplier maxSculkSupplier,
-                               Predicate<UUID> aliveParticipantPredicate) {
+                               Predicate<UUID> aliveParticipantPredicate,
+                               Consumer<String> debugSink) {
         this.plugin = plugin;
         this.world = world;
         this.origin = origin;
@@ -71,6 +72,7 @@ final class HallsSessionMonsterRuntime {
         this.monsterTypes = monsterTypes == null ? Map.of() : Map.copyOf(monsterTypes);
         this.maxSculkSupplier = maxSculkSupplier == null ? () -> 0 : maxSculkSupplier;
         this.aliveParticipantPredicate = aliveParticipantPredicate == null ? id -> true : aliveParticipantPredicate;
+        this.debugSink = debugSink == null ? ignored -> { } : debugSink;
     }
 
     void startExplorationFloor(HallsExplorationGenerator.Plan plan,
@@ -113,14 +115,7 @@ final class HallsSessionMonsterRuntime {
                 entity.remove();
             }
         }
-        for (UUID entityId : Set.copyOf(lureTargets)) {
-            Entity entity = Bukkit.getEntity(entityId);
-            if (entity != null) {
-                entity.remove();
-            }
-        }
         spawnedMonsters.clear();
-        lureTargets.clear();
         concealedParticipants.clear();
         spawnCells = List.of();
         spawnedThisFloor = 0;
@@ -135,7 +130,9 @@ final class HallsSessionMonsterRuntime {
     String debugStatus() {
         pruneDeadMonsters();
         return spawnedMonsters.size() + " alive, cap " + baseMaxAlive + ", extended cap " + maxAlive
-                + ", spawned " + spawnedThisFloor + ", next cap +" + Math.max(0, capExtensionCooldownTicks / 20) + "s";
+                + ", spawned " + spawnedThisFloor + ", next spawn "
+                + Math.max(0, spawnCooldownTicks / 20) + "s, next cap +"
+                + Math.max(0, capExtensionCooldownTicks / 20) + "s";
     }
 
     boolean registerSplitMonster(Entity entity) {
@@ -192,44 +189,6 @@ final class HallsSessionMonsterRuntime {
         }
     }
 
-    boolean lure(Location source, Location target, double radius, int durationTicks) {
-        if (source == null || target == null || !world.equals(source.getWorld()) || !world.equals(target.getWorld())) {
-            return false;
-        }
-        ArmorStand stand = world.spawn(target, ArmorStand.class, entity -> {
-            entity.setInvisible(true);
-            entity.setInvulnerable(true);
-            entity.setMarker(false);
-            entity.setSilent(true);
-            entity.setGravity(false);
-            entity.setPersistent(false);
-            entity.addScoreboardTag("omgames_hoc_lure");
-        });
-        lureTargets.add(stand.getUniqueId());
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            lureTargets.remove(stand.getUniqueId());
-            if (stand.isValid()) {
-                stand.remove();
-            }
-        }, Math.max(20L, durationTicks));
-        double radiusSquared = radius * radius;
-        int affected = 0;
-        for (UUID entityId : Set.copyOf(spawnedMonsters)) {
-            Entity entity = Bukkit.getEntity(entityId);
-            if (entity instanceof Creature creature && creature.getWorld().equals(world)
-                    && creature.getLocation().distanceSquared(source) <= radiusSquared) {
-                creature.setTarget(stand);
-                affected++;
-            }
-        }
-        if (affected == 0) {
-            lureTargets.remove(stand.getUniqueId());
-            stand.remove();
-            return false;
-        }
-        return true;
-    }
-
     void concealParticipant(UUID playerId, long durationMillis) {
         if (playerId == null || durationMillis <= 0L) {
             return;
@@ -275,6 +234,9 @@ final class HallsSessionMonsterRuntime {
             configureLivingMonster(living, type);
             spawnedMonsters.add(living.getUniqueId());
             spawnedThisFloor++;
+            debugSink.accept("Spawned " + type.id() + " at " + cell.x() + " " + origin.y() + " " + cell.z()
+                    + "; next spawn in " + (SPAWN_INTERVAL_TICKS / 20) + "s; alive "
+                    + spawnedMonsters.size() + "/" + maxAlive + ".");
         } else {
             entity.remove();
         }
@@ -451,6 +413,8 @@ final class HallsSessionMonsterRuntime {
         }
         maxAlive++;
         capExtensionCooldownTicks = capExtensionIntervalTicks;
+        debugSink.accept("Monster cap increased to " + maxAlive + "; next cap increase in "
+                + Math.max(0, capExtensionCooldownTicks / 20) + "s.");
     }
 
     private void updateMonsterTargets() {
@@ -460,9 +424,6 @@ final class HallsSessionMonsterRuntime {
                 continue;
             }
             LivingEntity current = creature.getTarget();
-            if (isActiveLureTarget(current)) {
-                continue;
-            }
             if (current instanceof Player player
                     && player.getWorld().equals(world)
                     && participants.contains(player.getUniqueId())
@@ -474,21 +435,6 @@ final class HallsSessionMonsterRuntime {
             }
             creature.setTarget(nearestParticipant(creature.getLocation(), 18.0));
         }
-    }
-
-    private boolean isActiveLureTarget(LivingEntity target) {
-        if (target == null) {
-            return false;
-        }
-        UUID targetId = target.getUniqueId();
-        if (!lureTargets.contains(targetId)) {
-            return false;
-        }
-        if (target.isDead() || !target.isValid()) {
-            lureTargets.remove(targetId);
-            return false;
-        }
-        return true;
     }
 
     private int capExtensionIntervalTicks(int difficulty) {

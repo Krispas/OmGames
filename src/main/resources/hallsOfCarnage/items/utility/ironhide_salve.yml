@@ -2,7 +2,8 @@ id: ironhide_salve
 name: "Ironhide Salve"
 category: utility
 rarity: normal
-material: CLAY_BALL
+material: EXPERIENCE_BOTTLE
+item-model: minecraft:clay_ball
 max-stack-size: 1
 lore:
   - "A gritty coating that hardens skin for a short push."
