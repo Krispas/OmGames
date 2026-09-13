@@ -109,7 +109,7 @@ public final class HallsCampLayoutLoader {
                 .orElse(new Cell((minX + maxX) / 2, (minZ + maxZ) / 2));
         BlockFace facing = face(rows.get(anchor.z()).charAt(anchor.x()));
         int span = Math.max(maxX - minX + 1, maxZ - minZ + 1);
-        String size = span >= 5 ? "large" : span >= 3 ? "medium" : "small";
+        String size = span >= 7 ? "station" : span >= 5 ? "large" : span >= 3 ? "medium" : "small";
         return new HallsCampLayout.BuildSpot(id, minX, maxX, minZ, maxZ, anchor.x(), anchor.z(), facing, size);
     }
 

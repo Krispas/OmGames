@@ -107,7 +107,7 @@ final class HallsRecipeBookMenu {
         Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.CRAFTING, null), 54,
                 Component.text("Crafting Recipes", NamedTextColor.DARK_RED));
         int index = 0;
-        for (String stationId : List.of("cooking_pot", "weapon_bench", "armory")) {
+        for (String stationId : List.of("camp_station", "cooking_pot", "weapon_bench", "armory")) {
             HallsBuildingType station = buildingTypes.get(stationId);
             if (station == null) {
                 continue;
@@ -119,7 +119,8 @@ final class HallsRecipeBookMenu {
                     if (itemType == null || index >= CONTENT_SLOTS.length) {
                         continue;
                     }
-                    inventory.setItem(CONTENT_SLOTS[index++], recipeItem(plugin, itemType, station.name(), level));
+                    inventory.setItem(CONTENT_SLOTS[index++], recipeItem(plugin, itemType, station.name(),
+                            station.id().equals("camp_station") ? 0 : level));
                 }
             }
         }
@@ -172,7 +173,7 @@ final class HallsRecipeBookMenu {
 
     private static ItemStack recipeItem(JavaPlugin plugin, HallsItemType type, String stationName, int level) {
         return previewItem(plugin, type, List.of("Station: " + stationName,
-                "Unlocks at level " + level + ".",
+                level <= 0 ? "Always available." : "Unlocks at level " + level + ".",
                 "Cost: " + formatCost(type.recipe())));
     }
 

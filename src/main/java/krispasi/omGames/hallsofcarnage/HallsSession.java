@@ -1263,6 +1263,8 @@ public final class HallsSession {
             dropPlayerSessionInventory(player);
             applyGhostState(player);
             player.setHealth(1.0);
+            teleportSessionPlayer(player, elevatorSpawnLocation());
+            player.setFallDistance(0.0f);
             player.sendTitle("Left Behind", "The elevator descended without you.", 10, 70, 20);
             player.sendMessage(Component.text("You were left behind and became a ghost.", NamedTextColor.DARK_RED));
             world.playSound(player.getLocation(), Sound.ENTITY_WITHER_HURT, 0.7f, 0.6f);

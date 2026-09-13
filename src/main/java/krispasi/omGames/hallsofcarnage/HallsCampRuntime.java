@@ -154,6 +154,12 @@ public final class HallsCampRuntime {
         Plot plot = new Plot(spot.id(), spot.size(), worldX, y, worldZ, spot.facing(), interaction.getUniqueId());
         plotsById.put(plot.id(), plot);
         plotsByEntity.put(interaction.getUniqueId(), plot);
+        if (isStationPlot(plot)) {
+            HallsBuildingType station = buildingTypes.get("camp_station");
+            if (station != null) {
+                setBuilding(plot, station, 1);
+            }
+        }
     }
 
     public void addDoor(int worldX, int y, int worldZ, HallsCampLayout.DoorCell cell) {
@@ -210,6 +216,9 @@ public final class HallsCampRuntime {
         }
         for (PlotState state : states) {
             Plot plot = plotsById.get(state.plotId());
+            if (isStationPlot(plot)) {
+                continue;
+            }
             HallsBuildingType building = buildingTypes.get(state.buildingId());
             if (plot == null || building == null || !building.fits(plot.size())) {
                 continue;
@@ -257,6 +266,10 @@ public final class HallsCampRuntime {
         if (plot == null) {
             Door door = doorsByEntity.get(entity.getUniqueId());
             return door != null && handleDoorInteract(player, door, player.isSneaking());
+        }
+        if (plot.buildingId() == null && isStationPlot(plot)) {
+            player.sendActionBar(Component.text("The camp station is not loaded.", NamedTextColor.RED));
+            return true;
         }
         if (plot.buildingId() == null) {
             return buildFromBlueprint(player, plot);
@@ -473,7 +486,9 @@ public final class HallsCampRuntime {
                 openBuildingMenu(player, plot);
             }
             case "destroy" -> {
-                destroyBuilding(player, plot, building);
+                if (!isPermanentBuilding(building)) {
+                    destroyBuilding(player, plot, building);
+                }
                 player.closeInventory();
             }
             case "craft" -> {
@@ -606,10 +621,14 @@ public final class HallsCampRuntime {
         if (building == null) {
             return;
         }
-        Inventory inventory = Bukkit.createInventory(new CampMenu(plot.id()), 27,
-                Component.text(building.name() + " L" + plot.level(), NamedTextColor.DARK_GREEN));
+        boolean permanent = isPermanentBuilding(building);
+        Inventory inventory = Bukkit.createInventory(new CampMenu(plot.id()), permanent ? 54 : 27,
+                Component.text(permanent ? building.name() : building.name() + " L" + plot.level(), NamedTextColor.DARK_GREEN));
         inventory.setItem(4, menuItem(Material.OAK_SIGN, building.name(), NamedTextColor.GREEN,
-                List.of("Level " + plot.level(), "Plot size: " + plot.size()), null, null));
+                permanent
+                        ? List.of("Permanent camp station.", "Plot size: " + plot.size())
+                        : List.of("Level " + plot.level(), "Plot size: " + plot.size()),
+                null, null));
         List<String> recipes = scenario == null ? List.of() : scenario.craftingRecipes(building.id(), plot.level());
         int recipeIndex = 0;
         if (isCraftingStation(building) && !recipes.isEmpty()) {
@@ -672,16 +691,23 @@ public final class HallsCampRuntime {
             inventory.setItem(13, menuItem(Material.PAPER, "No Recipes", NamedTextColor.GRAY,
                     List.of("No scenario recipes are unlocked here."), null, null));
         }
-        if (plot.level() < 3) {
+        int upgradeSlot = permanent ? 49 : 22;
+        int destroySlot = permanent ? 53 : 26;
+        if (permanent) {
+            inventory.setItem(upgradeSlot, menuItem(Material.LODESTONE, "Permanent Station", NamedTextColor.GRAY,
+                    List.of("Always present in this camp."), null, null));
+        } else if (plot.level() < 3) {
             HallsBuildingType.Level next = building.level(plot.level() + 1);
-            inventory.setItem(22, menuItem(Material.SMITHING_TABLE, "Upgrade", NamedTextColor.YELLOW,
+            inventory.setItem(upgradeSlot, menuItem(Material.SMITHING_TABLE, "Upgrade", NamedTextColor.YELLOW,
                     upgradeLore(building, plot), "upgrade", null));
         } else {
-            inventory.setItem(22, menuItem(Material.SMITHING_TABLE, "Max Level", NamedTextColor.GRAY,
+            inventory.setItem(upgradeSlot, menuItem(Material.SMITHING_TABLE, "Max Level", NamedTextColor.GRAY,
                     List.of("This building is already level 3."), null, null));
         }
-        inventory.setItem(26, menuItem(Material.TNT, "Destroy", NamedTextColor.RED,
-                List.of("Removes the building.", "The blueprint is not returned."), "destroy", null));
+        if (!permanent) {
+            inventory.setItem(destroySlot, menuItem(Material.TNT, "Destroy", NamedTextColor.RED,
+                    List.of("Removes the building.", "The blueprint is not returned."), "destroy", null));
+        }
         player.openInventory(inventory);
     }
 
@@ -834,7 +860,16 @@ public final class HallsCampRuntime {
     private boolean isCraftingStation(HallsBuildingType building) {
         return building.id().equals("cooking_pot")
                 || building.id().equals("weapon_bench")
-                || building.id().equals("armory");
+                || building.id().equals("armory")
+                || building.id().equals("camp_station");
+    }
+
+    private boolean isPermanentBuilding(HallsBuildingType building) {
+        return building != null && building.id().equals("camp_station");
+    }
+
+    private boolean isStationPlot(Plot plot) {
+        return plot != null && plot.size().equals("station");
     }
 
     private String upgradeBlueprintCost(HallsBuildingType building) {
@@ -1672,7 +1707,12 @@ public final class HallsCampRuntime {
         }
     }
 
-    private static final int[] RECIPE_SLOTS = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 23, 24, 25};
+    private static final int[] RECIPE_SLOTS = {
+            10, 11, 12, 13, 14, 15, 16,
+            19, 20, 21, 23, 24, 25,
+            28, 29, 30, 31, 32, 33, 34,
+            37, 38, 39, 40, 41, 42, 43
+    };
 
     private enum BuildingSound {
         OPEN,

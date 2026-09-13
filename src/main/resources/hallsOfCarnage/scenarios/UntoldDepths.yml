@@ -56,9 +56,6 @@ allowed-items:
     - storm_vial
     - poison_bomb
   blueprint:
-    - cooking_pot_blueprint
-    - weapon_bench_blueprint
-    - armory_blueprint
     - forge_blueprint
     - grindstone_blueprint
     - storage_locker_blueprint
@@ -71,9 +68,6 @@ allowed-items:
     - sculk_purifier_medium_blueprint
     - sculk_purifier_large_blueprint
   buildings:
-    - cooking_pot
-    - weapon_bench
-    - armory
     - forge
     - grindstone
     - storage_locker
@@ -87,9 +81,6 @@ allowed-items:
     - sculk_purifier_large
 blueprint-pools:
   normal:
-    - cooking_pot_blueprint
-    - weapon_bench_blueprint
-    - armory_blueprint
     - forge_blueprint
     - storage_locker_blueprint
     - mycelia_farm_blueprint
@@ -104,8 +95,6 @@ blueprint-pools:
     - sculk_purifier_large_blueprint
   howling_corridors:
     normal:
-      - cooking_pot_blueprint
-      - weapon_bench_blueprint
       - storage_locker_blueprint
       - mycelia_farm_blueprint
       - scanner_blueprint
@@ -116,7 +105,6 @@ blueprint-pools:
       - sculk_purifier_small_blueprint
   frozen_halls:
     normal:
-      - cooking_pot_blueprint
       - forge_blueprint
       - storage_locker_blueprint
       - mycelia_farm_blueprint
@@ -127,8 +115,6 @@ blueprint-pools:
       - sculk_purifier_large_blueprint
   deep_crypt:
     normal:
-      - weapon_bench_blueprint
-      - armory_blueprint
       - forge_blueprint
       - scanner_blueprint
       - sculk_purifier_small_blueprint
@@ -140,8 +126,6 @@ blueprint-pools:
       - sculk_purifier_large_blueprint
   infernal_chambers:
     normal:
-      - weapon_bench_blueprint
-      - armory_blueprint
       - forge_blueprint
       - storage_locker_blueprint
       - health_totem_blueprint
@@ -151,8 +135,6 @@ blueprint-pools:
       - health_totem_blueprint
   factory:
     normal:
-      - weapon_bench_blueprint
-      - armory_blueprint
       - forge_blueprint
       - storage_locker_blueprint
       - scanner_blueprint
@@ -162,7 +144,6 @@ blueprint-pools:
       - speed_totem_blueprint
   backrooms:
     normal:
-      - cooking_pot_blueprint
       - storage_locker_blueprint
       - mycelia_farm_blueprint
       - scanner_blueprint
@@ -173,7 +154,6 @@ blueprint-pools:
       - speed_totem_blueprint
   sewer:
     normal:
-      - cooking_pot_blueprint
       - forge_blueprint
       - storage_locker_blueprint
       - mycelia_farm_blueprint
@@ -183,42 +163,32 @@ blueprint-pools:
       - health_totem_blueprint
       - sculk_purifier_medium_blueprint
 crafting-stations:
-  cooking_pot:
+  camp_station:
     1:
       - cooked_mycelia
       - hearty_mycelia_stew
-    2:
       - fleetfoot_ration
       - stonehide_chowder
       - ember_stew
-    3:
       - golden_jerky
-  weapon_bench:
-    1:
       - rusty_sword
       - poking_stick
       - smoke_bomb
       - mending_salve
-    2:
       - miner_pick
       - bone_cleaver
       - frost_lance
       - adrenaline_shot
       - ironhide_salve
-    3:
       - echo_blade
       - sculk_maul
       - warding_totem
       - storm_vial
       - poison_bomb
-  armory:
-    1:
       - padded_armor
       - chainmail_hauberk
-    2:
       - ironbound_chestplate
       - cinderplate
-    3:
       - reinforced_chestplate
       - deepguard_plate
 floors:

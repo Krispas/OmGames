@@ -210,21 +210,10 @@ The block layout as a visual represantation of it and other info needed for them
 
 All buildings have 3 levels.
 
-### Cooking Pot
-- Size: Medium
+### Camp Station
+- Size: Station (7x7 reserved camp plot)
 
-Allows cooking food for free based on it's level. It can range from healing to stat bonuses.
-Upgrading to level 2 and level 3 requires another Cooking Pot blueprint in addition to scrap costs.
-### Weapon Bench
-- Size: Medium
-
-Allows crafting weapons based on scenario settings. Unlocks more recipes when upgraded. Uses scrap.
-Upgrading to level 2 and level 3 requires another Weapon Bench blueprint in addition to scrap costs.
-### Armory
-- Size: Medium
-
-Same as weapon bench, but for armor.
-Upgrading to level 2 and level 3 requires another Armory blueprint in addition to scrap costs.
+Each camp has one permanent Camp Station. It is always present, has no blueprint, has no levels, cannot be deconstructed, and provides all food, weapon, utility, and armor recipes that were previously split across Cooking Pot, Weapon Bench, and Armory.
 ### Grindstone
 - Size: Large
 

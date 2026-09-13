@@ -32,6 +32,7 @@ public record HallsBuildingType(String id,
             case "small" -> 1;
             case "medium" -> 2;
             case "large" -> 3;
+            case "station" -> 4;
             default -> 0;
         };
     }
