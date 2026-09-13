@@ -72,8 +72,8 @@ public final class HallsSession {
     private static final double DROP_SETTLE_VELOCITY_SQUARED = 0.0016;
     private static final String STARTER_ITEM_ID = "vagabonds_club";
     private static final long LEFT_BEHIND_MODIFIER_DELAY_TICKS = 100L;
-    private static final String HEALTH_TOTEM_MODIFIER = "hoc_health_totem";
-    private static final String SPEED_TOTEM_MODIFIER = "hoc_speed_totem";
+    private static final String HEALTH_TOTEM_MODIFIER_PREFIX = "hoc_health_totem_";
+    private static final String SPEED_TOTEM_MODIFIER_PREFIX = "hoc_speed_totem_";
     private static final long SCULK_MAUL_SPLASH_COOLDOWN_MILLIS = 350L;
 
     private final JavaPlugin plugin;
@@ -112,8 +112,8 @@ public final class HallsSession {
     private final HallsCampRuntime campRuntime;
     private final java.util.function.Predicate<UUID> debugEnabled;
     private final Set<UUID> ghostPlayers = new HashSet<>();
-    private final Map<UUID, Integer> healthTotemLevels = new HashMap<>();
-    private final Map<UUID, Integer> speedTotemLevels = new HashMap<>();
+    private final Map<UUID, Map<Integer, Integer>> healthTotemLevels = new HashMap<>();
+    private final Map<UUID, Map<Integer, Integer>> speedTotemLevels = new HashMap<>();
     private boolean firstGhostCoinCacheDropped;
     private BukkitTask hudTask;
     private BukkitTask physicsDropTask;
@@ -208,13 +208,13 @@ public final class HallsSession {
             }
         }, this::reducePlayerSculk, new HallsCampRuntime.TotemAccount() {
             @Override
-            public boolean applyHealthTotem(Player player, int level) {
-                return HallsSession.this.applyHealthTotem(player, level);
+            public boolean applyHealthTotem(Player player, int plotId, int level) {
+                return HallsSession.this.applyHealthTotem(player, plotId, level);
             }
 
             @Override
-            public boolean applySpeedTotem(Player player, int level) {
-                return HallsSession.this.applySpeedTotem(player, level);
+            public boolean applySpeedTotem(Player player, int plotId, int level) {
+                return HallsSession.this.applySpeedTotem(player, plotId, level);
             }
         }, this::scanUpcomingFloors, new HallsCampRuntime.KeyAccount() {
             @Override
@@ -451,7 +451,7 @@ public final class HallsSession {
             openElevatorDoors();
             world.playSound(block.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
             player.sendMessage(Component.text("The elevator begins its descent.", NamedTextColor.DARK_RED));
-            startElevatorTransition(nextFloorAfterCampDrill(), leftBehind);
+            startElevatorTransition(currentFloor + 1, leftBehind);
         } else {
             player.sendMessage(Component.text("No deeper placeholder floor is available.", NamedTextColor.YELLOW));
         }
@@ -1113,6 +1113,7 @@ public final class HallsSession {
         int connectorTargetZ = southDock ? roomStartZ + linkZ + 1 : roomStartZ + linkZ - 1;
         buildCampConnector(roomStartX + linkX, origin.y(), connectorTargetZ, levelType);
         depositCampBankCoins();
+        clearAllTotemBuffs();
         restoreElevatorChestContents();
         closeElevatorDoors();
         teleportParticipantsToElevator("Camp Floor " + floor, "Keys " + campKeys + " | " + nextCampKeyProgressLabel());
@@ -2680,7 +2681,32 @@ public final class HallsSession {
         if ("exploration".equalsIgnoreCase(floor.kind()) && !activeFloorModifiers.empty()) {
             quota = Math.max(0, (int) Math.round(quota * activeFloorModifiers.coinQuotaMultiplier()));
         }
+        if ("exploration".equalsIgnoreCase(floor.kind())) {
+            quota = Math.max(0, (int) Math.round(quota * elevatorDrillQuotaMultiplier()));
+        }
         return quota;
+    }
+
+    private double elevatorDrillQuotaMultiplier() {
+        double multiplier = 1.0;
+        for (HallsCampRuntime.PlotState state : activeCampPlotStates()) {
+            if (!"elevator_drill".equals(state.buildingId())) {
+                continue;
+            }
+            multiplier *= switch (Math.max(1, Math.min(3, state.level()))) {
+                case 1 -> 0.9;
+                case 2 -> 0.8;
+                default -> 0.7;
+            };
+        }
+        return multiplier;
+    }
+
+    private List<HallsCampRuntime.PlotState> activeCampPlotStates() {
+        if (isCurrentFloorCamp()) {
+            captureCurrentCampState();
+        }
+        return savedCampStates.getOrDefault(sharedCampStateKey(), List.of());
     }
 
     private Component campHudEconomyComponent() {
@@ -2690,27 +2716,6 @@ public final class HallsSession {
         int nextCost = scenario.camp().nextKeyCost(campKeysEarned);
         String progress = nextCost <= 0 ? "complete" : campBankCoins + "/" + nextCost;
         return Component.text("Keys " + campKeys + " | Bank " + progress, NamedTextColor.YELLOW);
-    }
-
-    private int nextFloorAfterCampDrill() {
-        int destination = currentFloor + 1;
-        if (!isCurrentFloorCamp() || campRuntime == null) {
-            return destination;
-        }
-        int skipsRemaining = campRuntime.highestBuiltLevel("elevator_drill");
-        while (skipsRemaining > 0 && destination < scenario.floorCount()) {
-            int candidate = destination + 1;
-            if (candidate >= scenario.floorCount()) {
-                break;
-            }
-            HallsScenario.FloorDefinition candidateFloor = scenario.floor(candidate);
-            if (candidateFloor == null || "camp".equalsIgnoreCase(candidateFloor.kind())) {
-                break;
-            }
-            destination = candidate;
-            skipsRemaining--;
-        }
-        return destination;
     }
 
     private HallsScenario.FloorDefinition adjustedDifficulty(HallsScenario.FloorDefinition floor) {
@@ -3869,14 +3874,9 @@ public final class HallsSession {
         for (Map.Entry<UUID, HallsSaveData.PlayerState> entry : checkpoint.players().entrySet()) {
             HallsSaveData.PlayerState state = entry.getValue();
             sculkRuntime.setSculk(entry.getKey(), state.sculk());
-            if (state.healthTotemLevel() > 0) {
-                healthTotemLevels.put(entry.getKey(), state.healthTotemLevel());
-            }
-            if (state.speedTotemLevel() > 0) {
-                speedTotemLevels.put(entry.getKey(), state.speedTotemLevel());
-            }
+            restoreLegacyTotemLevel(healthTotemLevels, entry.getKey(), state.healthTotemLevel());
+            restoreLegacyTotemLevel(speedTotemLevels, entry.getKey(), state.speedTotemLevel());
         }
-        resetCampHarvestForNewRun();
     }
 
     public void save(String reason) {
@@ -4009,8 +4009,8 @@ public final class HallsSession {
                 name,
                 ghostPlayers.contains(playerId),
                 sculkRuntime.sculkPercent(playerId),
-                healthTotemLevels.getOrDefault(playerId, 0),
-                speedTotemLevels.getOrDefault(playerId, 0),
+                aggregateTotemLevel(healthTotemLevels, playerId),
+                aggregateTotemLevel(speedTotemLevels, playerId),
                 hotbar,
                 armor,
                 offhand
@@ -4023,8 +4023,8 @@ public final class HallsSession {
             String path = "players." + playerId;
             yaml.set(path + ".ghost", ghostPlayers.contains(playerId));
             yaml.set(path + ".sculk", sculkRuntime.sculkPercent(playerId));
-            yaml.set(path + ".health-totem-level", healthTotemLevels.getOrDefault(playerId, 0));
-            yaml.set(path + ".speed-totem-level", speedTotemLevels.getOrDefault(playerId, 0));
+            yaml.set(path + ".health-totem-level", aggregateTotemLevel(healthTotemLevels, playerId));
+            yaml.set(path + ".speed-totem-level", aggregateTotemLevel(speedTotemLevels, playerId));
             if (player == null) {
                 continue;
             }
@@ -4212,12 +4212,13 @@ public final class HallsSession {
         return 0;
     }
 
-    private boolean applyHealthTotem(Player player, int level) {
+    private boolean applyHealthTotem(Player player, int plotId, int level) {
         if (player == null) {
             return false;
         }
-        if (healthTotemLevels.getOrDefault(player.getUniqueId(), 0) > 0) {
-            player.sendActionBar(Component.text("You already carry a vitality totem blessing.", NamedTextColor.GRAY));
+        Map<Integer, Integer> active = healthTotemLevels.computeIfAbsent(player.getUniqueId(), ignored -> new HashMap<>());
+        if (active.containsKey(plotId)) {
+            player.sendActionBar(Component.text("You already carry this vitality totem blessing.", NamedTextColor.GRAY));
             return false;
         }
         int normalizedLevel = Math.max(1, Math.min(3, level));
@@ -4226,20 +4227,22 @@ public final class HallsSession {
             player.sendActionBar(Component.text("Your max health cannot be changed here.", NamedTextColor.RED));
             return false;
         }
-        removeModifier(attribute, HEALTH_TOTEM_MODIFIER);
-        attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, HEALTH_TOTEM_MODIFIER),
+        String modifierKey = totemModifierKey(HEALTH_TOTEM_MODIFIER_PREFIX, plotId);
+        removeModifier(attribute, modifierKey);
+        attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, modifierKey),
                 2.0 * normalizedLevel, AttributeModifier.Operation.ADD_NUMBER));
-        healthTotemLevels.put(player.getUniqueId(), normalizedLevel);
+        active.put(plotId, normalizedLevel);
         player.setHealth(Math.min(attribute.getValue(), player.getHealth() + 2.0 * normalizedLevel));
         return true;
     }
 
-    private boolean applySpeedTotem(Player player, int level) {
+    private boolean applySpeedTotem(Player player, int plotId, int level) {
         if (player == null) {
             return false;
         }
-        if (speedTotemLevels.getOrDefault(player.getUniqueId(), 0) > 0) {
-            player.sendActionBar(Component.text("You already carry a speed totem blessing.", NamedTextColor.GRAY));
+        Map<Integer, Integer> active = speedTotemLevels.computeIfAbsent(player.getUniqueId(), ignored -> new HashMap<>());
+        if (active.containsKey(plotId)) {
+            player.sendActionBar(Component.text("You already carry this speed totem blessing.", NamedTextColor.GRAY));
             return false;
         }
         int normalizedLevel = Math.max(1, Math.min(3, level));
@@ -4248,10 +4251,11 @@ public final class HallsSession {
             player.sendActionBar(Component.text("Your movement speed cannot be changed here.", NamedTextColor.RED));
             return false;
         }
-        removeModifier(attribute, SPEED_TOTEM_MODIFIER);
-        attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, SPEED_TOTEM_MODIFIER),
+        String modifierKey = totemModifierKey(SPEED_TOTEM_MODIFIER_PREFIX, plotId);
+        removeModifier(attribute, modifierKey);
+        attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, modifierKey),
                 0.05 * normalizedLevel, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
-        speedTotemLevels.put(player.getUniqueId(), normalizedLevel);
+        active.put(plotId, normalizedLevel);
         return true;
     }
 
@@ -4260,22 +4264,24 @@ public final class HallsSession {
             return;
         }
         clearTotemBuffs(player);
-        int healthLevel = Math.max(0, Math.min(3, state.healthTotemLevel()));
+        int healthLevel = Math.max(0, state.healthTotemLevel());
         if (healthLevel > 0) {
             AttributeInstance attribute = player.getAttribute(Attribute.MAX_HEALTH);
             if (attribute != null) {
-                attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, HEALTH_TOTEM_MODIFIER),
+                String modifierKey = totemModifierKey(HEALTH_TOTEM_MODIFIER_PREFIX, -1);
+                attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, modifierKey),
                         2.0 * healthLevel, AttributeModifier.Operation.ADD_NUMBER));
-                healthTotemLevels.put(player.getUniqueId(), healthLevel);
+                restoreLegacyTotemLevel(healthTotemLevels, player.getUniqueId(), healthLevel);
             }
         }
-        int speedLevel = Math.max(0, Math.min(3, state.speedTotemLevel()));
+        int speedLevel = Math.max(0, state.speedTotemLevel());
         if (speedLevel > 0) {
             AttributeInstance attribute = player.getAttribute(Attribute.MOVEMENT_SPEED);
             if (attribute != null) {
-                attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, SPEED_TOTEM_MODIFIER),
+                String modifierKey = totemModifierKey(SPEED_TOTEM_MODIFIER_PREFIX, -1);
+                attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, modifierKey),
                         0.05 * speedLevel, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
-                speedTotemLevels.put(player.getUniqueId(), speedLevel);
+                restoreLegacyTotemLevel(speedTotemLevels, player.getUniqueId(), speedLevel);
             }
         }
     }
@@ -4284,21 +4290,25 @@ public final class HallsSession {
         if (player == null) {
             return;
         }
-        int healthLevel = healthTotemLevels.getOrDefault(player.getUniqueId(), 0);
-        int speedLevel = speedTotemLevels.getOrDefault(player.getUniqueId(), 0);
+        Map<Integer, Integer> healthLevels = new HashMap<>(healthTotemLevels.getOrDefault(player.getUniqueId(), Map.of()));
+        Map<Integer, Integer> speedLevels = new HashMap<>(speedTotemLevels.getOrDefault(player.getUniqueId(), Map.of()));
         clearTotemAttributeModifiers(player);
-        if (healthLevel > 0) {
-            AttributeInstance attribute = player.getAttribute(Attribute.MAX_HEALTH);
-            if (attribute != null) {
-                attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, HEALTH_TOTEM_MODIFIER),
-                        2.0 * healthLevel, AttributeModifier.Operation.ADD_NUMBER));
+        AttributeInstance health = player.getAttribute(Attribute.MAX_HEALTH);
+        if (health != null) {
+            for (Map.Entry<Integer, Integer> entry : healthLevels.entrySet()) {
+                int level = totemModifierLevel(entry.getKey(), entry.getValue());
+                health.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin,
+                        totemModifierKey(HEALTH_TOTEM_MODIFIER_PREFIX, entry.getKey())),
+                        2.0 * level, AttributeModifier.Operation.ADD_NUMBER));
             }
         }
-        if (speedLevel > 0) {
-            AttributeInstance attribute = player.getAttribute(Attribute.MOVEMENT_SPEED);
-            if (attribute != null) {
-                attribute.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin, SPEED_TOTEM_MODIFIER),
-                        0.05 * speedLevel, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
+        AttributeInstance speed = player.getAttribute(Attribute.MOVEMENT_SPEED);
+        if (speed != null) {
+            for (Map.Entry<Integer, Integer> entry : speedLevels.entrySet()) {
+                int level = totemModifierLevel(entry.getKey(), entry.getValue());
+                speed.addModifier(new AttributeModifier(new org.bukkit.NamespacedKey(plugin,
+                        totemModifierKey(SPEED_TOTEM_MODIFIER_PREFIX, entry.getKey())),
+                        0.05 * level, AttributeModifier.Operation.MULTIPLY_SCALAR_1));
             }
         }
     }
@@ -4312,18 +4322,67 @@ public final class HallsSession {
         speedTotemLevels.remove(player.getUniqueId());
     }
 
+    private void clearAllTotemBuffs() {
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                clearTotemBuffs(player);
+            }
+        }
+        healthTotemLevels.clear();
+        speedTotemLevels.clear();
+    }
+
     private void clearTotemAttributeModifiers(Player player) {
         if (player == null) {
             return;
         }
         AttributeInstance health = player.getAttribute(Attribute.MAX_HEALTH);
         if (health != null) {
-            removeModifier(health, HEALTH_TOTEM_MODIFIER);
+            removeKnownTotemModifiers(health, healthTotemLevels.getOrDefault(player.getUniqueId(), Map.of()),
+                    HEALTH_TOTEM_MODIFIER_PREFIX);
+            removeModifier(health, "hoc_health_totem");
+            removeModifier(health, totemModifierKey(HEALTH_TOTEM_MODIFIER_PREFIX, -1));
             player.setHealth(Math.min(player.getHealth(), health.getValue()));
         }
         AttributeInstance speed = player.getAttribute(Attribute.MOVEMENT_SPEED);
         if (speed != null) {
-            removeModifier(speed, SPEED_TOTEM_MODIFIER);
+            removeKnownTotemModifiers(speed, speedTotemLevels.getOrDefault(player.getUniqueId(), Map.of()),
+                    SPEED_TOTEM_MODIFIER_PREFIX);
+            removeModifier(speed, "hoc_speed_totem");
+            removeModifier(speed, totemModifierKey(SPEED_TOTEM_MODIFIER_PREFIX, -1));
+        }
+    }
+
+    private void removeKnownTotemModifiers(AttributeInstance attribute, Map<Integer, Integer> levels, String prefix) {
+        for (Integer plotId : levels.keySet()) {
+            removeModifier(attribute, totemModifierKey(prefix, plotId));
+        }
+    }
+
+    private String totemModifierKey(String prefix, int plotId) {
+        return prefix + (plotId < 0 ? "legacy" : plotId);
+    }
+
+    private int aggregateTotemLevel(Map<UUID, Map<Integer, Integer>> source, UUID playerId) {
+        int total = 0;
+        for (int level : source.getOrDefault(playerId, Map.of()).values()) {
+            total += Math.max(0, level);
+        }
+        return total;
+    }
+
+    private int totemModifierLevel(int plotId, int level) {
+        if (plotId < 0) {
+            return Math.max(1, level);
+        }
+        return Math.max(1, Math.min(3, level));
+    }
+
+    private void restoreLegacyTotemLevel(Map<UUID, Map<Integer, Integer>> target, UUID playerId, int level) {
+        int normalized = Math.max(0, level);
+        if (normalized > 0) {
+            target.computeIfAbsent(playerId, ignored -> new HashMap<>()).put(-1, normalized);
         }
     }
 

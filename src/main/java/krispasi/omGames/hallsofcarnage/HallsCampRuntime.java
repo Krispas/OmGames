@@ -52,9 +52,9 @@ public final class HallsCampRuntime {
     }
 
     public interface TotemAccount {
-        boolean applyHealthTotem(Player player, int level);
+        boolean applyHealthTotem(Player player, int plotId, int level);
 
-        boolean applySpeedTotem(Player player, int level);
+        boolean applySpeedTotem(Player player, int plotId, int level);
     }
 
     public interface KeyAccount {
@@ -561,9 +561,18 @@ public final class HallsCampRuntime {
             return true;
         }
         HallsBuildingType.Level next = building.level(plot.level() + 1);
+        String blueprintCost = upgradeBlueprintCost(building);
+        if (blueprintCost != null && countHotbarItem(player.getInventory(), blueprintCost) <= 0) {
+            player.sendActionBar(Component.text("Missing " + itemName(blueprintCost) + " for this upgrade.",
+                    NamedTextColor.RED));
+            return true;
+        }
         if (scrapAccount != null && !scrapAccount.spend(next.upgradeCost())) {
             player.sendActionBar(Component.text("Not enough stored scrap to upgrade.", NamedTextColor.RED));
             return true;
+        }
+        if (blueprintCost != null) {
+            consumeItemIngredients(player.getInventory(), Map.of(blueprintCost, 1));
         }
         setBuilding(plot, building, plot.level() + 1);
         refreshHarvestForLevel(plot, building);
@@ -630,9 +639,9 @@ public final class HallsCampRuntime {
                     "speed_totem", null));
         } else if (building.id().equals("elevator_drill")) {
             inventory.setItem(13, menuItem(Material.POINTED_DRIPSTONE, "Drill Ready", NamedTextColor.AQUA,
-                    List.of("Next camp descent skips up to " + Math.max(1, Math.min(3, plot.level()))
-                            + " floor" + (plot.level() == 1 ? "." : "s."),
-                            "It will not skip camps or the final floor."), null, null));
+                    List.of("Exploration coin quota multiplier: "
+                            + formatStatAmount(elevatorDrillQuotaMultiplier(plot.level()) * 100.0) + "%.",
+                            "Multiple drills stack multiplicatively."), null, null));
         } else if (building.id().equals("mycelia_farm")) {
             inventory.setItem(13, menuItem(Material.DEAD_BUSH, "Farm Empty", NamedTextColor.GRAY,
                     List.of("Upgrade or revisit after a future refresh."), null, null));
@@ -808,10 +817,21 @@ public final class HallsCampRuntime {
                 || building.id().equals("armory");
     }
 
+    private String upgradeBlueprintCost(HallsBuildingType building) {
+        if (building == null || !isCraftingStation(building)) {
+            return null;
+        }
+        return building.blueprint();
+    }
+
     private List<String> upgradeLore(HallsBuildingType building, Plot plot) {
         HallsBuildingType.Level next = building.level(plot.level() + 1);
         List<String> lore = new ArrayList<>();
         lore.add("Cost: " + formatCost(next.upgradeCost()));
+        String blueprintCost = upgradeBlueprintCost(building);
+        if (blueprintCost != null) {
+            lore.add("Blueprint: " + itemName(blueprintCost));
+        }
         if (isCraftingStation(building)) {
             List<String> currentRecipes = scenario == null ? List.of() : scenario.craftingRecipes(building.id(), plot.level());
             List<String> nextRecipes = scenario == null ? List.of() : scenario.craftingRecipes(building.id(), plot.level() + 1);
@@ -852,8 +872,9 @@ public final class HallsCampRuntime {
             lore.add("Movement speed: +" + speedTotemPercent(plot.level())
                     + "% -> +" + speedTotemPercent(plot.level() + 1) + "%");
         } else if (building.id().equals("elevator_drill")) {
-            lore.add("Skip depth: " + Math.max(1, Math.min(3, plot.level()))
-                    + " -> " + Math.max(1, Math.min(3, plot.level() + 1)));
+            lore.add("Quota multiplier: "
+                    + formatStatAmount(elevatorDrillQuotaMultiplier(plot.level()) * 100.0) + "% -> "
+                    + formatStatAmount(elevatorDrillQuotaMultiplier(plot.level() + 1) * 100.0) + "%");
         } else if (!next.giveItems().isEmpty()) {
             lore.add("Outputs: " + next.giveItems().stream().map(this::itemName).collect(java.util.stream.Collectors.joining(", ")));
         } else {
@@ -1056,7 +1077,7 @@ public final class HallsCampRuntime {
             player.sendActionBar(Component.text("This totem is depleted for this run.", NamedTextColor.GRAY));
             return;
         }
-        if (!totemAccount.applyHealthTotem(player, plot.level())) {
+        if (!totemAccount.applyHealthTotem(player, plot.id(), plot.level())) {
             return;
         }
         plot.setHarvestRemaining(plot.harvestRemaining() - 1);
@@ -1078,7 +1099,7 @@ public final class HallsCampRuntime {
             player.sendActionBar(Component.text("This totem is depleted for this run.", NamedTextColor.GRAY));
             return;
         }
-        if (!totemAccount.applySpeedTotem(player, plot.level())) {
+        if (!totemAccount.applySpeedTotem(player, plot.id(), plot.level())) {
             return;
         }
         plot.setHarvestRemaining(plot.harvestRemaining() - 1);
@@ -1179,6 +1200,14 @@ public final class HallsCampRuntime {
 
     private int speedTotemPercent(int level) {
         return 5 * Math.max(1, Math.min(3, level));
+    }
+
+    private double elevatorDrillQuotaMultiplier(int level) {
+        return switch (Math.max(1, Math.min(3, level))) {
+            case 1 -> 0.9;
+            case 2 -> 0.8;
+            default -> 0.7;
+        };
     }
 
     private void playBuildingSound(Player player, HallsBuildingType building, BuildingSound sound) {

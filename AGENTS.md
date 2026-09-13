@@ -1345,12 +1345,13 @@ SQLite tables:
 - Sculk Purifier buildings have `3` charges per run, reduce only the clicking player's current sculk pressure from their camp GUI, and scale the amount by purifier size and level.
 - Grindstone buildings have `1` charge per run and increase the held Halls weapon's melee damage by the building level.
 - Forge buildings are medium camp buildings with `1` charge per run and repair the held Halls item's durability by `30% * level` of its maximum durability.
-- Elevator Drill buildings affect the next descent from that camp: they skip up to `level` floors, but never skip a camp floor or the final scenario floor.
+- Elevator Drill buildings reduce exploration-floor coin quotas instead of skipping floors. Each built drill applies a multiplicative quota multiplier based on level: `0.9`, `0.8`, or `0.7`.
 - Scanner buildings reveal and lock the modifier rolls for the next `level` upcoming exploration floors in the current run.
-- Health Totem buildings are large camp buildings with `1` charge per run and increase one player's max health by `2 * level` for the current run.
-- Speed Totem buildings are small camp buildings with `1` charge per run and increase one player's movement speed by `5% * level` for the current run.
+- Health Totem buildings are large camp buildings with `1` charge per run and increase one player's max health by `2 * level` until the next camp arrival. Multiple health totems may stack on one player when they come from different built plots.
+- Speed Totem buildings are small camp buildings with `1` charge per run and increase one player's movement speed by `5% * level` until the next camp arrival. Multiple speed totems may stack on one player when they come from different built plots.
 - Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker and display parts are centered against plot centers/facing, including even-sized future plot footprints and scaled display parts.
 - Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Upgrade buttons show the stored-scrap cost plus practical effects such as newly unlocked station recipes or harvest changes.
+- Cooking Pot, Weapon Bench, and Armory upgrades consume one matching building blueprint for each level upgrade, in addition to stored scrap costs.
 - Halls save snapshots live in `plugins/OmGames/HallsOfCarnage/saves/` as YAML files keyed by scenario id plus sorted participant UUIDs.
 - The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, per-player sculk pressure, per-player active totem buff levels, elevator chest contents, stored scrap/coins, camp bank/key/team-life counters, and shared camp plot building state including building id, level, harvest counters, and storage locker contents.
 - Save snapshots are created/overwritten when a campaign starts, when the elevator leaves a floor, when arriving at a camp floor, when game-over restarts the run at floor 1, and when the host uses `/hoc leave` from the start floor or a camp floor.

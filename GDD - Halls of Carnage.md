@@ -214,14 +214,17 @@ All buildings have 3 levels.
 - Size: Medium
 
 Allows cooking food for free based on it's level. It can range from healing to stat bonuses.
+Upgrading to level 2 and level 3 requires another Cooking Pot blueprint in addition to scrap costs.
 ### Weapon Bench
 - Size: Medium
 
 Allows crafting weapons based on scenario settings. Unlocks more recipes when upgraded. Uses scrap.
+Upgrading to level 2 and level 3 requires another Weapon Bench blueprint in addition to scrap costs.
 ### Armory
 - Size: Medium
 
 Same as weapon bench, but for armor.
+Upgrading to level 2 and level 3 requires another Armory blueprint in addition to scrap costs.
 ### Grindstone
 - Size: Large
 
@@ -241,7 +244,7 @@ Grows basic food for free. Bigger level = more.
 ### Elevator Drill
 - Size: Large
 
-Makes it so players skip next few floors, the skip depends on the level. Cannot skip last floor or a camp.
+Reduces exploration floor coin quotas while built. Each drill applies a multiplicative quota multiplier based on level: level 1 is 0.9, level 2 is 0.8, and level 3 is 0.7. Multiple drills stack multiplicatively.
 
 ### Scanner
 - Size: Small
@@ -250,11 +253,11 @@ Tells you modifiers for the next floors based on the level.
 ### Health Totem
 - Size: Large
 
-Has 1 charge per run. Increases one player's max health by 2 per level for the current run. The effect is saved when the run is saved, and game over resets affected players back to normal max health.
+Has 1 charge per run. Increases one player's max health by 2 per level until the next camp arrival. Multiple Health Totems can stack on the same player when they are built on different plots.
 ### Speed Totem
 - Size: Small
 
-Has 1 charge per run. Increases one player's movement speed by 5% per level for the current run. The effect is saved when the run is saved, and game over resets affected players back to normal speed.
+Has 1 charge per run. Increases one player's movement speed by 5% per level until the next camp arrival. Multiple Speed Totems can stack on the same player when they are built on different plots.
 
 ### Sculk Purifier
 - Size: All three sizes (different blueprints)
