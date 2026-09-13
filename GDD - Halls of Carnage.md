@@ -152,7 +152,7 @@ Industrial open halls with machinery-like pillars and room-local open-hall gener
 ### Backrooms
 Yellowed liminal halls with maze-style open spaces, long wall runs, and sparse unsettling monster pools.
 ### Sewer
-Wet brick service tunnels with wide 5-block corridors and a 3-block liquid channel. Rooms can generate broad contiguous puddles; liquid is configured by level type so water is used now and lava can be used by future content. Bear traps and proximity mines are blacklisted from this level type.
+Wet brick service tunnels with wide 5-block corridors and a 3-block liquid channel. Rooms can generate broad contiguous puddles, including along room borders, and adjacent puddles/channels should merge without separating walls; liquid is configured by level type so water is used now and lava can be used by future content. Bear traps and proximity mines are blacklisted from this level type. Sewer bubbles and geysers use display-only bottom fixtures in puddles; geysers knock entities upward without direct damage.
 ### Other levels
 Of course, other types will be implemented throughout development.
 ## Traps

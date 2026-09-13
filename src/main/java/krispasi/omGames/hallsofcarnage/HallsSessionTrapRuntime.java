@@ -800,8 +800,8 @@ final class HallsSessionTrapRuntime {
 
     private List<UUID> buildSewerWaterFixture(HallsExplorationGenerator.Cell cell, HallsTrapType type) {
         setBlock(cell.x(), origin.y() - 1, cell.z(), Material.WATER);
-        setBlock(cell.x(), origin.y() - 2, cell.z(), type.blockMaterial());
-        return List.of(spawnFloorBlockDisplay(cell, type.blockMaterial(), type.modelScale()));
+        setBlock(cell.x(), origin.y() - 2, cell.z(), Material.WATER);
+        return List.of(spawnLiquidBottomBlockDisplay(cell, type.blockMaterial(), type.modelScale()));
     }
 
     private UUID spawnPufferfish(HallsExplorationGenerator.Cell cell) {
@@ -838,6 +838,26 @@ final class HallsSessionTrapRuntime {
         Material displayMaterial = material == null || material.isAir() ? Material.IRON_TRAPDOOR : material;
         float normalizedScale = Math.max(0.2f, scale);
         Location location = new Location(world, cell.x() + 0.5, origin.y() + 0.03, cell.z() + 0.5);
+        BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
+            entity.setBlock(displayMaterial.createBlockData());
+            entity.setBillboard(Display.Billboard.FIXED);
+            entity.setInterpolationDelay(1);
+            entity.setTeleportDuration(2);
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_trap");
+            entity.setTransformation(new Transformation(
+                    new Vector3f(-0.4f * normalizedScale, 0.0f, -0.4f * normalizedScale),
+                    new Quaternionf(),
+                    new Vector3f(0.8f * normalizedScale, 0.06f, 0.8f * normalizedScale),
+                    new Quaternionf()));
+        });
+        return display.getUniqueId();
+    }
+
+    private UUID spawnLiquidBottomBlockDisplay(HallsExplorationGenerator.Cell cell, Material material, float scale) {
+        Material displayMaterial = material == null || material.isAir() ? Material.IRON_TRAPDOOR : material;
+        float normalizedScale = Math.max(0.2f, scale);
+        Location location = new Location(world, cell.x() + 0.5, origin.y() - 1.97, cell.z() + 0.5);
         BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
             entity.setBlock(displayMaterial.createBlockData());
             entity.setBillboard(Display.Billboard.FIXED);
@@ -1054,8 +1074,8 @@ final class HallsSessionTrapRuntime {
                     if (activeAge == 0L) {
                         world.playSound(center, Sound.BLOCK_BUBBLE_COLUMN_UPWARDS_AMBIENT, 1.0f, 1.35f);
                     }
-                    knockbackPlayersNear(center, trap.type().radius(), trap.type().damage(), "A sewer geyser erupts.");
-                    knockbackMonstersNear(center, trap.type().radius(), trap.type().damage());
+                    knockbackPlayersNear(center, trap.type().radius());
+                    knockbackMonstersNear(center, trap.type().radius());
                 }
             }
             default -> {
@@ -1448,21 +1468,19 @@ final class HallsSessionTrapRuntime {
         }
     }
 
-    private void knockbackPlayersNear(Location center, double radius, double damage, String message) {
+    private void knockbackPlayersNear(Location center, double radius) {
         for (Player player : nearbyParticipants(center, radius)) {
-            damagePlayerFromTrap(player, damage, message);
             applyGeyserKnockback(player, center);
         }
     }
 
-    private void knockbackMonstersNear(Location center, double radius, double damage) {
+    private void knockbackMonstersNear(Location center, double radius) {
         if (!canTrapAffectMonsters(center)) {
             return;
         }
         double radiusSquared = radius * radius;
         for (LivingEntity monster : sessionMonsters()) {
             if (monster.getLocation().distanceSquared(center) <= radiusSquared) {
-                damageMonsterFromTrap(monster, damage);
                 applyGeyserKnockback(monster, center);
             }
         }

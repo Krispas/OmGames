@@ -1359,7 +1359,7 @@ public final class HallsSession {
         long started = System.nanoTime();
         Set<HallsExplorationGenerator.Cell> liquidCells = new HashSet<>(build.plan().liquidCells());
         for (HallsExplorationGenerator.Room room : build.plan().rooms()) {
-            liquidCells.addAll(roomLiquidCells(build, room, reservedCells, liquidCells));
+            liquidCells.addAll(roomLiquidCells(build, room, reservedCells));
         }
         for (HallsExplorationGenerator.Cell cell : liquidCells) {
             renderLiquidCell(cell, build.levelType(), liquidCells);
@@ -1370,11 +1370,10 @@ public final class HallsSession {
 
     private Set<HallsExplorationGenerator.Cell> roomLiquidCells(ExplorationBuild build,
                                                                 HallsExplorationGenerator.Room room,
-                                                                Set<HallsExplorationGenerator.Cell> reservedCells,
-                                                                Set<HallsExplorationGenerator.Cell> existingLiquid) {
-        List<HallsExplorationGenerator.Cell> candidates = openInteriorCells(room).stream()
+                                                                Set<HallsExplorationGenerator.Cell> reservedCells) {
+        List<HallsExplorationGenerator.Cell> candidates = roomLiquidCandidateCells(room).stream()
                 .map(cell -> new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()))
-                .filter(cell -> canPlaceRoomLiquid(cell, build.plan(), reservedCells, existingLiquid))
+                .filter(cell -> canPlaceRoomLiquid(cell, build.plan(), reservedCells))
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         if (candidates.isEmpty()) {
             return Set.of();
@@ -1424,9 +1423,8 @@ public final class HallsSession {
 
     private boolean canPlaceRoomLiquid(HallsExplorationGenerator.Cell cell,
                                        HallsExplorationGenerator.Plan plan,
-                                       Set<HallsExplorationGenerator.Cell> reservedCells,
-                                       Set<HallsExplorationGenerator.Cell> existingLiquid) {
-        if (plan.corridorCells().contains(cell) || existingLiquid.contains(cell)
+                                       Set<HallsExplorationGenerator.Cell> reservedCells) {
+        if (plan.corridorCells().contains(cell)
                 || (reservedCells != null && reservedCells.contains(cell))) {
             return false;
         }
@@ -1443,6 +1441,18 @@ public final class HallsSession {
 
     private boolean isSewer(HallsLevelType levelType) {
         return levelType != null && levelType.id().equals("sewer");
+    }
+
+    private List<Cell> roomLiquidCandidateCells(HallsExplorationGenerator.Room room) {
+        List<Cell> cells = new ArrayList<>();
+        for (int z = 0; z < room.layout().depth(); z++) {
+            for (int x = 0; x < room.layout().width(); x++) {
+                if (room.layout().at(x, z) == 'O') {
+                    cells.add(new Cell(x, z));
+                }
+            }
+        }
+        return cells;
     }
 
     private void renderLiquidCell(HallsExplorationGenerator.Cell cell,

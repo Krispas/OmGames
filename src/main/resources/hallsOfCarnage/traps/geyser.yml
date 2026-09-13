@@ -6,7 +6,7 @@ level-types:
 block-material: SOUL_SAND
 model-material: SOUL_SAND
 model-scale: 1.0
-damage: 2
+damage: 0
 radius: 2.5
 interval-ticks: 80
 active-ticks: 12
