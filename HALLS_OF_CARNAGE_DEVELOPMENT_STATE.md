@@ -164,3 +164,4 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- I added a new file UntoldDepthsLevels.csv. It contains a new layout of the Untold Depths scenario. I also changed some values for floors 2-9 so please reflect the changes. Fill the floors 11-30. You can keep 31-50 as placeholders for now.
