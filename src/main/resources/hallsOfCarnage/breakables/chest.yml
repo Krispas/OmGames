@@ -1,0 +1,11 @@
+id: chest
+rarity: common
+break-message: "You smashed a rotting chest."
+hitbox-height: 1.0
+particle-material: CHEST
+scrap-drops:
+  - wood_scrap
+  - diamond_scrap
+parts:
+  - material: CHEST
+    offset: [0, 0, 0]

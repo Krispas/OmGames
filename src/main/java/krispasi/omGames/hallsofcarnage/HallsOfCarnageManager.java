@@ -9,9 +9,11 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -33,9 +35,11 @@ public final class HallsOfCarnageManager {
     private static final String DATA_FOLDER_NAME = "HallsOfCarnage";
     private static final String MENU_VILLAGER_TAG = "omgames_hoc_menu_villager";
     private static final String[] RESOURCE_FILES = {
-            "hallsOfCarnage/scenarios/UntoldDepths.txt",
+            "hallsOfCarnage/scenarios/UntoldDepths.yml",
             "hallsOfCarnage/level/special/start_floor.txt",
             "hallsOfCarnage/level/special/final_floor_1.txt",
+            "hallsOfCarnage/level/camps/camp_1.txt",
+            "hallsOfCarnage/level/camps/camp_untold_depths.txt",
             "hallsOfCarnage/level/howling_corridors/exploration_1.txt",
             "hallsOfCarnage/level/howling_corridors/exploration_2.txt",
             "hallsOfCarnage/level/howling_corridors/exploration_3.txt",
@@ -68,49 +72,124 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/level/deep_crypt/exploration_8.txt",
             "hallsOfCarnage/level/deep_crypt/exploration_9.txt",
             "hallsOfCarnage/level/deep_crypt/exploration_10.txt",
-            "hallsOfCarnage/level_type/howling_corridors.txt",
-            "hallsOfCarnage/level_type/frozen_halls.txt",
-            "hallsOfCarnage/level_type/deep_crypt.txt",
+            "hallsOfCarnage/level/infernal_chambers/exploration_1.txt",
+            "hallsOfCarnage/level/factory/exploration_1.txt",
+            "hallsOfCarnage/level/backrooms/exploration_1.txt",
+            "hallsOfCarnage/level/sewer/exploration_1.txt",
+            "hallsOfCarnage/level_type/howling_corridors.yml",
+            "hallsOfCarnage/level_type/frozen_halls.yml",
+            "hallsOfCarnage/level_type/deep_crypt.yml",
+            "hallsOfCarnage/level_type/infernal_chambers.yml",
+            "hallsOfCarnage/level_type/factory.yml",
+            "hallsOfCarnage/level_type/backrooms.yml",
+            "hallsOfCarnage/level_type/sewer.yml",
             "hallsOfCarnage/modifiers/shared.yml",
             "hallsOfCarnage/modifiers/frozen_halls.yml",
             "hallsOfCarnage/modifiers/deep_crypt.yml",
-            "hallsOfCarnage/breakables/barrel.txt",
-            "hallsOfCarnage/breakables/chest.txt",
-            "hallsOfCarnage/breakables/table.txt",
-            "hallsOfCarnage/breakables/chair.txt",
-            "hallsOfCarnage/breakables/stool.txt",
-            "hallsOfCarnage/breakables/radiator.txt",
-            "hallsOfCarnage/breakables/metal_barrel.txt",
-            "hallsOfCarnage/traps/hole.txt",
-            "hallsOfCarnage/traps/bear_trap.txt",
-            "hallsOfCarnage/traps/proximity_mine.txt",
-            "hallsOfCarnage/traps/swinging_blade.txt",
-            "hallsOfCarnage/traps/wall_spikes.txt",
-            "hallsOfCarnage/traps/falling_ice.txt",
-            "hallsOfCarnage/traps/poison_darts.txt",
-            "hallsOfCarnage/items/weapons/rusty_sword.txt",
-            "hallsOfCarnage/items/weapons/echo_blade.txt",
-            "hallsOfCarnage/items/weapons/miner_pick.txt",
-            "hallsOfCarnage/items/ranged/short_bow.txt",
-            "hallsOfCarnage/items/ranged/storm_crossbow.txt",
-            "hallsOfCarnage/items/armors/padded_armor.txt",
-            "hallsOfCarnage/items/armors/reinforced_chestplate.txt",
-            "hallsOfCarnage/items/utility/smoke_bomb.txt",
-            "hallsOfCarnage/items/utility/warding_totem.txt",
-            "hallsOfCarnage/items/blueprints/cooking_pot_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/weapon_bench_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/armory_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/grindstone_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/storage_locker_small_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/storage_locker_medium_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/storage_locker_large_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/elevator_drill_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/scanner_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/bounty_board_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/mycelia_farm_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/sculk_purifier_small_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/sculk_purifier_medium_blueprint.txt",
-            "hallsOfCarnage/items/blueprints/sculk_purifier_large_blueprint.txt"
+            "hallsOfCarnage/modifiers/factory.yml",
+            "hallsOfCarnage/modifiers/sewer.yml",
+            "hallsOfCarnage/breakables/barrel.yml",
+            "hallsOfCarnage/breakables/chest.yml",
+            "hallsOfCarnage/breakables/ender_chest.yml",
+            "hallsOfCarnage/breakables/table.yml",
+            "hallsOfCarnage/breakables/chair.yml",
+            "hallsOfCarnage/breakables/stool.yml",
+            "hallsOfCarnage/breakables/radiator.yml",
+            "hallsOfCarnage/breakables/metal_barrel.yml",
+            "hallsOfCarnage/breakable_loot_pools/common.yml",
+            "hallsOfCarnage/breakable_loot_pools/rare.yml",
+            "hallsOfCarnage/vegetation/grass.yml",
+            "hallsOfCarnage/vegetation/deadbush.yml",
+            "hallsOfCarnage/vegetation/tall_dry_grass.yml",
+            "hallsOfCarnage/vegetation/bush.yml",
+            "hallsOfCarnage/traps/hole.yml",
+            "hallsOfCarnage/traps/bear_trap.yml",
+            "hallsOfCarnage/traps/proximity_mine.yml",
+            "hallsOfCarnage/traps/swinging_blade.yml",
+            "hallsOfCarnage/traps/wall_spikes.yml",
+            "hallsOfCarnage/traps/falling_ice.yml",
+            "hallsOfCarnage/traps/poison_darts.yml",
+            "hallsOfCarnage/traps/steam_vent.yml",
+            "hallsOfCarnage/traps/bubbles.yml",
+            "hallsOfCarnage/traps/geyser.yml",
+            "hallsOfCarnage/traps/pufferfish.yml",
+            "hallsOfCarnage/monsters/zombie.yml",
+            "hallsOfCarnage/monsters/creeper.yml",
+            "hallsOfCarnage/monsters/creaking.yml",
+            "hallsOfCarnage/monsters/slime_medium.yml",
+            "hallsOfCarnage/monsters/zombie_vanguard.yml",
+            "hallsOfCarnage/monsters/skeleton.yml",
+            "hallsOfCarnage/monsters/cave_spider.yml",
+            "hallsOfCarnage/monsters/stray.yml",
+            "hallsOfCarnage/monsters/bogged.yml",
+            "hallsOfCarnage/monsters/husk.yml",
+            "hallsOfCarnage/monsters/breeze.yml",
+            "hallsOfCarnage/monsters/vindicator.yml",
+            "hallsOfCarnage/monsters/silverfish.yml",
+            "hallsOfCarnage/monsters/pillager.yml",
+            "hallsOfCarnage/monsters/witch.yml",
+            "hallsOfCarnage/monsters/wither_skeleton.yml",
+            "hallsOfCarnage/monsters/warden.yml",
+            "hallsOfCarnage/monsters/piglin.yml",
+            "hallsOfCarnage/monsters/blaze.yml",
+            "hallsOfCarnage/monsters/piglin_brute.yml",
+            "hallsOfCarnage/monsters/parched.yml",
+            "hallsOfCarnage/monsters/drowned.yml",
+            "hallsOfCarnage/monsters/guardian.yml",
+            "hallsOfCarnage/monsters/ravager.yml",
+            "hallsOfCarnage/monsters/hoglin_slow.yml",
+            "hallsOfCarnage/monsters/magma_cube_large.yml",
+            "hallsOfCarnage/monsters/splinter.yml",
+            "hallsOfCarnage/monsters/splinter_small.yml",
+            "hallsOfCarnage/monsters/splinter_baby.yml",
+            "hallsOfCarnage/items/weapons/vagabonds_club.yml",
+            "hallsOfCarnage/items/weapons/rusty_sword.yml",
+            "hallsOfCarnage/items/weapons/poking_stick.yml",
+            "hallsOfCarnage/items/weapons/echo_blade.yml",
+            "hallsOfCarnage/items/weapons/miner_pick.yml",
+            "hallsOfCarnage/items/weapons/bone_cleaver.yml",
+            "hallsOfCarnage/items/weapons/frost_lance.yml",
+            "hallsOfCarnage/items/weapons/sculk_maul.yml",
+            "hallsOfCarnage/items/armors/padded_armor.yml",
+            "hallsOfCarnage/items/armors/reinforced_chestplate.yml",
+            "hallsOfCarnage/items/armors/chainmail_hauberk.yml",
+            "hallsOfCarnage/items/armors/ironbound_chestplate.yml",
+            "hallsOfCarnage/items/armors/cinderplate.yml",
+            "hallsOfCarnage/items/armors/deepguard_plate.yml",
+            "hallsOfCarnage/items/food/stale_bread.yml",
+            "hallsOfCarnage/items/food/raw_mycelia.yml",
+            "hallsOfCarnage/items/food/cooked_mycelia.yml",
+            "hallsOfCarnage/items/food/ember_stew.yml",
+            "hallsOfCarnage/items/food/golden_jerky.yml",
+            "hallsOfCarnage/items/food/hearty_mycelia_stew.yml",
+            "hallsOfCarnage/items/food/fleetfoot_ration.yml",
+            "hallsOfCarnage/items/food/stonehide_chowder.yml",
+            "hallsOfCarnage/items/utility/smoke_bomb.yml",
+            "hallsOfCarnage/items/utility/warding_totem.yml",
+            "hallsOfCarnage/items/utility/mending_salve.yml",
+            "hallsOfCarnage/items/utility/adrenaline_shot.yml",
+            "hallsOfCarnage/items/utility/ironhide_salve.yml",
+            "hallsOfCarnage/items/utility/storm_vial.yml",
+            "hallsOfCarnage/items/utility/poison_bomb.yml",
+            "hallsOfCarnage/items/blueprints/forge_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/grindstone_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/storage_locker_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/elevator_drill_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/scanner_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/health_totem_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/speed_totem_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/mycelia_farm_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/sculk_purifier_blueprint.yml",
+            "hallsOfCarnage/buildings/camp_station.yml",
+            "hallsOfCarnage/buildings/forge.yml",
+            "hallsOfCarnage/buildings/mycelia_farm.yml",
+            "hallsOfCarnage/buildings/storage_locker.yml",
+            "hallsOfCarnage/buildings/grindstone.yml",
+            "hallsOfCarnage/buildings/elevator_drill.yml",
+            "hallsOfCarnage/buildings/scanner.yml",
+            "hallsOfCarnage/buildings/health_totem.yml",
+            "hallsOfCarnage/buildings/speed_totem.yml",
+            "hallsOfCarnage/buildings/sculk_purifier.yml"
     };
 
     public record Result(boolean success, String message) {
@@ -129,13 +208,38 @@ public final class HallsOfCarnageManager {
     private final Map<Integer, HallsSession> activeSessions = new HashMap<>();
     private final Map<UUID, Integer> playerSessions = new HashMap<>();
     private final Map<Integer, BukkitTask> disconnectGraceTasks = new HashMap<>();
+    private final Map<UUID, PendingSession> pendingSessions = new HashMap<>();
+    private final Set<UUID> debugPlayers = new HashSet<>();
     private HallsConfig config;
     private List<HallsScenario> scenarios = List.of();
     private Map<String, HallsLevelType> levelTypes = Map.of();
     private Map<String, HallsBreakableType> breakableTypes = Map.of();
+    private Map<String, HallsVegetationType> vegetationTypes = Map.of();
     private Map<String, HallsItemType> itemTypes = Map.of();
     private Map<String, HallsTrapType> trapTypes = Map.of();
+    private Map<String, HallsMonsterType> monsterTypes = Map.of();
+    private Map<String, HallsModifierType> modifierTypes = Map.of();
+    private Map<String, HallsBuildingType> buildingTypes = Map.of();
     private int nextSessionId = 1;
+
+    private record DifficultyOption(String id, String name, double multiplier) {
+    }
+
+    private record PendingSession(String scenarioId,
+                                  DifficultyOption difficulty,
+                                  File saveFile,
+                                  java.util.LinkedHashSet<UUID> selectedPlayers) {
+        boolean loading() {
+            return saveFile != null;
+        }
+    }
+
+    private static final DifficultyOption NORMAL_DIFFICULTY = new DifficultyOption("normal", "Normal", 1.0);
+    private static final Map<String, DifficultyOption> DIFFICULTIES = Map.of(
+            "normal", NORMAL_DIFFICULTY,
+            "hard", new DifficultyOption("hard", "Hard", 1.5),
+            "extreme", new DifficultyOption("extreme", "Extreme", 2.0)
+    );
 
     public HallsOfCarnageManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -149,14 +253,21 @@ public final class HallsOfCarnageManager {
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
+        vegetationTypes = HallsVegetationTypeLoader.loadVegetationTypes(plugin, getVegetationFolder());
         itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
         trapTypes = HallsTrapTypeLoader.loadTrapTypes(plugin, getTrapsFolder());
+        monsterTypes = HallsMonsterTypeLoader.loadMonsterTypes(plugin, getMonstersFolder());
+        modifierTypes = HallsModifierTypeLoader.loadModifierTypes(plugin, getModifiersFolder());
+        buildingTypes = HallsBuildingTypeLoader.loadBuildingTypes(plugin, getBuildingsFolder());
         shameService.load();
         applyWorldRules();
         spawnConfiguredMenuVillager();
         plugin.getLogger().info("Loaded " + scenarios.size() + " Halls of Carnage scenarios and "
                 + levelTypes.size() + " level types, " + breakableTypes.size() + " breakable types, "
-                + itemTypes.size() + " item types, " + trapTypes.size() + " trap types.");
+                + vegetationTypes.size() + " vegetation types, " + itemTypes.size() + " item types, "
+                + trapTypes.size() + " trap types, "
+                + monsterTypes.size() + " monster types, " + modifierTypes.size() + " modifiers, "
+                + buildingTypes.size() + " buildings.");
     }
 
     public void shutdown() {
@@ -170,18 +281,25 @@ public final class HallsOfCarnageManager {
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
+        vegetationTypes = HallsVegetationTypeLoader.loadVegetationTypes(plugin, getVegetationFolder());
         itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
         trapTypes = HallsTrapTypeLoader.loadTrapTypes(plugin, getTrapsFolder());
+        monsterTypes = HallsMonsterTypeLoader.loadMonsterTypes(plugin, getMonstersFolder());
+        modifierTypes = HallsModifierTypeLoader.loadModifierTypes(plugin, getModifiersFolder());
+        buildingTypes = HallsBuildingTypeLoader.loadBuildingTypes(plugin, getBuildingsFolder());
         applyWorldRules();
         spawnConfiguredMenuVillager();
         return Result.ok("Reloaded Halls of Carnage. Scenarios: " + scenarios.size()
                 + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size()
-                + ", items: " + itemTypes.size() + ", traps: " + trapTypes.size() + ".");
+                + ", vegetation: " + vegetationTypes.size() + ", items: " + itemTypes.size()
+                + ", traps: " + trapTypes.size()
+                + ", monsters: " + monsterTypes.size() + ", modifiers: " + modifierTypes.size()
+                + ", buildings: " + buildingTypes.size() + ".");
     }
 
     public Result resetGameResources(boolean confirmed) {
         if (!confirmed) {
-            return Result.fail("This deletes Halls scenario/level/level_type/modifier/breakable/trap/item files and recopies bundled defaults. Use /hoc reset confirm.");
+            return Result.fail("This deletes Halls scenario/level/level_type/modifier/breakable/vegetation/trap/monster/item/building files and recopies bundled defaults. Use /hoc reset confirm.");
         }
         if (!activeSessions.isEmpty()) {
             return Result.fail("Stop active Halls sessions before resetting game resources.");
@@ -193,8 +311,12 @@ public final class HallsOfCarnageManager {
             deleteGameResourceFolder(new File(folder, "level_type"));
             deleteGameResourceFolder(new File(folder, "modifiers"));
             deleteGameResourceFolder(new File(folder, "breakables"));
+            deleteGameResourceFolder(new File(folder, "breakable_loot_pools"));
+            deleteGameResourceFolder(new File(folder, "vegetation"));
             deleteGameResourceFolder(new File(folder, "traps"));
+            deleteGameResourceFolder(new File(folder, "monsters"));
             deleteGameResourceFolder(new File(folder, "items"));
+            deleteGameResourceFolder(new File(folder, "buildings"));
         } catch (IOException ex) {
             return Result.fail("Failed to delete Halls game resources: " + ex.getMessage());
         }
@@ -204,11 +326,18 @@ public final class HallsOfCarnageManager {
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
         breakableTypes = HallsBreakableTypeLoader.loadBreakableTypes(plugin, getBreakablesFolder());
+        vegetationTypes = HallsVegetationTypeLoader.loadVegetationTypes(plugin, getVegetationFolder());
         itemTypes = HallsItemTypeLoader.loadItemTypes(plugin, getItemsFolder());
         trapTypes = HallsTrapTypeLoader.loadTrapTypes(plugin, getTrapsFolder());
+        monsterTypes = HallsMonsterTypeLoader.loadMonsterTypes(plugin, getMonstersFolder());
+        modifierTypes = HallsModifierTypeLoader.loadModifierTypes(plugin, getModifiersFolder());
+        buildingTypes = HallsBuildingTypeLoader.loadBuildingTypes(plugin, getBuildingsFolder());
         return Result.ok("Reset Halls game resources from bundled defaults. Scenarios: " + scenarios.size()
                 + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size()
-                + ", items: " + itemTypes.size() + ", traps: " + trapTypes.size() + ".");
+                + ", vegetation: " + vegetationTypes.size() + ", items: " + itemTypes.size()
+                + ", traps: " + trapTypes.size()
+                + ", monsters: " + monsterTypes.size() + ", modifiers: " + modifierTypes.size()
+                + ", buildings: " + buildingTypes.size() + ".");
     }
 
     public List<HallsScenario> getScenarios() {
@@ -281,7 +410,294 @@ public final class HallsOfCarnageManager {
         if (player == null) {
             return;
         }
-        HallsMainMenu.open(player, scenarios, shameService.getLeaderboard(10));
+        HallsMainMenu.openMain(plugin, player, shameService.getLeaderboard(10), savesFor(player).size());
+    }
+
+    public Result openRecipeBook(Player player) {
+        HallsSession session = activeSession(player);
+        if (session == null) {
+            return Result.fail("You must be in an active Halls session to view recipes.");
+        }
+        HallsRecipeBookMenu.openIndex(plugin, player, session.scenario());
+        return Result.ok("Opened Halls recipes.");
+    }
+
+    public boolean handleRecipeBookClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        HallsRecipeBookMenu.MenuHolder holder = HallsRecipeBookMenu.holder(event.getInventory());
+        if (holder == null) {
+            return false;
+        }
+        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player player)
+                || event.getClickedInventory() == null
+                || event.getClickedInventory() != event.getView().getTopInventory()) {
+            return true;
+        }
+        HallsSession session = activeSession(player);
+        if (session == null) {
+            player.closeInventory();
+            player.sendActionBar(Component.text("You are no longer in a Halls session.", NamedTextColor.RED));
+            return true;
+        }
+        String action = HallsRecipeBookMenu.action(plugin, event.getCurrentItem());
+        String value = HallsRecipeBookMenu.value(plugin, event.getCurrentItem());
+        if (action == null) {
+            return true;
+        }
+        switch (action) {
+            case HallsRecipeBookMenu.ACTION_BUILDINGS ->
+                    HallsRecipeBookMenu.openBuildings(plugin, player, session.scenario(), buildingTypes, itemTypes);
+            case HallsRecipeBookMenu.ACTION_CRAFTING ->
+                    HallsRecipeBookMenu.openCrafting(plugin, player, session.scenario(), buildingTypes, itemTypes);
+            case HallsRecipeBookMenu.ACTION_BUILDING_DETAIL -> {
+                HallsBuildingType building = buildingTypes.get(normalizeId(value));
+                if (building == null) {
+                    player.sendActionBar(Component.text("That building is no longer loaded.", NamedTextColor.RED));
+                    HallsRecipeBookMenu.openBuildings(plugin, player, session.scenario(), buildingTypes, itemTypes);
+                } else {
+                    HallsRecipeBookMenu.openBuildingDetail(plugin, player, session.scenario(), building, itemTypes);
+                }
+            }
+            case HallsRecipeBookMenu.ACTION_BACK ->
+                    HallsRecipeBookMenu.openIndex(plugin, player, session.scenario());
+            default -> {
+            }
+        }
+        return true;
+    }
+
+    public boolean handleMainMenuClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        HallsMainMenu.MenuHolder holder = HallsMainMenu.holder(event.getInventory());
+        if (holder == null) {
+            return false;
+        }
+        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player player)
+                || event.getClickedInventory() == null
+                || event.getClickedInventory() != event.getView().getTopInventory()) {
+            return true;
+        }
+        String action = HallsMainMenu.action(plugin, event.getCurrentItem());
+        String value = HallsMainMenu.value(plugin, event.getCurrentItem());
+        if (action == null) {
+            return true;
+        }
+        switch (action) {
+            case HallsMainMenu.ACTION_NEW -> HallsMainMenu.openScenarios(plugin, player, scenarios);
+            case HallsMainMenu.ACTION_LOAD -> HallsMainMenu.openSaves(plugin, player, savesFor(player));
+            case HallsMainMenu.ACTION_BACK -> openBack(player, holder);
+            case HallsMainMenu.ACTION_SCENARIO -> HallsMainMenu.openDifficulty(plugin, player, value);
+            case HallsMainMenu.ACTION_DIFFICULTY -> {
+                DifficultyOption difficulty = DIFFICULTIES.getOrDefault(normalizeId(value), NORMAL_DIFFICULTY);
+                PendingSession pending = new PendingSession(holder.context(), difficulty, null,
+                        new java.util.LinkedHashSet<>(List.of(player.getUniqueId())));
+                pendingSessions.put(player.getUniqueId(), pending);
+                openSessionSettings(player, pending);
+            }
+            case HallsMainMenu.ACTION_SAVE -> {
+                HallsSaveData save = saveByName(player, value);
+                if (save == null) {
+                    player.sendActionBar(Component.text("That save is no longer available.", NamedTextColor.RED));
+                    HallsMainMenu.openSaves(plugin, player, savesFor(player));
+                    return true;
+                }
+                if (event.isShiftClick() && event.isRightClick()) {
+                    Result result = deleteSave(player, save);
+                    player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+                    HallsMainMenu.openSaves(plugin, player, savesFor(player));
+                    return true;
+                }
+                DifficultyOption difficulty = DIFFICULTIES.getOrDefault(save.difficultyId(),
+                        new DifficultyOption(save.difficultyId(), save.difficultyId(), save.difficultyMultiplier()));
+                PendingSession pending = new PendingSession(save.scenarioId(), difficulty, save.file(),
+                        new java.util.LinkedHashSet<>(save.participants()));
+                pendingSessions.put(player.getUniqueId(), pending);
+                openSessionSettings(player, pending);
+            }
+            case HallsMainMenu.ACTION_TOGGLE_PLAYER -> {
+                PendingSession pending = pendingSessions.get(player.getUniqueId());
+                UUID target = parseUuid(value);
+                if (pending != null && target != null && !pending.loading()) {
+                    java.util.LinkedHashSet<UUID> selected = new java.util.LinkedHashSet<>(pending.selectedPlayers());
+                    if (selected.contains(target)) {
+                        if (!target.equals(player.getUniqueId())) {
+                            selected.remove(target);
+                        }
+                    } else {
+                        selected.add(target);
+                    }
+                    pending = new PendingSession(pending.scenarioId(), pending.difficulty(), pending.saveFile(), selected);
+                    pendingSessions.put(player.getUniqueId(), pending);
+                    openSessionSettings(player, pending);
+                }
+            }
+            case HallsMainMenu.ACTION_PLAY -> {
+                Result result = startPendingSession(player);
+                player.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+            }
+            default -> {
+            }
+        }
+        return true;
+    }
+
+    private void openBack(Player player, HallsMainMenu.MenuHolder holder) {
+        switch (holder.type()) {
+            case SCENARIOS, SAVES -> openMainMenu(player);
+            case DIFFICULTY -> HallsMainMenu.openScenarios(plugin, player, scenarios);
+            case SETTINGS -> {
+                PendingSession pending = pendingSessions.get(player.getUniqueId());
+                if (pending != null && pending.loading()) {
+                    HallsMainMenu.openSaves(plugin, player, savesFor(player));
+                } else {
+                    HallsMainMenu.openDifficulty(plugin, player, pending == null ? "" : pending.scenarioId());
+                }
+            }
+            default -> openMainMenu(player);
+        }
+    }
+
+    private void openSessionSettings(Player host, PendingSession pending) {
+        HallsScenario scenario = getScenario(pending.scenarioId());
+        if (scenario == null) {
+            host.sendActionBar(Component.text("That scenario is no longer loaded.", NamedTextColor.RED));
+            openMainMenu(host);
+            return;
+        }
+        List<HallsMainMenu.PlayerChoice> choices = pending.loading()
+                ? loadedSaveChoices(pending)
+                : newCampaignChoices(host, pending);
+        int selected = (int) choices.stream().filter(HallsMainMenu.PlayerChoice::selected).count();
+        boolean canPlay = selected >= scenario.minPlayers() && selected <= scenario.maxPlayers()
+                && choices.stream().filter(HallsMainMenu.PlayerChoice::selected).allMatch(HallsMainMenu.PlayerChoice::online);
+        HallsMainMenu.openSettings(plugin, host, scenario, pending.difficulty().name(),
+                pending.difficulty().multiplier(), choices, pending.loading(), canPlay);
+    }
+
+    private List<HallsMainMenu.PlayerChoice> newCampaignChoices(Player host, PendingSession pending) {
+        List<HallsMainMenu.PlayerChoice> choices = new ArrayList<>();
+        for (Player candidate : Bukkit.getOnlinePlayers().stream()
+                .filter(player -> isHallsWorld(player.getWorld()))
+                .sorted(Comparator.comparing(Player::getName))
+                .toList()) {
+            boolean selected = pending.selectedPlayers().contains(candidate.getUniqueId());
+            choices.add(new HallsMainMenu.PlayerChoice(candidate.getUniqueId(), candidate.getName(),
+                    selected, candidate.getUniqueId().equals(host.getUniqueId()), !isActiveSessionParticipant(candidate)));
+        }
+        return choices;
+    }
+
+    private List<HallsMainMenu.PlayerChoice> loadedSaveChoices(PendingSession pending) {
+        HallsSaveData save = HallsSaveData.load(pending.saveFile());
+        if (save == null) {
+            return List.of();
+        }
+        List<HallsMainMenu.PlayerChoice> choices = new ArrayList<>();
+        for (UUID playerId : save.participants()) {
+            Player online = Bukkit.getPlayer(playerId);
+            HallsSaveData.PlayerState state = save.players().get(playerId);
+            String name = online == null ? (state == null ? playerId.toString().substring(0, 8) : state.name()) : online.getName();
+            boolean available = online != null && isHallsWorld(online.getWorld()) && !isActiveSessionParticipant(online);
+            choices.add(new HallsMainMenu.PlayerChoice(playerId, name, true, true, available));
+        }
+        return choices;
+    }
+
+    private Result startPendingSession(Player host) {
+        PendingSession pending = pendingSessions.get(host.getUniqueId());
+        if (pending == null) {
+            return Result.fail("No Halls session is being configured.");
+        }
+        Result result;
+        if (pending.loading()) {
+            HallsSaveData save = HallsSaveData.load(pending.saveFile());
+            result = startLoadedSave(host, save);
+        } else {
+            List<Player> players = pending.selectedPlayers().stream()
+                    .map(Bukkit::getPlayer)
+                    .filter(player -> player != null && isHallsWorld(player.getWorld()))
+                    .toList();
+            result = startScenarioInternal(host, pending.scenarioId(), players, pending.difficulty(), null);
+        }
+        if (result.success()) {
+            pendingSessions.remove(host.getUniqueId());
+            host.closeInventory();
+        } else {
+            openSessionSettings(host, pending);
+        }
+        return result;
+    }
+
+    private Result startLoadedSave(Player host, HallsSaveData save) {
+        if (save == null) {
+            return Result.fail("That save file could not be loaded.");
+        }
+        List<Player> players = new ArrayList<>();
+        for (UUID playerId : save.participants()) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !isHallsWorld(player.getWorld())) {
+                HallsSaveData.PlayerState state = save.players().get(playerId);
+                String name = state == null ? playerId.toString().substring(0, 8) : state.name();
+                return Result.fail(name + " must be online in the Halls lobby to load this save.");
+            }
+            players.add(player);
+        }
+        DifficultyOption difficulty = new DifficultyOption(save.difficultyId(), save.difficultyId(), save.difficultyMultiplier());
+        return startScenarioInternal(host, save.scenarioId(), players, difficulty, save);
+    }
+
+    private List<HallsSaveData> savesFor(Player player) {
+        if (player == null) {
+            return List.of();
+        }
+        File folder = getSavesFolder();
+        File[] files = folder.listFiles((dir, name) -> name.endsWith(".yml") || name.endsWith(".yaml"));
+        if (files == null) {
+            return List.of();
+        }
+        List<HallsSaveData> saves = new ArrayList<>();
+        for (File file : files) {
+            HallsSaveData save = HallsSaveData.load(file);
+            if (save != null && save.participants().contains(player.getUniqueId())) {
+                saves.add(save);
+            }
+        }
+        saves.sort(Comparator.comparingLong(HallsSaveData::savedAt).reversed());
+        return saves;
+    }
+
+    private HallsSaveData saveByName(Player player, String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return null;
+        }
+        for (HallsSaveData save : savesFor(player)) {
+            if (save.file().getName().equals(fileName)) {
+                return save;
+            }
+        }
+        return null;
+    }
+
+    private Result deleteSave(Player player, HallsSaveData save) {
+        if (player == null || save == null || !save.participants().contains(player.getUniqueId())) {
+            return Result.fail("That save is no longer available.");
+        }
+        try {
+            Path savesRoot = getSavesFolder().getCanonicalFile().toPath();
+            Path savePath = save.file().getCanonicalFile().toPath();
+            if (!savePath.startsWith(savesRoot) || savePath.equals(savesRoot)) {
+                return Result.fail("Refusing to delete a save outside the Halls saves folder.");
+            }
+            Files.deleteIfExists(savePath);
+            PendingSession pending = pendingSessions.get(player.getUniqueId());
+            if (pending != null && pending.saveFile() != null
+                    && pending.saveFile().getCanonicalFile().toPath().equals(savePath)) {
+                pendingSessions.remove(player.getUniqueId());
+            }
+            return Result.ok("Deleted Halls save " + save.displayName() + ".");
+        } catch (IOException ex) {
+            return Result.fail("Failed to delete Halls save: " + ex.getMessage());
+        }
     }
 
     public boolean isMenuVillager(Entity entity) {
@@ -293,12 +709,46 @@ public final class HallsOfCarnageManager {
         return entity != null && activeSessions.values().stream().anyMatch(session -> session.isSessionEntity(entity));
     }
 
-    public boolean isActiveSessionParticipant(Player player) {
-        if (player == null) {
+    public boolean isSessionMonster(Entity entity) {
+        return entity != null && activeSessions.values().stream().anyMatch(session -> session.isSessionMonster(entity));
+    }
+
+    public boolean registerSplitMonster(Entity entity) {
+        if (entity == null) {
             return false;
         }
+        return activeSessions.values().stream().anyMatch(session -> session.registerSplitMonster(entity));
+    }
+
+    public boolean registerTransformedMonster(Entity original, Entity transformed) {
+        if (original == null || transformed == null) {
+            return false;
+        }
+        return activeSessions.values().stream().anyMatch(session -> session.registerTransformedMonster(original, transformed));
+    }
+
+    public void handleSessionMonsterDeath(org.bukkit.entity.LivingEntity entity, Player killer) {
+        if (entity == null) {
+            return;
+        }
+        for (HallsSession session : activeSessions.values()) {
+            if (session.isSessionMonster(entity)) {
+                session.handleMonsterDeath(entity, killer);
+                return;
+            }
+        }
+    }
+
+    public boolean isActiveSessionParticipant(Player player) {
+        return activeSession(player) != null;
+    }
+
+    private HallsSession activeSession(Player player) {
+        if (player == null) {
+            return null;
+        }
         Integer sessionId = playerSessions.get(player.getUniqueId());
-        return sessionId != null && activeSessions.containsKey(sessionId);
+        return sessionId == null ? null : activeSessions.get(sessionId);
     }
 
     public boolean isLockedInventorySlotItem(org.bukkit.inventory.ItemStack item) {
@@ -314,7 +764,36 @@ public final class HallsOfCarnageManager {
                 return true;
             }
         }
-        return false;
+        return isSessionEntity(entity);
+    }
+
+    public void handleSessionWeaponHit(Player player, Entity entity, org.bukkit.event.entity.EntityDamageByEntityEvent event) {
+        if (player == null || entity == null) {
+            return;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (session != null) {
+            session.handleWeaponHit(player, entity, event);
+        }
+    }
+
+    public boolean handleSessionFriendlyFire(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
+        if (event == null || !(event.getEntity() instanceof Player player)) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleFriendlyFire(event);
+    }
+
+    public boolean handleSessionItemDamage(org.bukkit.event.player.PlayerItemDamageEvent event) {
+        if (event == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(event.getPlayer().getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleItemDamage(event);
     }
 
     public boolean handlePhysicsDropPickup(Player player, Entity entity) {
@@ -326,6 +805,78 @@ public final class HallsOfCarnageManager {
         return session != null && session.handlePhysicsDropPickup(player, entity);
     }
 
+    public boolean handleResearchCrateInteract(Player player, Entity entity) {
+        if (player == null || entity == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleResearchCrateInteract(player, entity);
+    }
+
+    public boolean handleResearchCrateBlockInteract(Player player, org.bukkit.block.Block block) {
+        if (player == null || block == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleResearchCrateBlockInteract(player, block);
+    }
+
+    public boolean handleResearchCrateDeposit(Player player, org.bukkit.block.Block block) {
+        if (player == null || block == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleResearchCrateDeposit(player, block);
+    }
+
+    public boolean isResearchCrateCarrier(Player player) {
+        if (player == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.isResearchCrateCarrier(player);
+    }
+
+    public boolean handleResearchCrateSneak(Player player) {
+        if (player == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleResearchCrateSneak(player);
+    }
+
+    public boolean handleCampInteract(Player player, Entity entity) {
+        if (player == null || entity == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleCampInteract(player, entity);
+    }
+
+    public boolean handleCampInventoryClick(org.bukkit.event.inventory.InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleCampInventoryClick(event);
+    }
+
+    public boolean handleCampInventoryClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleCampInventoryClose(event);
+    }
+
     public boolean handlePlayerDroppedItem(Player player, org.bukkit.entity.Item itemDrop) {
         if (player == null || itemDrop == null) {
             return false;
@@ -335,6 +886,33 @@ public final class HallsOfCarnageManager {
         return session != null && session.handlePlayerDroppedItem(player, itemDrop);
     }
 
+    public boolean handleItemConsume(Player player, org.bukkit.inventory.ItemStack item) {
+        if (player == null || item == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleItemConsume(player, item);
+    }
+
+    public boolean handleFoodUse(Player player, org.bukkit.inventory.ItemStack item) {
+        if (player == null || item == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleFoodUse(player, item);
+    }
+
+    public boolean handleUtilityUse(Player player, org.bukkit.inventory.ItemStack item) {
+        if (player == null || item == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleUtilityUse(player, item);
+    }
+
     public boolean handleElevatorButton(Player player, org.bukkit.block.Block block) {
         if (player == null) {
             return false;
@@ -342,6 +920,15 @@ public final class HallsOfCarnageManager {
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         return session != null && session.handleElevatorButton(player, block);
+    }
+
+    public boolean handleElevatorChestInteract(Player player, org.bukkit.block.Block block) {
+        if (player == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleElevatorChestInteract(player, block);
     }
 
     public boolean handleScrapDeposit(Player player, org.bukkit.block.Block block) {
@@ -368,6 +955,27 @@ public final class HallsOfCarnageManager {
         if (session != null) {
             session.handlePlayerMove(player);
         }
+    }
+
+    public boolean handlePlayerDamage(org.bukkit.event.entity.EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handlePlayerDamage(event);
+    }
+
+    public boolean blocksEating(Player player) {
+        Integer sessionId = player == null ? null : playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.blocksEating(player);
+    }
+
+    public int forcedFoodLevel(Player player) {
+        Integer sessionId = player == null ? null : playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session == null ? 20 : session.forcedFoodLevel(player);
     }
 
     public boolean isHallsWorld(World world) {
@@ -409,6 +1017,14 @@ public final class HallsOfCarnageManager {
     }
 
     public Result startScenario(Player initiator, String scenarioId, List<Player> requestedPlayers) {
+        return startScenarioInternal(initiator, scenarioId, requestedPlayers, NORMAL_DIFFICULTY, null);
+    }
+
+    private Result startScenarioInternal(Player initiator,
+                                         String scenarioId,
+                                         List<Player> requestedPlayers,
+                                         DifficultyOption difficulty,
+                                         HallsSaveData saveData) {
         HallsScenario scenario = getScenario(scenarioId);
         if (scenario == null) {
             return Result.fail("Unknown Halls scenario: " + scenarioId + ".");
@@ -440,20 +1056,73 @@ public final class HallsOfCarnageManager {
         }
         int sessionId = nextSessionId++;
         int slot = firstFreeSessionSlot();
+        UUID hostId = initiator != null && players.contains(initiator)
+                ? initiator.getUniqueId()
+                : (saveData == null ? players.getFirst().getUniqueId() : saveData.hostId());
+        boolean hostIsParticipant = false;
+        for (Player player : players) {
+            if (player.getUniqueId().equals(hostId)) {
+                hostIsParticipant = true;
+                break;
+            }
+        }
+        if (!hostIsParticipant) {
+            hostId = players.getFirst().getUniqueId();
+        }
+        DifficultyOption selectedDifficulty = difficulty == null ? NORMAL_DIFFICULTY : difficulty;
         HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot),
-                getDataFolder(), levelTypes, breakableTypes, itemTypes, trapTypes, players);
+                getDataFolder(), levelTypes, breakableTypes, vegetationTypes, itemTypes, trapTypes, monsterTypes, modifierTypes,
+                buildingTypes, hostId, selectedDifficulty.id(), selectedDifficulty.multiplier(), saveData, players,
+                debugPlayers::contains);
         try {
+            closeOpenHallsMenus(players);
             session.start();
         } catch (IOException ex) {
             session.stop(null);
-            return Result.fail("Failed to build Halls start floor: " + ex.getMessage());
+            return Result.fail("Failed to build Halls floor: " + ex.getMessage());
         }
         activeSessions.put(sessionId, session);
         for (Player player : players) {
             playerSessions.put(player.getUniqueId(), sessionId);
         }
-        return Result.ok("Started Halls session " + sessionId + " for " + scenario.name() + " with "
+        return Result.ok((saveData == null ? "Started" : "Loaded") + " Halls session " + sessionId
+                + " for " + scenario.name() + " with "
                 + players.size() + " player" + (players.size() == 1 ? "" : "s") + ".");
+    }
+
+    private void closeOpenHallsMenus(List<Player> players) {
+        if (players == null) {
+            return;
+        }
+        for (Player player : players) {
+            if (player != null && HallsMainMenu.isMenu(player.getOpenInventory().getTopInventory())) {
+                player.closeInventory();
+            }
+        }
+    }
+
+    public Result leaveSession(Player player) {
+        if (player == null) {
+            return Result.fail("Only players can leave a Halls session.");
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        if (sessionId == null) {
+            return Result.fail("You are not in an active Halls session.");
+        }
+        HallsSession session = activeSessions.get(sessionId);
+        if (session == null) {
+            playerSessions.remove(player.getUniqueId());
+            return Result.fail("Your Halls session is no longer active.");
+        }
+        if (!session.isHost(player)) {
+            return Result.fail("Only the session host can end this Halls run.");
+        }
+        if (!session.canSaveAndLeave()) {
+            return Result.fail("/hoc leave can only save from the start floor or a camp floor.");
+        }
+        session.save("host-leave");
+        stopSession(sessionId, true);
+        return Result.ok("Saved and ended Halls session " + sessionId + ".");
     }
 
     public Result stopSession(String rawSessionId) {
@@ -518,6 +1187,7 @@ public final class HallsOfCarnageManager {
         if (session == null) {
             return;
         }
+        session.handlePlayerQuit(player);
         long delayTicks = Math.max(1L, config.disconnectGraceSeconds()) * 20L;
         BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             disconnectGraceTasks.remove(sessionId);
@@ -709,6 +1379,25 @@ public final class HallsOfCarnageManager {
             return Result.fail("Only players can receive Halls items.");
         }
         String itemId = normalizeId(rawItemId);
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (isResearchPointsId(itemId)) {
+            if (session == null) {
+                return Result.fail("You must be in an active Halls session to add test research points.");
+            }
+            int total = session.addResearchPoints(amount);
+            return Result.ok("Added " + amount + " Halls research point" + (amount == 1 ? "" : "s")
+                    + ". Current points: " + total + ".");
+        }
+        if (HallsSession.isScrapId(itemId)) {
+            if (session == null) {
+                return Result.fail("You must be in an active Halls session to deposit test scrap.");
+            }
+            if (!session.addStoredScrap(itemId, amount)) {
+                return Result.fail("Unknown Halls scrap type: " + rawItemId + ".");
+            }
+            return Result.ok("Deposited " + amount + " " + itemId.replace('_', ' ') + " into the elevator storage.");
+        }
         HallsItemType type = itemTypes.get(itemId);
         if (type == null) {
             return Result.fail("Unknown Halls item: " + rawItemId + ".");
@@ -723,6 +1412,27 @@ public final class HallsOfCarnageManager {
         }
         player.getInventory().setItem(slot, item);
         return Result.ok("Gave " + type.name() + ".");
+    }
+
+    private boolean isResearchPointsId(String itemId) {
+        return itemId != null && switch (itemId) {
+            case "research_point", "research_points", "research", "rp" -> true;
+            default -> false;
+        };
+    }
+
+    public Result toggleDebug(Player player) {
+        if (player == null) {
+            return Result.fail("Only players can toggle Halls debug mode.");
+        }
+        if (!debugPlayers.add(player.getUniqueId())) {
+            debugPlayers.remove(player.getUniqueId());
+            return Result.ok("Halls debug mode disabled.");
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        String suffix = session == null ? "" : " " + session.debugSummary();
+        return Result.ok("Halls debug mode enabled." + suffix);
     }
 
     private boolean tryEquipEmptyArmorSlot(PlayerInventory inventory, ItemStack item) {
@@ -761,15 +1471,43 @@ public final class HallsOfCarnageManager {
         return new File(getDataFolder(), "breakables");
     }
 
+    private File getVegetationFolder() {
+        return new File(getDataFolder(), "vegetation");
+    }
+
     private File getItemsFolder() {
         return new File(getDataFolder(), "items");
+    }
+
+    private File getSavesFolder() {
+        return new File(getDataFolder(), "saves");
     }
 
     private File getTrapsFolder() {
         return new File(getDataFolder(), "traps");
     }
 
+    private File getMonstersFolder() {
+        return new File(getDataFolder(), "monsters");
+    }
+
+    private File getModifiersFolder() {
+        return new File(getDataFolder(), "modifiers");
+    }
+
+    private File getBuildingsFolder() {
+        return new File(getDataFolder(), "buildings");
+    }
+
     private String normalizeId(String value) {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+    }
+
+    private UUID parseUuid(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 }

@@ -1,0 +1,10 @@
+id: pufferfish
+kind: pufferfish
+weight: 5
+level-types:
+  - sewer
+block-material: AIR
+model-material: PUFFERFISH
+model-scale: 1.0
+damage: 4
+radius: 1.0

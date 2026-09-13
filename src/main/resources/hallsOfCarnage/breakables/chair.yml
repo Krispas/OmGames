@@ -1,0 +1,12 @@
+id: chair
+rarity: common
+break-message: "You kicked apart a wooden chair."
+hitbox-height: 1.0
+particle-material: OAK_STAIRS
+scrap-drops:
+  - wood_scrap
+  - iron_scrap
+parts:
+  - material: OAK_STAIRS
+    block-data: "facing=east,half=bottom,shape=straight"
+    offset: [0, 0, 0]

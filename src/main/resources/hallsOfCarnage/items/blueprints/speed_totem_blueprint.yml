@@ -1,0 +1,8 @@
+id: speed_totem_blueprint
+name: "Blueprint: Speed Totem"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Builds a small camp totem that grants temporary speed."

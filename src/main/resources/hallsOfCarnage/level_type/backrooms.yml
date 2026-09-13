@@ -1,0 +1,35 @@
+id: backrooms
+name: "Backrooms"
+corridor-generation: backrooms
+materials:
+  floor: STRIPPED_BIRCH_WOOD
+  ceiling: SMOOTH_STONE
+  corridor-floor: STRIPPED_BIRCH_WOOD
+  corridor-ceiling: SMOOTH_STONE
+  light: OCHRE_FROGLIGHT
+wall-palettes:
+  wallpaper:
+    block: STRIPPED_BAMBOO_BLOCK
+    special-blocks:
+      old:
+        block: SULFUR
+        chance: 0.06
+  stained_wallpaper:
+    block: SAND
+pillar-palettes:
+  fluorescent_columns:
+    block: STRIPPED_OAK_WOOD
+monsters:
+  common:
+    - zombie
+    - splinter
+    - silverfish
+    - creaking
+  special:
+    - breeze
+    - witch
+    - skeleton
+vegetation:
+  chance: 0.004
+  types:
+    deadbush: 1

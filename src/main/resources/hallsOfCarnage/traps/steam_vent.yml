@@ -1,0 +1,13 @@
+id: steam_vent
+kind: steam_vent
+weight: 9
+level-types:
+  - factory
+block-material: HEAVY_WEIGHTED_PRESSURE_PLATE
+model-material: HEAVY_WEIGHTED_PRESSURE_PLATE
+item-model: ""
+model-scale: 1.0
+damage: 5
+radius: 1.75
+interval-ticks: 100
+active-ticks: 35

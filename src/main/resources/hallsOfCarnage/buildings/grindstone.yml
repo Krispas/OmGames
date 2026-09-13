@@ -1,0 +1,35 @@
+id: grindstone
+name: "Grindstone"
+size: large
+blueprint: grindstone_blueprint
+implemented: true
+levels:
+  1:
+    harvest:
+      uses: 1
+    parts:
+      - material: GRINDSTONE
+        offset: [0, 0, 0]
+        scale: [1.2, 1.2, 1.2]
+  2:
+    upgrade-cost: {diamond: 5}
+    harvest:
+      uses: 1
+    parts:
+      - material: GRINDSTONE
+        offset: [0, 0, 0]
+        scale: [1.4, 1.4, 1.4]
+      - material: ANVIL
+        offset: [0.9, 0, 0]
+        scale: [0.8, 0.8, 0.8]
+  3:
+    upgrade-cost: {diamond: 10}
+    harvest:
+      uses: 1
+    parts:
+      - material: GRINDSTONE
+        offset: [0, 0, 0]
+        scale: [1.6, 1.6, 1.6]
+      - material: ANVIL
+        offset: [0.9, 0, 0]
+        scale: [0.9, 0.9, 0.9]

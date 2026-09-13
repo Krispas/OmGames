@@ -1,0 +1,6 @@
+id: bush
+material: BUSH
+block-data: ""
+offset-y: 0.0
+scale: 1.0
+random-yaw: true

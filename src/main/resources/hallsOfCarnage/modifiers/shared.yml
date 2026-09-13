@@ -2,53 +2,84 @@ modifiers:
   free:
     type: good
     display-name: "Free"
+    icon: "☺"
     weight: 10
     effects: []
-  double_coins:
+  lower_quota:
     type: good
-    display-name: "Double Coins"
+    display-name: "Lower Quota"
+    icon: "♦"
     weight: 4
     effects:
-      coin-multiplier: 2.0
+      coin-quota-delta: -5
   less_enemies:
     type: good
     display-name: "Less Enemies"
+    icon: "♡"
     weight: 5
     effects:
       enemy-spawn-multiplier: 0.75
+  compass:
+    type: good
+    display-name: "Compass"
+    icon: "⌖"
+    weight: 4
+    effects:
+      compass: true
+  messy_floor:
+    type: good
+    display-name: "Messy Floor"
+    icon: "⌘"
+    weight: 2
+    effects:
+      scrap-drop-multiplier: 2.0
+      coin-quota-multiplier: 1.35
+  mercy_cache:
+    type: good
+    display-name: "Mercy Cache"
+    icon: "✚"
+    weight: 2
+    effects:
+      first-ghost-coin-cache: 5
   more_enemies:
     type: bad
     display-name: "More Enemies"
-    weight: 8
+    icon: "☠"
+    weight: 6
     effects:
       enemy-spawn-multiplier: 1.25
   more_traps:
     type: bad
     display-name: "More Traps"
-    weight: 7
+    icon: "♠"
+    weight: 6
     effects:
       trap-multiplier: 1.5
   less_loot:
     type: bad
     display-name: "Less Loot"
-    weight: 7
+    icon: "♣"
+    weight: 5
     effects:
       loot-multiplier: 0.75
   more_sculk:
     type: bad
     display-name: "More Sculk"
-    weight: 6
+    icon: "☻"
+    weight: 2
     effects:
-      sculk-multiplier: 2.0
+      sculk-multiplier: 3.0
   special_enemy:
     type: bad
     display-name: "Special Enemy"
+    icon: "★"
     weight: 5
     effects:
       special-enemy: true
   more_rooms:
     type: bad
     display-name: "More Rooms"
+    icon: "▦"
     weight: 5
     effects:
       extra-rooms-min: 3
@@ -56,6 +87,7 @@ modifiers:
   longer_corridors:
     type: bad
     display-name: "Longer Corridors"
+    icon: "↔"
     weight: 5
     effects:
       corridor-distance-multiplier: 1.35
@@ -63,6 +95,39 @@ modifiers:
   death_fog:
     type: bad
     display-name: "Death Fog"
-    weight: 3
+    icon: "☁"
+    weight: 2
     effects:
       wither-after-seconds: 600
+  glass_bones:
+    type: bad
+    display-name: "Glass Bones"
+    icon: "◇"
+    weight: 2
+    effects:
+      melee-damage-multiplier: 1.25
+      trap-damage-multiplier: 1.5
+  rotting_air:
+    type: bad
+    display-name: "Rotting Air"
+    icon: "☣"
+    weight: 2
+    effects:
+      food-heal-multiplier: 0.5
+      monster-coin-drop-chance-multiplier: 1.5
+  falling_apart:
+    type: bad
+    display-name: "Falling Apart"
+    icon: "⌄"
+    weight: 2
+    effects:
+      hole-multiplier: 1.6
+      hole-bridge-extra-width: 1
+  rusty_tools:
+    type: bad
+    display-name: "Rusty Tools"
+    icon: "⚒"
+    weight: 2
+    effects:
+      weapon-durability-loss-multiplier: 2.0
+      armor-damage-multiplier: 0.9

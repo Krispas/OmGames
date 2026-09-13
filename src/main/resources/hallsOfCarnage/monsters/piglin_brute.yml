@@ -1,0 +1,6 @@
+id: piglin_brute
+name: "Piglin Brute"
+entity-type: PIGLIN_BRUTE
+health: 45
+equipment:
+  main-hand: GOLDEN_AXE

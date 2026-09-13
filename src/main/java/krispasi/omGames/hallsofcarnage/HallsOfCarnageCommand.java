@@ -41,6 +41,13 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                 manager.openMainMenu(player);
                 return true;
             }
+            case "recipes" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("Only players can open Halls recipes.", NamedTextColor.RED));
+                    return true;
+                }
+                result = manager.openRecipeBook(player);
+            }
             case "scenarios" -> {
                 sendScenarios(sender);
                 return true;
@@ -56,6 +63,16 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                 sendSessions(sender);
                 return true;
             }
+            case "debug" -> {
+                if (!requireOp(sender)) {
+                    return true;
+                }
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("Only players can toggle Halls debug mode.", NamedTextColor.RED));
+                    return true;
+                }
+                result = manager.toggleDebug(player);
+            }
             case "top" -> {
                 sendLeaderboard(sender);
                 return true;
@@ -70,6 +87,13 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                     return true;
                 }
                 result = manager.teleportToLobby(player);
+            }
+            case "leave" -> {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(Component.text("Only players can leave a Halls session.", NamedTextColor.RED));
+                    return true;
+                }
+                result = manager.leaveSession(player);
             }
             case "start" -> {
                 if (!requireOp(sender)) {
@@ -233,7 +257,8 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                     + " players)", NamedTextColor.YELLOW));
             for (HallsScenario.FloorDefinition floor : scenario.floors()) {
                 sender.sendMessage(Component.text("  " + floorLabel(floor) + ": " + floor.kind()
-                        + ", " + floor.levelType() + ", rooms " + floor.rooms(), NamedTextColor.GRAY));
+                        + ", " + floor.levelType() + ", rooms " + floor.rooms()
+                        + ", quota " + floor.coinQuota(), NamedTextColor.GRAY));
                 if (floor.trappedRooms() > 0 || floor.holes() > 0) {
                     sender.sendMessage(Component.text("    traps: " + floor.trappedRooms() + " rooms, "
                             + floor.minTrapsPerRoom() + "-" + floor.maxTrapsPerRoom()
@@ -293,6 +318,7 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
             sender.sendMessage(Component.text("- " + session.id() + ": " + session.scenario().name()
                     + " (floor " + session.currentFloor() + ", " + session.activeLevelTypeId()
                     + ", rooms " + session.activeGeneratedRooms() + "/" + session.activeTargetRooms()
+                    + ", monsters " + session.monsterDebugStatus()
                     + ", " + session.participants().size() + " players, origin "
                     + origin.x() + " " + origin.y() + " " + origin.z() + ")", NamedTextColor.YELLOW));
         }
@@ -315,16 +341,22 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
     }
 
     private Component usage() {
-        return Component.text("Usage: /hoc menu | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc give <item> [amount] | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload | /hoc reset confirm", NamedTextColor.YELLOW);
+        return Component.text("Usage: /hoc menu | /hoc recipes | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc debug | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc leave | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc give <item> [amount] | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload | /hoc reset confirm", NamedTextColor.YELLOW);
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(args[0], "menu", "scenarios", "scenario", "sessions", "top", "shame", "tp", "start", "stop", "floor", "give", "lobby", "reload", "reset");
+            return filter(args[0], "menu", "recipes", "scenarios", "scenario", "sessions", "debug", "top", "shame", "tp", "leave", "start", "stop", "floor", "give", "lobby", "reload", "reset");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("give")) {
-            return filter(args[1], manager.getItemIds().toArray(String[]::new));
+            List<String> options = new ArrayList<>(manager.getItemIds());
+            options.add("wood_scrap");
+            options.add("iron_scrap");
+            options.add("diamond_scrap");
+            options.add("redstone_scrap");
+            options.add("research_points");
+            return filter(args[1], options.toArray(String[]::new));
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
             return filter(args[1], "confirm");

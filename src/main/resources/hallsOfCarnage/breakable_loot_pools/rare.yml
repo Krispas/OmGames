@@ -1,0 +1,10 @@
+rarity: rare
+loot:
+  - item: rare_weapon
+    weight: 5
+  - item: rare_armor
+    weight: 5
+  - item: rare_utility
+    weight: 5
+  - item: rare_blueprint
+    weight: 25

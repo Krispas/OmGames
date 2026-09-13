@@ -1,0 +1,11 @@
+id: ender_chest
+rarity: rare
+break-message: "You smashed a glorious chest."
+hitbox-height: 1.0
+particle-material: CHEST
+scrap-drops:
+  - wood_scrap
+  - diamond_scrap
+parts:
+  - material: ENDER_CHEST
+    offset: [0, 0, 0]

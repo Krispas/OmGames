@@ -1,0 +1,37 @@
+id: factory
+name: "Factory"
+corridor-generation: open_halls
+materials:
+  floor: SMOOTH_STONE
+  ceiling: POLISHED_TUFF
+  corridor-floor: POLISHED_ANDESITE
+  corridor-ceiling: POLISHED_TUFF
+  light: REDSTONE_LAMP
+wall-palettes:
+  iron:
+    block: IRON_BLOCK
+    special-blocks:
+      copper:
+        block: COPPER_BLOCK
+        chance: 0.07
+  andesite:
+    block: POLISHED_ANDESITE
+    special-blocks:
+      smooth_stone: 0.10
+      light_gray_concrete: 0.04
+pillar-palettes:
+  machinery:
+    block: DEEPSLATE_TILES
+monsters:
+  common:
+    - splinter
+    - silverfish
+    - creaking
+    - ravager
+  special:
+    - stray
+    - cave_spider
+    - zombie_vanguard
+vegetation:
+  chance: 0.0
+  types: {}

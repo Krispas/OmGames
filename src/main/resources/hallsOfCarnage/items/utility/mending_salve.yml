@@ -1,0 +1,15 @@
+id: mending_salve
+name: "Mending Salve"
+category: utility
+rarity: normal
+material: HONEY_BOTTLE
+max-stack-size: 1
+lore:
+  - "Reusable field medicine with a short recharge."
+stats:
+  durability: 6
+  heal: 4
+  cooldown-seconds: 45
+recipe:
+  redstone_scrap: 3
+  wood_scrap: 1
