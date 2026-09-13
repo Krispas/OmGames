@@ -178,9 +178,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/blueprints/health_totem_blueprint.yml",
             "hallsOfCarnage/items/blueprints/speed_totem_blueprint.yml",
             "hallsOfCarnage/items/blueprints/mycelia_farm_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/sculk_purifier_small_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/sculk_purifier_medium_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/sculk_purifier_large_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/sculk_purifier_blueprint.yml",
             "hallsOfCarnage/buildings/camp_station.yml",
             "hallsOfCarnage/buildings/forge.yml",
             "hallsOfCarnage/buildings/mycelia_farm.yml",
@@ -190,9 +188,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/buildings/scanner.yml",
             "hallsOfCarnage/buildings/health_totem.yml",
             "hallsOfCarnage/buildings/speed_totem.yml",
-            "hallsOfCarnage/buildings/sculk_purifier_small.yml",
-            "hallsOfCarnage/buildings/sculk_purifier_medium.yml",
-            "hallsOfCarnage/buildings/sculk_purifier_large.yml"
+            "hallsOfCarnage/buildings/sculk_purifier.yml"
     };
 
     public record Result(boolean success, String message) {

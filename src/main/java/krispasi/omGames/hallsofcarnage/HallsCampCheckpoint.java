@@ -18,12 +18,19 @@ public record HallsCampCheckpoint(int floor,
                                   int campBankCoins,
                                   int campKeys,
                                   int campKeysEarned,
+                                  int researchPoints,
+                                  Set<String> unlockedResearch,
+                                  int explorationFloorsSinceCamp,
                                   int remainingLives,
                                   int lastCampFloor,
                                   ItemStack[] elevatorChest,
                                   Map<UUID, HallsSaveData.PlayerState> players,
                                   Map<Integer, List<HallsCampRuntime.PlotState>> camps,
                                   Map<Integer, Set<Integer>> campUnlockedDoors) {
+    public HallsCampCheckpoint {
+        unlockedResearch = unlockedResearch == null ? Set.of() : Set.copyOf(unlockedResearch);
+    }
+
     public static HallsCampCheckpoint fromSaveData(HallsSaveData.LastCampCheckpoint checkpoint) {
         if (checkpoint == null) {
             return null;
@@ -38,6 +45,9 @@ public record HallsCampCheckpoint(int floor,
                 checkpoint.campBankCoins(),
                 checkpoint.campKeys(),
                 checkpoint.campKeysEarned(),
+                checkpoint.researchPoints(),
+                Set.copyOf(checkpoint.unlockedResearch()),
+                checkpoint.explorationFloorsSinceCamp(),
                 checkpoint.remainingLives(),
                 checkpoint.lastCampFloor(),
                 cloneArray(checkpoint.elevatorChest(), 27),
@@ -57,6 +67,9 @@ public record HallsCampCheckpoint(int floor,
         yaml.set(path + ".camp-bank.coins", campBankCoins);
         yaml.set(path + ".camp-bank.keys", campKeys);
         yaml.set(path + ".camp-bank.keys-earned", campKeysEarned);
+        yaml.set(path + ".research.points", researchPoints);
+        yaml.set(path + ".research.unlocked", unlockedResearch.stream().sorted().toList());
+        yaml.set(path + ".research.exploration-floors-since-camp", explorationFloorsSinceCamp);
         yaml.set(path + ".team-lives.remaining", remainingLives);
         yaml.set(path + ".team-lives.last-camp-floor", lastCampFloor);
         yaml.set(path + ".elevator-chest", java.util.Arrays.asList(elevatorChest));

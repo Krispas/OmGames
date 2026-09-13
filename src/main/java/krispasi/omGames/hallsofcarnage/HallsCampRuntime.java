@@ -63,6 +63,18 @@ public final class HallsCampRuntime {
         boolean spendKey();
     }
 
+    public interface ResearchAccount {
+        int points();
+
+        boolean isUnlocked(String nodeId);
+
+        boolean isItemResearched(String itemId);
+
+        boolean canUnlock(String nodeId);
+
+        boolean unlock(String nodeId);
+    }
+
     private final JavaPlugin plugin;
     private final World world;
     private final HallsScenario scenario;
@@ -73,6 +85,7 @@ public final class HallsCampRuntime {
     private final SculkAccount sculkAccount;
     private final TotemAccount totemAccount;
     private final Function<Integer, List<String>> scanner;
+    private final ResearchAccount researchAccount;
     private final Map<UUID, Plot> plotsByEntity = new HashMap<>();
     private final Map<Integer, Plot> plotsById = new HashMap<>();
     private final Map<UUID, Door> doorsByEntity = new HashMap<>();
@@ -93,6 +106,7 @@ public final class HallsCampRuntime {
                             SculkAccount sculkAccount,
                             TotemAccount totemAccount,
                             Function<Integer, List<String>> scanner,
+                            ResearchAccount researchAccount,
                             KeyAccount keyAccount) {
         this.plugin = plugin;
         this.world = world;
@@ -104,6 +118,7 @@ public final class HallsCampRuntime {
         this.sculkAccount = sculkAccount;
         this.totemAccount = totemAccount;
         this.scanner = scanner;
+        this.researchAccount = researchAccount;
         this.keyAccount = keyAccount;
     }
 
@@ -497,6 +512,16 @@ public final class HallsCampRuntime {
                 craftRecipe(player, plot, building, itemId);
                 openBuildingMenu(player, plot);
             }
+            case "station_home" -> openBuildingMenu(player, plot);
+            case "craft_category" -> openCraftingCategory(player, plot, clicked, 0);
+            case "craft_page" -> openCraftingCategory(player, plot, clicked, campPage(clicked));
+            case "research" -> openResearchMenu(player, plot);
+            case "research_node" -> {
+                String nodeId = clicked.getItemMeta().getPersistentDataContainer()
+                        .get(new NamespacedKey(plugin, "hoc_camp_item"), PersistentDataType.STRING);
+                unlockResearch(player, nodeId);
+                openResearchMenu(player, plot);
+            }
             case "storage" -> openStorage(player, plot, building);
             case "purify" -> {
                 activateSculkPurifier(player, plot, building);
@@ -622,7 +647,7 @@ public final class HallsCampRuntime {
             return;
         }
         boolean permanent = isPermanentBuilding(building);
-        Inventory inventory = Bukkit.createInventory(new CampMenu(plot.id()), permanent ? 54 : 27,
+        Inventory inventory = Bukkit.createInventory(new CampMenu(plot.id(), "home", "", 0), permanent ? 54 : 27,
                 Component.text(permanent ? building.name() : building.name() + " L" + plot.level(), NamedTextColor.DARK_GREEN));
         inventory.setItem(4, menuItem(Material.OAK_SIGN, building.name(), NamedTextColor.GREEN,
                 permanent
@@ -631,7 +656,18 @@ public final class HallsCampRuntime {
                 null, null));
         List<String> recipes = scenario == null ? List.of() : scenario.craftingRecipes(building.id(), plot.level());
         int recipeIndex = 0;
-        if (isCraftingStation(building) && !recipes.isEmpty()) {
+        if (building.id().equals("camp_station")) {
+            inventory.setItem(19, menuItem(Material.IRON_SWORD, "Weapons", NamedTextColor.YELLOW,
+                    List.of("Craft researched weapons."), "craft_category", "weapon"));
+            inventory.setItem(21, menuItem(Material.IRON_CHESTPLATE, "Armor", NamedTextColor.YELLOW,
+                    List.of("Craft researched armor."), "craft_category", "armor"));
+            inventory.setItem(23, menuItem(Material.BREWING_STAND, "Utilities", NamedTextColor.YELLOW,
+                    List.of("Craft researched utility items."), "craft_category", "utility"));
+            inventory.setItem(25, menuItem(Material.COOKED_BEEF, "Food", NamedTextColor.YELLOW,
+                    List.of("Craft researched food."), "craft_category", "food"));
+            inventory.setItem(31, menuItem(Material.ENCHANTING_TABLE, "Research", NamedTextColor.AQUA,
+                    List.of("Points: " + researchPointsLabel(), "Unlocks future camp-station recipes."), "research", null));
+        } else if (isCraftingStation(building) && !recipes.isEmpty()) {
             for (String itemId : recipes) {
                 if (recipeIndex >= RECIPE_SLOTS.length) {
                     break;
@@ -711,6 +747,45 @@ public final class HallsCampRuntime {
         player.openInventory(inventory);
     }
 
+    private void openCraftingCategory(Player player, Plot plot, ItemStack clicked, int page) {
+        String category = clicked.getItemMeta().getPersistentDataContainer()
+                .get(new NamespacedKey(plugin, "hoc_camp_item"), PersistentDataType.STRING);
+        if (category == null || category.isBlank()) {
+            openBuildingMenu(player, plot);
+            return;
+        }
+        HallsBuildingType building = buildingTypes.get(plot.buildingId());
+        if (building == null) {
+            openBuildingMenu(player, plot);
+            return;
+        }
+        List<String> recipes = scenario == null ? List.of() : scenario.craftingRecipes(building.id(), plot.level());
+        List<HallsItemType> categoryRecipes = recipes.stream()
+                .map(itemTypes::get)
+                .filter(type -> type != null && type.category().equals(category))
+                .toList();
+        int maxPage = Math.max(0, (categoryRecipes.size() - 1) / RECIPE_SLOTS.length);
+        int normalizedPage = Math.max(0, Math.min(maxPage, page));
+        Inventory inventory = Bukkit.createInventory(new CampMenu(plot.id(), "craft", category, normalizedPage), 54,
+                Component.text("Camp Station: " + categoryName(category), NamedTextColor.DARK_GREEN));
+        inventory.setItem(4, menuItem(Material.OAK_SIGN, categoryName(category), NamedTextColor.GREEN,
+                List.of("Page " + (normalizedPage + 1) + "/" + (maxPage + 1)), null, null));
+        int start = normalizedPage * RECIPE_SLOTS.length;
+        for (int i = 0; i < RECIPE_SLOTS.length && start + i < categoryRecipes.size(); i++) {
+            inventory.setItem(RECIPE_SLOTS[i], recipeMenuItem(categoryRecipes.get(start + i)));
+        }
+        inventory.setItem(45, menuItem(Material.ARROW, "Back", NamedTextColor.GRAY, List.of("Return to station."), "station_home", null));
+        if (normalizedPage > 0) {
+            inventory.setItem(48, pageItem(Material.SPECTRAL_ARROW, "Previous Page", category, normalizedPage - 1));
+        }
+        if (normalizedPage < maxPage) {
+            inventory.setItem(50, pageItem(Material.SPECTRAL_ARROW, "Next Page", category, normalizedPage + 1));
+        }
+        inventory.setItem(53, menuItem(Material.ENCHANTING_TABLE, "Research", NamedTextColor.AQUA,
+                List.of("Points: " + researchPointsLabel()), "research", null));
+        player.openInventory(inventory);
+    }
+
     private ItemStack recipeMenuItem(HallsItemType type) {
         ItemStack preview = itemFactory.apply(type);
         ItemMeta meta = preview.getItemMeta();
@@ -718,6 +793,9 @@ public final class HallsCampRuntime {
             List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
             if (!lore.isEmpty()) {
                 lore.add(Component.empty());
+            }
+            if (researchAccount != null && !researchAccount.isItemResearched(type.id())) {
+                lore.add(Component.text("Research required.", NamedTextColor.RED));
             }
             lore.add(Component.text("Cost: " + formatCost(type.recipe()), NamedTextColor.GOLD));
             meta.lore(lore);
@@ -730,6 +808,74 @@ public final class HallsCampRuntime {
         return preview;
     }
 
+    private void openResearchMenu(Player player, Plot plot) {
+        Inventory inventory = Bukkit.createInventory(new CampMenu(plot.id(), "research", "", 0), 54,
+                Component.text("Camp Station: Research", NamedTextColor.DARK_GREEN));
+        inventory.setItem(4, menuItem(Material.EXPERIENCE_BOTTLE, "Research Points", NamedTextColor.AQUA,
+                List.of("Available: " + researchPointsLabel()), null, null));
+        List<HallsResearchNode> nodes = scenario == null ? List.of() : scenario.researchNodes().values().stream()
+                .sorted(java.util.Comparator.comparingInt((HallsResearchNode node) -> node.prerequisites().size())
+                        .thenComparing(HallsResearchNode::id))
+                .toList();
+        int[][] slotsByDepth = {
+                {10, 19, 28, 37},
+                {12, 21, 30, 39},
+                {14, 23, 32, 41},
+                {16, 25, 34, 43}
+        };
+        int[] usedByDepth = new int[slotsByDepth.length];
+        int overflowIndex = 0;
+        int[] overflowSlots = {46, 47, 48, 50, 51, 52};
+        for (HallsResearchNode node : nodes) {
+            int depth = Math.min(slotsByDepth.length - 1, researchDepth(node, new HashSet<>()));
+            if (usedByDepth[depth] < slotsByDepth[depth].length) {
+                inventory.setItem(slotsByDepth[depth][usedByDepth[depth]++], researchNodeItem(node));
+            } else if (overflowIndex < overflowSlots.length) {
+                inventory.setItem(overflowSlots[overflowIndex++], researchNodeItem(node));
+            }
+        }
+        inventory.setItem(45, menuItem(Material.ARROW, "Back", NamedTextColor.GRAY, List.of("Return to station."), "station_home", null));
+        player.openInventory(inventory);
+    }
+
+    private int researchDepth(HallsResearchNode node, Set<String> visiting) {
+        if (node == null || node.prerequisites().isEmpty() || !visiting.add(node.id())) {
+            return 0;
+        }
+        int depth = 0;
+        for (String prerequisite : node.prerequisites()) {
+            depth = Math.max(depth, 1 + researchDepth(scenario.researchNode(prerequisite), visiting));
+        }
+        visiting.remove(node.id());
+        return depth;
+    }
+
+    private ItemStack researchNodeItem(HallsResearchNode node) {
+        boolean unlocked = researchAccount != null && researchAccount.isUnlocked(node.id());
+        boolean canUnlock = researchAccount != null && researchAccount.canUnlock(node.id());
+        List<String> lore = new ArrayList<>();
+        lore.add("Cost: " + node.cost() + " research");
+        if (!node.prerequisites().isEmpty()) {
+            lore.add("Requires: " + node.prerequisites().stream().map(this::researchName).collect(java.util.stream.Collectors.joining(", ")));
+        }
+        if (!node.unlocks().isEmpty()) {
+            lore.add("Unlocks:");
+            lore.addAll(node.unlocks().stream().map(item -> "- " + itemName(item)).toList());
+        }
+        lore.add(unlocked ? "Researched." : canUnlock ? "Click to research." : "Locked.");
+        return menuItem(unlocked ? Material.LIME_STAINED_GLASS_PANE : canUnlock ? node.icon() : Material.GRAY_DYE,
+                node.name(),
+                unlocked ? NamedTextColor.GREEN : canUnlock ? NamedTextColor.YELLOW : NamedTextColor.GRAY,
+                lore,
+                unlocked ? null : "research_node",
+                node.id());
+    }
+
+    private String researchName(String nodeId) {
+        HallsResearchNode node = scenario == null ? null : scenario.researchNode(nodeId);
+        return node == null ? nodeId.replace('_', ' ') : node.name();
+    }
+
     private void craftRecipe(Player player, Plot plot, HallsBuildingType building, String itemId) {
         if (itemId == null || (scenario != null && !scenario.craftingRecipes(building.id(), plot.level()).contains(itemId))) {
             player.sendActionBar(Component.text("That recipe is not available here.", NamedTextColor.RED));
@@ -738,6 +884,12 @@ public final class HallsCampRuntime {
         HallsItemType itemType = itemTypes.get(itemId);
         if (itemType == null) {
             player.sendActionBar(Component.text("That recipe is not loaded.", NamedTextColor.RED));
+            return;
+        }
+        if (researchAccount != null && !researchAccount.isItemResearched(itemId)) {
+            HallsResearchNode node = scenario == null ? null : scenario.researchNodeForItem(itemId);
+            String label = node == null ? "Research required." : "Research " + node.name() + " first.";
+            player.sendActionBar(Component.text(label, NamedTextColor.RED));
             return;
         }
         Map<String, Integer> scrapCost = scrapCost(itemType.recipe());
@@ -771,6 +923,30 @@ public final class HallsCampRuntime {
         }
         playBuildingSound(player, building, BuildingSound.USE);
         player.sendActionBar(Component.text("Crafted " + itemType.name() + ".", NamedTextColor.GREEN));
+    }
+
+    private void unlockResearch(Player player, String nodeId) {
+        if (researchAccount == null || nodeId == null || nodeId.isBlank()) {
+            player.sendActionBar(Component.text("Research is not available.", NamedTextColor.RED));
+            return;
+        }
+        HallsResearchNode node = scenario == null ? null : scenario.researchNode(nodeId);
+        if (node == null) {
+            player.sendActionBar(Component.text("That research is not loaded.", NamedTextColor.RED));
+            return;
+        }
+        if (researchAccount.isUnlocked(node.id())) {
+            player.sendActionBar(Component.text("Already researched.", NamedTextColor.GRAY));
+            return;
+        }
+        if (!researchAccount.canUnlock(node.id())) {
+            player.sendActionBar(Component.text("Research prerequisites or points are missing.", NamedTextColor.RED));
+            return;
+        }
+        if (researchAccount.unlock(node.id())) {
+            world.playSound(player.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.8f, 1.2f);
+            player.sendActionBar(Component.text("Researched " + node.name() + ".", NamedTextColor.GREEN));
+        }
     }
 
     private boolean harvestMycelia(Player player, Plot plot, HallsBuildingType building) {
@@ -972,6 +1148,41 @@ public final class HallsCampRuntime {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private ItemStack pageItem(Material material, String name, String category, int page) {
+        ItemStack item = menuItem(material, name, NamedTextColor.YELLOW, List.of("Page " + (page + 1)),
+                "craft_page", category);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_camp_page"),
+                    PersistentDataType.INTEGER, page);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private int campPage(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return 0;
+        }
+        Integer page = item.getItemMeta().getPersistentDataContainer()
+                .get(new NamespacedKey(plugin, "hoc_camp_page"), PersistentDataType.INTEGER);
+        return page == null ? 0 : Math.max(0, page);
+    }
+
+    private String categoryName(String category) {
+        return switch (category == null ? "" : category) {
+            case "weapon" -> "Weapons";
+            case "armor" -> "Armor";
+            case "utility" -> "Utilities";
+            case "food" -> "Food";
+            default -> "Recipes";
+        };
+    }
+
+    private String researchPointsLabel() {
+        return Integer.toString(researchAccount == null ? 0 : researchAccount.points());
     }
 
     private String formatCost(Map<String, Integer> cost) {
@@ -1179,7 +1390,11 @@ public final class HallsCampRuntime {
     }
 
     private boolean isSculkPurifier(HallsBuildingType building) {
-        return building != null && building.id().startsWith("sculk_purifier_");
+        return building != null && isSculkPurifierId(building.id());
+    }
+
+    private boolean isSculkPurifierId(String buildingId) {
+        return buildingId != null && (buildingId.equals("sculk_purifier") || buildingId.startsWith("sculk_purifier_"));
     }
 
     private int storageSlots(HallsBuildingType building, int level) {
@@ -1235,7 +1450,7 @@ public final class HallsCampRuntime {
         if (configured > 0) {
             return configured;
         }
-        if (building.id().startsWith("sculk_purifier_")) {
+        if (isSculkPurifierId(building.id())) {
             return 3;
         }
         if (building.id().equals("grindstone") || building.id().equals("forge")) {
@@ -1288,7 +1503,7 @@ public final class HallsCampRuntime {
                     world.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 1.0f);
                 } else if (id.equals("speed_totem")) {
                     world.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 1.55f);
-                } else if (id.startsWith("sculk_purifier_")) {
+                } else if (isSculkPurifierId(id)) {
                     world.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.35f);
                 } else if (isStorageLocker(id)) {
                     world.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 0.6f, 1.0f);
@@ -1735,7 +1950,7 @@ public final class HallsCampRuntime {
     private record Cell(int x, int z) {
     }
 
-    private record CampMenu(int plotId) implements InventoryHolder {
+    private record CampMenu(int plotId, String view, String category, int page) implements InventoryHolder {
         @Override
         public Inventory getInventory() {
             return null;

@@ -214,6 +214,7 @@ All buildings have 3 levels.
 - Size: Station (7x7 reserved camp plot)
 
 Each camp has one permanent Camp Station. It is always present, has no blueprint, has no levels, cannot be deconstructed, and provides all food, weapon, utility, and armor recipes that were previously split across Cooking Pot, Weapon Bench, and Armory.
+Camp Station crafting is split into food, weapon, utility, and armor views. Recipes are locked behind a scenario-defined research tree. Root research nodes are available at campaign start; every normal camp arrival grants one research point for each exploration floor cleared since the previous camp, and researched nodes persist in the team save.
 ### Grindstone
 - Size: Large
 
@@ -249,9 +250,9 @@ Has 1 charge per run. Increases one player's max health by 2 per level until the
 Has 1 charge per run. Increases one player's movement speed by 5% per level until the next camp arrival. Multiple Speed Totems can stack on the same player when they are built on different plots.
 
 ### Sculk Purifier
-- Size: All three sizes (different blueprints)
+- Size: Medium
 
-Has 3 charges per run. Removes some sculk from the player who uses the charge, based on size and level. Upgrading to level 2 and level 3 requires another matching Sculk Purifier blueprint in addition to scrap costs.
+Has 3 charges per run. Removes sculk from the player who uses the charge, scaling by level. Upgrading to level 2 and level 3 requires another Sculk Purifier blueprint in addition to scrap costs.
 ### More
 System must allow more to be added in the future. If anything comes to you during development, add it into this doc.
 

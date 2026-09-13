@@ -1,7 +1,7 @@
-id: sculk_purifier_medium
-name: "Medium Sculk Purifier"
+id: sculk_purifier
+name: "Sculk Purifier"
 size: medium
-blueprint: sculk_purifier_medium_blueprint
+blueprint: sculk_purifier_blueprint
 implemented: true
 levels:
   1:

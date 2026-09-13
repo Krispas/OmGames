@@ -55,6 +55,7 @@ public final class HallsScenarioLoader {
         Map<String, Map<String, List<String>>> levelTypeBlueprintPools =
                 loadNestedStringListMap(config.getConfigurationSection("blueprint-pools"));
         Map<String, Map<Integer, List<String>>> craftingStations = loadCraftingStations(config.getConfigurationSection("crafting-stations"));
+        Map<String, HallsResearchNode> researchNodes = loadResearchNodes(config.getConfigurationSection("research.nodes"));
         HallsScenario.CampSettings camp = loadCampSettings(config.getConfigurationSection("camp"));
         List<HallsScenario.FloorDefinition> floors = loadFloors(config);
         int floorCount = floors.stream().mapToInt(HallsScenario.FloorDefinition::lastFloor).max().orElse(0);
@@ -64,7 +65,41 @@ public final class HallsScenarioLoader {
         }
         return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers,
                 floorCount, camp, allowedItems, blueprintPools, levelTypeBlueprintPools,
-                craftingStations, List.copyOf(floors), debugLines(file, config, floors));
+                craftingStations, researchNodes, List.copyOf(floors), debugLines(file, config, floors));
+    }
+
+    private static Map<String, HallsResearchNode> loadResearchNodes(ConfigurationSection section) {
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, HallsResearchNode> nodes = new LinkedHashMap<>();
+        for (String key : section.getKeys(false)) {
+            ConfigurationSection nodeSection = section.getConfigurationSection(key);
+            if (nodeSection == null) {
+                continue;
+            }
+            String id = normalizeId(nodeSection.getString("id", key));
+            if (id.isBlank()) {
+                continue;
+            }
+            org.bukkit.Material icon = org.bukkit.Material.BOOK;
+            String configuredIcon = nodeSection.getString("icon", "");
+            if (configuredIcon != null && !configuredIcon.isBlank()) {
+                try {
+                    icon = org.bukkit.Material.valueOf(configuredIcon.trim().toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            nodes.put(id, new HallsResearchNode(
+                    id,
+                    nodeSection.getString("name", id.replace('_', ' ')),
+                    icon,
+                    Math.max(0, nodeSection.getInt("cost", 1)),
+                    nodeSection.getStringList("prerequisites"),
+                    nodeSection.getStringList("unlocks")
+            ));
+        }
+        return Map.copyOf(nodes);
     }
 
     private static HallsScenario.CampSettings loadCampSettings(ConfigurationSection section) {

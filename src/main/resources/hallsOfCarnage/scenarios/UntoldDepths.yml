@@ -64,9 +64,7 @@ allowed-items:
     - health_totem_blueprint
     - speed_totem_blueprint
     - mycelia_farm_blueprint
-    - sculk_purifier_small_blueprint
-    - sculk_purifier_medium_blueprint
-    - sculk_purifier_large_blueprint
+    - sculk_purifier_blueprint
   buildings:
     - forge
     - grindstone
@@ -76,9 +74,7 @@ allowed-items:
     - scanner
     - health_totem
     - speed_totem
-    - sculk_purifier_small
-    - sculk_purifier_medium
-    - sculk_purifier_large
+    - sculk_purifier
 blueprint-pools:
   normal:
     - forge_blueprint
@@ -90,9 +86,7 @@ blueprint-pools:
     - elevator_drill_blueprint
     - health_totem_blueprint
     - speed_totem_blueprint
-    - sculk_purifier_small_blueprint
-    - sculk_purifier_medium_blueprint
-    - sculk_purifier_large_blueprint
+    - sculk_purifier_blueprint
   howling_corridors:
     normal:
       - storage_locker_blueprint
@@ -102,28 +96,26 @@ blueprint-pools:
       - grindstone_blueprint
       - health_totem_blueprint
       - speed_totem_blueprint
-      - sculk_purifier_small_blueprint
+      - sculk_purifier_blueprint
   frozen_halls:
     normal:
       - forge_blueprint
       - storage_locker_blueprint
       - mycelia_farm_blueprint
-      - sculk_purifier_small_blueprint
+      - sculk_purifier_blueprint
     rare:
       - speed_totem_blueprint
-      - sculk_purifier_medium_blueprint
-      - sculk_purifier_large_blueprint
+      - sculk_purifier_blueprint
   deep_crypt:
     normal:
       - forge_blueprint
       - scanner_blueprint
-      - sculk_purifier_small_blueprint
-      - sculk_purifier_medium_blueprint
+      - sculk_purifier_blueprint
     rare:
       - grindstone_blueprint
       - elevator_drill_blueprint
       - health_totem_blueprint
-      - sculk_purifier_large_blueprint
+      - sculk_purifier_blueprint
   infernal_chambers:
     normal:
       - forge_blueprint
@@ -157,11 +149,11 @@ blueprint-pools:
       - forge_blueprint
       - storage_locker_blueprint
       - mycelia_farm_blueprint
-      - sculk_purifier_small_blueprint
+      - sculk_purifier_blueprint
     rare:
       - elevator_drill_blueprint
       - health_totem_blueprint
-      - sculk_purifier_medium_blueprint
+      - sculk_purifier_blueprint
 crafting-stations:
   camp_station:
     1:
@@ -191,6 +183,87 @@ crafting-stations:
       - cinderplate
       - reinforced_chestplate
       - deepguard_plate
+research:
+  nodes:
+    field_cooking:
+      name: "Field Cooking"
+      icon: COOKED_BEEF
+      cost: 0
+      unlocks:
+        - cooked_mycelia
+        - hearty_mycelia_stew
+        - fleetfoot_ration
+        - stonehide_chowder
+    camp_tools:
+      name: "Camp Tools"
+      icon: STONE_AXE
+      cost: 0
+      unlocks:
+        - rusty_sword
+        - poking_stick
+        - smoke_bomb
+        - mending_salve
+        - padded_armor
+    better_meals:
+      name: "Better Meals"
+      icon: RABBIT_STEW
+      cost: 1
+      prerequisites:
+        - field_cooking
+      unlocks:
+        - ember_stew
+        - golden_jerky
+    mining_arms:
+      name: "Mining Arms"
+      icon: IRON_PICKAXE
+      cost: 1
+      prerequisites:
+        - camp_tools
+      unlocks:
+        - miner_pick
+        - bone_cleaver
+        - chainmail_hauberk
+    frostcraft:
+      name: "Frostcraft"
+      icon: TRIDENT
+      cost: 2
+      prerequisites:
+        - mining_arms
+      unlocks:
+        - frost_lance
+        - ironbound_chestplate
+        - adrenaline_shot
+    warding:
+      name: "Warding"
+      icon: TOTEM_OF_UNDYING
+      cost: 2
+      prerequisites:
+        - better_meals
+        - mining_arms
+      unlocks:
+        - warding_totem
+        - ironhide_salve
+        - cinderplate
+    stormcraft:
+      name: "Stormcraft"
+      icon: LIGHTNING_ROD
+      cost: 3
+      prerequisites:
+        - frostcraft
+      unlocks:
+        - storm_vial
+        - echo_blade
+    sculk_studies:
+      name: "Sculk Studies"
+      icon: SCULK_CATALYST
+      cost: 3
+      prerequisites:
+        - warding
+      unlocks:
+        - poison_bomb
+        - sculk_maul
+        - reinforced_chestplate
+        - deepguard_plate
 floors:
   - number: 1
     kind: start

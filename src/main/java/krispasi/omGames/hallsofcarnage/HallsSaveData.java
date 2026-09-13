@@ -27,6 +27,9 @@ public record HallsSaveData(File file,
                             int campBankCoins,
                             int campKeys,
                             int campKeysEarned,
+                            int researchPoints,
+                            Set<String> unlockedResearch,
+                            int explorationFloorsSinceCamp,
                             int remainingLives,
                             int lastCampFloor,
                             ItemStack[] elevatorChest,
@@ -35,6 +38,10 @@ public record HallsSaveData(File file,
                             Map<Integer, Set<Integer>> campUnlockedDoors,
                             LastCampCheckpoint lastCampCheckpoint,
                             long savedAt) {
+    public HallsSaveData {
+        unlockedResearch = unlockedResearch == null ? Set.of() : Set.copyOf(unlockedResearch);
+    }
+
     public static HallsSaveData load(File file) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         String scenarioId = normalizeId(yaml.getString("scenario", ""));
@@ -65,6 +72,9 @@ public record HallsSaveData(File file,
                 yaml.getInt("camp-bank.coins", 0),
                 yaml.getInt("camp-bank.keys", 0),
                 yaml.getInt("camp-bank.keys-earned", Math.max(0, yaml.getInt("camp-bank.keys", 0))),
+                yaml.getInt("research.points", 0),
+                normalizedSet(yaml.getStringList("research.unlocked")),
+                yaml.getInt("research.exploration-floors-since-camp", 0),
                 yaml.getInt("team-lives.remaining", 3),
                 yaml.getInt("team-lives.last-camp-floor", lastSavedCampFloor(yaml)),
                 itemArray(yaml.getList("elevator-chest"), 27),
@@ -109,6 +119,9 @@ public record HallsSaveData(File file,
                 yaml.getInt(path + ".camp-bank.coins", 0),
                 yaml.getInt(path + ".camp-bank.keys", 0),
                 yaml.getInt(path + ".camp-bank.keys-earned", Math.max(0, yaml.getInt(path + ".camp-bank.keys", 0))),
+                yaml.getInt(path + ".research.points", 0),
+                normalizedSet(yaml.getStringList(path + ".research.unlocked")),
+                yaml.getInt(path + ".research.exploration-floors-since-camp", 0),
                 yaml.getInt(path + ".team-lives.remaining", 3),
                 yaml.getInt(path + ".team-lives.last-camp-floor", floor),
                 itemArray(yaml.getList(path + ".elevator-chest"), 27),
@@ -195,6 +208,16 @@ public record HallsSaveData(File file,
         return value instanceof List<?> list ? list : List.of();
     }
 
+    private static Set<String> normalizedSet(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return Set.of();
+        }
+        return values.stream()
+                .map(HallsSaveData::normalizeId)
+                .filter(value -> !value.isBlank())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
     private static ItemStack[] itemArray(List<?> rows, int size) {
         ItemStack[] items = new ItemStack[size];
         if (rows == null) {
@@ -252,11 +275,17 @@ public record HallsSaveData(File file,
                                      int campBankCoins,
                                      int campKeys,
                                      int campKeysEarned,
+                                     int researchPoints,
+                                     Set<String> unlockedResearch,
+                                     int explorationFloorsSinceCamp,
                                      int remainingLives,
                                      int lastCampFloor,
                                      ItemStack[] elevatorChest,
                                      Map<UUID, PlayerState> players,
                                      Map<Integer, List<HallsCampRuntime.PlotState>> camps,
                                      Map<Integer, Set<Integer>> campUnlockedDoors) {
+        public LastCampCheckpoint {
+            unlockedResearch = unlockedResearch == null ? Set.of() : Set.copyOf(unlockedResearch);
+        }
     }
 }

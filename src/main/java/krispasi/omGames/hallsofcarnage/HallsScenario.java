@@ -16,6 +16,7 @@ public record HallsScenario(
         Map<String, List<String>> blueprintPools,
         Map<String, Map<String, List<String>>> levelTypeBlueprintPools,
         Map<String, Map<Integer, List<String>>> craftingStations,
+        Map<String, HallsResearchNode> researchNodes,
         List<FloorDefinition> floors,
         List<String> debugLines
 ) {
@@ -25,6 +26,7 @@ public record HallsScenario(
         blueprintPools = Map.copyOf(blueprintPools);
         levelTypeBlueprintPools = deepCopyBlueprintPools(levelTypeBlueprintPools);
         craftingStations = deepCopyCraftingStations(craftingStations);
+        researchNodes = researchNodes == null ? Map.of() : Map.copyOf(researchNodes);
     }
 
     public record CampSettings(String layout, int teamLives, List<Integer> keyCosts) {
@@ -74,6 +76,31 @@ public record HallsScenario(
             recipes.addAll(levels.getOrDefault(current, List.of()));
         }
         return List.copyOf(recipes);
+    }
+
+    public List<String> rootResearchNodes() {
+        return researchNodes.values().stream()
+                .filter(HallsResearchNode::root)
+                .map(HallsResearchNode::id)
+                .toList();
+    }
+
+    public HallsResearchNode researchNode(String nodeId) {
+        return researchNodes.get(normalize(nodeId));
+    }
+
+    public HallsResearchNode researchNodeForItem(String itemId) {
+        String normalized = normalize(itemId);
+        for (HallsResearchNode node : researchNodes.values()) {
+            if (node.unlocks().contains(normalized)) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+    public boolean usesResearch() {
+        return !researchNodes.isEmpty();
     }
 
     public FloorDefinition floor(int floor) {

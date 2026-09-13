@@ -106,6 +106,7 @@ public final class HallsSession {
     private final Map<Integer, List<HallsCampRuntime.PlotState>> savedCampStates = new HashMap<>();
     private final Map<Integer, Set<Integer>> savedCampUnlockedDoors = new HashMap<>();
     private final Map<Integer, HallsFloorModifiers> scannedFloorModifiers = new HashMap<>();
+    private final Set<String> unlockedResearch = new HashSet<>();
     private final HallsSessionTrapRuntime trapRuntime;
     private final HallsSessionMonsterRuntime monsterRuntime;
     private final HallsSessionSculkRuntime sculkRuntime;
@@ -129,6 +130,8 @@ public final class HallsSession {
     private int campBankCoins;
     private int campKeys;
     private int campKeysEarned;
+    private int researchPoints;
+    private int explorationFloorsSinceCamp;
     private int remainingLives;
     private int lastCampFloor;
     private HallsCampCheckpoint lastCampCheckpoint;
@@ -216,7 +219,32 @@ public final class HallsSession {
             public boolean applySpeedTotem(Player player, int plotId, int level) {
                 return HallsSession.this.applySpeedTotem(player, plotId, level);
             }
-        }, this::scanUpcomingFloors, new HallsCampRuntime.KeyAccount() {
+        }, this::scanUpcomingFloors, new HallsCampRuntime.ResearchAccount() {
+            @Override
+            public int points() {
+                return researchPoints;
+            }
+
+            @Override
+            public boolean isUnlocked(String nodeId) {
+                return unlockedResearch.contains(normalizeId(nodeId));
+            }
+
+            @Override
+            public boolean isItemResearched(String itemId) {
+                return HallsSession.this.isItemResearched(itemId);
+            }
+
+            @Override
+            public boolean canUnlock(String nodeId) {
+                return HallsSession.this.canUnlockResearch(nodeId);
+            }
+
+            @Override
+            public boolean unlock(String nodeId) {
+                return HallsSession.this.unlockResearch(nodeId);
+            }
+        }, new HallsCampRuntime.KeyAccount() {
             @Override
             public int keys() {
                 return campKeys;
@@ -233,6 +261,7 @@ public final class HallsSession {
         });
         this.debugEnabled = debugEnabled == null ? ignored -> false : debugEnabled;
         this.remainingLives = scenario.camp().teamLives();
+        unlockRootResearch();
     }
 
     public int id() {
@@ -1040,6 +1069,7 @@ public final class HallsSession {
         clearBuildVolume();
         buildElevator();
         currentFloor = floor;
+        explorationFloorsSinceCamp++;
         floorStartedAtMillis = System.currentTimeMillis();
         renderExplorationRooms(build);
         renderExplorationCorridors(build);
@@ -1121,6 +1151,7 @@ public final class HallsSession {
         int connectorTargetZ = southDock ? roomStartZ + linkZ + 1 : roomStartZ + linkZ - 1;
         buildCampConnector(roomStartX + linkX, origin.y(), connectorTargetZ, levelType);
         depositCampBankCoins();
+        awardResearchForCampArrival(refreshRunUses);
         clearAllTotemBuffs();
         restoreElevatorChestContents();
         closeElevatorDoors();
@@ -3847,6 +3878,9 @@ public final class HallsSession {
                 campBankCoins,
                 campKeys,
                 campKeysEarned,
+                researchPoints,
+                Set.copyOf(unlockedResearch),
+                explorationFloorsSinceCamp,
                 remainingLives,
                 lastCampFloor,
                 cloneArray(elevatorChestContents, 27),
@@ -3872,6 +3906,11 @@ public final class HallsSession {
         campBankCoins = Math.max(0, checkpoint.campBankCoins());
         campKeys = Math.max(0, checkpoint.campKeys());
         campKeysEarned = Math.max(0, checkpoint.campKeysEarned());
+        researchPoints = Math.max(0, checkpoint.researchPoints());
+        unlockedResearch.clear();
+        unlockedResearch.addAll(checkpoint.unlockedResearch());
+        unlockRootResearch();
+        explorationFloorsSinceCamp = Math.max(0, checkpoint.explorationFloorsSinceCamp());
         remainingLives = restoredLives;
         lastCampFloor = Math.max(0, checkpoint.lastCampFloor());
         currentFloor = Math.max(1, checkpoint.floor());
@@ -3923,6 +3962,9 @@ public final class HallsSession {
             yaml.set("camp-bank.coins", campBankCoins);
             yaml.set("camp-bank.keys", campKeys);
             yaml.set("camp-bank.keys-earned", campKeysEarned);
+            yaml.set("research.points", researchPoints);
+            yaml.set("research.unlocked", unlockedResearch.stream().sorted().toList());
+            yaml.set("research.exploration-floors-since-camp", explorationFloorsSinceCamp);
             yaml.set("team-lives.remaining", remainingLives);
             yaml.set("team-lives.last-camp-floor", lastCampFloor);
             yaml.set("elevator-chest", java.util.Arrays.asList(elevatorChestContents));
@@ -3953,6 +3995,11 @@ public final class HallsSession {
         campBankCoins = Math.max(0, save.campBankCoins());
         campKeys = Math.max(0, save.campKeys());
         campKeysEarned = Math.max(0, save.campKeysEarned());
+        researchPoints = Math.max(0, save.researchPoints());
+        unlockedResearch.clear();
+        unlockedResearch.addAll(save.unlockedResearch());
+        unlockRootResearch();
+        explorationFloorsSinceCamp = Math.max(0, save.explorationFloorsSinceCamp());
         remainingLives = Math.max(0, save.remainingLives());
         lastCampFloor = Math.max(0, save.lastCampFloor());
         activeFloorModifiers = HallsFloorModifiers.none();
@@ -4139,6 +4186,56 @@ public final class HallsSession {
         }
     }
 
+    private void awardResearchForCampArrival(boolean normalArrival) {
+        if (!normalArrival || explorationFloorsSinceCamp <= 0) {
+            return;
+        }
+        int awarded = explorationFloorsSinceCamp;
+        researchPoints += awarded;
+        explorationFloorsSinceCamp = 0;
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.sendMessage(Component.text("Camp research gained " + awarded + " point"
+                        + (awarded == 1 ? "." : "s."), NamedTextColor.AQUA));
+            }
+        }
+    }
+
+    private void unlockRootResearch() {
+        if (scenario == null || !scenario.usesResearch()) {
+            return;
+        }
+        unlockedResearch.addAll(scenario.rootResearchNodes());
+    }
+
+    private boolean isItemResearched(String itemId) {
+        if (scenario == null || !scenario.usesResearch()) {
+            return true;
+        }
+        HallsResearchNode node = scenario.researchNodeForItem(itemId);
+        return node != null && unlockedResearch.contains(node.id());
+    }
+
+    private boolean canUnlockResearch(String nodeId) {
+        HallsResearchNode node = scenario == null ? null : scenario.researchNode(nodeId);
+        if (node == null || unlockedResearch.contains(node.id()) || researchPoints < node.cost()) {
+            return false;
+        }
+        return unlockedResearch.containsAll(node.prerequisites());
+    }
+
+    private boolean unlockResearch(String nodeId) {
+        HallsResearchNode node = scenario == null ? null : scenario.researchNode(nodeId);
+        if (node == null || !canUnlockResearch(node.id())) {
+            return false;
+        }
+        researchPoints -= node.cost();
+        unlockedResearch.add(node.id());
+        save("research");
+        return true;
+    }
+
     private String nextCampKeyProgressLabel() {
         int nextCost = scenario.camp().nextKeyCost(campKeysEarned);
         if (nextCost <= 0) {
@@ -4169,6 +4266,10 @@ public final class HallsSession {
             campBankCoins = 0;
             campKeys = 0;
             campKeysEarned = 0;
+            researchPoints = 0;
+            unlockedResearch.clear();
+            unlockRootResearch();
+            explorationFloorsSinceCamp = 0;
             remainingLives = scenario.camp().teamLives();
             lastCampFloor = 0;
         }
@@ -4219,7 +4320,7 @@ public final class HallsSession {
         if (configured > 0) {
             return configured;
         }
-        if (building.id().startsWith("sculk_purifier_")) {
+        if (building.id().equals("sculk_purifier") || building.id().startsWith("sculk_purifier_")) {
             return 3;
         }
         if (building.id().equals("grindstone") || building.id().equals("forge")) {
