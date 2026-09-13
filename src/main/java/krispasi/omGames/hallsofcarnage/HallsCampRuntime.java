@@ -157,10 +157,10 @@ public final class HallsCampRuntime {
     }
 
     public void addDoor(int worldX, int y, int worldZ, HallsCampLayout.DoorCell cell) {
-        Location location = new Location(world, worldX + 0.5, y + 1.0, worldZ + 0.5);
+        Location location = new Location(world, worldX + 0.5, y, worldZ + 0.5);
         Interaction interaction = world.spawn(location, Interaction.class, entity -> {
             entity.setInteractionWidth(1.0f);
-            entity.setInteractionHeight(2.4f);
+            entity.setInteractionHeight(3.4f);
             entity.setResponsive(true);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_camp_door");

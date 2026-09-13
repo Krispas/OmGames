@@ -27,6 +27,7 @@ final class HallsExplorationGenerator {
     private final int originZ;
     private final int clearRadius;
     private final Bounds protectedElevator;
+    private final BlockFace elevatorFrontFace;
     private final Random random;
     private final CorridorMode corridorMode;
     private final double corridorDistanceMultiplier;
@@ -43,6 +44,7 @@ final class HallsExplorationGenerator {
                                       int originZ,
                                       int clearRadius,
                                       Bounds protectedElevator,
+                                      BlockFace elevatorFrontFace,
                                       String corridorGeneration,
                                       double corridorDistanceMultiplier,
                                       Random random) {
@@ -50,6 +52,7 @@ final class HallsExplorationGenerator {
         this.originZ = originZ;
         this.clearRadius = clearRadius;
         this.protectedElevator = protectedElevator;
+        this.elevatorFrontFace = elevatorFrontFace == null ? BlockFace.SOUTH : elevatorFrontFace;
         this.corridorMode = CorridorMode.from(corridorGeneration);
         this.corridorDistanceMultiplier = Math.max(0.5, corridorDistanceMultiplier);
         this.random = random;
@@ -59,6 +62,7 @@ final class HallsExplorationGenerator {
                          int originZ,
                          int clearRadius,
                          int elevatorOuterRadius,
+                         BlockFace elevatorFrontFace,
                          List<HallsLayout> layouts,
                          HallsScenario.FloorDefinition floorDefinition,
                          String corridorGeneration,
@@ -75,6 +79,7 @@ final class HallsExplorationGenerator {
                 originZ,
                 clearRadius,
                 elevatorBounds,
+                elevatorFrontFace,
                 corridorGeneration,
                 corridorDistanceMultiplier,
                 random
@@ -126,8 +131,8 @@ final class HallsExplorationGenerator {
     }
 
     private void seedElevatorNetwork() {
-        for (int z = protectedElevator.maxZ() + 1; z <= protectedElevator.maxZ() + 4; z++) {
-            Cell cell = new Cell(originX, z);
+        for (int step = 1; step <= 4; step++) {
+            Cell cell = elevatorFrontCell(step);
             networkCells.add(cell);
             corridorCells.add(cell);
         }
@@ -137,15 +142,15 @@ final class HallsExplorationGenerator {
         if (corridorMode == CorridorMode.SEWER) {
             return addFirstSewerRoom(layouts);
         }
-        HallsLayout layout = randomLayoutWithDoor(layouts, BlockFace.NORTH);
+        BlockFace face = elevatorFrontFace.getOppositeFace();
+        HallsLayout layout = randomLayoutWithDoor(layouts, face);
         if (layout == null) {
             return false;
         }
-        BlockFace face = BlockFace.NORTH;
         int offset = doorOffset(layout, face);
-        Room first = new Room(layout, originX - offset, originZ + 12);
+        Room first = firstRoom(layout, face, offset, 12);
         Cell door = doorCell(first, face, offset);
-        List<Cell> path = directVerticalPath(new Cell(originX, protectedElevator.maxZ() + 1), door);
+        List<Cell> path = directVerticalPath(elevatorFrontCell(1), door);
         first.openings().put(face, offset);
         addRoom(first);
         rememberCorridor(path);
@@ -160,7 +165,9 @@ final class HallsExplorationGenerator {
                 continue;
             }
             int offset = doorOffset(layout, face);
-            int corridorZ = originZ + 18 + random.nextInt(9);
+            int corridorZ = elevatorFrontFace == BlockFace.NORTH
+                    ? originZ - 18 - random.nextInt(9)
+                    : originZ + 18 + random.nextInt(9);
             int sideGap = 8 + random.nextInt(7);
             int startX = face == BlockFace.WEST
                     ? originX + sideGap
@@ -170,7 +177,7 @@ final class HallsExplorationGenerator {
                 continue;
             }
             Cell door = doorCell(first, face, offset);
-            Cell start = new Cell(originX, protectedElevator.maxZ() + 1);
+            Cell start = elevatorFrontCell(1);
             List<Cell> path = findConnectorPath(start, Set.of(door), Bounds.of(first));
             if (path.isEmpty()) {
                 continue;
@@ -181,6 +188,30 @@ final class HallsExplorationGenerator {
             return true;
         }
         return false;
+    }
+
+    private Room firstRoom(HallsLayout layout, BlockFace face, int offset, int gap) {
+        return switch (face) {
+            case NORTH -> new Room(layout, originX - offset, originZ + gap);
+            case SOUTH -> new Room(layout, originX - offset, originZ - gap - layout.depth());
+            case EAST -> new Room(layout, originX - gap - layout.width(), originZ - offset);
+            case WEST -> new Room(layout, originX + gap, originZ - offset);
+            default -> new Room(layout, originX - offset, originZ + gap);
+        };
+    }
+
+    private Cell elevatorFrontCell(int distance) {
+        int edge = switch (elevatorFrontFace) {
+            case NORTH -> protectedElevator.minZ() - distance;
+            case SOUTH -> protectedElevator.maxZ() + distance;
+            default -> originZ;
+        };
+        int side = switch (elevatorFrontFace) {
+            case EAST -> protectedElevator.maxX() + distance;
+            case WEST -> protectedElevator.minX() - distance;
+            default -> originX;
+        };
+        return new Cell(side, edge);
     }
 
     private HallsLayout randomLayoutWithDoor(List<HallsLayout> layouts, BlockFace face) {
@@ -1295,7 +1326,7 @@ final class HallsExplorationGenerator {
         }
         Set<Cell> reachable = new HashSet<>();
         Queue<Cell> queue = new ArrayDeque<>();
-        Cell start = new Cell(originX, protectedElevator.maxZ() + 1);
+        Cell start = elevatorFrontCell(1);
         queue.add(start);
         reachable.add(start);
         while (!queue.isEmpty()) {

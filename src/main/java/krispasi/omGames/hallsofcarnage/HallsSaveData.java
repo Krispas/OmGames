@@ -33,6 +33,7 @@ public record HallsSaveData(File file,
                             Map<UUID, PlayerState> players,
                             Map<Integer, List<HallsCampRuntime.PlotState>> camps,
                             Map<Integer, Set<Integer>> campUnlockedDoors,
+                            LastCampCheckpoint lastCampCheckpoint,
                             long savedAt) {
     public static HallsSaveData load(File file) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
@@ -47,19 +48,7 @@ public record HallsSaveData(File file,
         }
         String difficultyId = normalizeId(yaml.getString("difficulty.id", "normal"));
         double difficultyMultiplier = Math.max(1.0, yaml.getDouble("difficulty.multiplier", 1.0));
-        Map<UUID, PlayerState> players = new HashMap<>();
-        for (UUID playerId : participants) {
-            String path = "players." + playerId;
-            players.put(playerId, new PlayerState(
-                    yaml.getString(path + ".name", playerId.toString().substring(0, 8)),
-                    yaml.getBoolean(path + ".ghost", false),
-                    yaml.getDouble(path + ".sculk", 0.0),
-                    Math.max(0, yaml.getInt(path + ".health-totem-level", 0)),
-                    Math.max(0, yaml.getInt(path + ".speed-totem-level", 0)),
-                    itemArray(yaml.getList(path + ".hotbar"), 9),
-                    itemArray(yaml.getList(path + ".armor"), 4),
-                    item(yaml.get(path + ".offhand"))));
-        }
+        Map<UUID, PlayerState> players = players(yaml, "players", participants);
         return new HallsSaveData(
                 file,
                 scenarioId,
@@ -80,8 +69,9 @@ public record HallsSaveData(File file,
                 yaml.getInt("team-lives.last-camp-floor", lastSavedCampFloor(yaml)),
                 itemArray(yaml.getList("elevator-chest"), 27),
                 Map.copyOf(players),
-                camps(yaml),
-                campUnlockedDoors(yaml),
+                camps(yaml, "camps"),
+                campUnlockedDoors(yaml, "camps"),
+                lastCampCheckpoint(yaml, participants),
                 yaml.getLong("saved-at", file.lastModified()));
     }
 
@@ -103,12 +93,53 @@ public record HallsSaveData(File file,
         return scenarioId + " floor " + currentFloor;
     }
 
-    private static Map<Integer, List<HallsCampRuntime.PlotState>> camps(YamlConfiguration yaml) {
+    private static LastCampCheckpoint lastCampCheckpoint(YamlConfiguration yaml, List<UUID> participants) {
+        String path = "last-camp-checkpoint";
+        if (!yaml.isConfigurationSection(path)) {
+            return null;
+        }
+        int floor = Math.max(1, yaml.getInt(path + ".floor", 1));
+        return new LastCampCheckpoint(
+                floor,
+                yaml.getInt(path + ".storage.wood", 0),
+                yaml.getInt(path + ".storage.iron", 0),
+                yaml.getInt(path + ".storage.diamond", 0),
+                yaml.getInt(path + ".storage.redstone", 0),
+                yaml.getInt(path + ".storage.coins", 0),
+                yaml.getInt(path + ".camp-bank.coins", 0),
+                yaml.getInt(path + ".camp-bank.keys", 0),
+                yaml.getInt(path + ".camp-bank.keys-earned", Math.max(0, yaml.getInt(path + ".camp-bank.keys", 0))),
+                yaml.getInt(path + ".team-lives.remaining", 3),
+                yaml.getInt(path + ".team-lives.last-camp-floor", floor),
+                itemArray(yaml.getList(path + ".elevator-chest"), 27),
+                players(yaml, path + ".players", participants),
+                camps(yaml, path + ".camps"),
+                campUnlockedDoors(yaml, path + ".camps"));
+    }
+
+    private static Map<UUID, PlayerState> players(YamlConfiguration yaml, String root, List<UUID> participants) {
+        Map<UUID, PlayerState> players = new HashMap<>();
+        for (UUID playerId : participants) {
+            String path = root + "." + playerId;
+            players.put(playerId, new PlayerState(
+                    yaml.getString(path + ".name", playerId.toString().substring(0, 8)),
+                    yaml.getBoolean(path + ".ghost", false),
+                    yaml.getDouble(path + ".sculk", 0.0),
+                    Math.max(0, yaml.getInt(path + ".health-totem-level", 0)),
+                    Math.max(0, yaml.getInt(path + ".speed-totem-level", 0)),
+                    itemArray(yaml.getList(path + ".hotbar"), 9),
+                    itemArray(yaml.getList(path + ".armor"), 4),
+                    item(yaml.get(path + ".offhand"))));
+        }
+        return Map.copyOf(players);
+    }
+
+    private static Map<Integer, List<HallsCampRuntime.PlotState>> camps(YamlConfiguration yaml, String root) {
         Map<Integer, List<HallsCampRuntime.PlotState>> camps = new LinkedHashMap<>();
-        if (!yaml.isConfigurationSection("camps")) {
+        if (!yaml.isConfigurationSection(root)) {
             return camps;
         }
-        for (String key : yaml.getConfigurationSection("camps").getKeys(false)) {
+        for (String key : yaml.getConfigurationSection(root).getKeys(false)) {
             int floor;
             try {
                 floor = Integer.parseInt(key);
@@ -116,7 +147,7 @@ public record HallsSaveData(File file,
                 continue;
             }
             List<HallsCampRuntime.PlotState> plots = new ArrayList<>();
-            for (Map<?, ?> row : yaml.getMapList("camps." + key + ".plots")) {
+            for (Map<?, ?> row : yaml.getMapList(root + "." + key + ".plots")) {
                 Object buildingValue = row.get("building");
                 String building = normalizeId(buildingValue == null ? "" : String.valueOf(buildingValue));
                 if (building.isBlank()) {
@@ -135,12 +166,12 @@ public record HallsSaveData(File file,
         return Map.copyOf(camps);
     }
 
-    private static Map<Integer, Set<Integer>> campUnlockedDoors(YamlConfiguration yaml) {
+    private static Map<Integer, Set<Integer>> campUnlockedDoors(YamlConfiguration yaml, String root) {
         Map<Integer, Set<Integer>> doors = new LinkedHashMap<>();
-        if (!yaml.isConfigurationSection("camps")) {
+        if (!yaml.isConfigurationSection(root)) {
             return doors;
         }
-        for (String key : yaml.getConfigurationSection("camps").getKeys(false)) {
+        for (String key : yaml.getConfigurationSection(root).getKeys(false)) {
             int floor;
             try {
                 floor = Integer.parseInt(key);
@@ -148,7 +179,7 @@ public record HallsSaveData(File file,
                 continue;
             }
             Set<Integer> ids = new HashSet<>();
-            for (int id : yaml.getIntegerList("camps." + key + ".unlocked-doors")) {
+            for (int id : yaml.getIntegerList(root + "." + key + ".unlocked-doors")) {
                 if (id > 0) {
                     ids.add(id);
                 }
@@ -210,5 +241,22 @@ public record HallsSaveData(File file,
                               ItemStack[] hotbar,
                               ItemStack[] armor,
                               ItemStack offhand) {
+    }
+
+    public record LastCampCheckpoint(int floor,
+                                     int woodScrap,
+                                     int ironScrap,
+                                     int diamondScrap,
+                                     int redstoneScrap,
+                                     int coins,
+                                     int campBankCoins,
+                                     int campKeys,
+                                     int campKeysEarned,
+                                     int remainingLives,
+                                     int lastCampFloor,
+                                     ItemStack[] elevatorChest,
+                                     Map<UUID, PlayerState> players,
+                                     Map<Integer, List<HallsCampRuntime.PlotState>> camps,
+                                     Map<Integer, Set<Integer>> campUnlockedDoors) {
     }
 }

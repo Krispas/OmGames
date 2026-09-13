@@ -61,6 +61,7 @@ public final class HallsSession {
     private static final int ROOM_HEIGHT = 5;
     private static final int ELEVATOR_INNER_RADIUS = 2;
     private static final int ELEVATOR_OUTER_RADIUS = 3;
+    private static final BlockFace ELEVATOR_FRONT_FACE = BlockFace.NORTH;
     private static final int CLEAR_COLUMNS_PER_TICK = 3;
     private static final int CORRIDOR_CELLS_PER_TICK = 96;
     private static final int MIN_ELEVATOR_TRANSITION_TICKS = 100;
@@ -129,6 +130,7 @@ public final class HallsSession {
     private int campKeysEarned;
     private int remainingLives;
     private int lastCampFloor;
+    private HallsCampCheckpoint lastCampCheckpoint;
     private ItemStack[] elevatorChestContents = new ItemStack[27];
     private int activeClearRadius = CLEAR_RADIUS;
     private String activeLevelTypeId = "howling_corridors";
@@ -415,7 +417,7 @@ public final class HallsSession {
             player.sendMessage(Component.text("Ghosts cannot operate the elevator.", NamedTextColor.GRAY));
             return true;
         }
-        if (block.getX() != origin.x() - ELEVATOR_INNER_RADIUS
+        if (block.getX() != elevatorMachineInnerX()
                 || block.getY() != origin.y() + 1
                 || block.getZ() != origin.z()) {
             return false;
@@ -453,7 +455,7 @@ public final class HallsSession {
         if (!running || player == null || block == null || !player.getWorld().equals(world)) {
             return false;
         }
-        if (block.getX() != origin.x() - ELEVATOR_INNER_RADIUS
+        if (block.getX() != elevatorMachineInnerX()
                 || block.getY() != origin.y()
                 || block.getZ() != origin.z()) {
             return false;
@@ -496,7 +498,7 @@ public final class HallsSession {
             player.sendActionBar(Component.text("Ghosts cannot deposit scrap.", NamedTextColor.GRAY));
             return true;
         }
-        if (block.getX() != origin.x() - ELEVATOR_INNER_RADIUS
+        if (block.getX() != elevatorMachineInnerX()
                 || block.getY() != origin.y() + 2
                 || block.getZ() != origin.z()) {
             return false;
@@ -901,6 +903,9 @@ public final class HallsSession {
             player.sendTitle("Entering " + scenario.name(), "Floor " + currentFloor, 0, 45, 15);
             player.sendMessage(Component.text("Entering " + scenario.name() + " floor " + currentFloor + ".", NamedTextColor.DARK_RED));
         }
+        if (isCurrentFloorCamp()) {
+            captureLastCampCheckpoint();
+        }
         save("campaign-start");
     }
 
@@ -958,10 +963,10 @@ public final class HallsSession {
         buildElevator();
         HallsLayout layout = HallsLayoutLoader.load(new File(dataFolder, "level/special/start_floor.txt"));
         int roomStartX = origin.x() - layout.width() / 2;
-        int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 6;
+        int roomStartZ = origin.z() - ELEVATOR_OUTER_RADIUS - 6 - layout.depth();
         buildLayoutRoom(layout, roomStartX, origin.y(), roomStartZ,
-                Map.of(BlockFace.NORTH, layout.width() / 2), levelType, new Random((((long) id) << 32) ^ 1));
-        buildConnector(origin.x(), origin.y(), origin.z() + ELEVATOR_OUTER_RADIUS + 1, roomStartZ - 1, levelType);
+                Map.of(BlockFace.SOUTH, layout.width() / 2), levelType, new Random((((long) id) << 32) ^ 1));
+        buildConnector(origin.x(), origin.y(), elevatorFrontZ(1), roomStartZ + layout.depth(), levelType);
         startRoomSpawn = new Location(world, roomStartX + layout.width() / 2.0 + 0.5,
                 origin.y() + 1.0, roomStartZ + layout.depth() / 2.0 + 0.5, 0.0f, 0.0f);
         Cell blueprintCell = firstOpenStartFloorCell(layout);
@@ -1071,7 +1076,7 @@ public final class HallsSession {
         int roomStartX = origin.x() - linkX;
         boolean southDock = link != null && link.z() >= Math.max(0, layout.depth() - 2);
         int roomStartZ = southDock
-                ? origin.z() + ELEVATOR_OUTER_RADIUS + 1 - linkZ
+                ? elevatorFrontZ(1) - linkZ
                 : origin.z() + ELEVATOR_OUTER_RADIUS + 10 - linkZ;
         int entranceX = southDock || link == null || link.z() != 0
                 ? (southDock ? linkX : nearestCampEntranceX(layout, origin.x() - roomStartX))
@@ -1087,6 +1092,7 @@ public final class HallsSession {
         restoreElevatorChestContents();
         closeElevatorDoors();
         teleportParticipantsToElevator("Camp Floor " + floor, "Keys " + campKeys + " | " + nextCampKeyProgressLabel());
+        captureLastCampCheckpoint();
         save("camp-floor");
     }
 
@@ -1107,8 +1113,10 @@ public final class HallsSession {
     }
 
     private void buildCampConnector(int targetX, int y, int targetZ, HallsLevelType levelType) {
-        int startZ = origin.z() + ELEVATOR_OUTER_RADIUS + 1;
-        int turnZ = Math.min(targetZ, startZ + 2);
+        int startZ = elevatorFrontZ(1);
+        int turnZ = ELEVATOR_FRONT_FACE == BlockFace.NORTH
+                ? Math.max(targetZ, startZ - 2)
+                : Math.min(targetZ, startZ + 2);
         buildConnector(origin.x(), y, startZ, turnZ, levelType, 1);
         for (int x = Math.min(origin.x(), targetX); x <= Math.max(origin.x(), targetX); x++) {
             buildCorridorCell(x, y, turnZ, 1, false, levelType,
@@ -1166,6 +1174,22 @@ public final class HallsSession {
 
     private Location elevatorSpawnLocation() {
         return new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5, 180.0f, 0.0f);
+    }
+
+    private int elevatorMachineInnerX() {
+        return origin.x() + ELEVATOR_INNER_RADIUS;
+    }
+
+    private int elevatorMachineOuterX() {
+        return origin.x() + ELEVATOR_OUTER_RADIUS;
+    }
+
+    private int elevatorDoorZ() {
+        return origin.z() + ELEVATOR_FRONT_FACE.getModZ() * ELEVATOR_OUTER_RADIUS;
+    }
+
+    private int elevatorFrontZ(int distanceOutside) {
+        return origin.z() + ELEVATOR_FRONT_FACE.getModZ() * (ELEVATOR_OUTER_RADIUS + distanceOutside);
     }
 
     private void setPlayerElevatorRespawn(Player player) {
@@ -1236,6 +1260,7 @@ public final class HallsSession {
                 origin.z(),
                 activeClearRadius,
                 ELEVATOR_OUTER_RADIUS,
+                ELEVATOR_FRONT_FACE,
                 layouts,
                 floorDefinition,
                 levelType.corridorGeneration(),
@@ -1252,6 +1277,7 @@ public final class HallsSession {
                     origin.z(),
                     activeClearRadius,
                     ELEVATOR_OUTER_RADIUS,
+                    ELEVATOR_FRONT_FACE,
                     layouts,
                     floorDefinition,
                     levelType.corridorGeneration(),
@@ -1874,14 +1900,14 @@ public final class HallsSession {
         }
         setBlock(origin.x(), origin.y() + 4, origin.z(), Material.SEA_LANTERN);
         for (int x = -2; x <= 2; x++) {
-            setBlock(origin.x() + x, origin.y() + 4, origin.z() + ELEVATOR_OUTER_RADIUS + 1, back);
+            setBlock(origin.x() + x, origin.y() + 4, elevatorFrontZ(1), back);
         }
         for (int y = 0; y <= 3; y++) {
             for (int x = -ELEVATOR_OUTER_RADIUS; x <= ELEVATOR_OUTER_RADIUS; x++) {
                 Material backMaterial = Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : Math.abs(x) == 2 ? side : back;
                 Material frontMaterial = Math.abs(x) <= 1 && y <= 2 ? door : Math.abs(x) == ELEVATOR_OUTER_RADIUS ? corner : Math.abs(x) == 2 ? side : back;
-                setBlock(origin.x() + x, origin.y() + y, origin.z() - ELEVATOR_OUTER_RADIUS, backMaterial);
-                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, frontMaterial,
+                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, backMaterial);
+                setBlock(origin.x() + x, origin.y() + y, elevatorDoorZ(), frontMaterial,
                         frontMaterial == door ? BlockFace.EAST : null);
             }
             for (int z = -ELEVATOR_INNER_RADIUS; z <= ELEVATOR_INNER_RADIUS; z++) {
@@ -1890,12 +1916,12 @@ public final class HallsSession {
                 setBlock(origin.x() + ELEVATOR_OUTER_RADIUS, origin.y() + y, origin.z() + z, sideWall);
             }
         }
-        setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y(), origin.z(), Material.CHEST, BlockFace.EAST);
-        setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y() + 1, origin.z(), Material.STONE_BUTTON, BlockFace.EAST);
-        setBlock(origin.x() - ELEVATOR_INNER_RADIUS, origin.y() + 2, origin.z(), Material.HOPPER, BlockFace.WEST);
-        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y(), origin.z(), machine);
-        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 1, origin.z(), machine);
-        setBlock(origin.x() - ELEVATOR_OUTER_RADIUS, origin.y() + 2, origin.z(), machine);
+        setBlock(elevatorMachineInnerX(), origin.y(), origin.z(), Material.CHEST, BlockFace.WEST);
+        setBlock(elevatorMachineInnerX(), origin.y() + 1, origin.z(), Material.STONE_BUTTON, BlockFace.WEST);
+        setBlock(elevatorMachineInnerX(), origin.y() + 2, origin.z(), Material.HOPPER, BlockFace.EAST);
+        setBlock(elevatorMachineOuterX(), origin.y(), origin.z(), machine);
+        setBlock(elevatorMachineOuterX(), origin.y() + 1, origin.z(), machine);
+        setBlock(elevatorMachineOuterX(), origin.y() + 2, origin.z(), machine);
         buildElevatorVestibule(true);
     }
 
@@ -1980,7 +2006,7 @@ public final class HallsSession {
 
     private void buildConnector(int x, int y, int startZ, int endZ, HallsLevelType levelType, int baseHalfWidth) {
         for (int z = Math.min(startZ, endZ); z <= Math.max(startZ, endZ); z++) {
-            int halfWidth = Math.max(baseHalfWidth, z == origin.z() + ELEVATOR_OUTER_RADIUS + 1 ? 1 : 0);
+            int halfWidth = Math.max(baseHalfWidth, z == elevatorFrontZ(1) ? 1 : 0);
             buildCorridorCell(x, y, z, halfWidth, true, levelType, new Random((((long) x) << 32) ^ z));
         }
     }
@@ -2151,7 +2177,7 @@ public final class HallsSession {
 
     private boolean isProtectedElevatorTransferCell(int x, int z) {
         return isProtectedElevatorCell(x, z)
-                || (z == origin.z() + ELEVATOR_OUTER_RADIUS + 1
+                || (z == elevatorFrontZ(1)
                 && x >= origin.x() - ELEVATOR_INNER_RADIUS
                 && x <= origin.x() + ELEVATOR_INNER_RADIUS);
     }
@@ -2159,11 +2185,11 @@ public final class HallsSession {
     private void openElevatorDoors() {
         for (int y = 0; y <= 2; y++) {
             for (int x = -1; x <= 1; x++) {
-                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, Material.AIR);
+                setBlock(origin.x() + x, origin.y() + y, elevatorDoorZ(), Material.AIR);
             }
         }
         for (int x = -1; x <= 1; x++) {
-            setBlock(origin.x() + x, origin.y() + 3, origin.z() + ELEVATOR_OUTER_RADIUS, Material.DEEPSLATE_BRICKS);
+            setBlock(origin.x() + x, origin.y() + 3, elevatorDoorZ(), Material.DEEPSLATE_BRICKS);
         }
         buildElevatorVestibule(true);
     }
@@ -2172,17 +2198,17 @@ public final class HallsSession {
         Material door = firstMaterial("WAXED_WEATHERED_COPPER_BARS", "WAXED_WEATHERED_COPPER_GRATE", "COPPER_BARS", "IRON_BARS");
         for (int y = 0; y <= 2; y++) {
             for (int x = -1; x <= 1; x++) {
-                setBlock(origin.x() + x, origin.y() + y, origin.z() + ELEVATOR_OUTER_RADIUS, door, BlockFace.EAST);
+                setBlock(origin.x() + x, origin.y() + y, elevatorDoorZ(), door, BlockFace.EAST);
             }
         }
         for (int x = -1; x <= 1; x++) {
-            setBlock(origin.x() + x, origin.y() + 3, origin.z() + ELEVATOR_OUTER_RADIUS, Material.DEEPSLATE_BRICKS);
+            setBlock(origin.x() + x, origin.y() + 3, elevatorDoorZ(), Material.DEEPSLATE_BRICKS);
         }
         buildElevatorVestibule(false);
     }
 
     private void buildElevatorVestibule(boolean open) {
-        int z = origin.z() + ELEVATOR_OUTER_RADIUS + 1;
+        int z = elevatorFrontZ(1);
         HallsLevelType levelType = activeLevelType();
         for (int x = -2; x <= 2; x++) {
             int blockX = origin.x() + x;
@@ -2733,7 +2759,7 @@ public final class HallsSession {
     }
 
     private Container elevatorChestContainer() {
-        Block block = world.getBlockAt(origin.x() - ELEVATOR_INNER_RADIUS, origin.y(), origin.z());
+        Block block = world.getBlockAt(elevatorMachineInnerX(), origin.y(), origin.z());
         return block.getState(false) instanceof Container container ? container : null;
     }
 
@@ -3607,9 +3633,15 @@ public final class HallsSession {
     }
 
     private void restartFromLastCampLife(Location protectedSpawn) {
-        remainingLives = Math.max(0, remainingLives - 1);
-        resetRunState(false);
-        resetCampHarvestForNewRun();
+        HallsCampCheckpoint checkpoint = lastCampCheckpoint;
+        if (checkpoint == null) {
+            remainingLives = Math.max(0, remainingLives - 1);
+            resetRunState(false);
+            resetCampHarvestForNewRun();
+        } else {
+            restoreCampCheckpoint(checkpoint, Math.max(0, checkpoint.remainingLives() - 1));
+            currentFloor = 0;
+        }
         try {
             buildCampFloor(lastCampFloor);
         } catch (RuntimeException ex) {
@@ -3630,10 +3662,16 @@ public final class HallsSession {
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
-                player.getInventory().clear();
-                player.getInventory().setArmorContents(null);
-                player.getInventory().setItemInOffHand(null);
-                clearTotemBuffs(player);
+                HallsSaveData.PlayerState state = checkpoint == null ? null : checkpoint.players().get(playerId);
+                if (state == null) {
+                    player.getInventory().clear();
+                    player.getInventory().setArmorContents(null);
+                    player.getInventory().setItemInOffHand(null);
+                    clearTotemBuffs(player);
+                } else {
+                    restoreSavedPlayer(player, state);
+                    restoreSavedTotemBuffs(player, state);
+                }
                 player.setHealth(Math.min(player.getMaxHealth(), 20.0));
                 clearGhostState(player);
                 applyInventoryLimit(player);
@@ -3642,6 +3680,70 @@ public final class HallsSession {
             }
         }
         save("life-camp-restart");
+    }
+
+    private void captureLastCampCheckpoint() {
+        captureCurrentCampState();
+        captureElevatorChestContents(false);
+        lastCampCheckpoint = new HallsCampCheckpoint(
+                currentFloor,
+                woodScrap,
+                ironScrap,
+                diamondScrap,
+                redstoneScrap,
+                coins,
+                campBankCoins,
+                campKeys,
+                campKeysEarned,
+                remainingLives,
+                lastCampFloor,
+                cloneArray(elevatorChestContents, 27),
+                capturePlayerStates(),
+                HallsCampCheckpoint.copyCampStates(savedCampStates),
+                HallsCampCheckpoint.copyCampDoors(savedCampUnlockedDoors)
+        );
+    }
+
+    private void restoreCampCheckpoint(HallsCampCheckpoint checkpoint, int restoredLives) {
+        ghostPlayers.clear();
+        savedCampStates.clear();
+        savedCampStates.putAll(HallsCampCheckpoint.copyCampStates(checkpoint.camps()));
+        savedCampUnlockedDoors.clear();
+        savedCampUnlockedDoors.putAll(HallsCampCheckpoint.copyCampDoors(checkpoint.campUnlockedDoors()));
+        elevatorChestContents = cloneArray(checkpoint.elevatorChest(), 27);
+        elevatorChestSnapshotLocked = true;
+        woodScrap = Math.max(0, checkpoint.woodScrap());
+        ironScrap = Math.max(0, checkpoint.ironScrap());
+        diamondScrap = Math.max(0, checkpoint.diamondScrap());
+        redstoneScrap = Math.max(0, checkpoint.redstoneScrap());
+        coins = Math.max(0, checkpoint.coins());
+        campBankCoins = Math.max(0, checkpoint.campBankCoins());
+        campKeys = Math.max(0, checkpoint.campKeys());
+        campKeysEarned = Math.max(0, checkpoint.campKeysEarned());
+        remainingLives = restoredLives;
+        lastCampFloor = Math.max(0, checkpoint.lastCampFloor());
+        currentFloor = Math.max(1, checkpoint.floor());
+        activeFloorModifiers = HallsFloorModifiers.none();
+        firstGhostCoinCacheDropped = false;
+        compassTrailCountdown = 0;
+        utilityCooldowns.clear();
+        sculkMaulSplashCooldowns.clear();
+        sculkMaulSplashing.clear();
+        scannedFloorModifiers.clear();
+        healthTotemLevels.clear();
+        speedTotemLevels.clear();
+        sculkRuntime.clearAll();
+        for (Map.Entry<UUID, HallsSaveData.PlayerState> entry : checkpoint.players().entrySet()) {
+            HallsSaveData.PlayerState state = entry.getValue();
+            sculkRuntime.setSculk(entry.getKey(), state.sculk());
+            if (state.healthTotemLevel() > 0) {
+                healthTotemLevels.put(entry.getKey(), state.healthTotemLevel());
+            }
+            if (state.speedTotemLevel() > 0) {
+                speedTotemLevels.put(entry.getKey(), state.speedTotemLevel());
+            }
+        }
+        resetCampHarvestForNewRun();
     }
 
     public void save(String reason) {
@@ -3679,6 +3781,9 @@ public final class HallsSession {
             yaml.set("elevator-chest", java.util.Arrays.asList(elevatorChestContents));
             savePlayers(yaml);
             saveCamps(yaml);
+            if (lastCampCheckpoint != null) {
+                lastCampCheckpoint.save(yaml);
+            }
             yaml.save(saveFile());
         } catch (IOException | RuntimeException ex) {
             plugin.getLogger().warning("Failed to save Halls session " + id + ": " + ex.getMessage());
@@ -3716,6 +3821,7 @@ public final class HallsSession {
         for (Map.Entry<UUID, HallsSaveData.PlayerState> entry : save.players().entrySet()) {
             sculkRuntime.setSculk(entry.getKey(), entry.getValue().sculk());
         }
+        lastCampCheckpoint = HallsCampCheckpoint.fromSaveData(save.lastCampCheckpoint());
     }
 
     private void restoreSavedPlayer(Player player, HallsSaveData.PlayerState state) {
@@ -3742,6 +3848,40 @@ public final class HallsSession {
             copy[i] = cloneOrNull(source[i]);
         }
         return copy;
+    }
+
+    private Map<UUID, HallsSaveData.PlayerState> capturePlayerStates() {
+        Map<UUID, HallsSaveData.PlayerState> states = new HashMap<>();
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            states.put(playerId, capturePlayerState(playerId, player));
+        }
+        return Map.copyOf(states);
+    }
+
+    private HallsSaveData.PlayerState capturePlayerState(UUID playerId, Player player) {
+        String name = player == null ? playerId.toString().substring(0, 8) : player.getName();
+        ItemStack[] hotbar = new ItemStack[9];
+        ItemStack[] armor = new ItemStack[4];
+        ItemStack offhand = null;
+        if (player != null) {
+            PlayerInventory inventory = player.getInventory();
+            for (int slot = 0; slot <= 8; slot++) {
+                hotbar[slot] = cloneOrNull(inventory.getItem(slot));
+            }
+            armor = cloneArray(inventory.getArmorContents(), 4);
+            offhand = cloneOrNull(inventory.getItemInOffHand());
+        }
+        return new HallsSaveData.PlayerState(
+                name,
+                ghostPlayers.contains(playerId),
+                sculkRuntime.sculkPercent(playerId),
+                healthTotemLevels.getOrDefault(playerId, 0),
+                speedTotemLevels.getOrDefault(playerId, 0),
+                hotbar,
+                armor,
+                offhand
+        );
     }
 
     private void savePlayers(YamlConfiguration yaml) {
@@ -4412,7 +4552,7 @@ public final class HallsSession {
 
     private boolean multipleFacingState(Material material, BlockFace configuredFace, BlockFace face, int x, int y, int z) {
         if (isDoorBar(material)) {
-            return face == BlockFace.EAST || face == BlockFace.WEST;
+            return face == configuredFace || face == configuredFace.getOppositeFace();
         }
         if (material == Material.SCULK_VEIN) {
             return face == configuredFace;

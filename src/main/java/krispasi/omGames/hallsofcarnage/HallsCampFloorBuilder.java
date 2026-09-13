@@ -11,7 +11,11 @@ import org.bukkit.block.BlockFace;
 
 public final class HallsCampFloorBuilder {
     public interface BlockPlacer {
-        void setBlock(int x, int y, int z, Material material);
+        void setBlock(int x, int y, int z, Material material, BlockFace facing);
+
+        default void setBlock(int x, int y, int z, Material material) {
+            setBlock(x, y, z, material, null);
+        }
     }
 
     private static final int ROOM_HEIGHT = 5;
@@ -173,10 +177,29 @@ public final class HallsCampFloorBuilder {
             Material material = wallMaterial(levelType, worldX, worldZ, false);
             blockPlacer.setBlock(worldX, y - 1, worldZ, levelType.floor());
             blockPlacer.setBlock(worldX, y + ROOM_HEIGHT, worldZ, levelType.ceiling());
+            BlockFace barFacing = doorBarFacing(layout, door);
             for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
-                blockPlacer.setBlock(worldX, y + dy, worldZ, dy < 3 ? Material.IRON_BARS : material);
+                if (dy < 3) {
+                    blockPlacer.setBlock(worldX, y + dy, worldZ, Material.IRON_BARS, barFacing);
+                } else {
+                    blockPlacer.setBlock(worldX, y + dy, worldZ, material);
+                }
             }
             campRuntime.addDoor(worldX, y, worldZ, door);
         }
+    }
+
+    private BlockFace doorBarFacing(HallsCampLayout layout, HallsCampLayout.DoorCell door) {
+        boolean northOpen = layout.openAt(door.x(), door.z() - 1);
+        boolean southOpen = layout.openAt(door.x(), door.z() + 1);
+        boolean eastOpen = layout.openAt(door.x() + 1, door.z());
+        boolean westOpen = layout.openAt(door.x() - 1, door.z());
+        if ((northOpen || southOpen) && !(eastOpen || westOpen)) {
+            return BlockFace.EAST;
+        }
+        if ((eastOpen || westOpen) && !(northOpen || southOpen)) {
+            return BlockFace.NORTH;
+        }
+        return BlockFace.EAST;
     }
 }
