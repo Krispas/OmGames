@@ -169,3 +169,5 @@ Do all following for the next slice (and keep this line):
 - Remove medium and large storage lockers. Make it so storage locker requires its own blueprint for upgrading and make small storage locker have 9/18/27 slots. Also rename it to just storage locker.
 - Make sculk purifiers require their own blueprints for upgrades.
 - Add guardians as mobs, with 10 hp, replace creaking with them in sewers level type.
+- Make it so after 3 minutes on the floor, monsters start spawning faster and by faster I mean that their spawning rate gets reduced by 1% (of the total) length each spawn. It should never go lower than 5 seconds however. If by any chance players will manage to survive on a floor for more than 15 minutes, start spawning all special mobs for the level type.
+- When the fog modifier is active, make it so there are warnings 3 minutes before, 1 minute before and 30 seconds before.

@@ -339,7 +339,7 @@ floors:
     coin-quota: 28
   - number: 10
     kind: camp
-    level-type: frozen_halls
+    level-type: howling_corridors
   - number: 11-49
     kind: exploration
     level-type: deep_crypt
