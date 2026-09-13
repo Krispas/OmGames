@@ -173,3 +173,6 @@ Do all following for the next slice (and keep this line):
 - Make it so elevator has a marker on the locator bar. You could do this by having an entity with certain attributes if I am correct, but find out yourself using docs.
 - Make it so each floor generates a research crate. It is a 2x2x2 magenta concrete. It can be picked up by player, but not into inventory, instead the player will hold it above the head. While holding it, player cannot use right or left click actions or open the inventory. Player can press shift to let go of it. If player brings it to the elevator and right clicks hopper, it will get deposited and team will receive 1 bonus research point. While carrying, player has slowness and resistance II (if nothing else is providing better resistance)
 - Give utilities durability
+- Give vagabonds club 4 wood recipe and add it as a default item to one of the root nodes
+- Add poking stick into the untold depths scenerio and put it into research
+- Rework double coin modifier, instaed of double coins, it will now be "lower quota", decreasing the quoate for the current level by 5 coins.
