@@ -435,11 +435,17 @@ public final class HallsSession {
                 }
                 coins = Math.max(0, coins - quota);
             }
-            boolean leftBehind = markLeftBehindPlayersAsGhosts();
+            if (isCurrentFloorCamp()) {
+                campRuntime.closeOpenViewers();
+            }
             closeOpenElevatorChestViewers();
             captureElevatorChestContents();
             removeElevatorCompasses();
             elevatorChestSnapshotLocked = true;
+            if (isCurrentFloorCamp()) {
+                captureLastCampCheckpoint();
+            }
+            boolean leftBehind = markLeftBehindPlayersAsGhosts();
             save("floor-leave");
             transitioning = true;
             openElevatorDoors();

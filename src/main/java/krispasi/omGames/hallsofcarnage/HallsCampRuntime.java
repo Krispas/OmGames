@@ -189,6 +189,21 @@ public final class HallsCampRuntime {
         return Set.copyOf(unlockedDoorIds);
     }
 
+    public void closeOpenViewers() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!player.getWorld().equals(world)) {
+                continue;
+            }
+            Inventory top = player.getOpenInventory().getTopInventory();
+            if (top.getHolder() instanceof StorageMenu menu) {
+                saveStorageMenu(menu.plotId(), top);
+                player.closeInventory();
+            } else if (top.getHolder() instanceof CampMenu) {
+                player.closeInventory();
+            }
+        }
+    }
+
     public void restore(List<PlotState> states) {
         if (states == null || states.isEmpty()) {
             return;
@@ -482,17 +497,22 @@ public final class HallsCampRuntime {
         if (!(event.getInventory().getHolder() instanceof StorageMenu menu)) {
             return false;
         }
-        Plot plot = plotsById.get(menu.plotId());
-        if (plot != null && plot.buildingId() != null && isStorageLocker(plot.buildingId())) {
-            int slots = storageOpenSlots(plot);
-            ItemStack[] contents = new ItemStack[slots];
-            for (int slot = 0; slot < slots; slot++) {
-                ItemStack item = event.getInventory().getItem(slot);
-                contents[slot] = isLockedStorageFiller(item) ? null : cloneOrNull(item);
-            }
-            plot.setStorageContents(contents);
-        }
+        saveStorageMenu(menu.plotId(), event.getInventory());
         return true;
+    }
+
+    private void saveStorageMenu(int plotId, Inventory inventory) {
+        Plot plot = plotsById.get(plotId);
+        if (plot == null || plot.buildingId() == null || !isStorageLocker(plot.buildingId())) {
+            return;
+        }
+        int slots = storageOpenSlots(plot);
+        ItemStack[] contents = new ItemStack[slots];
+        for (int slot = 0; slot < slots; slot++) {
+            ItemStack item = inventory.getItem(slot);
+            contents[slot] = isLockedStorageFiller(item) ? null : cloneOrNull(item);
+        }
+        plot.setStorageContents(contents);
     }
 
     public int highestBuiltLevel(String buildingId) {

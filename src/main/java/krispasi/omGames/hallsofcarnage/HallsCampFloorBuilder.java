@@ -3,9 +3,12 @@ package krispasi.omGames.hallsofcarnage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import org.bukkit.Material;
 import org.bukkit.block.BlockFace;
 
@@ -123,29 +126,82 @@ public final class HallsCampFloorBuilder {
     }
 
     private void placeLights(HallsCampLayout layout, int startX, int y, int startZ, HallsLevelType levelType) {
-        List<int[]> candidates = new ArrayList<>();
+        Random random = new Random((((long) startX) << 32) ^ startZ ^ 0xCA9E1L);
+        Set<Cell> lit = new HashSet<>();
+        for (List<Cell> room : campRooms(layout)) {
+            List<Cell> candidates = new ArrayList<>();
+            for (Cell cell : room) {
+                if (cell.x() > 0 && cell.z() > 0 && cell.x() < layout.width() - 1 && cell.z() < layout.depth() - 1) {
+                    candidates.add(cell);
+                }
+            }
+            if (candidates.isEmpty()) {
+                candidates.addAll(room);
+            }
+            Collections.shuffle(candidates, random);
+            if (!candidates.isEmpty()) {
+                Cell cell = candidates.getFirst();
+                blockPlacer.setBlock(startX + cell.x(), y + ROOM_HEIGHT, startZ + cell.z(), levelType.light());
+                lit.add(cell);
+            }
+        }
+
+        List<Cell> extraCandidates = new ArrayList<>();
         for (int z = 1; z < layout.depth() - 1; z++) {
             for (int x = 1; x < layout.width() - 1; x++) {
-                if (layout.openAt(x, z)) {
-                    candidates.add(new int[]{x, z});
+                Cell cell = new Cell(x, z);
+                if (isCampRoomCell(layout, x, z) && !lit.contains(cell)) {
+                    extraCandidates.add(cell);
                 }
             }
         }
-        if (candidates.isEmpty()) {
-            for (int z = 0; z < layout.depth(); z++) {
-                for (int x = 0; x < layout.width(); x++) {
-                    if (layout.openAt(x, z)) {
-                        candidates.add(new int[]{x, z});
+        Collections.shuffle(extraCandidates, random);
+        int target = Math.max(lit.size(), Math.min(lit.size() + 4,
+                Math.max(1, (lit.size() + extraCandidates.size()) / 28)));
+        for (int i = 0; lit.size() < target && i < extraCandidates.size(); i++) {
+            Cell cell = extraCandidates.get(i);
+            blockPlacer.setBlock(startX + cell.x(), y + ROOM_HEIGHT, startZ + cell.z(), levelType.light());
+            lit.add(cell);
+        }
+    }
+
+    private List<List<Cell>> campRooms(HallsCampLayout layout) {
+        List<List<Cell>> rooms = new ArrayList<>();
+        Set<Cell> visited = new HashSet<>();
+        for (int z = 0; z < layout.depth(); z++) {
+            for (int x = 0; x < layout.width(); x++) {
+                Cell start = new Cell(x, z);
+                if (visited.contains(start) || !isCampRoomCell(layout, x, z)) {
+                    continue;
+                }
+                List<Cell> room = new ArrayList<>();
+                ArrayDeque<Cell> queue = new ArrayDeque<>();
+                queue.add(start);
+                visited.add(start);
+                while (!queue.isEmpty()) {
+                    Cell cell = queue.remove();
+                    room.add(cell);
+                    for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                        Cell next = new Cell(cell.x() + face.getModX(), cell.z() + face.getModZ());
+                        if (visited.contains(next) || !isCampRoomCell(layout, next.x(), next.z())) {
+                            continue;
+                        }
+                        visited.add(next);
+                        queue.add(next);
                     }
                 }
+                rooms.add(room);
             }
         }
-        Collections.shuffle(candidates, new Random((((long) startX) << 32) ^ startZ ^ 0xCA9E1L));
-        int target = Math.max(1, Math.min(5, Math.max(1, candidates.size()) / 28));
-        for (int i = 0; i < Math.min(target, candidates.size()); i++) {
-            int[] cell = candidates.get(i);
-            blockPlacer.setBlock(startX + cell[0], y + ROOM_HEIGHT, startZ + cell[1], levelType.light());
-        }
+        return rooms;
+    }
+
+    private boolean isCampRoomCell(HallsCampLayout layout, int x, int z) {
+        char cell = layout.at(x, z);
+        return cell != 'X' && cell != 'D';
+    }
+
+    private record Cell(int x, int z) {
     }
 
     private void renderCampPlots(HallsCampLayout layout, int roomStartX, int y, int roomStartZ) {
