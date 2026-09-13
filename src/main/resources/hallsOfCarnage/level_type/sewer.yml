@@ -4,48 +4,43 @@ corridor-generation: sewer
 materials:
   floor: MUD_BRICKS
   ceiling: DEEPSLATE_BRICKS
-  corridor-floor: MUD_BRICKS
-  corridor-ceiling: DEEPSLATE_BRICKS
+  corridor-floor: TUFF_BRICKS
+  corridor-ceiling: POLISHED_TUFF
   light: SEA_LANTERN
 liquid:
   enabled: true
   material: WATER
   room-coverage: 0.45
 wall-palettes:
-  mossy_stone:
-    block: MOSSY_STONE_BRICKS
+  stone_bricks:
+    block: STONE_BRICKS
     special-blocks:
-      cracked:
-        block: CRACKED_STONE_BRICKS
-        chance: 0.08
-      stone:
-        block: STONE_BRICKS
-        chance: 0.06
-  deepslate:
-    block: DEEPSLATE_BRICKS
+      rough:
+        block: STONE
+        chance: 0.10
+  tuff:
+    block: TUFF_BRICKS
     special-blocks:
-      mossy:
-        block: MOSSY_COBBLESTONE
+      rough:
+        block: TUFF
         chance: 0.10
 pillar-palettes:
   mossy_cobble:
-    block: MOSSY_COBBLESTONE
+    block: SMOOTH_BASALT
     special-blocks:
       cobble:
-        block: COBBLESTONE
+        block: BASALT
         chance: 0.08
 monsters:
   common:
     - drowned
-    - zombie
     - slime_medium
     - silverfish
     - creaking
   special:
-    - drowned
+    - skeleton
     - bogged
     - cave_spider
-    - warden
 vegetation:
   chance: 0.015
   types:

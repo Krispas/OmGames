@@ -2,37 +2,23 @@ id: backrooms
 name: "Backrooms"
 corridor-generation: backrooms
 materials:
-  floor: YELLOW_TERRACOTTA
-  ceiling: SMOOTH_SANDSTONE
-  corridor-floor: YELLOW_TERRACOTTA
-  corridor-ceiling: SMOOTH_SANDSTONE
+  floor: STRIPPED_BIRCH_WOOD
+  ceiling: SMOOTH_STONE
+  corridor-floor: STRIPPED_BIRCH_WOOD
+  corridor-ceiling: SMOOTH_STONE
   light: OCHRE_FROGLIGHT
 wall-palettes:
   wallpaper:
-    block: YELLOW_TERRACOTTA
+    block: STRIPPED_BAMBOO_BLOCK
     special-blocks:
-      birch_panel:
-        block: STRIPPED_BIRCH_WOOD
+      old:
+        block: SULFUR
         chance: 0.06
-      old_tile:
-        block: END_STONE_BRICKS
-        chance: 0.05
   stained_wallpaper:
-    block: END_STONE_BRICKS
-    special-blocks:
-      yellow:
-        block: YELLOW_TERRACOTTA
-        chance: 0.12
-      smooth:
-        block: SMOOTH_SANDSTONE
-        chance: 0.06
+    block: SAND
 pillar-palettes:
   fluorescent_columns:
-    block: STRIPPED_BIRCH_WOOD
-    special-blocks:
-      wallpaper:
-        block: YELLOW_TERRACOTTA
-        chance: 0.10
+    block: STRIPPED_OAK_WOOD
 monsters:
   common:
     - zombie

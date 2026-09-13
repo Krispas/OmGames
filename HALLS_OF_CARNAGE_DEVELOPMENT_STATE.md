@@ -168,3 +168,4 @@ Do all following for the next slice (and keep this line):
 - When going to camp (by not dying), buildings do not regain charges, fix that.
 - Remove medium and large storage lockers. Make it so storage locker requires its own blueprint for upgrading and make small storage locker have 9/18/27 slots. Also rename it to just storage locker.
 - Make sculk purifiers require their own blueprints for upgrades.
+- Add guardians as mobs, with 10 hp, replace creaking with them in sewers level type.
