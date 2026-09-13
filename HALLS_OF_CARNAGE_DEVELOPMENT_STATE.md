@@ -165,3 +165,4 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- When players are left behind, they should get TPd into elevator before being dropped into the void by unloading of the level, killing them instantly when they respawn.
