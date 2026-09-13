@@ -149,15 +149,31 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: added resource-driven decorative vegetation under `hallsOfCarnage/vegetation`, loaded independently from breakables/traps and seeded by `/hoc reset confirm`. Level types now define `vegetation.chance` plus weighted vegetation ids. Exploration floors spawn vegetation as passive `BlockDisplay` entities only, with no interaction entities or hitboxes, skip trap-reserved cells such as holes and ground traps, reserve their own cells so breakables do not overlap them, and clean displays on floor rebuild/session stop. Bundled defaults include grass, deadbush, dry grass, and bush, with biome-appropriate level-type weights.
 - Next reviewer slice applied: vegetation now also samples corridor cells at reduced density, while still skipping trap-reserved cells and reserving its own display cells. Vegetation yaw now compensates for the lower-corner BlockDisplay origin so random rotation pivots around the cell center. Trident-based physics drops now use the built-in GUI item-display transform instead of a raised upright custom transform. Ravagers were weakened by lowering bundled health to `10` and runtime attack damage to `4`.
 - Next reviewer slice applied: added the `sewer` level type, bundled Sewer room template, and Untold Depths floor 9 test coverage. Level types now support optional `liquid.enabled`, `liquid.material`, and `liquid.room-coverage`; Sewer renders 5-wide corridors with 3-cell, 2-block-deep liquid channels, short dry one-cell offshoots into rooms/elevator, and room puddles generated after holes/traps while avoiding reserved cells, hole/trap neighbors, and corridor neighbors. Trap files now support `blacklisted-level-types`, and bundled bear traps/proximity mines blacklist `sewer`.
+- Next reviewer slice applied: Halls armor item `stats.armor` now creates real Bukkit armor attribute modifiers, with optional `armor-toughness` support. Sewer generation now branches the first room off a main corridor instead of placing it directly in front of the elevator, room puddles generate much more aggressively, and breakables may spawn in liquid cells two blocks lower. Added drowned to bundled/fallback monster pools and Sewer pools. Added Sewer-only `bubbles`, `geyser`, and `pufferfish` trap resources, runtime behavior, and matching Sewer trap-boost modifiers; geysers prefer `Particle.GEYSER` when the API exposes it and fall back to splash/bubble particles otherwise.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Armors seem to not reflect their armor value in the actual ingame attribute
-- Make it so specifically in sewer type generation, elevator doesnt lead into a room but into the main corridors.
-- Add a new trap type to sewer. It is a water trap called bubbles, it has magma block model and it creates bubble particles on it. Touching that block causes damage. The trap should be marked as impassable for room gen.
-- Add a new trap type to sewer. It is a water trap called geyser. It has soul sand model. It has a cooldown, when it fires it creates geyser particles (yes, those exist in 26.2, check the docs) and applies large knockback to all players/monsters near
-- Puddles in sewers are way too rare. Make them generate WAY more. Puddles are not impassable, they can generate in bad places.
-- Add new monster, drowned.
-- Add a new trap type to sewer. It is a water trap called Pufferfish. Its just that, it spawns pufferfish at that location. Pufferfish can be killed of course.
-- Add three new modifiers unique to sewers, all are traps modifiers and work like other unique trap modifiers.
-- Make it so breakables can generate in liquids. Dont forget they have to be two blocks lower.
+- Make it so water traps can generate only in liquids
+- Make puddles larger, they are still super small, is there something blocking them from being larger?
+- Fix the following problem:
+10:04:46[WARN] [OmGames] Task #75 for OmGames v0.9.3 generated an exception
+java.lang.IllegalArgumentException: missing required data class org.bukkit.Particle$Geyser
+at com.google.common.base.Preconditions.checkArgument(Preconditions.java:220) ~[guava-33.6.0-jre.jar:?]
+at org.bukkit.craftbukkit.CraftParticle.createParticleParam(CraftParticle.java:72) ~[paper-26.2.jar:26.2-65-fc9375a]
+at org.bukkit.craftbukkit.CraftWorld.spawnParticle(CraftWorld.java:1758) ~[paper-26.2.jar:26.2-65-fc9375a]
+at org.bukkit.World.spawnParticle(World.java:4183) ~[paper-api-26.2.build.65-beta.jar:?]
+at org.bukkit.craftbukkit.CraftWorld.spawnParticle(CraftWorld.java:1746) ~[paper-26.2.jar:26.2-65-fc9375a]
+at org.bukkit.World.spawnParticle(World.java:4034) ~[paper-api-26.2.build.65-beta.jar:?]
+at org.bukkit.World.spawnParticle(World.java:4013) ~[paper-api-26.2.build.65-beta.jar:?]
+at omgames-0.9.3.jar//krispasi.omGames.hallsofcarnage.HallsSessionTrapRuntime.spawnGeyserParticles(HallsSessionTrapRuntime.java:1051) ~[?:?]
+at omgames-0.9.3.jar//krispasi.omGames.hallsofcarnage.HallsSessionTrapRuntime.tickTrap(HallsSessionTrapRuntime.java:1029) ~[?:?]
+at omgames-0.9.3.jar//krispasi.omGames.hallsofcarnage.HallsSessionTrapRuntime.tickTraps(HallsSessionTrapRuntime.java:942) ~[?:?]
+at org.bukkit.craftbukkit.scheduler.CraftTask.run(CraftTask.java:78) ~[paper-26.2.jar:26.2-65-fc9375a]
+at org.bukkit.craftbukkit.scheduler.CraftScheduler.mainThreadHeartbeat(CraftScheduler.java:474) ~[paper-26.2.jar:26.2-65-fc9375a]
+at net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1768) ~[paper-26.2.jar:26.2-65-fc9375a]
+at net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:1621) ~[paper-26.2.jar:26.2-65-fc9375a]
+at net.minecraft.server.dedicated.DedicatedServer.tickServer(DedicatedServer.java:404) ~[paper-26.2.jar:26.2-65-fc9375a]
+at net.minecraft.server.MinecraftServer.processPacketsAndTick(MinecraftServer.java:1679) ~[paper-26.2.jar:26.2-65-fc9375a]
+at net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:1349) ~[paper-26.2.jar:26.2-65-fc9375a]
+at net.minecraft.server.MinecraftServer.lambda$spin$0(MinecraftServer.java:303) ~[paper-26.2.jar:26.2-65-fc9375a]
+at java.base/java.lang.Thread.run(Thread.java:1474) ~[?:?]

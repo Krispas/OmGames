@@ -75,6 +75,8 @@ public final class HallsTrapTypeLoader {
             case "proximity_mine" -> 18.0;
             case "poison_darts" -> 4.0;
             case "steam_vent" -> 5.0;
+            case "bubbles" -> 4.0;
+            case "geyser" -> 2.0;
             default -> 200.0;
         };
     }
@@ -83,6 +85,8 @@ public final class HallsTrapTypeLoader {
         return switch (kind) {
             case "poison_darts" -> 5.0;
             case "steam_vent" -> 1.75;
+            case "bubbles" -> 0.9;
+            case "geyser" -> 2.5;
             case "wall_spikes" -> 3.0;
             case "swinging_blade" -> 1.15;
             default -> 1.0;
@@ -95,6 +99,7 @@ public final class HallsTrapTypeLoader {
             case "falling_ice" -> 55;
             case "poison_darts" -> 60;
             case "steam_vent" -> 100;
+            case "geyser" -> 80;
             default -> 60;
         };
     }
@@ -103,6 +108,7 @@ public final class HallsTrapTypeLoader {
         return switch (kind) {
             case "wall_spikes" -> 12;
             case "steam_vent" -> 35;
+            case "geyser" -> 12;
             default -> 16;
         };
     }
@@ -137,6 +143,9 @@ public final class HallsTrapTypeLoader {
         add(types, "falling_ice", "falling_ice", 9, List.of("frozen_halls"), List.of(), Material.AIR, Material.POINTED_DRIPSTONE, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.0, 55, 1, 2.4f);
         add(types, "poison_darts", "poison_darts", 9, List.of("deep_crypt"), List.of(), Material.DISPENSER, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 5.0, 60, 1, 2.4f);
         add(types, "steam_vent", "steam_vent", 9, List.of("factory"), List.of(), Material.HEAVY_WEIGHTED_PRESSURE_PLATE, Material.AIR, Material.HEAVY_WEIGHTED_PRESSURE_PLATE, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 5.0, 1.75, 100, 35, 2.4f);
+        add(types, "bubbles", "bubbles", 8, List.of("sewer"), List.of(), Material.MAGMA_BLOCK, Material.AIR, Material.MAGMA_BLOCK, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 0.9, 20, 20, 2.4f);
+        add(types, "geyser", "geyser", 8, List.of("sewer"), List.of(), Material.SOUL_SAND, Material.AIR, Material.SOUL_SAND, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 2.0, 2.5, 80, 12, 2.4f);
+        add(types, "pufferfish", "pufferfish", 5, List.of("sewer"), List.of(), Material.AIR, Material.AIR, Material.PUFFERFISH, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 1.0, 60, 16, 2.4f);
         return Map.copyOf(types);
     }
 

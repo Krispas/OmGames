@@ -28,6 +28,7 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.PufferFish;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -37,6 +38,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Transformation;
+import org.bukkit.util.Vector;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -224,7 +226,7 @@ final class HallsSessionTrapRuntime {
         }
         int laneSpan = kind == TrapKind.SWINGING_BLADE ? swingLaneHalfSpan(candidate, face) : 0;
         Set<HallsExplorationGenerator.Cell> footprint = trapFootprint(kind, cell, face, laneSpan);
-        if (globalReachabilityChecks && (kind == TrapKind.PROXIMITY_MINE || requiresWall(kind))
+        if (globalReachabilityChecks && (kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.BUBBLES || requiresWall(kind))
                 && !floorReachableWithout(plan.walkableCells(), footprint)) {
             return false;
         }
@@ -720,6 +722,9 @@ final class HallsSessionTrapRuntime {
             case FALLING_ICE -> type.ceilingMaterial().isAir() ? List.of() : List.of(spawnCeilingBlockDisplay(cell, type.ceilingMaterial()));
             case POISON_DARTS -> buildPoisonDartLauncher(cell, face, type);
             case STEAM_VENT -> List.of(spawnFloorBlockDisplay(cell, type.blockMaterial(), type.modelScale()));
+            case BUBBLES -> buildSewerWaterFixture(cell, type);
+            case GEYSER -> buildSewerWaterFixture(cell, type);
+            case PUFFERFISH -> List.of(spawnPufferfish(cell));
             default -> List.of();
         };
     }
@@ -767,6 +772,24 @@ final class HallsSessionTrapRuntime {
 
     private List<UUID> buildPoisonDartLauncher(HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type) {
         return List.of(spawnWallBlockDisplay(cell, face, type.blockMaterial(), 0.08f, 0.65f, 0.65f));
+    }
+
+    private List<UUID> buildSewerWaterFixture(HallsExplorationGenerator.Cell cell, HallsTrapType type) {
+        setBlock(cell.x(), origin.y() - 1, cell.z(), Material.WATER);
+        setBlock(cell.x(), origin.y() - 2, cell.z(), type.blockMaterial());
+        return List.of(spawnFloorBlockDisplay(cell, type.blockMaterial(), type.modelScale()));
+    }
+
+    private UUID spawnPufferfish(HallsExplorationGenerator.Cell cell) {
+        setBlock(cell.x(), origin.y() - 1, cell.z(), Material.WATER);
+        setBlock(cell.x(), origin.y() - 2, cell.z(), Material.WATER);
+        Location location = new Location(world, cell.x() + 0.5, origin.y() - 0.55, cell.z() + 0.5);
+        PufferFish pufferFish = world.spawn(location, PufferFish.class, entity -> {
+            entity.setPersistent(false);
+            entity.setPuffState(2);
+            entity.addScoreboardTag("omgames_hoc_trap");
+        });
+        return pufferFish.getUniqueId();
     }
 
     private UUID spawnCeilingBlockDisplay(HallsExplorationGenerator.Cell cell, Material material) {
@@ -995,8 +1018,48 @@ final class HallsSessionTrapRuntime {
                     world.playSound(center, Sound.BLOCK_IRON_TRAPDOOR_OPEN, 0.45f, 0.65f);
                 }
             }
+            case BUBBLES -> {
+                spawnBubbleTrapParticles(trap);
+                damagePlayersNear(center, trap.type().radius(), trap.type().damage(), "Scalding bubbles bite at you.");
+                damageMonstersNear(center, trap.type().radius(), trap.type().damage());
+            }
+            case GEYSER -> {
+                long activeAge = age % trap.type().intervalTicks();
+                if (activeAge < trap.type().activeTicks()) {
+                    spawnGeyserParticles(center);
+                    if (activeAge == 0L) {
+                        world.playSound(center, Sound.BLOCK_BUBBLE_COLUMN_UPWARDS_AMBIENT, 1.0f, 1.35f);
+                    }
+                    knockbackPlayersNear(center, trap.type().radius(), trap.type().damage(), "A sewer geyser erupts.");
+                    knockbackMonstersNear(center, trap.type().radius(), trap.type().damage());
+                }
+            }
             default -> {
             }
+        }
+    }
+
+    private void spawnBubbleTrapParticles(HallsTrap trap) {
+        Location center = new Location(world, trap.x() + 0.5, origin.y() - 0.45, trap.z() + 0.5);
+        world.spawnParticle(Particle.BUBBLE_COLUMN_UP, center, 8, 0.35, 0.35, 0.35, 0.02);
+        world.spawnParticle(Particle.BUBBLE_POP, center.clone().add(0.0, 0.85, 0.0), 3, 0.3, 0.15, 0.3, 0.01);
+    }
+
+    private void spawnGeyserParticles(Location center) {
+        Particle geyser = geyserParticle();
+        Location base = center.clone().add(0.0, -0.45, 0.0);
+        world.spawnParticle(geyser, base.clone().add(0.0, 0.8, 0.0), 18, 0.25, 0.75, 0.25, 0.12);
+        if (geyser != Particle.SPLASH) {
+            world.spawnParticle(Particle.SPLASH, base.clone().add(0.0, 1.3, 0.0), 12, 0.35, 0.45, 0.35, 0.08);
+        }
+        world.spawnParticle(Particle.BUBBLE_COLUMN_UP, base, 12, 0.35, 0.55, 0.35, 0.08);
+    }
+
+    private Particle geyserParticle() {
+        try {
+            return Particle.valueOf("GEYSER");
+        } catch (IllegalArgumentException ignored) {
+            return Particle.SPLASH;
         }
     }
 
@@ -1021,6 +1084,7 @@ final class HallsSessionTrapRuntime {
             switch (trap.kind()) {
                 case BEAR_TRAP -> triggerBearTrap(trap, player);
                 case PROXIMITY_MINE -> triggerProximityMine(trap, player);
+                case BUBBLES -> damagePlayerFromTrap(player, trap.type().damage(), "Scalding bubbles bite at you.");
                 case HOLE -> {
                     if (player.getLocation().getY() <= origin.y() - Math.max(3, trap.type().depth() - 2)) {
                         damagePlayerFromTrap(player, 200.0, "The pit swallows you.");
@@ -1045,6 +1109,7 @@ final class HallsSessionTrapRuntime {
             switch (trap.kind()) {
                 case BEAR_TRAP -> triggerBearTrap(trap, monster);
                 case PROXIMITY_MINE -> triggerProximityMine(trap, monster);
+                case BUBBLES -> damageMonsterFromTrap(monster, trap.type().damage());
                 case HOLE -> {
                     if (monster.getLocation().getY() <= origin.y() - Math.max(3, trap.type().depth() - 2)) {
                         damageMonsterFromTrap(monster, 200.0);
@@ -1370,6 +1435,37 @@ final class HallsSessionTrapRuntime {
         }
     }
 
+    private void knockbackPlayersNear(Location center, double radius, double damage, String message) {
+        for (Player player : nearbyParticipants(center, radius)) {
+            damagePlayerFromTrap(player, damage, message);
+            applyGeyserKnockback(player, center);
+        }
+    }
+
+    private void knockbackMonstersNear(Location center, double radius, double damage) {
+        if (!canTrapAffectMonsters(center)) {
+            return;
+        }
+        double radiusSquared = radius * radius;
+        for (LivingEntity monster : sessionMonsters()) {
+            if (monster.getLocation().distanceSquared(center) <= radiusSquared) {
+                damageMonsterFromTrap(monster, damage);
+                applyGeyserKnockback(monster, center);
+            }
+        }
+    }
+
+    private void applyGeyserKnockback(LivingEntity entity, Location center) {
+        Vector direction = entity.getLocation().toVector().subtract(center.toVector());
+        direction.setY(0.0);
+        if (direction.lengthSquared() < 0.01) {
+            direction = new Vector(0.0, 0.0, 1.0);
+        }
+        direction.normalize().multiply(0.9);
+        direction.setY(1.25);
+        entity.setVelocity(direction);
+    }
+
     private List<Player> nearbyParticipants(Location center, double radius) {
         double radiusSquared = radius * radius;
         List<Player> players = new ArrayList<>();
@@ -1425,6 +1521,9 @@ final class HallsSessionTrapRuntime {
             case "falling_ice" -> TrapKind.FALLING_ICE;
             case "poison_darts" -> TrapKind.POISON_DARTS;
             case "steam_vent" -> TrapKind.STEAM_VENT;
+            case "bubbles" -> TrapKind.BUBBLES;
+            case "geyser" -> TrapKind.GEYSER;
+            case "pufferfish" -> TrapKind.PUFFERFISH;
             default -> null;
         };
     }
@@ -1657,6 +1756,9 @@ final class HallsSessionTrapRuntime {
         WALL_SPIKES,
         FALLING_ICE,
         POISON_DARTS,
-        STEAM_VENT
+        STEAM_VENT,
+        BUBBLES,
+        GEYSER,
+        PUFFERFISH
     }
 }

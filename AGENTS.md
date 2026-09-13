@@ -1370,6 +1370,7 @@ SQLite tables:
 - The generic `blueprint` loot keyword rolls the active level type's scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools, falling back to global scenario pools when no level-specific pool exists.
 - `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions. If `<item>` is `wood_scrap`, `iron_scrap`, `diamond_scrap`, or `redstone_scrap`, the amount is deposited directly into the caller's active session elevator storage and awards the matching test coins.
 - Halls armor items equip into empty matching armor slots from `/hoc give`; right-click physics-drop pickup still inserts into the selected hotbar slot.
+- Halls armor item `stats.armor` maps to real Bukkit `ARMOR` item attributes on the matching armor slot; optional `stats.armor-toughness` / normalized `armor_toughness` maps to `ARMOR_TOUGHNESS`.
 - Halls coin drops use session-owned physics drops but bypass normal inventory pickup; right-clicking the coin adds it directly to the shared session coin counter even when the hotbar is full.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
@@ -1394,7 +1395,8 @@ SQLite tables:
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth. Bear traps and proximity mines render through item-display models instead of placed physical floor blocks.
 - Trap files may define `blacklisted-level-types`; blacklisted level type ids are rejected even when `level-types` is empty. Bundled bear traps and proximity mines are blacklisted from `sewer`.
-- Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults. Ravagers are intentionally weaker than vanilla for Halls; bundled health is `10` and runtime attack damage is clamped to `4`.
+- Sewer trap kinds currently include `bubbles`, `geyser`, and `pufferfish`. Bubbles use a magma-block water fixture and damage contact; geysers use a soul-sand water fixture, cooldown bursts, geyser/splash/bubble particles, and large knockback for nearby players/monsters; pufferfish spawns a killable pufferfish trap entity.
+- Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults. Ravagers are intentionally weaker than vanilla for Halls; bundled health is `10` and runtime attack damage is clamped to `4`. Drowned is bundled for Sewer pools.
 - Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `scale`, optional `movement-speed-multiplier`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
 - Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
 - Modifier files define `modifiers.<id>.type`, `display-name`, `icon`, `weight`, and `effects`.
@@ -1441,4 +1443,4 @@ SQLite tables:
 - Infernal Chambers defaults to `large_corridors` corridor generation and currently has one bundled exploration room for testing.
 - Factory defaults to `open_halls` corridor generation and currently has one bundled exploration room for testing.
 - Backrooms defaults to `backrooms` corridor generation and currently has one bundled exploration room for testing.
-- Sewer defaults to `sewer` corridor generation and water liquid generation. Sewer corridors are 5 blocks wide with the 3 inner cells rendered as 2-block-deep liquid channels, with short dry one-cell offshoots into rooms/elevator; Sewer rooms generate contiguous puddles after holes/traps while avoiding trap-reserved cells, hole neighbors, and corridor neighbors.
+- Sewer defaults to `sewer` corridor generation and water liquid generation. Sewer corridors are 5 blocks wide with the 3 inner cells rendered as 2-block-deep liquid channels, with short dry one-cell offshoots into rooms/elevator. Sewer first-room placement branches off a main corridor instead of opening directly in front of the elevator. Sewer room puddles are intentionally very common and may be awkward/non-blocking; breakables may spawn in liquid cells and should be placed two blocks lower.

@@ -134,6 +134,9 @@ final class HallsExplorationGenerator {
     }
 
     private boolean addFirstRoom(List<HallsLayout> layouts) {
+        if (corridorMode == CorridorMode.SEWER) {
+            return addFirstSewerRoom(layouts);
+        }
         HallsLayout layout = randomLayoutWithDoor(layouts, BlockFace.NORTH);
         if (layout == null) {
             return false;
@@ -147,6 +150,37 @@ final class HallsExplorationGenerator {
         addRoom(first);
         rememberCorridor(path);
         return true;
+    }
+
+    private boolean addFirstSewerRoom(List<HallsLayout> layouts) {
+        for (int attempt = 0; attempt < 24; attempt++) {
+            BlockFace face = random.nextBoolean() ? BlockFace.WEST : BlockFace.EAST;
+            HallsLayout layout = randomLayoutWithDoor(layouts, face);
+            if (layout == null) {
+                continue;
+            }
+            int offset = doorOffset(layout, face);
+            int corridorZ = originZ + 18 + random.nextInt(9);
+            int sideGap = 8 + random.nextInt(7);
+            int startX = face == BlockFace.WEST
+                    ? originX + sideGap
+                    : originX - sideGap - layout.width();
+            Room first = new Room(layout, startX, corridorZ - offset);
+            if (!canPlaceRoom(first)) {
+                continue;
+            }
+            Cell door = doorCell(first, face, offset);
+            Cell start = new Cell(originX, protectedElevator.maxZ() + 1);
+            List<Cell> path = findConnectorPath(start, Set.of(door), Bounds.of(first));
+            if (path.isEmpty()) {
+                continue;
+            }
+            first.openings().put(face, offset);
+            addRoom(first);
+            rememberCorridor(path);
+            return true;
+        }
+        return false;
     }
 
     private HallsLayout randomLayoutWithDoor(List<HallsLayout> layouts, BlockFace face) {

@@ -1,0 +1,12 @@
+id: geyser
+kind: geyser
+weight: 8
+level-types:
+  - sewer
+block-material: SOUL_SAND
+model-material: SOUL_SAND
+model-scale: 1.0
+damage: 2
+radius: 2.5
+interval-ticks: 80
+active-ticks: 12

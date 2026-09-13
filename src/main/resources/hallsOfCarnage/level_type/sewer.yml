@@ -36,11 +36,13 @@ pillar-palettes:
         chance: 0.08
 monsters:
   common:
+    - drowned
     - zombie
     - slime_medium
     - silverfish
     - creaking
   special:
+    - drowned
     - bogged
     - cave_spider
     - warden

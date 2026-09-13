@@ -56,6 +56,7 @@ final class HallsItemFactory {
                 }
             }
             applyArmorModel(meta, type);
+            applyArmorStats(plugin, meta, type);
             applyCombatStats(plugin, meta, type);
             applySpecialItemMetadata(meta, type);
             applyDurability(meta, type);
@@ -126,6 +127,35 @@ final class HallsItemFactory {
         }
     }
 
+    private static void applyArmorStats(JavaPlugin plugin, ItemMeta meta, HallsItemType type) {
+        if (!type.category().equals("armor")) {
+            return;
+        }
+        EquipmentSlot slot = armorSlot(type.material());
+        EquipmentSlotGroup group = armorSlotGroup(slot);
+        if (group == null) {
+            return;
+        }
+        Double armor = type.stats().get("armor");
+        if (armor != null) {
+            meta.addAttributeModifier(Attribute.ARMOR, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_armor_" + type.id()),
+                    armor,
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    group
+            ));
+        }
+        Double toughness = type.stats().get("armor_toughness");
+        if (toughness != null) {
+            meta.addAttributeModifier(Attribute.ARMOR_TOUGHNESS, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_armor_toughness_" + type.id()),
+                    toughness,
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    group
+            ));
+        }
+    }
+
     private static void applySpecialItemMetadata(ItemMeta meta, HallsItemType type) {
         if (!type.id().equals("frost_lance")) {
             return;
@@ -168,6 +198,19 @@ final class HallsItemFactory {
             return EquipmentSlot.FEET;
         }
         return null;
+    }
+
+    private static EquipmentSlotGroup armorSlotGroup(EquipmentSlot slot) {
+        if (slot == null) {
+            return null;
+        }
+        return switch (slot) {
+            case HEAD -> EquipmentSlotGroup.HEAD;
+            case CHEST -> EquipmentSlotGroup.CHEST;
+            case LEGS -> EquipmentSlotGroup.LEGS;
+            case FEET -> EquipmentSlotGroup.FEET;
+            default -> null;
+        };
     }
 
     private static NamedTextColor itemColor(HallsItemType type) {

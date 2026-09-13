@@ -97,6 +97,7 @@ public final class HallsSession {
     private final Map<UUID, BreakableProp> breakableProps = new HashMap<>();
     private final Set<UUID> vegetationDisplays = new HashSet<>();
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
+    private Set<HallsExplorationGenerator.Cell> activeLiquidCells = Set.of();
     private final Map<String, Long> utilityCooldowns = new HashMap<>();
     private final Map<String, Long> sculkMaulSplashCooldowns = new HashMap<>();
     private final Set<UUID> sculkMaulSplashing = new HashSet<>();
@@ -1001,10 +1002,11 @@ public final class HallsSession {
         renderExplorationRooms(build);
         renderExplorationCorridors(build);
         Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build);
-        reservedCells = withReserved(reservedCells, renderExplorationLiquids(build, reservedCells));
-        reservedCells = withReserved(reservedCells, renderExplorationVegetation(build, reservedCells));
-        renderExplorationSculk(build, reservedCells);
-        renderExplorationContents(build, reservedCells);
+        activeLiquidCells = renderExplorationLiquids(build, reservedCells);
+        Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
+        Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
+        renderExplorationSculk(build, liquidReservedCells);
+        renderExplorationContents(build, withReserved(reservedCells, vegetationCells));
         startExplorationMonsters(build);
         restoreElevatorChestContents();
         closeElevatorDoors();
@@ -1376,7 +1378,8 @@ public final class HallsSession {
         if (candidates.isEmpty()) {
             return Set.of();
         }
-        int target = Math.max(1, (int) Math.round(candidates.size() * build.levelType().liquid().roomCoverage()));
+        double coverage = Math.max(build.levelType().liquid().roomCoverage(), isSewer(build.levelType()) ? 0.92 : 0.0);
+        int target = Math.max(1, (int) Math.round(candidates.size() * coverage));
         HallsExplorationGenerator.Cell start = candidates.get(build.random().nextInt(candidates.size()));
         Set<HallsExplorationGenerator.Cell> candidateSet = new HashSet<>(candidates);
         Set<HallsExplorationGenerator.Cell> result = new HashSet<>();
@@ -1418,11 +1421,15 @@ public final class HallsSession {
             HallsExplorationGenerator.Cell side = new HallsExplorationGenerator.Cell(
                     cell.x() + face.getModX(),
                     cell.z() + face.getModZ());
-            if (plan.corridorCells().contains(side) || (reservedCells != null && reservedCells.contains(side))) {
+            if (reservedCells != null && reservedCells.contains(side)) {
                 return false;
             }
         }
         return true;
+    }
+
+    private boolean isSewer(HallsLevelType levelType) {
+        return levelType != null && levelType.id().equals("sewer");
     }
 
     private void renderLiquidCell(HallsExplorationGenerator.Cell cell,
@@ -2144,7 +2151,8 @@ public final class HallsSession {
                 targetBreakableDropsForRoom(floorDefinition, roomIndex), cells.size(), random);
         for (int i = 0; i < propLootRolls.size(); i++) {
             Cell cell = cells.get(random.nextInt(cells.size()));
-            spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
+            HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z());
+            spawnBreakableProp(absolute.x(), propBaseY(absolute), absolute.z(),
                     propArchetype(i, roomIndex, HallsLevelType.fallback("howling_corridors")),
                     propHealth(i), propLootRolls.get(i));
         }
@@ -2170,8 +2178,9 @@ public final class HallsSession {
             if (cell == null) {
                 return;
             }
-            usedCells.add(new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()));
-            spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
+            HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z());
+            usedCells.add(absolute);
+            spawnBreakableProp(absolute.x(), propBaseY(absolute), absolute.z(),
                     rarePropArchetype(levelType), propHealth(0), 1);
             if (!propLootRolls.isEmpty()) {
                 propLootRolls.removeFirst();
@@ -2182,10 +2191,15 @@ public final class HallsSession {
             if (cell == null) {
                 return;
             }
-            usedCells.add(new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()));
-            spawnBreakableProp(room.startX() + cell.x(), origin.y(), room.startZ() + cell.z(),
+            HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z());
+            usedCells.add(absolute);
+            spawnBreakableProp(absolute.x(), propBaseY(absolute), absolute.z(),
                     commonPropArchetype(i, roomIndex, levelType), propHealth(i), propLootRolls.get(i));
         }
+    }
+
+    private int propBaseY(HallsExplorationGenerator.Cell absolute) {
+        return activeLiquidCells.contains(absolute) ? origin.y() - 2 : origin.y();
     }
 
     private int targetBreakableDropsForRoom(HallsScenario.FloorDefinition floorDefinition, int roomIndex) {
@@ -3308,6 +3322,7 @@ public final class HallsSession {
         monsterRuntime.clear();
         trapRuntime.clear();
         campRuntime.clear();
+        activeLiquidCells = Set.of();
         for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
             removeBreakableProp(prop);
         }
@@ -4314,9 +4329,11 @@ public final class HallsSession {
 
         private void buildTraps() {
             reservedCells = renderExplorationTraps(build);
-            reservedCells = withReserved(reservedCells, renderExplorationLiquids(build, reservedCells));
-            reservedCells = withReserved(reservedCells, renderExplorationVegetation(build, reservedCells));
-            renderExplorationSculk(build, reservedCells);
+            activeLiquidCells = renderExplorationLiquids(build, reservedCells);
+            Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
+            Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
+            renderExplorationSculk(build, liquidReservedCells);
+            reservedCells = withReserved(reservedCells, vegetationCells);
             rareBreakableRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
             contentStartedNanos = System.nanoTime();
             contentBreakablesBefore = new HashSet<>(breakableProps.values()).size();

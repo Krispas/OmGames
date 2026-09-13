@@ -155,7 +155,7 @@ final class HallsMonsterTypeLoader {
 
     private static final class ListIds {
         private static final java.util.List<String> DEFAULT_MONSTERS = java.util.List.of(
-                "zombie", "creeper", "creaking", "skeleton", "cave_spider", "stray", "bogged", "husk", "breeze",
+                "zombie", "drowned", "creeper", "creaking", "skeleton", "cave_spider", "stray", "bogged", "husk", "breeze",
                 "vindicator", "silverfish", "pillager", "witch", "wither_skeleton", "piglin", "blaze",
                 "piglin_brute", "parched", "ravager", "hoglin_slow", "magma_cube_large",
                 "splinter", "splinter_small", "splinter_baby"
