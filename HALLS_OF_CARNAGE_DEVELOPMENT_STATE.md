@@ -160,3 +160,4 @@ Do all following for the next slice (and keep this line):
 - Add new monster, drowned.
 - Add a new trap type to sewer. It is a water trap called Pufferfish. Its just that, it spawns pufferfish at that location. Pufferfish can be killed of course.
 - Add three new modifiers unique to sewers, all are traps modifiers and work like other unique trap modifiers.
+- Make it so breakables can generate in liquids. Dont forget they have to be two blocks lower.
