@@ -1,7 +1,7 @@
-id: storage_locker_small
-name: "Small Storage Locker"
+id: storage_locker
+name: "Storage Locker"
 size: small
-blueprint: storage_locker_small_blueprint
+blueprint: storage_locker_blueprint
 implemented: true
 levels:
   1:

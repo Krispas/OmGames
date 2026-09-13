@@ -193,7 +193,7 @@ public final class HallsSession {
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
                 this::isAliveParticipant);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
-                sculkRuntime::maxSculkPercent, this::isAliveParticipant,
+                this::maxAliveSculkPercent, this::isAliveParticipant,
                 location -> dropSessionItem(location, coinItem(1)), this::debug);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
                 type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
@@ -798,6 +798,7 @@ public final class HallsSession {
         if (type == null || !type.category().equals("utility")) {
             return false;
         }
+        ensureUseCooldownMetadata(item, type);
         return switch (type.id()) {
             case "smoke_bomb" -> {
                 if (isUtilityOnCooldown(player, type)) {
@@ -1056,6 +1057,10 @@ public final class HallsSession {
     }
 
     private void buildCampFloor(int floor) {
+        buildCampFloor(floor, true);
+    }
+
+    private void buildCampFloor(int floor, boolean refreshRunUses) {
         captureCurrentCampState();
         captureElevatorChestContents();
         removeSessionEntities();
@@ -1110,6 +1115,9 @@ public final class HallsSession {
         renderLayoutVegetation(layout, roomStartX, origin.y(), roomStartZ, levelType,
                 new Random((((long) id) << 32) ^ (((long) floor) << 16) ^ 0xCA4F), campVegetationReservedCells(layout, roomStartX, roomStartZ), 0.75);
         campRuntime.restore(savedCampStates.getOrDefault(sharedCampStateKey(), savedCampStates.get(floor)));
+        if (refreshRunUses) {
+            refreshCurrentCampRunUses();
+        }
         int connectorTargetZ = southDock ? roomStartZ + linkZ + 1 : roomStartZ + linkZ - 1;
         buildCampConnector(roomStartX + linkX, origin.y(), connectorTargetZ, levelType);
         depositCampBankCoins();
@@ -2614,7 +2622,7 @@ public final class HallsSession {
         long floorSeconds = Math.max(0L, (System.currentTimeMillis() - floorStartedAtMillis) / 1000L);
         if (floorSeconds == witherAfterSeconds - 180
                 || floorSeconds == witherAfterSeconds - 60
-                || floorSeconds == witherAfterSeconds - 10) {
+                || floorSeconds == witherAfterSeconds - 30) {
             for (UUID playerId : participants) {
                 Player player = Bukkit.getPlayer(playerId);
                 if (player != null && player.getWorld().equals(world)) {
@@ -2786,6 +2794,10 @@ public final class HallsSession {
         }
         Player player = Bukkit.getPlayer(playerId);
         return player != null && player.getWorld().equals(world);
+    }
+
+    private int maxAliveSculkPercent() {
+        return sculkRuntime.maxSculkPercent(this::isAliveParticipant);
     }
 
     private String formatElapsedSeconds() {
@@ -3781,7 +3793,7 @@ public final class HallsSession {
             currentFloor = 0;
         }
         try {
-            buildCampFloor(lastCampFloor);
+            buildCampFloor(lastCampFloor, false);
         } catch (RuntimeException ex) {
             plugin.getLogger().warning("Failed to return Halls session " + id + " to camp after game over: " + ex.getMessage());
             if (protectedSpawn != null) {
@@ -4190,6 +4202,11 @@ public final class HallsSession {
             }
             savedCampStates.put(entry.getKey(), List.copyOf(refreshed));
         }
+    }
+
+    private void refreshCurrentCampRunUses() {
+        campRuntime.refreshRunUses();
+        captureCurrentCampState();
     }
 
     private int defaultRunUses(HallsBuildingType building, int level) {

@@ -1341,8 +1341,8 @@ SQLite tables:
 - Camp build-spot floors are rendered as oak planks for visibility and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
 - Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.yml`; legacy `.txt` and `.yaml` files are still parsed if present.
 - Building files define `id`, `name`, `size` (`small`, `medium`, `large`), `blueprint`, `implemented`, and `levels.<1|2|3>` with display `parts`, optional `empty-parts`, optional `upgrade-cost` stored-scrap requirements, optional `interaction.give-items` compatibility outputs, and optional `harvest.uses` / `harvest.items` for harvestable buildings.
-- Storage Locker buildings open persisted camp-plot inventories sized by building size and level: small lockers provide `1/2/3` usable slots, medium lockers provide `2/4/6`, and large lockers provide `4/8/12`; unused Bukkit row slots are locked filler, and lockers cannot be destroyed until emptied.
-- Sculk Purifier buildings have `3` charges per run, reduce only the clicking player's current sculk pressure from their camp GUI, and scale the amount by purifier size and level.
+- Storage Locker buildings use the single `storage_locker` building id, open persisted camp-plot inventories with `9/18/27` usable slots by level, use locked filler for unused Bukkit row slots, cannot be destroyed until emptied, and require one matching Storage Locker blueprint for each upgrade to level 2 or 3.
+- Sculk Purifier buildings have `3` charges per run, reduce only the clicking player's current sculk pressure from their camp GUI, scale the amount by purifier size and level, and require one matching purifier blueprint for each upgrade to level 2 or 3.
 - Grindstone buildings have `1` charge per run and increase the held Halls weapon's melee damage by the building level.
 - Forge buildings are medium camp buildings with `1` charge per run and repair the held Halls item's durability by `30% * level` of its maximum durability.
 - Elevator Drill buildings reduce exploration-floor coin quotas instead of skipping floors. Each built drill applies a multiplicative quota multiplier based on level: `0.9`, `0.8`, or `0.7`.
@@ -1368,7 +1368,7 @@ SQLite tables:
 - `vagabonds_club` is the default starter weapon. Every participant receives it when a Halls run starts or fully restarts after game over.
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control global fallback blueprint keyword drops.
 - Scenario blueprint pools may also be restricted by level type with `blueprint-pools.<level-type>.normal` and `blueprint-pools.<level-type>.rare`; runtime uses the active floor level type first and falls back to the global rarity pool when no level-specific pool exists.
-- Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, forge, storage lockers by size, mycelia farm, elevator drill, scanner, health totem, speed totem, and sculk purifiers by size.
+- Blueprint defaults currently cover every GDD building family: cooking pot, weapon bench, armory, grindstone, forge, storage locker, mycelia farm, elevator drill, scanner, health totem, speed totem, and sculk purifiers by size.
 - Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `utility`, `rare_weapon`, `rare_armor`, and `rare_utility`; `ranged` / `rare_ranged` are no longer supported Halls loot keywords.
 - The generic `blueprint` loot keyword rolls the active level type's scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools, falling back to global scenario pools when no level-specific pool exists.
 - `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions. If `<item>` is `wood_scrap`, `iron_scrap`, `diamond_scrap`, or `redstone_scrap`, the amount is deposited directly into the caller's active session elevator storage and awards the matching test coins.
@@ -1399,7 +1399,7 @@ SQLite tables:
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth. Bear traps and proximity mines render through item-display models instead of placed physical floor blocks.
 - Trap files may define `blacklisted-level-types`; blacklisted level type ids are rejected even when `level-types` is empty. Bundled bear traps and proximity mines are blacklisted from `sewer`.
 - Sewer trap kinds currently include `bubbles`, `geyser`, and `pufferfish`. Bubbles and geysers render squished magma/soul-sand display fixtures at the bottom of two-block-deep puddles without replacing the water blocks; bubbles damage contact, geysers use cooldown bursts, splash/cloud/bubble particles, and large knockback without damage, and pufferfish spawns a killable pufferfish trap entity.
-- Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults. Ravagers are intentionally weaker than vanilla for Halls; bundled health is `10` and runtime attack damage is clamped to `4`. Drowned is bundled for Sewer pools.
+- Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults. Ravagers are intentionally weaker than vanilla for Halls; bundled health is `10` and runtime attack damage is clamped to `4`. Drowned and 10-HP guardians are bundled for Sewer pools.
 - Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `scale`, optional `movement-speed-multiplier`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
 - Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
 - Modifier files define `modifiers.<id>.type`, `display-name`, `icon`, `weight`, and `effects`.
@@ -1408,17 +1408,17 @@ SQLite tables:
 - Duplicate modifiers are allowed and their effects stack or multiply.
 - Modifier reveal pacing is intentionally slow enough for players to read each selected modifier during elevator descent.
 - Implemented modifier effects include coin/enemy/trap/loot/sculk multipliers, special enemy pool inclusion, extra rooms, longer corridors, death fog, trap-kind boosts, and Compass.
-- Death Fog warns at 3 minutes, 1 minute, and 10 seconds before the wither timer begins.
+- Death Fog warns at 3 minutes, 1 minute, and 30 seconds before the wither timer begins.
 - Compass once grants an elevator compass, twice adds exact elevator block distance to the HUD, and three times emits an elevator trail every 5 seconds. Elevator compasses are removed from player inventories and the elevator transfer chest before each descent chooses the next floor's modifiers.
 - Session monster spawning clears native/random equipment first, then applies only gear explicitly defined in the monster resource file. Session monsters that fall into generated holes are killed.
 - Session monsters are persistent, have far-away removal disabled, and should prioritize alive participants over ghost players as targets.
 - Session monsters normally acquire targets only at close range; breakable destruction and elevator scrap deposits alert nearby spawned monsters at long range. Smoke Bomb concealment clears and suppresses targeting for its duration, and Creative/Spectator participants are ignored by monster target selection.
-- Exploration monster spawning has no finite total spawn budget. It fills to a live cap, extends that cap periodically based on floor difficulty, reduces the cap by one when an alive participant kills a session monster, and adds one cap slot for each session slime created by slime splitting.
+- Exploration monster spawning has no finite total spawn budget. It fills to a live cap, extends that cap periodically based on floor difficulty, reduces the cap by one when an alive participant kills a session monster, and adds one cap slot for each session slime created by slime splitting. Direct spawn attempts stay on a fixed 5-second interval. After 3 minutes on a floor, the cap-extension cooldown tightens by 1% of its base length per successful spawn until it reaches the 5-second minimum; after 15 minutes, the level type's full special monster pool may spawn.
 - Each extra participant after the first adds 33% to the exploration monster live cap and cap-extension speed before modifier multipliers apply.
 - Level type `monsters.common` and `monsters.special` are parsed into runtime pools; exploration floors spawn a first-pass session-local monster flood from the active level type.
 - Breaking Halls props and depositing elevator scrap alert nearby spawned monsters toward the nearest participant.
 - Exploration monsters avoid first-person-visible spawn cells, drop no loot/XP, and increase their live spawn cap by 5% for every minute spent on the floor.
-- When any active participant's sculk is at least 65%, each monster spawn has `min(sculk - 55, 35) / 10%` chance to spawn a warden instead.
+- When the alive participant with the highest sculk pressure is at least 65%, each monster spawn has `min(sculk - 55, 35) / 10%` chance to spawn a warden instead.
 - Exploration floor scenario field `traps` means the number of rooms that should receive traps, not the raw trap count.
 - Exploration floor scenario field `traps-per-room.min` / `traps-per-room.max` controls how many normal traps Java attempts inside each trapped room.
 - Hole/pit generation is controlled separately by scenario floor field `holes`.

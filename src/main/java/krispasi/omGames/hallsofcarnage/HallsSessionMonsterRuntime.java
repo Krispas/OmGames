@@ -38,6 +38,9 @@ import org.bukkit.scheduler.BukkitTask;
 
 final class HallsSessionMonsterRuntime {
     private static final int SPAWN_INTERVAL_TICKS = 100;
+    private static final int MIN_CAP_EXTENSION_INTERVAL_TICKS = 100;
+    private static final int CAP_ACCELERATION_START_SECONDS = 180;
+    private static final int ALL_SPECIAL_START_SECONDS = 900;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -53,6 +56,7 @@ final class HallsSessionMonsterRuntime {
     private final Map<UUID, Long> concealedParticipants = new java.util.HashMap<>();
     private List<HallsExplorationGenerator.Cell> spawnCells = List.of();
     private List<HallsMonsterType> commonPool = List.of();
+    private List<HallsMonsterType> specialPool = List.of();
     private HallsMonsterType activeSpecialType;
     private int monsterCoinDropChancePercent = 10;
     private Random random = new Random();
@@ -61,8 +65,10 @@ final class HallsSessionMonsterRuntime {
     private int baseMaxAlive;
     private int spawnedThisFloor;
     private int spawnCooldownTicks;
+    private int baseCapExtensionIntervalTicks;
     private int capExtensionCooldownTicks;
     private int capExtensionIntervalTicks;
+    private long floorStartedAtMillis;
 
     HallsSessionMonsterRuntime(JavaPlugin plugin,
                                World world,
@@ -94,7 +100,7 @@ final class HallsSessionMonsterRuntime {
         this.random = random == null ? new Random() : random;
         this.spawnCells = spawnCells(plan);
         this.commonPool = monsterPool(levelType == null ? List.of() : levelType.commonMonsters());
-        List<HallsMonsterType> specialPool = monsterPool(levelType == null ? List.of() : levelType.specialMonsters());
+        this.specialPool = monsterPool(levelType == null ? List.of() : levelType.specialMonsters());
         this.activeSpecialType = modifiers != null && modifiers.useSpecialEnemy() && !specialPool.isEmpty()
                 ? specialPool.get(this.random.nextInt(specialPool.size()))
                 : null;
@@ -106,8 +112,10 @@ final class HallsSessionMonsterRuntime {
         double playerStack = participantStackMultiplier();
         this.baseMaxAlive = Math.max(2, Math.min(36, (int) Math.round((1 + rooms / 4.0 + difficulty / 15.0) * playerStack * enemyMultiplier)));
         this.maxAlive = baseMaxAlive;
-        this.capExtensionIntervalTicks = Math.max(20, (int) Math.round(capExtensionIntervalTicks(difficulty) / playerStack));
+        this.capExtensionIntervalTicks = Math.max(MIN_CAP_EXTENSION_INTERVAL_TICKS, (int) Math.round(capExtensionIntervalTicks(difficulty) / playerStack));
+        this.baseCapExtensionIntervalTicks = capExtensionIntervalTicks;
         this.capExtensionCooldownTicks = capExtensionIntervalTicks;
+        this.floorStartedAtMillis = System.currentTimeMillis();
         if (spawnCells.isEmpty() || commonPool.isEmpty()) {
             return;
         }
@@ -132,11 +140,14 @@ final class HallsSessionMonsterRuntime {
         spawnCells = List.of();
         spawnedThisFloor = 0;
         activeSpecialType = null;
+        specialPool = List.of();
         spawnCooldownTicks = 0;
+        baseCapExtensionIntervalTicks = 0;
         baseMaxAlive = 0;
         maxAlive = 0;
         capExtensionCooldownTicks = 0;
         capExtensionIntervalTicks = 0;
+        floorStartedAtMillis = 0L;
         monsterCoinDropChancePercent = 10;
     }
 
@@ -309,6 +320,7 @@ final class HallsSessionMonsterRuntime {
             debugSink.accept("Spawned " + type.id() + " at " + cell.x() + " " + origin.y() + " " + cell.z()
                     + "; next spawn in " + (SPAWN_INTERVAL_TICKS / 20) + "s; alive "
                     + spawnedMonsters.size() + "/" + maxAlive + ".");
+            accelerateCapExtensionIfNeeded();
         } else {
             entity.remove();
         }
@@ -441,6 +453,9 @@ final class HallsSessionMonsterRuntime {
         HallsMonsterType warden = rollWarden();
         if (warden != null) {
             return warden;
+        }
+        if (floorElapsedSeconds() >= ALL_SPECIAL_START_SECONDS && !specialPool.isEmpty()) {
+            return specialPool.get(random.nextInt(specialPool.size()));
         }
         if (activeSpecialType != null && random.nextInt(6) == 0) {
             return activeSpecialType;
@@ -578,6 +593,21 @@ final class HallsSessionMonsterRuntime {
             seconds = (int) Math.round(60.0 - ((difficulty - 10) * (40.0 / 70.0)));
         }
         return seconds * 20;
+    }
+
+    private void accelerateCapExtensionIfNeeded() {
+        if (floorElapsedSeconds() < CAP_ACCELERATION_START_SECONDS
+                || capExtensionIntervalTicks <= MIN_CAP_EXTENSION_INTERVAL_TICKS
+                || baseCapExtensionIntervalTicks <= 0) {
+            return;
+        }
+        int reduction = Math.max(1, baseCapExtensionIntervalTicks / 100);
+        capExtensionIntervalTicks = Math.max(MIN_CAP_EXTENSION_INTERVAL_TICKS, capExtensionIntervalTicks - reduction);
+        capExtensionCooldownTicks = Math.min(capExtensionCooldownTicks, capExtensionIntervalTicks);
+    }
+
+    private long floorElapsedSeconds() {
+        return floorStartedAtMillis <= 0L ? 0L : Math.max(0L, (System.currentTimeMillis() - floorStartedAtMillis) / 1000L);
     }
 
     private double participantStackMultiplier() {

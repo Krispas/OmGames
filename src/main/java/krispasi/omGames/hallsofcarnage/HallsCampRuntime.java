@@ -229,6 +229,26 @@ public final class HallsCampRuntime {
         }
     }
 
+    public void refreshRunUses() {
+        for (Plot plot : plotsById.values()) {
+            if (plot.buildingId() == null) {
+                continue;
+            }
+            HallsBuildingType building = buildingTypes.get(plot.buildingId());
+            if (building == null) {
+                continue;
+            }
+            int level = Math.max(1, Math.min(3, plot.level()));
+            int uses = defaultRunUses(building, level);
+            if (uses <= 0) {
+                continue;
+            }
+            plot.setHarvestRemaining(uses);
+            plot.setHarvestUsed(0);
+            setDisplays(plot, building, building.level(level).parts());
+        }
+    }
+
     public boolean handleInteract(Player player, Entity entity) {
         if (player == null || entity == null) {
             return false;
@@ -818,10 +838,13 @@ public final class HallsCampRuntime {
     }
 
     private String upgradeBlueprintCost(HallsBuildingType building) {
-        if (building == null || !isCraftingStation(building)) {
+        if (building == null) {
             return null;
         }
-        return building.blueprint();
+        if (isCraftingStation(building) || isStorageLocker(building) || isSculkPurifier(building)) {
+            return building.blueprint();
+        }
+        return null;
     }
 
     private List<String> upgradeLore(HallsBuildingType building, Plot plot) {
@@ -1117,7 +1140,7 @@ public final class HallsCampRuntime {
     }
 
     private boolean isStorageLocker(String buildingId) {
-        return buildingId != null && buildingId.startsWith("storage_locker_");
+        return buildingId != null && (buildingId.equals("storage_locker") || buildingId.startsWith("storage_locker_"));
     }
 
     private boolean isSculkPurifier(HallsBuildingType building) {
@@ -1125,12 +1148,7 @@ public final class HallsCampRuntime {
     }
 
     private int storageSlots(HallsBuildingType building, int level) {
-        int baseSlots = switch (building.size()) {
-            case "medium" -> 2;
-            case "large" -> 4;
-            default -> 1;
-        };
-        return Math.max(1, Math.min(54, baseSlots * Math.max(1, Math.min(3, level))));
+        return Math.max(1, Math.min(54, 9 * Math.max(1, Math.min(3, level))));
     }
 
     private int storageSlots(int plotId) {
@@ -1237,7 +1255,7 @@ public final class HallsCampRuntime {
                     world.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.8f, 1.55f);
                 } else if (id.startsWith("sculk_purifier_")) {
                     world.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.35f);
-                } else if (id.startsWith("storage_locker_")) {
+                } else if (isStorageLocker(id)) {
                     world.playSound(player.getLocation(), Sound.BLOCK_CHEST_OPEN, 0.6f, 1.0f);
                 } else {
                     world.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.5f, 1.2f);

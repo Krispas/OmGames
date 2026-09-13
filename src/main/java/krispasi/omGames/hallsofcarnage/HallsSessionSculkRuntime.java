@@ -101,6 +101,15 @@ final class HallsSessionSculkRuntime {
         return (int) Math.round(playerSculk.values().stream().mapToDouble(Double::doubleValue).max().orElse(0.0));
     }
 
+    int maxSculkPercent(Predicate<UUID> playerFilter) {
+        Predicate<UUID> filter = playerFilter == null ? ignored -> true : playerFilter;
+        return (int) Math.round(playerSculk.entrySet().stream()
+                .filter(entry -> filter.test(entry.getKey()))
+                .mapToDouble(Map.Entry::getValue)
+                .max()
+                .orElse(0.0));
+    }
+
     int sculkPercent(Player player) {
         if (player == null) {
             return 0;

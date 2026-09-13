@@ -234,9 +234,9 @@ Each run, can sharpen one held weapon, increasing its melee damage. The upgrade 
 
 Each run, can repair one held Halls item. It restores 30% of the item's maximum durability per building level.
 ### Storage Locker
-- Size: All three sizes (different blueprints)
+- Size: Small
 
-Has storage based on its size and level: small lockers have 1/2/3 slots, medium lockers have 2/4/6, and large lockers have 4/8/12. Allows storing items for future runs.
+Has 9/18/27 storage slots by level. Allows storing items for future runs. Upgrading to level 2 and level 3 requires another Storage Locker blueprint in addition to scrap costs.
 ### Mycelia Farm
 - Size: Small
 
@@ -262,7 +262,7 @@ Has 1 charge per run. Increases one player's movement speed by 5% per level unti
 ### Sculk Purifier
 - Size: All three sizes (different blueprints)
 
-Has 3 charges per run. Removes some sculk from the player who uses the charge, based on size and level.
+Has 3 charges per run. Removes some sculk from the player who uses the charge, based on size and level. Upgrading to level 2 and level 3 requires another matching Sculk Purifier blueprint in addition to scrap costs.
 ### More
 System must allow more to be added in the future. If anything comes to you during development, add it into this doc.
 
@@ -287,11 +287,11 @@ Sometimes a blueprint can be found, which can be used for buildings.
 ## Monsters
 Monsters slowly flood the dungeon. The amount and max current spawns are defined by size of the level and difficulty/modifiers.
 On exploration floors, monsters spawn in places not visible by players currently. If possible on technical level, when player interacts with stuff such as breaking or depositing scrap, they should be alerted of the location and walk there for a small period of time until loosing interest.
-Monster types are based on the level type. Level type also defines pool of special mobs, but those dont spawn unless modifiers are active.
+Monster types are based on the level type. Level type also defines pool of special mobs, but those dont spawn unless modifiers are active or players survive more than 15 minutes on a floor. Direct spawn attempts stay on a fixed interval. After 3 minutes on an exploration floor, successful monster spawns reduce the cap-extension cooldown by 1% of its base length until it reaches a 5-second minimum.
 On fight floors, monsters "come in" (spawn) through fake doors on the walls.
 Large monsters such as ravagers should be tuned below vanilla lethality so they act as pressure enemies instead of instant run-ending walls.
 ## Sculk
-Based on difficulty, sculk patches can appear and replace parts of the levels. Standing on sculk blocks or veins raises the player's sculk pressure. Sculk is saved between floor and save loads. High sculk adds a chance for warden to spawn instead of normal enemies; it should not directly apply potion effects, hunger changes, or item-use restrictions.
+Based on difficulty, sculk patches can appear and replace parts of the levels. Standing on sculk blocks or veins raises the player's sculk pressure. Sculk is saved between floor and save loads. The alive player with the highest sculk pressure controls the chance for a warden to spawn instead of a normal enemy; it should not directly apply potion effects, hunger changes, or item-use restrictions.
 ## Hunger
 Hunger is not present in the game. Make it so the bar is always full so player can sprint and disable natural regen.
 ## Compass

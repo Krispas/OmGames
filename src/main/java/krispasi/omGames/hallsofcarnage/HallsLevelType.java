@@ -159,7 +159,7 @@ public record HallsLevelType(
                             new BlockPalette(Material.DEEPSLATE_BRICKS, Material.MOSSY_COBBLESTONE, 0.10)
                     ),
                     List.of(new BlockPalette(Material.MOSSY_COBBLESTONE, Material.COBBLESTONE, 0.08)),
-                    List.of("drowned", "zombie", "slime_medium", "silverfish", "creaking"),
+                    List.of("drowned", "zombie", "slime_medium", "silverfish", "guardian"),
                     List.of("drowned", "bogged", "cave_spider", "warden"),
                     0.015,
                     List.of(new VegetationEntry("bush", 1)),

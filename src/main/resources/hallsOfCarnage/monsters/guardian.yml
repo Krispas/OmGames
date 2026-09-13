@@ -1,0 +1,4 @@
+id: guardian
+name: "Guardian"
+entity-type: GUARDIAN
+health: 10
