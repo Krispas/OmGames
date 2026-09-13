@@ -1070,12 +1070,15 @@ final class HallsSessionTrapRuntime {
             case GEYSER -> {
                 long activeAge = age % trap.type().intervalTicks();
                 if (activeAge < trap.type().activeTicks()) {
+                    setGeyserLiquidColumn(trap, Material.BUBBLE_COLUMN);
                     spawnGeyserParticles(center);
                     if (activeAge == 0L) {
                         world.playSound(center, Sound.BLOCK_BUBBLE_COLUMN_UPWARDS_AMBIENT, 1.0f, 1.35f);
                     }
                     knockbackPlayersNear(center, trap.type().radius());
                     knockbackMonstersNear(center, trap.type().radius());
+                } else if (activeAge == trap.type().activeTicks()) {
+                    setGeyserLiquidColumn(trap, Material.WATER);
                 }
             }
             default -> {
@@ -1094,6 +1097,12 @@ final class HallsSessionTrapRuntime {
         world.spawnParticle(Particle.SPLASH, base.clone().add(0.0, 1.0, 0.0), 24, 0.25, 0.75, 0.25, 0.12);
         world.spawnParticle(Particle.CLOUD, base.clone().add(0.0, 1.4, 0.0), 8, 0.2, 0.5, 0.2, 0.04);
         world.spawnParticle(Particle.BUBBLE_COLUMN_UP, base, 12, 0.35, 0.55, 0.35, 0.08);
+    }
+
+    private void setGeyserLiquidColumn(HallsTrap trap, Material material) {
+        Material columnMaterial = material == Material.BUBBLE_COLUMN ? Material.BUBBLE_COLUMN : Material.WATER;
+        setBlock(trap.x(), origin.y() - 1, trap.z(), columnMaterial);
+        setBlock(trap.x(), origin.y() - 2, trap.z(), columnMaterial);
     }
 
     private void spawnSteamVentSmoke(HallsTrap trap) {

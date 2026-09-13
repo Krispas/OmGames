@@ -306,6 +306,10 @@ public final class HallsSession {
         return monsterRuntime.registerSplitMonster(entity);
     }
 
+    public boolean registerTransformedMonster(Entity original, Entity transformed) {
+        return monsterRuntime.registerTransformedMonster(original, transformed);
+    }
+
     public void handleMonsterDeath(org.bukkit.entity.LivingEntity entity, Player killer) {
         monsterRuntime.handleMonsterDeath(entity, killer);
     }
@@ -1378,7 +1382,7 @@ public final class HallsSession {
         if (candidates.isEmpty()) {
             return Set.of();
         }
-        double coverage = Math.max(build.levelType().liquid().roomCoverage(), isSewer(build.levelType()) ? 0.92 : 0.0);
+        double coverage = Math.max(build.levelType().liquid().roomCoverage(), isSewer(build.levelType()) ? 0.45 : 0.0);
         int target = Math.max(1, (int) Math.round(candidates.size() * coverage));
         HallsExplorationGenerator.Cell start = candidates.get(build.random().nextInt(candidates.size()));
         Set<HallsExplorationGenerator.Cell> candidateSet = new HashSet<>(candidates);
@@ -3944,7 +3948,7 @@ public final class HallsSession {
             return;
         }
         Location next = drop.location().clone().add(drop.velocity());
-        if (next.getY() < origin.y() - 0.5) {
+        if (next.getY() < minimumDropY(next)) {
             removePhysicsDrop(drop);
             return;
         }
@@ -3983,6 +3987,11 @@ public final class HallsSession {
         int blockY = (int) Math.floor(location.getY() - 0.08);
         Block block = world.getBlockAt(location.getBlockX(), blockY, location.getBlockZ());
         return block.getType().isSolid();
+    }
+
+    private double minimumDropY(Location location) {
+        HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(location.getBlockX(), location.getBlockZ());
+        return activeLiquidCells.contains(cell) ? origin.y() - 3.5 : origin.y() - 0.5;
     }
 
     private Optional<Double> supportYBelow(Location location) {

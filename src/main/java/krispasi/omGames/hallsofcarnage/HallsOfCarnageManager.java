@@ -730,6 +730,13 @@ public final class HallsOfCarnageManager {
         return activeSessions.values().stream().anyMatch(session -> session.registerSplitMonster(entity));
     }
 
+    public boolean registerTransformedMonster(Entity original, Entity transformed) {
+        if (original == null || transformed == null) {
+            return false;
+        }
+        return activeSessions.values().stream().anyMatch(session -> session.registerTransformedMonster(original, transformed));
+    }
+
     public void handleSessionMonsterDeath(org.bukkit.entity.LivingEntity entity, Player killer) {
         if (entity == null) {
             return;

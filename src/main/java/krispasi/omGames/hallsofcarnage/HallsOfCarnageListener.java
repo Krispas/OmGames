@@ -11,6 +11,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityTransformEvent;
+import org.bukkit.entity.EntityType;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.block.Action;
@@ -130,6 +131,11 @@ public final class HallsOfCarnageListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onEntityTransform(EntityTransformEvent event) {
         if (manager.isSessionMonster(event.getEntity())) {
+            if (event.getEntity().getType() == EntityType.ZOMBIE
+                    && event.getTransformedEntity().getType() == EntityType.DROWNED
+                    && manager.registerTransformedMonster(event.getEntity(), event.getTransformedEntity())) {
+                return;
+            }
             event.setCancelled(true);
         }
     }

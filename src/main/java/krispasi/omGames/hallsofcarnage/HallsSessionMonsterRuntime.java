@@ -162,6 +162,27 @@ final class HallsSessionMonsterRuntime {
         return true;
     }
 
+    boolean registerTransformedMonster(Entity original, Entity transformed) {
+        if (!(transformed instanceof LivingEntity living)
+                || original == null
+                || !world.equals(transformed.getWorld())
+                || !isSessionMonster(original)) {
+            return false;
+        }
+        String typeId = original.getPersistentDataContainer().get(monsterTypeKey, PersistentDataType.STRING);
+        spawnedMonsters.remove(original.getUniqueId());
+        spawnedMonsters.add(living.getUniqueId());
+        living.setPersistent(true);
+        if (living instanceof Mob mob) {
+            mob.setRemoveWhenFarAway(false);
+        }
+        living.addScoreboardTag("omgames_hoc_monster");
+        if (typeId != null) {
+            living.getPersistentDataContainer().set(monsterTypeKey, PersistentDataType.STRING, typeId);
+        }
+        return true;
+    }
+
     void handleMonsterDeath(LivingEntity entity, Player killer) {
         if (entity == null || !spawnedMonsters.remove(entity.getUniqueId())) {
             return;
