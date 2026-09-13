@@ -44,6 +44,7 @@ They are located under resources/hallsOfCarnage/scenarios. There is already one 
 It contains how the campaign is structured. While each dive attempt randomizes the floors by generating a new seed, the level types and camps stay the same.
 
 Also contains item types which are present in the scenario, choosing whitelist approach for which gear can appear/be crafted during the scenario. Same goes for camp buildings
+Blueprint drop pools are scenario-owned. A scenario may define global normal/rare blueprint pools and may override those pools per level type, so specific building blueprints can be found only in certain dungeon themes.
 ## Multiplayer
 Game can be played in 1-6 players. When player dies in a multiplayer game, they become a ghost (not spectator, I dont want them to go out of bounds). And can explore the level still. However the inventory is blocked and all stuff dropped on the ground. Can damage monsters using hand. They are also still in adventure mode, but invisible. Particles are displayed in their place.
 ## Save Files
@@ -53,7 +54,7 @@ If scenario is finished by beating last floor, the save is marked as completed a
 
 When creating a savefile, scenario is first picked and then players present in the lobby.
 ## Items
-Players have limited inventory of armor slots and only the hotbar row. All items except arrows and fireworks are unstackable. Dropped items on the ground are removed and instead a physics driven item drop is created. They can use Item Displays and Interaction entities for a smooth experience. Players can pick them up with right-clicking by empty hand.
+Players have limited inventory of armor slots and only the hotbar row. Halls player equipment and utility items are unstackable unless an item file explicitly says otherwise. Dropped items on the ground are removed and instead a physics driven item drop is created. They can use Item Displays and Interaction entities for a smooth experience. Players can pick them up with right-clicking by empty hand.
 
 Items are located in the resources/hallsOfCarnage/items/ folder. Look into there for examples. There is also a chest in the elevator, giving players access to 27 slots for floor transfer. The contents of the chest are lost if players loose.
 
@@ -65,6 +66,7 @@ Layouts are stored under reources/level and level types under resources/hallsOfC
 Type is like a biome. It defines what kind of modifiers can appear in the type and what kind of mobs do too.
 The layouts contain X for filled, like walls and pillars, of course there is also an unspecified wall around the rooms. O is open space.
 The level type defines from what material the walls, floor and ceiling are built from.
+Level types can also configure decorative vegetation density and weighted vegetation ids from `resources/hallsOfCarnage/vegetation`.
 
 A floor config in scenario sets its size and type and difficulty. Elevator is always in the middle of the floor and everything generates around it. All rooms are then connected with corridors. 
 The generation algorithm for corridors is level type specific, but each room generates a connection point which then tries to be connected. Rooms try to create connection points on nearby rooms when generating too, so they can connect. 
@@ -72,7 +74,7 @@ If corridor intersects another throughout the generation, then it stops expandin
 
 Rooms are 5 blocks tall, corridors 3 blocks tall.
 
-First rooms generate, then corridors, then traps, then items and breakables.
+First rooms generate, then corridors, then traps, then decorative vegetation, then items and breakables.
 
 There are three types of corridor generations which level types can pick from.
 #### Normal
@@ -81,6 +83,8 @@ Straight corridors with 90 degree turns are created between the rooms, they are 
 Natural bendy corridors generate between the rooms. They are 1-3 blocks wide per need and must allow passage on bends.
 #### Maze
 A maze is generated and the rooms are set into it, allowing entrance on the connection points.
+#### Backrooms
+A maze-like open hall field is generated, then long internal wall runs are added while preserving reachability.
 
 ### Elevator
 Elevator is a 5x4x5 inside area with walls around it, making the total shell footprint 7x4x7. Walls:
@@ -119,11 +123,18 @@ fight waves of randomized mobs defined by a pool from the scenario.
 
 Once all enemies are defeated, the elevator can be taken deeper.
 ### Camp Floors
-Camp floors are respites for players. Game can be saved there from a special terminal which the game generates somewhere in the room.
-They generate randomly, figure out some kind of algorithm yourself. Elevator must be present again. It can be a cave, a room or anything of that thing.
+Camp floors are respites for players. Each scenario has one shared camp layout for the entire campaign instead of separate random camps per camp floor. The camp is configured by the scenario and can use a large text layout such as `resources/hallsOfCarnage/level/camps/camp_untold_depths.txt`.
 
-Game needs to remember layout of these floors! Players can build buildings on build spots, which are scattered throughout the room. There are 3 types of slots.
-Small (1x1), Medium (3x3) and Large (5x5). More on those later, their amount is configured through scenario.
+The camp layout uses normal open/blocked room markers plus special markers:
+- `L` is the camp elevator link point.
+- `D` is a locked camp door.
+- `C` and facing markers (`N`, `S`, `E`, `W`) define build plots.
+
+Camp rooms behind locked doors start inaccessible. Right-clicking a locked door tells players what build plots are in the room behind it. Shift-right-clicking the door while the party has a key permanently unlocks it. If both sides of a door are already unlocked through other paths, that door can be opened for free.
+
+Players can build buildings on build spots scattered throughout the shared camp. There are 3 types of slots: Small (1x1), Medium (3x3), and Large (5x5). Smaller buildings can be built on larger spots. The shared camp is saved across camp visits, but it resets when the team suffers a full hard reset after running out of team lives.
+
+Camp floors replace the normal coin quota display with a key counter. When the party arrives at camp, extra carried coins are deposited into the camp bank. The scenario defines a key-cost sequence, for example 30, 40, 50. Bank progress accumulates across camp visits and grants a key each time the next threshold is reached. Keys are then spent to unlock reachable camp doors.
 ### Transition Floors
 Transition floors are like loading screen. Which should last at least 10 seconds or more if the game needs to. It is in the elevator with partiles going around.
 If going to exploration floor, modifiers are also picked here and displayed as title like a "gambling machine display."
@@ -134,12 +145,21 @@ A special transition floor at the end of the game, which tells players they won 
 Level types define look of the rooms, enemies and possible modifiers, like biomes almost.
 Saved under resources/hallsOfCarnage/level_type
 The doc does't state much as they are in concept stage right now.
+Level types may define decorative vegetation using a chance and weighted vegetation ids. Vegetation is display-only decoration, not normal placed blocks, and should not use interaction entities or hitboxes. It can appear in rooms and corridors, but must not generate inside holes or on ground-trap cells.
 ### Howling Corridors
 Your basic minecraft dungeons. Zombies, skeletons and so on.
 ### Frozen Halls
 Frozen Caves.
 ### Deep Crypt
 Desert temple.
+### Infernal Chambers
+Nether-blackstone halls with wider corridors, heat-lit walls, and harsher monster pools.
+### Factory
+Industrial open halls with machinery-like pillars and room-local open-hall generation.
+### Backrooms
+Yellowed liminal halls with maze-style open spaces, long wall runs, and sparse unsettling monster pools.
+### Sewer
+Wet brick service tunnels with wide 5-block corridors and a 3-block liquid channel. Rooms can generate broad contiguous puddles, including along room borders, and adjacent puddles/channels should merge without separating walls; liquid is configured by level type so water is used now and lava can be used by future content. Bear traps and proximity mines are blacklisted from this level type. Sewer bubbles and geysers use display-only bottom fixtures in puddles; geysers knock entities upward without direct damage.
 ### Other levels
 Of course, other types will be implemented throughout development.
 ## Traps
@@ -154,6 +174,8 @@ Just a bear trap, must not generate in a way that restricts access. Deals a lot 
 Generates on the walls, spikes periodically pierce entities in front of it, dealing a lot of damage.
 ### Proximity mine
 Bear trap, but better.
+### Steam vent
+Factory-only floor vent that alternates between safe and harmful intervals. During the harmful interval it fills a 3x3 area with steam/smoke and damages players and monsters passing through it.
 ## Modifiers
 Exploration floors have modifiers, these are defined by level types, allowing unique modifiers for specific types.
 However most are shared. There are good and bad modifiers. Good are yellow, bad are red. They are picked based on the difficulty, higher difficulty means lower chance for good ones.
@@ -161,19 +183,20 @@ However most are shared. There are good and bad modifiers. Good are yellow, bad 
 They are not defined in the resource files, so please add resource files for them.
 ### Good
 - Free - nothing
-- Double coins - doubles coins
+- Lower quota - decreases the current floor coin quota by 5 coins
 - Less enemies - 25% less enemy spawns
 ### Bad
 - More enemies - 25% more enemy spawns
 - More traps - 50% more traps
 - Less loot - 25% less loot
-- More sculk - double sculk generation
+- More sculk - triple sculk generation
 - Special enemy - adds a special enemy from special enemy pool to the enemy pool based on level type
 - More rooms - adds 3-5 more rooms (this is bad, because the treasure is more spread)
 - Longer corridors - rooms generate further apart. This effect shouldnt be as powerful when maze corridor generating is active.
 - Death fog - Deadly fumes build up, resulting in wither effect after 10 minutes of entering the floor. Players will be warned throughout.
 - Falling ice - In some rooms, icycles periodically fall from the ceiling as a special trap. Unique to Frozen Halls.
 - Poison darts - Adds a new poison dart trap. Unique to Deep Crypt.
+- Steam vents - Makes Factory steam vent traps more common.
 ## Buildings
 Players can build buildings in camps. To build a building a blueprint is needed. Buildings have sizes of small, medium and large (1x1, 3x3, 5x5).
 They can be built on special spots in camps. Smaller buildings can be built on larger spots. These buildings last over game overs and offer a way to outpace the increasing difficulty of the game.
@@ -187,26 +210,23 @@ The block layout as a visual represantation of it and other info needed for them
 
 All buildings have 3 levels.
 
-### Cooking Pot
-- Size: Medium
+### Camp Station
+- Size: Station (7x7 reserved camp plot)
 
-Allows cooking food for free based on it's level. It can range from healing to stat bonuses.
-### Weapon Bench
-- Size: Medium
-
-Allows crafting weapons based on scenario settings. Unlocks more recipes when upgraded. Uses scrap.
-### Armory
-- Size: Medium
-
-Same as weapon bench, but for armor.
+Each camp has one permanent Camp Station. It is always present, has no blueprint, has no levels, cannot be deconstructed, and provides all food, weapon, utility, and armor recipes that were previously split across Cooking Pot, Weapon Bench, and Armory.
+Camp Station crafting is split into food, weapon, utility, and armor views. Recipes are locked behind a scenario-defined research tree. Root research nodes are available at campaign start; every normal camp arrival grants one research point for each exploration floor cleared since the previous camp, and researched nodes persist in the team save.
 ### Grindstone
 - Size: Large
 
-Each run, can upgrade one armor or weapon piece, giving it better stats. The upgrade strenght is based on level.
-### Storage Locker
-- Size: All three sizes (different blueprints)
+Each run, can sharpen one held weapon, increasing its melee damage. The upgrade strength is based on level.
+### Forge
+- Size: Medium
 
-Has a storage based on its size. Size x Level. Allows storing items for future runs.
+Each run, can repair one held Halls item. It restores 30% of the item's maximum durability per building level.
+### Storage Locker
+- Size: Small
+
+Has 9/18/27 storage slots by level. Allows storing items for future runs. Upgrading to level 2 and level 3 requires another Storage Locker blueprint in addition to scrap costs.
 ### Mycelia Farm
 - Size: Small
 
@@ -214,21 +234,25 @@ Grows basic food for free. Bigger level = more.
 ### Elevator Drill
 - Size: Large
 
-Makes it so players skip next few floors, the skip depends on the level. Cannot skip last floor or a camp.
+Reduces exploration floor coin quotas while built. Each drill applies a multiplicative quota multiplier based on level: level 1 is 0.9, level 2 is 0.8, and level 3 is 0.7. Multiple drills stack multiplicatively.
 
 ### Scanner
 - Size: Small
 
 Tells you modifiers for the next floors based on the level.
-### Bounty Board
-- Size: Medium
+### Health Totem
+- Size: Large
 
-Based on level, gives you 1-3 quests. Like kill specific common mobs (they must be present before the next camp). Or gather specific amount of scrap to trade in. The board will then appear in next camp on a special additional slot (which is normaly empty and cannot be seen). Rewards can be blueprints, items and so on. Rewards are known beforehand.
+Has 1 charge per run. Increases one player's max health by 2 per level until the next camp arrival. Multiple Health Totems can stack on the same player when they are built on different plots.
+### Speed Totem
+- Size: Small
+
+Has 1 charge per run. Increases one player's movement speed by 5% per level until the next camp arrival. Multiple Speed Totems can stack on the same player when they are built on different plots.
 
 ### Sculk Purifier
-- Size: All three sizes (different blueprints)
+- Size: Medium
 
-Removes some sculk based on size and level.
+Has 3 charges per run. Removes sculk from the player who uses the charge, scaling by level. Upgrading to level 2 and level 3 requires another Sculk Purifier blueprint in addition to scrap costs.
 ### More
 System must allow more to be added in the future. If anything comes to you during development, add it into this doc.
 
@@ -244,21 +268,20 @@ Food is meant for regenerating lost health, as natural regeneration is turned of
 Some food can apply status effects.
 ### Melee
 Swords, axes, spears and so on. All have durability, which is not a normal minecraft durability.
-### Ranged
-Bows, crossbows, arrows, explosive fireworks, tridents.
 ### Utility
-Shields, totems of undying and other stuff.
+Shields, totems of undying and other stuff. Utilities can have custom durability, losing durability on successful use instead of always being consumed.
 ### Armor
-Armor. Of course, stuff like melee, ranged, utility and armor can have special attributes, to make things spicy. Define this in the files.
+Armor. Of course, stuff like melee weapons, utility and armor can have special attributes, to make things spicy. Define this in the files.
 ### Blueprints
 Sometimes a blueprint can be found, which can be used for buildings.
 ## Monsters
 Monsters slowly flood the dungeon. The amount and max current spawns are defined by size of the level and difficulty/modifiers.
 On exploration floors, monsters spawn in places not visible by players currently. If possible on technical level, when player interacts with stuff such as breaking or depositing scrap, they should be alerted of the location and walk there for a small period of time until loosing interest.
-Monster types are based on the level type. Level type also defines pool of special mobs, but those dont spawn unless modifiers are active.
+Monster types are based on the level type. Level type also defines pool of special mobs, but those dont spawn unless modifiers are active or players survive more than 15 minutes on a floor. Direct spawn attempts stay on a fixed interval. After 3 minutes on an exploration floor, successful monster spawns reduce the cap-extension cooldown by 1% of its base length until it reaches a 5-second minimum.
 On fight floors, monsters "come in" (spawn) through fake doors on the walls.
+Large monsters such as ravagers should be tuned below vanilla lethality so they act as pressure enemies instead of instant run-ending walls.
 ## Sculk
-Based on difficulty, sculk patches can appear and replace parts of the levels. Standing on sculk blocks or veins will slowly raise the sculk stats. Sculk is saved between floor and save loads. High sculk adds a chance for warden to spawn instead of normal enemies.
+Based on difficulty, sculk patches can appear and replace parts of the levels. Standing on sculk blocks or veins raises the player's sculk pressure. Sculk is saved between floor and save loads. The alive player with the highest sculk pressure controls the chance for a warden to spawn instead of a normal enemy; it should not directly apply potion effects, hunger changes, or item-use restrictions.
 ## Hunger
 Hunger is not present in the game. Make it so the bar is always full so player can sprint and disable natural regen.
 ## Compass
@@ -267,7 +290,9 @@ Above hotbar on message line should be something akin to a ui, which will tell p
 ### Reviving
 If player dies and becomes a ghost, it gets revived on the next floor without their stuff.
 ### Loose conditions
-If all players become ghosts, the game fades into special elevator transition floors, announcing game over. The players are then moved to floor 1 and can begin another run.
+Players have shared team lives, configured by scenario and defaulting to 3. If all players become ghosts, the game fades into a game-over transition. If the team has reached at least one camp and still has a life left, one life is consumed and the last camp save is restored. The shared camp does not reset in this case.
+
+If the team wipes before reaching the first camp, the run hard-resets to floor 1 without consuming a life. If the team wipes with no lives left, the players are moved to floor 1, the shared camp resets, and they can begin another run.
 ## Sounds
 Add sound effects to stuff. You have full freedom over the choice as long as it seems suitable.
 ## Shame

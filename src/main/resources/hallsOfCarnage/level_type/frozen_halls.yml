@@ -1,0 +1,38 @@
+id: frozen_halls
+name: "Frozen Halls"
+corridor-generation: cave
+materials:
+  floor: PACKED_ICE
+  ceiling: BLUE_ICE
+  corridor-floor: PACKED_ICE
+  corridor-ceiling: BLUE_ICE
+  light: PEARLESCENT_FROGLIGHT
+wall-palettes:
+  ice_bricks:
+    block: POLISHED_DIORITE
+    special-blocks:
+      calcite: 0.08
+      diorite: 0.08
+  icy:
+    block: PACKED_ICE
+    special-blocks:
+      blue_ice: 0.05
+pillar-palettes:
+  packed_ice:
+    block: PACKED_ICE
+    special-blocks:
+      blue_ice: 0.10
+monsters:
+  common:
+    - zombie
+    - silverfish
+    - vindicator
+    - slime_medium
+  special:
+    - bogged
+    - stray
+    - witch
+vegetation:
+  chance: 0.01
+  types:
+    deadbush: 1

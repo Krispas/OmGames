@@ -1,0 +1,16 @@
+id: smoke_bomb
+name: "Smoke Bomb"
+category: utility
+rarity: normal
+material: FIREWORK_STAR
+max-stack-size: 1
+lore:
+  - "Breaks nearby monster pursuit and hides you briefly."
+stats:
+  durability: 4
+  cooldown-seconds: 25
+  duration-seconds: 6
+  radius: 10
+recipe:
+  redstone_scrap: 3
+  wood_scrap: 1

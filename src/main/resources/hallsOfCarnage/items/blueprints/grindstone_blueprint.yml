@@ -1,0 +1,9 @@
+id: grindstone_blueprint
+name: "Rare Blueprint: Grindstone"
+category: blueprint
+rarity: rare
+material: PAPER
+item-model: minecraft:map
+max-stack-size: 1
+lore:
+  - "Unlocks a camp station for sharpening held weapons."

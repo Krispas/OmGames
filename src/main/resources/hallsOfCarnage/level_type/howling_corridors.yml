@@ -1,0 +1,40 @@
+id: howling_corridors
+name: "Howling Corridors"
+corridor-generation: normal
+materials:
+  floor: PACKED_MUD
+  ceiling: TUFF_BRICKS
+  corridor-floor: PACKED_MUD
+  corridor-ceiling: DEEPSLATE_BRICKS
+  light: SEA_LANTERN
+wall-palettes:
+  deepslate_bricks:
+    block: DEEPSLATE_BRICKS
+    special-blocks:
+      deepslate: 0.06
+      cracked:
+        block: CRACKED_DEEPSLATE_BRICKS
+        chance: 0.04
+  tuff:
+    block: TUFF_BRICKS
+    special-blocks:
+      tuff: 0.07
+pillar-palettes:
+  reinforced_deepslate:
+    block: REINFORCED_DEEPSLATE
+    special-chance: 0.0
+monsters:
+  common:
+    - zombie
+    - creeper
+    - creaking
+    - slime_medium
+  special:
+    - zombie_vanguard
+    - skeleton
+    - cave_spider
+vegetation:
+  chance: 0.04
+  types:
+    grass: 4
+    bush: 1

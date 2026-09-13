@@ -1,0 +1,6 @@
+id: pillager
+name: "Pillager"
+entity-type: PILLAGER
+health: 20
+equipment:
+  main-hand: CROSSBOW

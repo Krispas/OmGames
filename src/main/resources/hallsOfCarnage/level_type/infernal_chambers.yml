@@ -1,0 +1,50 @@
+id: infernal_chambers
+name: "Infernal Chambers"
+corridor-generation: large_corridors
+materials:
+  floor: CRACKED_POLISHED_BLACKSTONE_BRICKS
+  ceiling: POLISHED_BLACKSTONE_BRICKS
+  corridor-floor: BLACKSTONE
+  corridor-ceiling: POLISHED_BLACKSTONE_BRICKS
+  light: SHROOMLIGHT
+wall-palettes:
+  blackstone:
+    block: POLISHED_BLACKSTONE_BRICKS
+    special-blocks:
+      magma:
+        block: MAGMA_BLOCK
+        chance: 0.08
+      cracked:
+        block: CRACKED_POLISHED_BLACKSTONE_BRICKS
+        chance: 0.05
+  nether_bricks:
+    block: NETHER_BRICKS
+    special-blocks:
+      red:
+        block: RED_NETHER_BRICKS
+        chance: 0.08
+      cracked:
+        block: CRACKED_NETHER_BRICKS
+        chance: 0.04
+pillar-palettes:
+  basalt:
+    block: BASALT
+    special-blocks:
+      polished_basalt: 0.10
+      magma:
+        block: MAGMA_BLOCK
+        chance: 0.04
+monsters:
+  common:
+    - piglin
+    - blaze
+    - magma_cube
+    - hoglin_slow
+  special:
+    - piglin_brute
+    - wither_skeleton
+    - parched
+vegetation:
+  chance: 0.008
+  types:
+    deadbush: 1

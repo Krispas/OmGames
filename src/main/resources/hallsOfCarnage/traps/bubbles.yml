@@ -1,0 +1,12 @@
+id: bubbles
+kind: bubbles
+weight: 8
+level-types:
+  - sewer
+block-material: MAGMA_BLOCK
+model-material: MAGMA_BLOCK
+model-scale: 1.0
+damage: 4
+radius: 0.9
+interval-ticks: 20
+active-ticks: 20

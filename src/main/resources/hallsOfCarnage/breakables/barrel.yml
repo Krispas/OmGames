@@ -1,0 +1,11 @@
+id: barrel
+rarity: common
+break-message: "You broke open a dusty barrel."
+hitbox-height: 1.0
+particle-material: BARREL
+scrap-drops:
+  - redstone_scrap
+  - diamond_scrap
+parts:
+  - material: BARREL
+    offset: [0, 0, 0]

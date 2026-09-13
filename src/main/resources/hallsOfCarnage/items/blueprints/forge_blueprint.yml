@@ -1,0 +1,8 @@
+id: forge_blueprint
+name: "Blueprint: Forge"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Unlocks a camp forge for repairing worn gear."

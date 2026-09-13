@@ -1,0 +1,17 @@
+id: warding_totem
+name: "Warding Totem"
+category: utility
+rarity: rare
+material: TOTEM_OF_UNDYING
+max-stack-size: 1
+lore:
+  - "Grants nearby players Resistance II for 10 seconds."
+stats:
+  durability: 5
+  cooldown-seconds: 120
+  duration-seconds: 20
+  radius: 8
+  ward-strength: 2
+recipe:
+  redstone_scrap: 9
+  wood_scrap: 2

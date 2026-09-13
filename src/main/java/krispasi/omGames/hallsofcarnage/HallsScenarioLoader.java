@@ -1,6 +1,7 @@
 package krispasi.omGames.hallsofcarnage;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -52,6 +53,18 @@ public final class HallsScenarioLoader {
         int maxPlayers = players == null ? 6 : clamp(players.getInt("max", 6), minPlayers, 6);
         Map<String, List<String>> allowedItems = loadStringListMap(config.getConfigurationSection("allowed-items"));
         Map<String, List<String>> blueprintPools = loadStringListMap(config.getConfigurationSection("blueprint-pools"));
+        Map<String, Map<String, List<String>>> levelTypeBlueprintPools =
+                loadNestedStringListMap(config.getConfigurationSection("blueprint-pools"));
+        Map<String, Map<Integer, List<String>>> craftingStations = loadCraftingStations(config.getConfigurationSection("crafting-stations"));
+        Map<String, HallsResearchNode> researchNodes = loadResearchNodes(config.getConfigurationSection("research.nodes"));
+        if (researchNodes.isEmpty() && config.getConfigurationSection("research.nodes") == null) {
+            researchNodes = loadBundledResearchNodes(plugin, file);
+            if (!researchNodes.isEmpty()) {
+                plugin.getLogger().info("Using bundled Halls research defaults for scenario " + id
+                        + " because " + file.getName() + " has no research.nodes section.");
+            }
+        }
+        HallsScenario.CampSettings camp = loadCampSettings(config.getConfigurationSection("camp"));
         List<HallsScenario.FloorDefinition> floors = loadFloors(config);
         int floorCount = floors.stream().mapToInt(HallsScenario.FloorDefinition::lastFloor).max().orElse(0);
         if (id.isBlank() || name == null || name.isBlank()) {
@@ -59,7 +72,77 @@ public final class HallsScenarioLoader {
             return null;
         }
         return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers,
-                floorCount, allowedItems, blueprintPools, List.copyOf(floors), debugLines(file, config, floors));
+                floorCount, camp, allowedItems, blueprintPools, levelTypeBlueprintPools,
+                craftingStations, researchNodes, List.copyOf(floors), debugLines(file, config, floors, researchNodes.size()));
+    }
+
+    private static Map<String, HallsResearchNode> loadResearchNodes(ConfigurationSection section) {
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, HallsResearchNode> nodes = new LinkedHashMap<>();
+        for (String key : section.getKeys(false)) {
+            ConfigurationSection nodeSection = section.getConfigurationSection(key);
+            if (nodeSection == null) {
+                continue;
+            }
+            String id = normalizeId(nodeSection.getString("id", key));
+            if (id.isBlank()) {
+                continue;
+            }
+            org.bukkit.Material icon = org.bukkit.Material.BOOK;
+            String configuredIcon = nodeSection.getString("icon", "");
+            if (configuredIcon != null && !configuredIcon.isBlank()) {
+                try {
+                    icon = org.bukkit.Material.valueOf(configuredIcon.trim().toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            nodes.put(id, new HallsResearchNode(
+                    id,
+                    nodeSection.getString("name", id.replace('_', ' ')),
+                    icon,
+                    Math.max(0, nodeSection.getInt("cost", 1)),
+                    nodeSection.getStringList("prerequisites"),
+                    nodeSection.getStringList("unlocks")
+            ));
+        }
+        return Map.copyOf(nodes);
+    }
+
+    private static Map<String, HallsResearchNode> loadBundledResearchNodes(JavaPlugin plugin, File file) {
+        String resourcePath = "hallsOfCarnage/scenarios/" + file.getName();
+        try (InputStream input = plugin.getResource(resourcePath)) {
+            if (input == null) {
+                return Map.of();
+            }
+            YamlConfiguration bundled = YamlConfiguration.loadConfiguration(
+                    new java.io.InputStreamReader(input, java.nio.charset.StandardCharsets.UTF_8));
+            return loadResearchNodes(bundled.getConfigurationSection("research.nodes"));
+        } catch (java.io.IOException ex) {
+            plugin.getLogger().warning("Could not read bundled Halls research defaults from "
+                    + resourcePath + ": " + ex.getMessage());
+            return Map.of();
+        }
+    }
+
+    private static HallsScenario.CampSettings loadCampSettings(ConfigurationSection section) {
+        HallsScenario.CampSettings defaults = HallsScenario.CampSettings.defaults();
+        if (section == null) {
+            return defaults;
+        }
+        List<Integer> keyCosts = new ArrayList<>();
+        for (Object value : section.getList("key-costs", List.of())) {
+            int cost = positiveInt(value, 0);
+            if (cost > 0) {
+                keyCosts.add(cost);
+            }
+        }
+        return new HallsScenario.CampSettings(
+                section.getString("layout", defaults.layout()),
+                section.getInt("team-lives", defaults.teamLives()),
+                keyCosts.isEmpty() ? defaults.keyCosts() : List.copyOf(keyCosts)
+        );
     }
 
     private static Map<String, List<String>> loadStringListMap(ConfigurationSection section) {
@@ -68,12 +151,64 @@ public final class HallsScenarioLoader {
         }
         Map<String, List<String>> values = new LinkedHashMap<>();
         for (String key : section.getKeys(false)) {
-            values.put(normalizeId(key), section.getStringList(key).stream()
+            List<String> entries = section.getStringList(key).stream()
                     .map(HallsScenarioLoader::normalizeId)
                     .filter(value -> !value.isBlank())
-                    .toList());
+                    .toList();
+            if (!entries.isEmpty()) {
+                values.put(normalizeId(key), entries);
+            }
         }
         return Map.copyOf(values);
+    }
+
+    private static Map<String, Map<String, List<String>>> loadNestedStringListMap(ConfigurationSection section) {
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, Map<String, List<String>>> values = new LinkedHashMap<>();
+        for (String key : section.getKeys(false)) {
+            ConfigurationSection nested = section.getConfigurationSection(key);
+            if (nested == null) {
+                continue;
+            }
+            Map<String, List<String>> pools = loadStringListMap(nested);
+            if (!pools.isEmpty()) {
+                values.put(normalizeId(key), pools);
+            }
+        }
+        return Map.copyOf(values);
+    }
+
+    private static Map<String, Map<Integer, List<String>>> loadCraftingStations(ConfigurationSection section) {
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, Map<Integer, List<String>>> stations = new LinkedHashMap<>();
+        for (String stationKey : section.getKeys(false)) {
+            ConfigurationSection stationSection = section.getConfigurationSection(stationKey);
+            if (stationSection == null) {
+                continue;
+            }
+            Map<Integer, List<String>> levels = new LinkedHashMap<>();
+            for (String levelKey : stationSection.getKeys(false)) {
+                int level = parseCraftingLevel(levelKey);
+                if (level < 1 || level > 3) {
+                    continue;
+                }
+                List<String> recipes = stationSection.getStringList(levelKey).stream()
+                        .map(HallsScenarioLoader::normalizeId)
+                        .filter(value -> !value.isBlank())
+                        .toList();
+                if (!recipes.isEmpty()) {
+                    levels.put(level, recipes);
+                }
+            }
+            if (!levels.isEmpty()) {
+                stations.put(normalizeId(stationKey), Map.copyOf(levels));
+            }
+        }
+        return Map.copyOf(stations);
     }
 
     private static List<HallsScenario.FloorDefinition> loadFloors(YamlConfiguration config) {
@@ -99,7 +234,10 @@ public final class HallsScenarioLoader {
                     positiveInt(map.get("traps"), 5),
                     trapRange.min(),
                     trapRange.max(),
-                    positiveInt(map.get("holes"), 1)
+                    positiveInt(map.get("holes"), 1),
+                    positiveInt(map.get("sculk-patches"), 2),
+                    positiveInt(map.get("coin-quota"), 0),
+                    stringValue(map.get("layout"), "")
             ));
         }
         floors.sort(Comparator.comparingInt(HallsScenario.FloorDefinition::firstFloor));
@@ -108,9 +246,11 @@ public final class HallsScenarioLoader {
 
     private static List<String> debugLines(File file,
                                            YamlConfiguration config,
-                                           List<HallsScenario.FloorDefinition> floors) {
+                                           List<HallsScenario.FloorDefinition> floors,
+                                           int researchNodeCount) {
         List<String> lines = new ArrayList<>();
         lines.add("source-file: " + file.getName());
+        lines.add("research-nodes: " + Math.max(0, researchNodeCount));
         lines.add("parsed-floor-definitions:");
         if (floors.isEmpty()) {
             lines.add("  <none>");
@@ -125,7 +265,10 @@ public final class HallsScenarioLoader {
                         + " breakables=" + floor.breakables()
                         + " trapped-rooms=" + floor.trappedRooms()
                         + " traps-per-room=" + floor.minTrapsPerRoom() + "-" + floor.maxTrapsPerRoom()
-                        + " holes=" + floor.holes());
+                        + " holes=" + floor.holes()
+                        + " sculk-patches=" + floor.sculkPatches()
+                        + " coin-quota=" + floor.coinQuota()
+                        + " layout=" + floor.layout());
             }
         }
         lines.add("loaded-yaml:");
@@ -202,6 +345,15 @@ public final class HallsScenarioLoader {
             return "";
         }
         return value.trim().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+    }
+
+    private static int parseCraftingLevel(String key) {
+        String normalized = normalizeId(key).replace("level_", "");
+        try {
+            return Integer.parseInt(normalized);
+        } catch (NumberFormatException ex) {
+            return -1;
+        }
     }
 
     private static int clamp(int value, int min, int max) {

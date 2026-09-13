@@ -1,0 +1,5 @@
+id: drowned
+name: "Drowned"
+entity-type: DROWNED
+health: 20
+movement-speed-multiplier: 0.95

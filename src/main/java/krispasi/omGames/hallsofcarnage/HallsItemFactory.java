@@ -8,10 +8,17 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.components.UseCooldownComponent;
 import org.bukkit.inventory.meta.components.EquippableComponent;
+import org.bukkit.inventory.meta.components.FoodComponent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -49,6 +56,12 @@ final class HallsItemFactory {
                 }
             }
             applyArmorModel(meta, type);
+            applyArmorStats(plugin, meta, type);
+            applyCombatStats(plugin, meta, type);
+            applySpecialItemMetadata(meta, type);
+            applyDurability(meta, type);
+            applyUseCooldown(plugin, meta, type);
+            applyFoodComponent(meta, type);
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING, type.id());
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_category"), PersistentDataType.STRING, type.category());
             meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_item_rarity"), PersistentDataType.STRING, type.rarity());
@@ -62,6 +75,93 @@ final class HallsItemFactory {
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    private static void applyDurability(ItemMeta meta, HallsItemType type) {
+        Double durability = type.stats().get("durability");
+        if (durability != null && durability > 0.0 && meta instanceof Damageable damageable) {
+            damageable.setMaxDamage(Math.max(1, durability.intValue()));
+        }
+    }
+
+    private static void applyFoodComponent(ItemMeta meta, HallsItemType type) {
+        if (!type.category().equals("food")) {
+            return;
+        }
+        FoodComponent food = meta.getFood();
+        food.setNutrition(0);
+        food.setSaturation(0.0f);
+        food.setCanAlwaysEat(true);
+        meta.setFood(food);
+    }
+
+    private static void applyUseCooldown(JavaPlugin plugin, ItemMeta meta, HallsItemType type) {
+        Double cooldownSeconds = type.stats().get("cooldown_seconds");
+        if (cooldownSeconds == null || cooldownSeconds <= 0.0) {
+            return;
+        }
+        UseCooldownComponent cooldown = meta.getUseCooldown();
+        cooldown.setCooldownSeconds(cooldownSeconds.floatValue());
+        cooldown.setCooldownGroup(new NamespacedKey(plugin, "hoc_" + type.id()));
+        meta.setUseCooldown(cooldown);
+    }
+
+    private static void applyCombatStats(JavaPlugin plugin, ItemMeta meta, HallsItemType type) {
+        Double meleeDamage = type.stats().get("melee_damage");
+        if (meleeDamage != null) {
+            meta.addAttributeModifier(Attribute.ATTACK_DAMAGE, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_melee_damage_" + type.id()),
+                    meleeDamage - 1.0,
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    EquipmentSlotGroup.HAND
+            ));
+        }
+        Double attackSpeed = type.stats().get("attack_speed");
+        if (attackSpeed != null) {
+            meta.addAttributeModifier(Attribute.ATTACK_SPEED, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_attack_speed_" + type.id()),
+                    attackSpeed - 4.0,
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    EquipmentSlotGroup.HAND
+            ));
+        }
+    }
+
+    private static void applyArmorStats(JavaPlugin plugin, ItemMeta meta, HallsItemType type) {
+        if (!type.category().equals("armor")) {
+            return;
+        }
+        EquipmentSlot slot = armorSlot(type.material());
+        EquipmentSlotGroup group = armorSlotGroup(slot);
+        if (group == null) {
+            return;
+        }
+        Double armor = type.stats().get("armor");
+        if (armor != null) {
+            meta.addAttributeModifier(Attribute.ARMOR, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_armor_" + type.id()),
+                    armor,
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    group
+            ));
+        }
+        Double toughness = type.stats().get("armor_toughness");
+        if (toughness != null) {
+            meta.addAttributeModifier(Attribute.ARMOR_TOUGHNESS, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_armor_toughness_" + type.id()),
+                    toughness,
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    group
+            ));
+        }
+    }
+
+    private static void applySpecialItemMetadata(ItemMeta meta, HallsItemType type) {
+        if (!type.id().equals("frost_lance")) {
+            return;
+        }
+        meta.addEnchant(Enchantment.LOYALTY, 3, true);
+        meta.setEnchantmentGlintOverride(false);
     }
 
     private static void applyArmorModel(ItemMeta meta, HallsItemType type) {
@@ -100,9 +200,25 @@ final class HallsItemFactory {
         return null;
     }
 
+    private static EquipmentSlotGroup armorSlotGroup(EquipmentSlot slot) {
+        if (slot == null) {
+            return null;
+        }
+        return switch (slot) {
+            case HEAD -> EquipmentSlotGroup.HEAD;
+            case CHEST -> EquipmentSlotGroup.CHEST;
+            case LEGS -> EquipmentSlotGroup.LEGS;
+            case FEET -> EquipmentSlotGroup.FEET;
+            default -> null;
+        };
+    }
+
     private static NamedTextColor itemColor(HallsItemType type) {
         if (type.category().equals("blueprint")) {
             return type.rarity().equals("rare") ? NamedTextColor.LIGHT_PURPLE : NamedTextColor.AQUA;
+        }
+        if (type.category().equals("food")) {
+            return type.rarity().equals("rare") ? NamedTextColor.YELLOW : NamedTextColor.GREEN;
         }
         return type.rarity().equals("rare") ? NamedTextColor.GOLD : NamedTextColor.WHITE;
     }

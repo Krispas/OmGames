@@ -1,0 +1,5 @@
+id: zombie
+name: "Zombie"
+entity-type: ZOMBIE
+health: 20
+baby: false

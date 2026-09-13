@@ -1,0 +1,10 @@
+id: stale_bread
+name: "Stale Bread"
+category: food
+rarity: normal
+material: BREAD
+max-stack-size: 1
+lore:
+  - "Hard, sweet, and still technically edible."
+stats:
+  heal: 3

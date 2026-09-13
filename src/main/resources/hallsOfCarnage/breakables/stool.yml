@@ -1,0 +1,13 @@
+id: stool
+rarity: common
+break-message: "You cracked apart a small stool."
+hitbox-height: 0.8
+particle-material: SPRUCE_FENCE
+scrap-drops:
+  - wood_scrap
+  - iron_scrap
+parts:
+  - material: SPRUCE_FENCE
+    offset: [0, -0.4, 0]
+  - material: SPRUCE_PRESSURE_PLATE
+    offset: [0, 0.6, 0]

@@ -1,0 +1,20 @@
+id: camp_station
+name: "Camp Station"
+size: station
+blueprint: ""
+implemented: true
+levels:
+  1:
+    parts:
+      - material: SMITHING_TABLE
+        offset: [0, 0, 0]
+        scale: [1.4, 0.9, 1.4]
+      - material: CAULDRON
+        offset: [-1.3, 0, 0]
+        scale: [1.0, 1.0, 1.0]
+      - material: ANVIL
+        offset: [1.3, 0.1, 0]
+        scale: [0.85, 0.85, 0.85]
+      - material: BARREL
+        offset: [0, 0, -1.3]
+        scale: [0.9, 0.9, 0.9]

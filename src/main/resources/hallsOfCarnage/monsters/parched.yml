@@ -1,0 +1,6 @@
+id: parched
+name: "Parched"
+entity-type: PARCHED
+health: 6
+equipment:
+  main-hand: BOW

@@ -1,0 +1,15 @@
+id: radiator
+rarity: common
+break-message: "You tore scrap from a dead radiator."
+hitbox-height: 1.0
+particle-material: IRON_BARS
+scrap-drops:
+  - iron_scrap
+  - redstone_scrap
+parts:
+  - material: IRON_BARS
+    offset: [0, 0, 0]
+  - material: SMOOTH_QUARTZ_SLAB
+    offset: [0, 0.0, 0]
+  - material: SMOOTH_QUARTZ_SLAB
+    offset: [0, 1.0, 0]
