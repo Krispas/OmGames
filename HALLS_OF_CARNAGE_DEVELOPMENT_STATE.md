@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-13
+Last updated: 2026-09-14
 
 ## Implemented
 
@@ -167,11 +167,10 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: scenarios that predate `research.nodes` now load bundled research defaults at runtime when their data-folder scenario file has no research section, without rewriting server files. This prevents old Untold Depths configs from treating Camp Station recipes as fully legacy-unlocked and restores the research tree in the Camp Station menu. The research menu also shows an explicit "No Research Loaded" diagnostic instead of opening blank if a scenario truly has no research nodes.
 - Next reviewer slice applied: Camp Station category crafting views now hide recipes whose research node has not been unlocked yet, instead of showing them with a red research-required lore line. Empty researched categories show a clear placeholder directing players back to research.
 - Next reviewer slice applied: `/hoc give research_points [amount]` now adds test research points to the caller's active Halls session and saves the updated session state. Accepted aliases are `research_point`, `research`, and `rp`; tab completion lists `research_points`.
+- Next reviewer slice applied: the elevator now spawns an invisible ArmorStand waypoint transmitter at the elevator spawn and raises participants' waypoint receive range so the elevator appears on the vanilla locator bar without changing the existing Compass modifier item/trail behavior. Generated start, exploration, and camp floors now place one 2x2x2 magenta research crate when a valid reserved-free footprint exists. Right-clicking the crate picks it up as BlockDisplay cargo above the player's head, blocks attacks/interactions/inventory opening/drop actions while carried, applies Slowness plus Resistance II unless a stronger Resistance is active, lets the carrier sneak to place it back down, and lets the carrier right-click the elevator hopper to deposit it for +1 team research point with an immediate save.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Make it so elevator has a marker on the locator bar. You could do this by having an entity with certain attributes if I am correct, but find out yourself using docs.
-- Make it so each floor generates a research crate. It is a 2x2x2 magenta concrete. It can be picked up by player, but not into inventory, instead the player will hold it above the head. While holding it, player cannot use right or left click actions or open the inventory. Player can press shift to let go of it. If player brings it to the elevator and right clicks hopper, it will get deposited and team will receive 1 bonus research point. While carrying, player has slowness and resistance II (if nothing else is providing better resistance)
 - Give utilities durability
 - Give vagabonds club 4 wood recipe and add it as a default item to one of the root nodes
 - Add poking stick into the untold depths scenerio and put it into research

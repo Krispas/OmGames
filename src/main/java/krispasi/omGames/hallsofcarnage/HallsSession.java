@@ -35,6 +35,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.LivingEntity;
@@ -75,6 +76,8 @@ public final class HallsSession {
     private static final String HEALTH_TOTEM_MODIFIER_PREFIX = "hoc_health_totem_";
     private static final String SPEED_TOTEM_MODIFIER_PREFIX = "hoc_speed_totem_";
     private static final long SCULK_MAUL_SPLASH_COOLDOWN_MILLIS = 350L;
+    private static final String RESEARCH_CRATE_TAG = "omgames_hoc_research_crate";
+    private static final String ELEVATOR_WAYPOINT_TAG = "omgames_hoc_elevator_waypoint";
 
     private final JavaPlugin plugin;
     private final int id;
@@ -103,6 +106,7 @@ public final class HallsSession {
     private final Map<String, Long> utilityCooldowns = new HashMap<>();
     private final Map<String, Long> sculkMaulSplashCooldowns = new HashMap<>();
     private final Set<UUID> sculkMaulSplashing = new HashSet<>();
+    private final Map<UUID, CarriedResearchCrate> carriedResearchCrates = new HashMap<>();
     private final Map<Integer, List<HallsCampRuntime.PlotState>> savedCampStates = new HashMap<>();
     private final Map<Integer, Set<Integer>> savedCampUnlockedDoors = new HashMap<>();
     private final Map<Integer, HallsFloorModifiers> scannedFloorModifiers = new HashMap<>();
@@ -118,6 +122,7 @@ public final class HallsSession {
     private boolean firstGhostCoinCacheDropped;
     private BukkitTask hudTask;
     private BukkitTask physicsDropTask;
+    private BukkitTask researchCrateTask;
     private BukkitTask floorBuildTask;
     private BukkitTask gameOverTask;
     private long startedAtMillis;
@@ -147,6 +152,8 @@ public final class HallsSession {
     private long floorStartedAtMillis;
     private HallsFloorModifiers activeFloorModifiers = HallsFloorModifiers.none();
     private int compassTrailCountdown;
+    private ResearchCrate researchCrate;
+    private UUID elevatorWaypointId;
 
     public HallsSession(JavaPlugin plugin,
                         int id,
@@ -329,7 +336,14 @@ public final class HallsSession {
     public boolean isSessionEntity(Entity entity) {
         return entity != null && (breakableProps.containsKey(entity.getUniqueId())
                 || physicsDrops.containsKey(entity.getUniqueId())
-                || campRuntime.isCampEntity(entity));
+                || campRuntime.isCampEntity(entity)
+                || (researchCrate != null && researchCrate.entityIds().contains(entity.getUniqueId()))
+                || carriedResearchCrates.values().stream().anyMatch(crate -> crate.displayIds().contains(entity.getUniqueId()))
+                || entity.getUniqueId().equals(elevatorWaypointId));
+    }
+
+    public boolean isResearchCrateCarrier(Player player) {
+        return player != null && carriedResearchCrates.containsKey(player.getUniqueId());
     }
 
     public boolean handleCampInteract(Player player, Entity entity) {
@@ -398,6 +412,64 @@ public final class HallsSession {
         player.getInventory().setItem(slot, drop.stack().clone());
         removePhysicsDrop(drop);
         world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.4f);
+        return true;
+    }
+
+    public boolean handleResearchCrateInteract(Player player, Entity entity) {
+        if (player == null || entity == null || !running || !player.getWorld().equals(world)) {
+            return false;
+        }
+        if (researchCrate == null || !researchCrate.entityIds().contains(entity.getUniqueId())) {
+            return false;
+        }
+        pickupResearchCrate(player);
+        return true;
+    }
+
+    public boolean handleResearchCrateBlockInteract(Player player, Block block) {
+        if (player == null || block == null || !running || !player.getWorld().equals(world)) {
+            return false;
+        }
+        if (researchCrate == null || !researchCrate.contains(block.getX(), block.getY(), block.getZ())) {
+            return false;
+        }
+        pickupResearchCrate(player);
+        return true;
+    }
+
+    public boolean handleResearchCrateDeposit(Player player, Block block) {
+        if (player == null || block == null || !running || !player.getWorld().equals(world)) {
+            return false;
+        }
+        if (!carriedResearchCrates.containsKey(player.getUniqueId())) {
+            return false;
+        }
+        if (block.getX() != elevatorMachineInnerX()
+                || block.getY() != origin.y() + 2
+                || block.getZ() != origin.z()) {
+            player.sendActionBar(Component.text("Carry the research crate to the elevator chute.", NamedTextColor.LIGHT_PURPLE));
+            return true;
+        }
+        removeCarriedResearchCrate(player.getUniqueId());
+        researchPoints++;
+        save("research-crate");
+        world.playSound(block.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.9f, 1.35f);
+        world.spawnParticle(Particle.ENCHANT, block.getLocation().add(0.5, 0.7, 0.5), 40, 0.35, 0.35, 0.35, 0.06);
+        for (UUID playerId : participants) {
+            Player participant = Bukkit.getPlayer(playerId);
+            if (participant != null && participant.getWorld().equals(world)) {
+                participant.sendMessage(Component.text(player.getName() + " deposited a research crate. Research +1.",
+                        NamedTextColor.LIGHT_PURPLE));
+            }
+        }
+        return true;
+    }
+
+    public boolean handleResearchCrateSneak(Player player) {
+        if (!isResearchCrateCarrier(player)) {
+            return false;
+        }
+        dropCarriedResearchCrate(player);
         return true;
     }
 
@@ -567,6 +639,7 @@ public final class HallsSession {
         if (player == null || !participants.contains(player.getUniqueId())) {
             return;
         }
+        removeCarriedResearchCrate(player.getUniqueId());
         clearTotemAttributeModifiers(player);
     }
 
@@ -980,6 +1053,7 @@ public final class HallsSession {
         }
         restoreBlocks();
         removeSessionEntities();
+        removeElevatorWaypoint();
         stopHudTask();
         cancelGameOverTask();
         running = false;
@@ -998,6 +1072,7 @@ public final class HallsSession {
         activeClearRadius = CLEAR_RADIUS;
         clearBuildVolume();
         buildElevator();
+        ensureElevatorWaypoint();
         HallsLayout layout = HallsLayoutLoader.load(new File(dataFolder, "level/special/start_floor.txt"));
         int roomStartX = origin.x() - layout.width() / 2;
         int roomStartZ = origin.z() - ELEVATOR_OUTER_RADIUS - 6 - layout.depth();
@@ -1013,6 +1088,9 @@ public final class HallsSession {
                 origin.y() + 1.0, roomStartZ + layout.depth() / 2.0 + 0.5, 0.0f, 0.0f);
         spawnBreakableProp(roomStartX + blueprintCell.x(), origin.y(), roomStartZ + blueprintCell.z(),
                 breakableType("barrel"), 3, List.of(new HallsBreakableType.LootEntry("rare_blueprint", 1, 1, 1)), 1);
+        placeResearchCrate(layout, roomStartX, roomStartZ, Set.of(
+                new HallsExplorationGenerator.Cell(roomStartX + blueprintCell.x(), roomStartZ + blueprintCell.z())
+        ));
         closeElevatorDoors();
     }
 
@@ -1078,7 +1156,9 @@ public final class HallsSession {
         Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
         Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
         renderExplorationSculk(build, liquidReservedCells);
-        renderExplorationContents(build, withReserved(reservedCells, vegetationCells));
+        Set<HallsExplorationGenerator.Cell> contentReservedCells = withReserved(reservedCells, vegetationCells);
+        Set<HallsExplorationGenerator.Cell> researchCrateCells = placeResearchCrate(build, contentReservedCells);
+        renderExplorationContents(build, withReserved(contentReservedCells, researchCrateCells));
         startExplorationMonsters(build);
         restoreElevatorChestContents();
         closeElevatorDoors();
@@ -1113,6 +1193,7 @@ public final class HallsSession {
         activeClearRadius = Math.max(CLEAR_RADIUS, 16 + Math.max(layout.width(), layout.depth()));
         clearBuildVolume();
         buildElevator();
+        ensureElevatorWaypoint();
         currentFloor = floor;
         lastCampFloor = Math.max(lastCampFloor, floor);
         floorStartedAtMillis = System.currentTimeMillis();
@@ -1144,6 +1225,7 @@ public final class HallsSession {
                 levelType, entranceX, southDock ? BlockFace.SOUTH : BlockFace.NORTH);
         renderLayoutVegetation(layout, roomStartX, origin.y(), roomStartZ, levelType,
                 new Random((((long) id) << 32) ^ (((long) floor) << 16) ^ 0xCA4F), campVegetationReservedCells(layout, roomStartX, roomStartZ), 0.75);
+        placeResearchCrate(layout, roomStartX, roomStartZ, campVegetationReservedCells(layout, roomStartX, roomStartZ));
         campRuntime.restore(savedCampStates.getOrDefault(sharedCampStateKey(), savedCampStates.get(floor)));
         if (refreshRunUses) {
             refreshCurrentCampRunUses();
@@ -1466,6 +1548,144 @@ public final class HallsSession {
                     build.floorDefinition(), build.levelType(), reservedCells, i == rareRoomIndex);
         }
         debugGeneration("contents", started, "breakables " + (new HashSet<>(breakableProps.values()).size() - before));
+    }
+
+    private Set<HallsExplorationGenerator.Cell> placeResearchCrate(ExplorationBuild build,
+                                                                   Set<HallsExplorationGenerator.Cell> reservedCells) {
+        if (build == null || build.plan().rooms().isEmpty() || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())) {
+            return Set.of();
+        }
+        List<HallsExplorationGenerator.Room> rooms = new ArrayList<>(build.plan().rooms());
+        java.util.Collections.shuffle(rooms, build.random());
+        for (HallsExplorationGenerator.Room room : rooms) {
+            List<Cell> cells = openInteriorCells(room);
+            java.util.Collections.shuffle(cells, build.random());
+            for (Cell cell : cells) {
+                int x = room.startX() + cell.x();
+                int z = room.startZ() + cell.z();
+                Set<HallsExplorationGenerator.Cell> footprint = researchCrateFootprint(x, z);
+                if (canPlaceResearchCrate(footprint, reservedCells, room)) {
+                    spawnResearchCrate(x, origin.y(), z, footprint);
+                    return footprint;
+                }
+            }
+        }
+        debug("No valid research crate position found on floor " + build.floor() + ".");
+        return Set.of();
+    }
+
+    private Set<HallsExplorationGenerator.Cell> placeResearchCrate(HallsLayout layout,
+                                                                   int startX,
+                                                                   int startZ,
+                                                                   Set<HallsExplorationGenerator.Cell> reservedCells) {
+        if (layout == null) {
+            return Set.of();
+        }
+        List<Cell> cells = openInteriorCells(layout);
+        java.util.Collections.shuffle(cells, floorRandom());
+        for (Cell cell : cells) {
+            int x = startX + cell.x();
+            int z = startZ + cell.z();
+            Set<HallsExplorationGenerator.Cell> footprint = researchCrateFootprint(x, z);
+            if (canPlaceLayoutResearchCrate(footprint, reservedCells, localCell -> layout.at(localCell.x(), localCell.z()) == 'O',
+                    startX, startZ, layout.width(), layout.depth())) {
+                spawnResearchCrate(x, origin.y(), z, footprint);
+                return footprint;
+            }
+        }
+        return Set.of();
+    }
+
+    private Set<HallsExplorationGenerator.Cell> placeResearchCrate(HallsCampLayout layout,
+                                                                   int startX,
+                                                                   int startZ,
+                                                                   Set<HallsExplorationGenerator.Cell> reservedCells) {
+        if (layout == null) {
+            return Set.of();
+        }
+        List<HallsExplorationGenerator.Cell> cells = campLayoutVegetationCells(layout, startX, startZ);
+        java.util.Collections.shuffle(cells, floorRandom());
+        for (HallsExplorationGenerator.Cell cell : cells) {
+            Set<HallsExplorationGenerator.Cell> footprint = researchCrateFootprint(cell.x(), cell.z());
+            if (canPlaceLayoutResearchCrate(footprint, reservedCells, localCell -> layout.openAt(localCell.x(), localCell.z()),
+                    startX, startZ, layout.width(), layout.depth())) {
+                spawnResearchCrate(cell.x(), origin.y(), cell.z(), footprint);
+                return footprint;
+            }
+        }
+        return Set.of();
+    }
+
+    private boolean canPlaceLayoutResearchCrate(Set<HallsExplorationGenerator.Cell> footprint,
+                                                Set<HallsExplorationGenerator.Cell> reservedCells,
+                                                java.util.function.Predicate<Cell> openPredicate,
+                                                int startX,
+                                                int startZ,
+                                                int width,
+                                                int depth) {
+        for (HallsExplorationGenerator.Cell cell : footprint) {
+            if ((reservedCells != null && reservedCells.contains(cell)) || activeLiquidCells.contains(cell)) {
+                return false;
+            }
+            int localX = cell.x() - startX;
+            int localZ = cell.z() - startZ;
+            if (localX < 1 || localZ < 1 || localX >= width - 1 || localZ >= depth - 1
+                    || !openPredicate.test(new Cell(localX, localZ))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private Set<HallsExplorationGenerator.Cell> researchCrateFootprint(int x, int z) {
+        Set<HallsExplorationGenerator.Cell> cells = new HashSet<>();
+        for (int dx = 0; dx <= 1; dx++) {
+            for (int dz = 0; dz <= 1; dz++) {
+                cells.add(new HallsExplorationGenerator.Cell(x + dx, z + dz));
+            }
+        }
+        return Set.copyOf(cells);
+    }
+
+    private boolean canPlaceResearchCrate(Set<HallsExplorationGenerator.Cell> footprint,
+                                          Set<HallsExplorationGenerator.Cell> reservedCells,
+                                          HallsExplorationGenerator.Room room) {
+        for (HallsExplorationGenerator.Cell cell : footprint) {
+            if ((reservedCells != null && reservedCells.contains(cell)) || activeLiquidCells.contains(cell)) {
+                return false;
+            }
+            int localX = cell.x() - room.startX();
+            int localZ = cell.z() - room.startZ();
+            if (localX < 1 || localZ < 1 || localX >= room.layout().width() - 1 || localZ >= room.layout().depth() - 1
+                    || room.layout().at(localX, localZ) != 'O'
+                    || isNearRoomExit(room, localX, localZ)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void spawnResearchCrate(int x, int y, int z, Set<HallsExplorationGenerator.Cell> footprint) {
+        removeResearchCrate();
+        Set<CrateBlock> blocks = new HashSet<>();
+        for (int dx = 0; dx <= 1; dx++) {
+            for (int dz = 0; dz <= 1; dz++) {
+                for (int dy = 0; dy <= 1; dy++) {
+                    setBlock(x + dx, y + dy, z + dz, Material.MAGENTA_CONCRETE);
+                    blocks.add(new CrateBlock(x + dx, y + dy, z + dz));
+                }
+            }
+        }
+        Location hitboxLocation = new Location(world, x + 1.0, y, z + 1.0);
+        Interaction interaction = world.spawn(hitboxLocation, Interaction.class, entity -> {
+            entity.setInteractionWidth(2.0f);
+            entity.setInteractionHeight(2.0f);
+            entity.setResponsive(true);
+            entity.setPersistent(false);
+            entity.addScoreboardTag(RESEARCH_CRATE_TAG);
+        });
+        researchCrate = new ResearchCrate(blocks, footprint, Set.of(interaction.getUniqueId()));
+        debug("Placed research crate at " + x + "," + y + "," + z + ".");
     }
 
     private Set<HallsExplorationGenerator.Cell> renderExplorationVegetation(ExplorationBuild build,
@@ -2098,6 +2318,42 @@ public final class HallsSession {
         setBlock(elevatorMachineOuterX(), origin.y() + 1, origin.z(), machine);
         setBlock(elevatorMachineOuterX(), origin.y() + 2, origin.z(), machine);
         buildElevatorVestibule(true);
+        ensureElevatorWaypoint();
+    }
+
+    private void ensureElevatorWaypoint() {
+        Entity existing = elevatorWaypointId == null ? null : Bukkit.getEntity(elevatorWaypointId);
+        if (existing != null && existing.getWorld().equals(world)) {
+            existing.teleport(elevatorSpawnLocation());
+            return;
+        }
+        ArmorStand marker = world.spawn(elevatorSpawnLocation(), ArmorStand.class, entity -> {
+            entity.setVisible(false);
+            entity.setMarker(true);
+            entity.setSmall(true);
+            entity.setGravity(false);
+            entity.setInvulnerable(true);
+            entity.setPersistent(false);
+            entity.setSilent(true);
+            entity.customName(Component.text("Elevator", NamedTextColor.LIGHT_PURPLE));
+            entity.setCustomNameVisible(false);
+            entity.addScoreboardTag(ELEVATOR_WAYPOINT_TAG);
+            AttributeInstance transmit = entity.getAttribute(Attribute.WAYPOINT_TRANSMIT_RANGE);
+            if (transmit != null) {
+                transmit.setBaseValue(512.0);
+            }
+        });
+        elevatorWaypointId = marker.getUniqueId();
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null) {
+                continue;
+            }
+            AttributeInstance receive = player.getAttribute(Attribute.WAYPOINT_RECEIVE_RANGE);
+            if (receive != null) {
+                receive.setBaseValue(Math.max(receive.getBaseValue(), 512.0));
+            }
+        }
     }
 
     private void buildLayoutRoom(HallsLayout layout,
@@ -3025,6 +3281,207 @@ public final class HallsSession {
         vegetationDisplays.add(display.getUniqueId());
     }
 
+    private void pickupResearchCrate(Player player) {
+        if (ghostPlayers.contains(player.getUniqueId())) {
+            player.sendActionBar(Component.text("Ghosts cannot carry research crates.", NamedTextColor.GRAY));
+            return;
+        }
+        if (carriedResearchCrates.containsKey(player.getUniqueId())) {
+            player.sendActionBar(Component.text("You are already carrying a research crate.", NamedTextColor.GRAY));
+            return;
+        }
+        if (researchCrate == null) {
+            return;
+        }
+        for (CrateBlock block : researchCrate.blocks()) {
+            setBlock(block.x(), block.y(), block.z(), Material.AIR);
+        }
+        for (UUID entityId : researchCrate.entityIds()) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity != null) {
+                entity.remove();
+            }
+        }
+        researchCrate = null;
+        List<UUID> displays = new ArrayList<>();
+        for (int dx = 0; dx <= 1; dx++) {
+            for (int dz = 0; dz <= 1; dz++) {
+                for (int dy = 0; dy <= 1; dy++) {
+                    Location location = carriedCrateBlockLocation(player, dx, dy, dz);
+                    BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
+                        entity.setBlock(Material.MAGENTA_CONCRETE.createBlockData());
+                        entity.setInterpolationDelay(0);
+                        entity.setTeleportDuration(1);
+                        entity.setPersistent(false);
+                        entity.addScoreboardTag(RESEARCH_CRATE_TAG);
+                    });
+                    displays.add(display.getUniqueId());
+                }
+            }
+        }
+        carriedResearchCrates.put(player.getUniqueId(), new CarriedResearchCrate(displays));
+        startResearchCrateTask();
+        player.sendActionBar(Component.text("Research crate lifted. Sneak to drop it.", NamedTextColor.LIGHT_PURPLE));
+        world.playSound(player.getLocation(), Sound.BLOCK_WOOL_BREAK, 0.7f, 0.8f);
+    }
+
+    private Location carriedCrateBlockLocation(Player player, int dx, int dy, int dz) {
+        Location base = player.getLocation();
+        return new Location(world,
+                base.getX() - 1.0 + dx,
+                base.getY() + 2.25 + dy,
+                base.getZ() - 1.0 + dz,
+                0.0f,
+                0.0f);
+    }
+
+    private void startResearchCrateTask() {
+        if (researchCrateTask != null) {
+            return;
+        }
+        researchCrateTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickCarriedResearchCrates, 1L, 1L);
+    }
+
+    private void stopResearchCrateTask() {
+        if (researchCrateTask != null) {
+            researchCrateTask.cancel();
+            researchCrateTask = null;
+        }
+    }
+
+    private void tickCarriedResearchCrates() {
+        if (!running || carriedResearchCrates.isEmpty()) {
+            stopResearchCrateTask();
+            return;
+        }
+        for (Map.Entry<UUID, CarriedResearchCrate> entry : new ArrayList<>(carriedResearchCrates.entrySet())) {
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null || !player.getWorld().equals(world) || ghostPlayers.contains(entry.getKey())) {
+                removeCarriedResearchCrate(entry.getKey());
+                continue;
+            }
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 0, true, true, true));
+            PotionEffect resistance = player.getPotionEffect(PotionEffectType.RESISTANCE);
+            if (resistance == null || resistance.getAmplifier() < 1 || resistance.getDuration() < 25) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, 1, true, true, true));
+            }
+            int index = 0;
+            for (int dx = 0; dx <= 1; dx++) {
+                for (int dz = 0; dz <= 1; dz++) {
+                    for (int dy = 0; dy <= 1; dy++) {
+                        if (index >= entry.getValue().displayIds().size()) {
+                            continue;
+                        }
+                        Entity display = Bukkit.getEntity(entry.getValue().displayIds().get(index++));
+                        if (display != null) {
+                            display.teleport(carriedCrateBlockLocation(player, dx, dy, dz));
+                        }
+                    }
+                }
+            }
+        }
+        if (carriedResearchCrates.isEmpty()) {
+            stopResearchCrateTask();
+        }
+    }
+
+    private void dropCarriedResearchCrate(Player player) {
+        if (player == null || !carriedResearchCrates.containsKey(player.getUniqueId())) {
+            return;
+        }
+        Optional<CratePlacement> placement = findResearchCrateDropPlacement(player.getLocation());
+        if (placement.isEmpty()) {
+            player.sendActionBar(Component.text("No room to drop the research crate here.", NamedTextColor.RED));
+            return;
+        }
+        removeCarriedResearchCrate(player.getUniqueId());
+        spawnResearchCrate(placement.get().x(), placement.get().y(), placement.get().z(), placement.get().footprint());
+        world.playSound(player.getLocation(), Sound.BLOCK_WOOL_PLACE, 0.7f, 0.75f);
+        player.sendActionBar(Component.text("Research crate dropped.", NamedTextColor.LIGHT_PURPLE));
+    }
+
+    private Optional<CratePlacement> findResearchCrateDropPlacement(Location location) {
+        int baseY = Math.max(origin.y(), location.getBlockY());
+        for (int radius = 0; radius <= 2; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    int x = location.getBlockX() + dx;
+                    int z = location.getBlockZ() + dz;
+                    Set<HallsExplorationGenerator.Cell> footprint = researchCrateFootprint(x, z);
+                    if (canDropResearchCrateAt(x, baseY, z, footprint)) {
+                        return Optional.of(new CratePlacement(x, baseY, z, footprint));
+                    }
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    private boolean canDropResearchCrateAt(int x, int y, int z, Set<HallsExplorationGenerator.Cell> footprint) {
+        for (CrateBlock block : researchCrateBlocks(x, y, z)) {
+            Material material = world.getBlockAt(block.x(), block.y(), block.z()).getType();
+            if (!material.isAir()) {
+                return false;
+            }
+        }
+        for (HallsExplorationGenerator.Cell cell : footprint) {
+            if (activeLiquidCells.contains(cell) || isProtectedElevatorTransferCell(cell.x(), cell.z())) {
+                return false;
+            }
+            if (!world.getBlockAt(cell.x(), y - 1, cell.z()).getType().isSolid()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private Set<CrateBlock> researchCrateBlocks(int x, int y, int z) {
+        Set<CrateBlock> blocks = new HashSet<>();
+        for (int dx = 0; dx <= 1; dx++) {
+            for (int dz = 0; dz <= 1; dz++) {
+                for (int dy = 0; dy <= 1; dy++) {
+                    blocks.add(new CrateBlock(x + dx, y + dy, z + dz));
+                }
+            }
+        }
+        return Set.copyOf(blocks);
+    }
+
+    private void removeResearchCrate() {
+        if (researchCrate == null) {
+            return;
+        }
+        for (UUID entityId : researchCrate.entityIds()) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity != null) {
+                entity.remove();
+            }
+        }
+        researchCrate = null;
+    }
+
+    private void removeCarriedResearchCrate(UUID playerId) {
+        CarriedResearchCrate carried = carriedResearchCrates.remove(playerId);
+        if (carried == null) {
+            return;
+        }
+        for (UUID displayId : carried.displayIds()) {
+            Entity display = Bukkit.getEntity(displayId);
+            if (display != null) {
+                display.remove();
+            }
+        }
+        if (carriedResearchCrates.isEmpty()) {
+            stopResearchCrateTask();
+        }
+    }
+
+    private void removeAllCarriedResearchCrates() {
+        for (UUID playerId : new HashSet<>(carriedResearchCrates.keySet())) {
+            removeCarriedResearchCrate(playerId);
+        }
+    }
+
     private Transformation vegetationTransformation(HallsVegetationType type, Random random) {
         float scale = randomDisplayScale(type.scale());
         float yaw = type.randomYaw() ? (float) (random.nextDouble() * Math.PI * 2.0) : 0.0f;
@@ -3614,6 +4071,8 @@ public final class HallsSession {
         trapRuntime.clear();
         campRuntime.clear();
         activeLiquidCells = Set.of();
+        removeResearchCrate();
+        removeAllCarriedResearchCrates();
         for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
             removeBreakableProp(prop);
         }
@@ -3630,6 +4089,14 @@ public final class HallsSession {
         }
         physicsDrops.clear();
         stopPhysicsDropTask();
+    }
+
+    private void removeElevatorWaypoint() {
+        Entity entity = elevatorWaypointId == null ? null : Bukkit.getEntity(elevatorWaypointId);
+        if (entity != null) {
+            entity.remove();
+        }
+        elevatorWaypointId = null;
     }
 
     private void removeBreakableProp(BreakableProp prop) {
@@ -3681,6 +4148,7 @@ public final class HallsSession {
 
     private void makeGhost(Player player) {
         ghostPlayers.add(player.getUniqueId());
+        removeCarriedResearchCrate(player.getUniqueId());
         dropPlayerSessionInventory(player);
         dropFirstGhostCoinCache(player);
         applyGhostState(player);
@@ -4957,6 +5425,7 @@ public final class HallsSession {
 
         private void buildElevatorPass() {
             buildElevator();
+            ensureElevatorWaypoint();
             closeElevatorDoors();
             stage = 3;
         }
@@ -4990,6 +5459,7 @@ public final class HallsSession {
             Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
             renderExplorationSculk(build, liquidReservedCells);
             reservedCells = withReserved(reservedCells, vegetationCells);
+            reservedCells = withReserved(reservedCells, placeResearchCrate(build, reservedCells));
             rareBreakableRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
             contentStartedNanos = System.nanoTime();
             contentBreakablesBefore = new HashSet<>(breakableProps.values()).size();
@@ -5054,6 +5524,23 @@ public final class HallsSession {
                                     HallsLevelType levelType,
                                     Random random,
                                     HallsExplorationGenerator.Plan plan) {
+    }
+
+    private record CrateBlock(int x, int y, int z) {
+    }
+
+    private record ResearchCrate(Set<CrateBlock> blocks,
+                                 Set<HallsExplorationGenerator.Cell> footprint,
+                                 Set<UUID> entityIds) {
+        private boolean contains(int x, int y, int z) {
+            return blocks.contains(new CrateBlock(x, y, z));
+        }
+    }
+
+    private record CarriedResearchCrate(List<UUID> displayIds) {
+    }
+
+    private record CratePlacement(int x, int y, int z, Set<HallsExplorationGenerator.Cell> footprint) {
     }
 
     private static final class PhysicsDrop {

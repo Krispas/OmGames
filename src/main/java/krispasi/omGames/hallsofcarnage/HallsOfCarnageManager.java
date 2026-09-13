@@ -804,6 +804,51 @@ public final class HallsOfCarnageManager {
         return session != null && session.handlePhysicsDropPickup(player, entity);
     }
 
+    public boolean handleResearchCrateInteract(Player player, Entity entity) {
+        if (player == null || entity == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleResearchCrateInteract(player, entity);
+    }
+
+    public boolean handleResearchCrateBlockInteract(Player player, org.bukkit.block.Block block) {
+        if (player == null || block == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleResearchCrateBlockInteract(player, block);
+    }
+
+    public boolean handleResearchCrateDeposit(Player player, org.bukkit.block.Block block) {
+        if (player == null || block == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleResearchCrateDeposit(player, block);
+    }
+
+    public boolean isResearchCrateCarrier(Player player) {
+        if (player == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.isResearchCrateCarrier(player);
+    }
+
+    public boolean handleResearchCrateSneak(Player player) {
+        if (player == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleResearchCrateSneak(player);
+    }
+
     public boolean handleCampInteract(Player player, Entity entity) {
         if (player == null || entity == null) {
             return false;

@@ -1307,6 +1307,7 @@ SQLite tables:
 - Exploration corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
 - Generated corridors use ceiling-embedded light blocks so the walkable corridor remains 3 blocks tall, and the elevator has a ceiling light.
 - The elevator exterior vestibule is generated as a sealed mini-tunnel outside the door; opening the door clears only the passage while preserving the vestibule floor, side walls, and ceiling.
+- Halls elevators spawn a hidden waypoint-transmitting marker entity at the elevator spawn so participants see the elevator on the vanilla locator bar; keep this separate from the Compass modifier's item/HUD/trail behavior.
 - Elevator transitions rebuild exploration floors through a staged session-local main-thread build job: plan, clear old columns, elevator shell, room batches, corridor batches, traps, content batches, chest restore, and door opening.
 - Staged Halls floor clears must not clear the protected elevator footprint while players are inside it.
 - Active Halls participants should have their respawn location set to the session elevator; normal session exit should restore their respawn location to the configured Halls lobby spawn.
@@ -1324,6 +1325,7 @@ SQLite tables:
 - Generic breakable loot entries `scrap` / `random_scrap` choose randomly from that breakable's configured `scrap-drops`.
 - Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
 - Exploration floors force exactly one rare breakable prop in a random generated room when a rare breakable archetype is available, and normal generated prop slots should use common breakables.
+- Generated playable floors may place one 2x2x2 magenta research crate. It is carried as session-owned display cargo above a player, blocks normal interactions/inventory opening while carried, drops on sneak, and deposits into the elevator hopper for `+1` team research point.
 - Halls vegetation archetypes are loaded from `plugins/OmGames/HallsOfCarnage/vegetation/` and seeded from bundled defaults.
 - Vegetation files define `id`, `material`, optional `block-data`, `offset-y`, `scale`, and `random-yaw`.
 - Exploration vegetation is purely decorative `BlockDisplay` clutter. It may generate in rooms and corridors, must not place normal blocks, interaction entities, or hitboxes, and generation must avoid trap-reserved cells such as holes and ground traps.
