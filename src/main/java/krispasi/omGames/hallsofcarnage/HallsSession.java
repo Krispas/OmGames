@@ -62,6 +62,7 @@ public final class HallsSession {
     private static final int ELEVATOR_INNER_RADIUS = 2;
     private static final int ELEVATOR_OUTER_RADIUS = 3;
     private static final BlockFace ELEVATOR_FRONT_FACE = BlockFace.NORTH;
+    private static final int CAMP_ELEVATOR_CORRIDOR_LENGTH = 5;
     private static final int CLEAR_COLUMNS_PER_TICK = 3;
     private static final int CORRIDOR_CELLS_PER_TICK = 96;
     private static final int MIN_ELEVATOR_TRANSITION_TICKS = 100;
@@ -967,9 +968,13 @@ public final class HallsSession {
         buildLayoutRoom(layout, roomStartX, origin.y(), roomStartZ,
                 Map.of(BlockFace.SOUTH, layout.width() / 2), levelType, new Random((((long) id) << 32) ^ 1));
         buildConnector(origin.x(), origin.y(), elevatorFrontZ(1), roomStartZ + layout.depth(), levelType);
+        Cell blueprintCell = firstOpenStartFloorCell(layout);
+        renderLayoutVegetation(layout, roomStartX, origin.y(), roomStartZ, levelType,
+                new Random((((long) id) << 32) ^ 0x57A27), Set.of(
+                        new HallsExplorationGenerator.Cell(roomStartX + blueprintCell.x(), roomStartZ + blueprintCell.z())
+                ), 1.0);
         startRoomSpawn = new Location(world, roomStartX + layout.width() / 2.0 + 0.5,
                 origin.y() + 1.0, roomStartZ + layout.depth() / 2.0 + 0.5, 0.0f, 0.0f);
-        Cell blueprintCell = firstOpenStartFloorCell(layout);
         spawnBreakableProp(roomStartX + blueprintCell.x(), origin.y(), roomStartZ + blueprintCell.z(),
                 breakableType("barrel"), 3, List.of(new HallsBreakableType.LootEntry("rare_blueprint", 1, 1, 1)), 1);
         closeElevatorDoors();
@@ -1076,15 +1081,28 @@ public final class HallsSession {
         int roomStartX = origin.x() - linkX;
         boolean southDock = link != null && link.z() >= Math.max(0, layout.depth() - 2);
         int roomStartZ = southDock
-                ? elevatorFrontZ(1) - linkZ
+                ? elevatorFrontZ(1) - CAMP_ELEVATOR_CORRIDOR_LENGTH - linkZ
                 : origin.z() + ELEVATOR_OUTER_RADIUS + 10 - linkZ;
         int entranceX = southDock || link == null || link.z() != 0
                 ? (southDock ? linkX : nearestCampEntranceX(layout, origin.x() - roomStartX))
                 : link.x();
         campRuntime.startLayout(layout, roomStartX, origin.y(), roomStartZ,
                 savedCampUnlockedDoors.getOrDefault(sharedCampStateKey(), savedCampUnlockedDoors.get(floor)));
-        new HallsCampFloorBuilder(this::setBlock, campRuntime).build(layout, roomStartX, origin.y(), roomStartZ,
+        HallsCampFloorBuilder.BlockPlacer campBlockPlacer = new HallsCampFloorBuilder.BlockPlacer() {
+            @Override
+            public void setBlock(int x, int y, int z, Material material, BlockFace facing) {
+                HallsSession.this.setBlock(x, y, z, material, facing);
+            }
+
+            @Override
+            public Material wallMaterial(HallsLevelType type, int x, int y, int z, boolean pillar) {
+                return HallsSession.this.wallMaterial(type, x, y, z, pillar, 0xCA9E1L);
+            }
+        };
+        new HallsCampFloorBuilder(campBlockPlacer, campRuntime).build(layout, roomStartX, origin.y(), roomStartZ,
                 levelType, entranceX, southDock ? BlockFace.SOUTH : BlockFace.NORTH);
+        renderLayoutVegetation(layout, roomStartX, origin.y(), roomStartZ, levelType,
+                new Random((((long) id) << 32) ^ (((long) floor) << 16) ^ 0xCA4F), campVegetationReservedCells(layout, roomStartX, roomStartZ), 0.75);
         campRuntime.restore(savedCampStates.getOrDefault(sharedCampStateKey(), savedCampStates.get(floor)));
         int connectorTargetZ = southDock ? roomStartZ + linkZ + 1 : roomStartZ + linkZ - 1;
         buildCampConnector(roomStartX + linkX, origin.y(), connectorTargetZ, levelType);
@@ -1414,6 +1432,115 @@ public final class HallsSession {
         placeVegetationInCells(build, vegetationCorridorCells(build), reservedCells, occupied, 0.5);
         debugGeneration("vegetation", started, "displays " + occupied.size());
         return Set.copyOf(occupied);
+    }
+
+    private Set<HallsExplorationGenerator.Cell> renderLayoutVegetation(HallsLayout layout,
+                                                                       int startX,
+                                                                       int y,
+                                                                       int startZ,
+                                                                       HallsLevelType levelType,
+                                                                       Random random,
+                                                                       Set<HallsExplorationGenerator.Cell> reservedCells,
+                                                                       double chanceMultiplier) {
+        if (layout == null || vegetationTypes.isEmpty()
+                || levelType.vegetationChance() <= 0.0 || levelType.vegetation().isEmpty()) {
+            return Set.of();
+        }
+        Set<HallsExplorationGenerator.Cell> occupied = new HashSet<>();
+        List<HallsExplorationGenerator.Cell> cells = layoutVegetationCells(layout, startX, startZ);
+        java.util.Collections.shuffle(cells, random);
+        double chance = Math.max(0.0, Math.min(1.0, levelType.vegetationChance() * chanceMultiplier));
+        for (HallsExplorationGenerator.Cell cell : cells) {
+            if (random.nextDouble() >= chance) {
+                continue;
+            }
+            if ((reservedCells != null && reservedCells.contains(cell)) || occupied.contains(cell)) {
+                continue;
+            }
+            HallsVegetationType type = weightedVegetation(levelType, random);
+            if (type == null) {
+                continue;
+            }
+            spawnVegetationDisplay(cell.x(), y, cell.z(), type, random);
+            occupied.add(cell);
+        }
+        return Set.copyOf(occupied);
+    }
+
+    private Set<HallsExplorationGenerator.Cell> renderLayoutVegetation(HallsCampLayout layout,
+                                                                       int startX,
+                                                                       int y,
+                                                                       int startZ,
+                                                                       HallsLevelType levelType,
+                                                                       Random random,
+                                                                       Set<HallsExplorationGenerator.Cell> reservedCells,
+                                                                       double chanceMultiplier) {
+        if (layout == null || vegetationTypes.isEmpty()
+                || levelType.vegetationChance() <= 0.0 || levelType.vegetation().isEmpty()) {
+            return Set.of();
+        }
+        Set<HallsExplorationGenerator.Cell> occupied = new HashSet<>();
+        List<HallsExplorationGenerator.Cell> cells = campLayoutVegetationCells(layout, startX, startZ);
+        java.util.Collections.shuffle(cells, random);
+        double chance = Math.max(0.0, Math.min(1.0, levelType.vegetationChance() * chanceMultiplier));
+        for (HallsExplorationGenerator.Cell cell : cells) {
+            if (random.nextDouble() >= chance) {
+                continue;
+            }
+            if ((reservedCells != null && reservedCells.contains(cell)) || occupied.contains(cell)) {
+                continue;
+            }
+            HallsVegetationType type = weightedVegetation(levelType, random);
+            if (type == null) {
+                continue;
+            }
+            spawnVegetationDisplay(cell.x(), y, cell.z(), type, random);
+            occupied.add(cell);
+        }
+        return Set.copyOf(occupied);
+    }
+
+    private List<HallsExplorationGenerator.Cell> layoutVegetationCells(HallsLayout layout, int startX, int startZ) {
+        List<HallsExplorationGenerator.Cell> cells = new ArrayList<>();
+        for (int z = 1; z < layout.depth() - 1; z++) {
+            for (int x = 1; x < layout.width() - 1; x++) {
+                if (layout.at(x, z) == 'O') {
+                    cells.add(new HallsExplorationGenerator.Cell(startX + x, startZ + z));
+                }
+            }
+        }
+        return cells;
+    }
+
+    private List<HallsExplorationGenerator.Cell> campLayoutVegetationCells(HallsCampLayout layout, int startX, int startZ) {
+        List<HallsExplorationGenerator.Cell> cells = new ArrayList<>();
+        for (int z = 1; z < layout.depth() - 1; z++) {
+            for (int x = 1; x < layout.width() - 1; x++) {
+                if (layout.openAt(x, z)) {
+                    cells.add(new HallsExplorationGenerator.Cell(startX + x, startZ + z));
+                }
+            }
+        }
+        return cells;
+    }
+
+    private Set<HallsExplorationGenerator.Cell> campVegetationReservedCells(HallsCampLayout layout, int startX, int startZ) {
+        Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
+        for (HallsCampLayout.BuildSpot spot : layout.buildSpots()) {
+            for (int z = spot.minZ(); z <= spot.maxZ(); z++) {
+                for (int x = spot.minX(); x <= spot.maxX(); x++) {
+                    reserved.add(new HallsExplorationGenerator.Cell(startX + x, startZ + z));
+                }
+            }
+        }
+        for (HallsCampLayout.DoorCell door : layout.doors()) {
+            reserved.add(new HallsExplorationGenerator.Cell(startX + door.x(), startZ + door.z()));
+        }
+        HallsCampLayout.Cell link = layout.elevatorLink();
+        if (link != null) {
+            reserved.add(new HallsExplorationGenerator.Cell(startX + link.x(), startZ + link.z()));
+        }
+        return Set.copyOf(reserved);
     }
 
     private Set<HallsExplorationGenerator.Cell> renderExplorationLiquids(ExplorationBuild build,

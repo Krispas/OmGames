@@ -16,6 +16,14 @@ public final class HallsCampFloorBuilder {
         default void setBlock(int x, int y, int z, Material material) {
             setBlock(x, y, z, material, null);
         }
+
+        default Material wallMaterial(HallsLevelType levelType, int x, int y, int z, boolean pillar) {
+            Random random = new Random((((long) x) * 341873128712L)
+                    ^ (((long) y) * 42317861L)
+                    ^ (((long) z) * 132897987541L)
+                    ^ 0xCA4F);
+            return (pillar ? levelType.pillarPalette(random) : levelType.wallPalette(random)).material(random);
+        }
     }
 
     private static final int ROOM_HEIGHT = 5;
@@ -85,12 +93,15 @@ public final class HallsCampFloorBuilder {
                 boolean wall = !opening && (border || layout.at(x, z) == 'X');
                 int blockX = startX + x;
                 int blockZ = startZ + z;
-                Material wallMaterial = wallMaterial(levelType, blockX, blockZ, pillarColumn(layout, x, z, border));
+                boolean pillar = pillarColumn(layout, x, z, border);
+                Material wallMaterial = blockPlacer.wallMaterial(levelType, blockX, y, blockZ, pillar);
                 blockPlacer.setBlock(blockX, y - 1, blockZ, wall ? wallMaterial : levelType.floor());
                 blockPlacer.setBlock(blockX, y + ROOM_HEIGHT, blockZ, levelType.ceiling());
                 for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
                     boolean openingHeader = opening && dy >= 3;
-                    blockPlacer.setBlock(blockX, y + dy, blockZ, wall || openingHeader ? wallMaterial : Material.AIR);
+                    blockPlacer.setBlock(blockX, y + dy, blockZ, wall || openingHeader
+                            ? blockPlacer.wallMaterial(levelType, blockX, y + dy, blockZ, pillar)
+                            : Material.AIR);
                 }
             }
         }
@@ -137,21 +148,6 @@ public final class HallsCampFloorBuilder {
         }
     }
 
-    private Material wallMaterial(HallsLevelType levelType, int x, int z, boolean pillar) {
-        int groupX = Math.floorDiv(x, 7);
-        int groupZ = Math.floorDiv(z, 7);
-        Random paletteRandom = new Random((((long) groupX) * 341873128712L)
-                ^ (((long) groupZ) * 132897987541L)
-                ^ 0xCA4F);
-        HallsLevelType.BlockPalette palette = pillar
-                ? levelType.pillarPalette(paletteRandom)
-                : levelType.wallPalette(paletteRandom);
-        Random columnRandom = new Random((((long) x) * 341873128712L)
-                ^ (((long) z) * 132897987541L)
-                ^ 0x51EC1A7EL);
-        return palette.material(columnRandom);
-    }
-
     private void renderCampPlots(HallsCampLayout layout, int roomStartX, int y, int roomStartZ) {
         for (int z = 0; z < layout.depth(); z++) {
             for (int x = 0; x < layout.width(); x++) {
@@ -174,7 +170,6 @@ public final class HallsCampFloorBuilder {
         for (HallsCampLayout.DoorCell door : layout.doors()) {
             int worldX = roomStartX + door.x();
             int worldZ = roomStartZ + door.z();
-            Material material = wallMaterial(levelType, worldX, worldZ, false);
             blockPlacer.setBlock(worldX, y - 1, worldZ, levelType.floor());
             blockPlacer.setBlock(worldX, y + ROOM_HEIGHT, worldZ, levelType.ceiling());
             BlockFace barFacing = doorBarFacing(layout, door);
@@ -182,7 +177,8 @@ public final class HallsCampFloorBuilder {
                 if (dy < 3) {
                     blockPlacer.setBlock(worldX, y + dy, worldZ, Material.IRON_BARS, barFacing);
                 } else {
-                    blockPlacer.setBlock(worldX, y + dy, worldZ, material);
+                    blockPlacer.setBlock(worldX, y + dy, worldZ,
+                            blockPlacer.wallMaterial(levelType, worldX, y + dy, worldZ, false));
                 }
             }
             campRuntime.addDoor(worldX, y, worldZ, door);
