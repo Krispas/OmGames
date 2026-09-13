@@ -160,3 +160,5 @@ This is the first implementation slice. It focuses on:
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
 - Okay, amazing you are almost there with the elevator moving. Make it so there is at least a 5 block corridor between the campsite and the elevator
+- Generation of walls on non-exploration floors should be updated to also work on other floors. (for example the pallets)
+- Generation of vegetation should also be enabled for non-exploration floors. In camps, do not generate vegetation on build spots or gates.
