@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-12
+Last updated: 2026-09-13
 
 ## Implemented
 
@@ -150,30 +150,11 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: vegetation now also samples corridor cells at reduced density, while still skipping trap-reserved cells and reserving its own display cells. Vegetation yaw now compensates for the lower-corner BlockDisplay origin so random rotation pivots around the cell center. Trident-based physics drops now use the built-in GUI item-display transform instead of a raised upright custom transform. Ravagers were weakened by lowering bundled health to `10` and runtime attack damage to `4`.
 - Next reviewer slice applied: added the `sewer` level type, bundled Sewer room template, and Untold Depths floor 9 test coverage. Level types now support optional `liquid.enabled`, `liquid.material`, and `liquid.room-coverage`; Sewer renders 5-wide corridors with 3-cell, 2-block-deep liquid channels, short dry one-cell offshoots into rooms/elevator, and room puddles generated after holes/traps while avoiding reserved cells, hole/trap neighbors, and corridor neighbors. Trap files now support `blacklisted-level-types`, and bundled bear traps/proximity mines blacklist `sewer`.
 - Next reviewer slice applied: Halls armor item `stats.armor` now creates real Bukkit armor attribute modifiers, with optional `armor-toughness` support. Sewer generation now branches the first room off a main corridor instead of placing it directly in front of the elevator, room puddles generate much more aggressively, and breakables may spawn in liquid cells two blocks lower. Added drowned to bundled/fallback monster pools and Sewer pools. Added Sewer-only `bubbles`, `geyser`, and `pufferfish` trap resources, runtime behavior, and matching Sewer trap-boost modifiers; geysers prefer `Particle.GEYSER` when the API exposes it and fall back to splash/bubble particles otherwise.
+- Next reviewer slice applied: Sewer liquids now render before trap placement so generated water traps can validate against the actual liquid cells for the floor. Bubbles, geysers, and pufferfish traps now require liquid footprints, while non-water traps and holes avoid liquid cells. Sewer room liquid coverage defaults were raised to `0.95`, and room puddle growth now continues from additional seeds when a room mask contains disconnected open regions instead of stopping at the first region. Geyser particles no longer call `Particle.GEYSER`, avoiding the Paper data-class crash by using splash/cloud/bubble particles only.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Make it so water traps can generate only in liquids
-- Make puddles larger, they are still super small, is there something blocking them from being larger?
-- Fix the following problem:
-10:04:46[WARN] [OmGames] Task #75 for OmGames v0.9.3 generated an exception
-java.lang.IllegalArgumentException: missing required data class org.bukkit.Particle$Geyser
-at com.google.common.base.Preconditions.checkArgument(Preconditions.java:220) ~[guava-33.6.0-jre.jar:?]
-at org.bukkit.craftbukkit.CraftParticle.createParticleParam(CraftParticle.java:72) ~[paper-26.2.jar:26.2-65-fc9375a]
-at org.bukkit.craftbukkit.CraftWorld.spawnParticle(CraftWorld.java:1758) ~[paper-26.2.jar:26.2-65-fc9375a]
-at org.bukkit.World.spawnParticle(World.java:4183) ~[paper-api-26.2.build.65-beta.jar:?]
-at org.bukkit.craftbukkit.CraftWorld.spawnParticle(CraftWorld.java:1746) ~[paper-26.2.jar:26.2-65-fc9375a]
-at org.bukkit.World.spawnParticle(World.java:4034) ~[paper-api-26.2.build.65-beta.jar:?]
-at org.bukkit.World.spawnParticle(World.java:4013) ~[paper-api-26.2.build.65-beta.jar:?]
-at omgames-0.9.3.jar//krispasi.omGames.hallsofcarnage.HallsSessionTrapRuntime.spawnGeyserParticles(HallsSessionTrapRuntime.java:1051) ~[?:?]
-at omgames-0.9.3.jar//krispasi.omGames.hallsofcarnage.HallsSessionTrapRuntime.tickTrap(HallsSessionTrapRuntime.java:1029) ~[?:?]
-at omgames-0.9.3.jar//krispasi.omGames.hallsofcarnage.HallsSessionTrapRuntime.tickTraps(HallsSessionTrapRuntime.java:942) ~[?:?]
-at org.bukkit.craftbukkit.scheduler.CraftTask.run(CraftTask.java:78) ~[paper-26.2.jar:26.2-65-fc9375a]
-at org.bukkit.craftbukkit.scheduler.CraftScheduler.mainThreadHeartbeat(CraftScheduler.java:474) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.tickChildren(MinecraftServer.java:1768) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.tickServer(MinecraftServer.java:1621) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.dedicated.DedicatedServer.tickServer(DedicatedServer.java:404) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.processPacketsAndTick(MinecraftServer.java:1679) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:1349) ~[paper-26.2.jar:26.2-65-fc9375a]
-at net.minecraft.server.MinecraftServer.lambda$spin$0(MinecraftServer.java:303) ~[paper-26.2.jar:26.2-65-fc9375a]
-at java.base/java.lang.Thread.run(Thread.java:1474) ~[?:?]
+- The water traps (bubble and geyser ones) shouldnt have a physical block, instead make it so the model of a squished block you use for them is still used, but two blocks lower so it sits at the bottom of the puddle
+- Make it so puddles can intersect without generating wall between them
+- I noticed puddles cant generate around the border of the room. Change that, it should be totally fine, puddles are not hazard, they are completely "walkable".
+- Make it so geyser trap doesnt do damage

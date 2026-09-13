@@ -163,7 +163,7 @@ public record HallsLevelType(
                     List.of("drowned", "bogged", "cave_spider", "warden"),
                     0.015,
                     List.of(new VegetationEntry("bush", 1)),
-                    new LiquidSettings(true, Material.WATER, 0.80)
+                    new LiquidSettings(true, Material.WATER, 0.95)
             );
         }
         return new HallsLevelType(

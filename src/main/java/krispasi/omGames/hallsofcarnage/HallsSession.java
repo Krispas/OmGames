@@ -1001,8 +1001,8 @@ public final class HallsSession {
         floorStartedAtMillis = System.currentTimeMillis();
         renderExplorationRooms(build);
         renderExplorationCorridors(build);
-        Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build);
-        activeLiquidCells = renderExplorationLiquids(build, reservedCells);
+        activeLiquidCells = renderExplorationLiquids(build, Set.of());
+        Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build, activeLiquidCells);
         Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
         Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
         renderExplorationSculk(build, liquidReservedCells);
@@ -1314,13 +1314,14 @@ public final class HallsSession {
         }
     }
 
-    private Set<HallsExplorationGenerator.Cell> renderExplorationTraps(ExplorationBuild build) {
+    private Set<HallsExplorationGenerator.Cell> renderExplorationTraps(ExplorationBuild build,
+                                                                       Set<HallsExplorationGenerator.Cell> liquidCells) {
         if (build.plan().rooms().isEmpty()) {
             return Set.of();
         }
         long started = System.nanoTime();
         Set<HallsExplorationGenerator.Cell> reserved = trapRuntime.placeGeneratedTraps(build.plan(), build.random(),
-                build.floorDefinition(), build.levelType(), activeFloorModifiers);
+                build.floorDefinition(), build.levelType(), activeFloorModifiers, liquidCells);
         debugGeneration("traps", started, "traps " + trapRuntime.activeTrapCount() + ", reserved cells " + reserved.size());
         return reserved;
     }
@@ -1384,25 +1385,37 @@ public final class HallsSession {
         Set<HallsExplorationGenerator.Cell> candidateSet = new HashSet<>(candidates);
         Set<HallsExplorationGenerator.Cell> result = new HashSet<>();
         java.util.ArrayDeque<HallsExplorationGenerator.Cell> queue = new java.util.ArrayDeque<>();
-        queue.add(start);
-        result.add(start);
-        while (!queue.isEmpty() && result.size() < target) {
-            HallsExplorationGenerator.Cell current = queue.remove();
-            List<HallsExplorationGenerator.Cell> nextCells = new ArrayList<>();
-            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
-                HallsExplorationGenerator.Cell next = new HallsExplorationGenerator.Cell(
-                        current.x() + face.getModX(),
-                        current.z() + face.getModZ());
-                if (candidateSet.contains(next) && !result.contains(next)) {
-                    nextCells.add(next);
-                }
+        while (result.size() < target && result.size() < candidateSet.size()) {
+            HallsExplorationGenerator.Cell seed = result.isEmpty()
+                    ? start
+                    : candidates.stream()
+                    .filter(cell -> !result.contains(cell))
+                    .skip(build.random().nextInt(Math.max(1, candidateSet.size() - result.size())))
+                    .findFirst()
+                    .orElse(null);
+            if (seed == null) {
+                break;
             }
-            java.util.Collections.shuffle(nextCells, build.random());
-            for (HallsExplorationGenerator.Cell next : nextCells) {
-                result.add(next);
-                queue.add(next);
-                if (result.size() >= target) {
-                    break;
+            queue.add(seed);
+            result.add(seed);
+            while (!queue.isEmpty() && result.size() < target) {
+                HallsExplorationGenerator.Cell current = queue.remove();
+                List<HallsExplorationGenerator.Cell> nextCells = new ArrayList<>();
+                for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                    HallsExplorationGenerator.Cell next = new HallsExplorationGenerator.Cell(
+                            current.x() + face.getModX(),
+                            current.z() + face.getModZ());
+                    if (candidateSet.contains(next) && !result.contains(next)) {
+                        nextCells.add(next);
+                    }
+                }
+                java.util.Collections.shuffle(nextCells, build.random());
+                for (HallsExplorationGenerator.Cell next : nextCells) {
+                    result.add(next);
+                    queue.add(next);
+                    if (result.size() >= target) {
+                        break;
+                    }
                 }
             }
         }
@@ -4328,8 +4341,8 @@ public final class HallsSession {
         }
 
         private void buildTraps() {
-            reservedCells = renderExplorationTraps(build);
-            activeLiquidCells = renderExplorationLiquids(build, reservedCells);
+            activeLiquidCells = renderExplorationLiquids(build, Set.of());
+            reservedCells = renderExplorationTraps(build, activeLiquidCells);
             Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
             Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
             renderExplorationSculk(build, liquidReservedCells);

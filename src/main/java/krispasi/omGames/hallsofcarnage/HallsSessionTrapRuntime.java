@@ -127,8 +127,10 @@ final class HallsSessionTrapRuntime {
                                                             Random random,
                                                             HallsScenario.FloorDefinition floorDefinition,
                                                             HallsLevelType levelType,
-                                                            HallsFloorModifiers modifiers) {
+                                                            HallsFloorModifiers modifiers,
+                                                            Set<HallsExplorationGenerator.Cell> liquidCells) {
         clear();
+        Set<HallsExplorationGenerator.Cell> liquidTrapCells = liquidCells == null ? Set.of() : Set.copyOf(liquidCells);
         List<TrapCandidate> candidates = trapCandidates(plan);
         List<TrapCandidate> holeCandidates = holeCandidates(plan);
         if (candidates.isEmpty() && holeCandidates.isEmpty()) {
@@ -158,7 +160,10 @@ final class HallsSessionTrapRuntime {
             if (holeType == null) {
                 continue;
             }
-            if (placeHole(candidate, plan, random, holeType, occupied, globalReachabilityChecks, modifiers)) {
+            if (liquidTrapCells.contains(candidate.cell())) {
+                continue;
+            }
+            if (placeHole(candidate, plan, random, holeType, occupied, globalReachabilityChecks, modifiers, liquidTrapCells)) {
                 holesPlaced++;
             }
         }
@@ -185,7 +190,7 @@ final class HallsSessionTrapRuntime {
                     break;
                 }
                 HallsTrapType type = random.nextInt(100) < 10 ? weightedTrap(pool, random, modifiers) : roomType;
-                if (tryPlaceTrap(candidate, plan, random, type, occupied, globalReachabilityChecks)) {
+                if (tryPlaceTrap(candidate, plan, random, type, occupied, globalReachabilityChecks, liquidTrapCells)) {
                     placedInRoom++;
                 }
             }
@@ -210,13 +215,21 @@ final class HallsSessionTrapRuntime {
                                  Random random,
                                  HallsTrapType type,
                                  Set<HallsExplorationGenerator.Cell> occupied,
-                                 boolean globalReachabilityChecks) {
+                                 boolean globalReachabilityChecks,
+                                 Set<HallsExplorationGenerator.Cell> liquidCells) {
         HallsExplorationGenerator.Cell cell = candidate.cell();
         if (isNearExistingTrap(cell, occupied)) {
             return false;
         }
         TrapKind kind = trapKind(type.kind());
         if (kind == null) {
+            return false;
+        }
+        boolean waterTrap = isWaterTrap(kind);
+        if (waterTrap && !liquidCells.contains(cell)) {
+            return false;
+        }
+        if (!waterTrap && liquidCells.contains(cell)) {
             return false;
         }
         BlockFace face = trapFace(kind, candidate, random);
@@ -226,6 +239,13 @@ final class HallsSessionTrapRuntime {
         }
         int laneSpan = kind == TrapKind.SWINGING_BLADE ? swingLaneHalfSpan(candidate, face) : 0;
         Set<HallsExplorationGenerator.Cell> footprint = trapFootprint(kind, cell, face, laneSpan);
+        if (waterTrap) {
+            if (!liquidCells.containsAll(footprint)) {
+                return false;
+            }
+        } else if (!Collections.disjoint(footprint, liquidCells)) {
+            return false;
+        }
         if (globalReachabilityChecks && (kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.BUBBLES || requiresWall(kind))
                 && !floorReachableWithout(plan.walkableCells(), footprint)) {
             return false;
@@ -248,9 +268,13 @@ final class HallsSessionTrapRuntime {
                               HallsTrapType type,
                               Set<HallsExplorationGenerator.Cell> occupied,
                               boolean globalReachabilityChecks,
-                              HallsFloorModifiers modifiers) {
+                              HallsFloorModifiers modifiers,
+                              Set<HallsExplorationGenerator.Cell> liquidCells) {
         Set<HallsExplorationGenerator.Cell> pitCells = pitMask(candidate, random, type);
         if (pitCells.isEmpty()) {
+            return false;
+        }
+        if (!Collections.disjoint(pitCells, liquidCells)) {
             return false;
         }
         Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(candidate, plan.walkableCells(),
@@ -1046,21 +1070,10 @@ final class HallsSessionTrapRuntime {
     }
 
     private void spawnGeyserParticles(Location center) {
-        Particle geyser = geyserParticle();
         Location base = center.clone().add(0.0, -0.45, 0.0);
-        world.spawnParticle(geyser, base.clone().add(0.0, 0.8, 0.0), 18, 0.25, 0.75, 0.25, 0.12);
-        if (geyser != Particle.SPLASH) {
-            world.spawnParticle(Particle.SPLASH, base.clone().add(0.0, 1.3, 0.0), 12, 0.35, 0.45, 0.35, 0.08);
-        }
+        world.spawnParticle(Particle.SPLASH, base.clone().add(0.0, 1.0, 0.0), 24, 0.25, 0.75, 0.25, 0.12);
+        world.spawnParticle(Particle.CLOUD, base.clone().add(0.0, 1.4, 0.0), 8, 0.2, 0.5, 0.2, 0.04);
         world.spawnParticle(Particle.BUBBLE_COLUMN_UP, base, 12, 0.35, 0.55, 0.35, 0.08);
-    }
-
-    private Particle geyserParticle() {
-        try {
-            return Particle.valueOf("GEYSER");
-        } catch (IllegalArgumentException ignored) {
-            return Particle.SPLASH;
-        }
     }
 
     private void spawnSteamVentSmoke(HallsTrap trap) {
@@ -1530,6 +1543,10 @@ final class HallsSessionTrapRuntime {
 
     private boolean requiresWall(TrapKind kind) {
         return kind == TrapKind.WALL_SPIKES || kind == TrapKind.POISON_DARTS;
+    }
+
+    private boolean isWaterTrap(TrapKind kind) {
+        return kind == TrapKind.BUBBLES || kind == TrapKind.GEYSER || kind == TrapKind.PUFFERFISH;
     }
 
     private BlockFace trapFace(TrapKind kind, TrapCandidate candidate, Random random) {

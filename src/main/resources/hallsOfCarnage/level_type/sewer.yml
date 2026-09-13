@@ -10,7 +10,7 @@ materials:
 liquid:
   enabled: true
   material: WATER
-  room-coverage: 0.80
+  room-coverage: 0.95
 wall-palettes:
   mossy_stone:
     block: MOSSY_STONE_BRICKS
