@@ -4,8 +4,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
@@ -30,6 +32,7 @@ public record HallsSaveData(File file,
                             ItemStack[] elevatorChest,
                             Map<UUID, PlayerState> players,
                             Map<Integer, List<HallsCampRuntime.PlotState>> camps,
+                            Map<Integer, Set<Integer>> campUnlockedDoors,
                             long savedAt) {
     public static HallsSaveData load(File file) {
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
@@ -78,6 +81,7 @@ public record HallsSaveData(File file,
                 itemArray(yaml.getList("elevator-chest"), 27),
                 Map.copyOf(players),
                 camps(yaml),
+                campUnlockedDoors(yaml),
                 yaml.getLong("saved-at", file.lastModified()));
     }
 
@@ -129,6 +133,31 @@ public record HallsSaveData(File file,
             camps.put(floor, List.copyOf(plots));
         }
         return Map.copyOf(camps);
+    }
+
+    private static Map<Integer, Set<Integer>> campUnlockedDoors(YamlConfiguration yaml) {
+        Map<Integer, Set<Integer>> doors = new LinkedHashMap<>();
+        if (!yaml.isConfigurationSection("camps")) {
+            return doors;
+        }
+        for (String key : yaml.getConfigurationSection("camps").getKeys(false)) {
+            int floor;
+            try {
+                floor = Integer.parseInt(key);
+            } catch (NumberFormatException ex) {
+                continue;
+            }
+            Set<Integer> ids = new HashSet<>();
+            for (int id : yaml.getIntegerList("camps." + key + ".unlocked-doors")) {
+                if (id > 0) {
+                    ids.add(id);
+                }
+            }
+            if (!ids.isEmpty()) {
+                doors.put(floor, Set.copyOf(ids));
+            }
+        }
+        return Map.copyOf(doors);
     }
 
     private static List<?> listValue(Object value) {

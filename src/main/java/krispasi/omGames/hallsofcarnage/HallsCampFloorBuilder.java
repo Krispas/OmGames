@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.bukkit.Material;
+import org.bukkit.block.BlockFace;
 
 public final class HallsCampFloorBuilder {
     public interface BlockPlacer {
@@ -48,8 +49,19 @@ public final class HallsCampFloorBuilder {
                       int roomStartZ,
                       HallsLevelType levelType,
                       int northOpeningX) {
-        buildRoom(layout, roomStartX, y, roomStartZ, levelType, northOpeningX);
+        build(layout, roomStartX, y, roomStartZ, levelType, northOpeningX, BlockFace.NORTH);
+    }
+
+    public void build(HallsCampLayout layout,
+                      int roomStartX,
+                      int y,
+                      int roomStartZ,
+                      HallsLevelType levelType,
+                      int openingX,
+                      BlockFace openingFace) {
+        buildRoom(layout, roomStartX, y, roomStartZ, levelType, openingX, openingFace);
         renderCampPlots(layout, roomStartX, y, roomStartZ);
+        renderCampDoors(layout, roomStartX, y, roomStartZ, levelType);
     }
 
     private void buildRoom(HallsCampLayout layout,
@@ -57,12 +69,15 @@ public final class HallsCampFloorBuilder {
                            int y,
                            int startZ,
                            HallsLevelType levelType,
-                           int northOpeningX) {
+                           int openingX,
+                           BlockFace openingFace) {
         for (int z = -1; z <= layout.depth(); z++) {
             for (int x = -1; x <= layout.width(); x++) {
                 boolean border = x < 0 || z < 0 || x >= layout.width() || z >= layout.depth();
-                boolean opening = border && z == -1 && x >= 0 && x < layout.width()
-                        && Math.abs(x - northOpeningX) <= 1;
+                boolean opening = border && x >= 0 && x < layout.width()
+                        && Math.abs(x - openingX) <= 1
+                        && ((openingFace == BlockFace.NORTH && z == -1)
+                        || (openingFace == BlockFace.SOUTH && z == layout.depth()));
                 boolean wall = !opening && (border || layout.at(x, z) == 'X');
                 int blockX = startX + x;
                 int blockZ = startZ + z;
@@ -144,6 +159,24 @@ public final class HallsCampFloorBuilder {
         }
         for (HallsCampLayout.BuildSpot spot : layout.buildSpots()) {
             campRuntime.addPlot(roomStartX + spot.centerX(), y, roomStartZ + spot.centerZ(), spot);
+        }
+    }
+
+    private void renderCampDoors(HallsCampLayout layout,
+                                 int roomStartX,
+                                 int y,
+                                 int roomStartZ,
+                                 HallsLevelType levelType) {
+        for (HallsCampLayout.DoorCell door : layout.doors()) {
+            int worldX = roomStartX + door.x();
+            int worldZ = roomStartZ + door.z();
+            Material material = wallMaterial(levelType, worldX, worldZ, false);
+            blockPlacer.setBlock(worldX, y - 1, worldZ, levelType.floor());
+            blockPlacer.setBlock(worldX, y + ROOM_HEIGHT, worldZ, levelType.ceiling());
+            for (int dy = 0; dy < ROOM_HEIGHT; dy++) {
+                blockPlacer.setBlock(worldX, y + dy, worldZ, dy < 3 ? Material.IRON_BARS : material);
+            }
+            campRuntime.addDoor(worldX, y, worldZ, door);
         }
     }
 }

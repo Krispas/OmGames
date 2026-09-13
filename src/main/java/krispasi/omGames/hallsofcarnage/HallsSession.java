@@ -102,6 +102,7 @@ public final class HallsSession {
     private final Map<String, Long> sculkMaulSplashCooldowns = new HashMap<>();
     private final Set<UUID> sculkMaulSplashing = new HashSet<>();
     private final Map<Integer, List<HallsCampRuntime.PlotState>> savedCampStates = new HashMap<>();
+    private final Map<Integer, Set<Integer>> savedCampUnlockedDoors = new HashMap<>();
     private final Map<Integer, HallsFloorModifiers> scannedFloorModifiers = new HashMap<>();
     private final HallsSessionTrapRuntime trapRuntime;
     private final HallsSessionMonsterRuntime monsterRuntime;
@@ -212,7 +213,21 @@ public final class HallsSession {
             public boolean applySpeedTotem(Player player, int level) {
                 return HallsSession.this.applySpeedTotem(player, level);
             }
-        }, this::scanUpcomingFloors);
+        }, this::scanUpcomingFloors, new HallsCampRuntime.KeyAccount() {
+            @Override
+            public int keys() {
+                return campKeys;
+            }
+
+            @Override
+            public boolean spendKey() {
+                if (campKeys <= 0) {
+                    return false;
+                }
+                campKeys--;
+                return true;
+            }
+        });
         this.debugEnabled = debugEnabled == null ? ignored -> false : debugEnabled;
         this.remainingLives = scenario.camp().teamLives();
     }
@@ -1054,12 +1069,20 @@ public final class HallsSession {
         int linkX = link == null ? layout.width() / 2 : link.x();
         int linkZ = link == null ? 0 : link.z();
         int roomStartX = origin.x() - linkX;
-        int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 10 - linkZ;
-        int entranceX = link == null || link.z() != 0 ? nearestCampEntranceX(layout, origin.x() - roomStartX) : link.x();
+        boolean southDock = link != null && link.z() >= Math.max(0, layout.depth() - 2);
+        int roomStartZ = southDock
+                ? origin.z() + ELEVATOR_OUTER_RADIUS + 1 - linkZ
+                : origin.z() + ELEVATOR_OUTER_RADIUS + 10 - linkZ;
+        int entranceX = southDock || link == null || link.z() != 0
+                ? (southDock ? linkX : nearestCampEntranceX(layout, origin.x() - roomStartX))
+                : link.x();
+        campRuntime.startLayout(layout, roomStartX, origin.y(), roomStartZ,
+                savedCampUnlockedDoors.getOrDefault(sharedCampStateKey(), savedCampUnlockedDoors.get(floor)));
         new HallsCampFloorBuilder(this::setBlock, campRuntime).build(layout, roomStartX, origin.y(), roomStartZ,
-                levelType, entranceX);
+                levelType, entranceX, southDock ? BlockFace.SOUTH : BlockFace.NORTH);
         campRuntime.restore(savedCampStates.getOrDefault(sharedCampStateKey(), savedCampStates.get(floor)));
-        buildCampConnector(roomStartX + linkX, origin.y(), roomStartZ + linkZ - 1, levelType);
+        int connectorTargetZ = southDock ? roomStartZ + linkZ + 1 : roomStartZ + linkZ - 1;
+        buildCampConnector(roomStartX + linkX, origin.y(), connectorTargetZ, levelType);
         depositCampBankCoins();
         restoreElevatorChestContents();
         closeElevatorDoors();
@@ -3666,6 +3689,8 @@ public final class HallsSession {
         ghostPlayers.clear();
         savedCampStates.clear();
         savedCampStates.putAll(save.camps());
+        savedCampUnlockedDoors.clear();
+        savedCampUnlockedDoors.putAll(save.campUnlockedDoors());
         elevatorChestContents = cloneArray(save.elevatorChest(), 27);
         elevatorChestSnapshotLocked = true;
         woodScrap = Math.max(0, save.woodScrap());
@@ -3743,9 +3768,13 @@ public final class HallsSession {
     }
 
     private void saveCamps(YamlConfiguration yaml) {
-        for (Map.Entry<Integer, List<HallsCampRuntime.PlotState>> entry : savedCampStates.entrySet()) {
+        Set<Integer> campKeys = new HashSet<>();
+        campKeys.addAll(savedCampStates.keySet());
+        campKeys.addAll(savedCampUnlockedDoors.keySet());
+        for (Integer campKey : campKeys) {
+            List<HallsCampRuntime.PlotState> states = savedCampStates.getOrDefault(campKey, List.of());
             List<Map<String, Object>> plots = new ArrayList<>();
-            for (HallsCampRuntime.PlotState state : entry.getValue()) {
+            for (HallsCampRuntime.PlotState state : states) {
                 Map<String, Object> row = new HashMap<>();
                 row.put("plot", state.plotId());
                 row.put("building", state.buildingId());
@@ -3755,7 +3784,11 @@ public final class HallsSession {
                 row.put("storage", java.util.Arrays.asList(cloneArray(state.storageContents(), 54)));
                 plots.add(row);
             }
-            yaml.set("camps." + entry.getKey() + ".plots", plots);
+            yaml.set("camps." + campKey + ".plots", plots);
+            Set<Integer> unlockedDoors = savedCampUnlockedDoors.getOrDefault(campKey, Set.of());
+            if (!unlockedDoors.isEmpty()) {
+                yaml.set("camps." + campKey + ".unlocked-doors", unlockedDoors.stream().sorted().toList());
+            }
         }
     }
 
@@ -3776,6 +3809,12 @@ public final class HallsSession {
             return;
         }
         List<HallsCampRuntime.PlotState> snapshot = campRuntime.snapshot();
+        Set<Integer> unlockedDoors = campRuntime.unlockedDoors();
+        if (unlockedDoors.isEmpty()) {
+            savedCampUnlockedDoors.remove(sharedCampStateKey());
+        } else {
+            savedCampUnlockedDoors.put(sharedCampStateKey(), unlockedDoors);
+        }
         if (snapshot.isEmpty()) {
             savedCampStates.remove(sharedCampStateKey());
             return;
@@ -3839,6 +3878,7 @@ public final class HallsSession {
         coins = 0;
         if (resetCampProgress) {
             savedCampStates.clear();
+            savedCampUnlockedDoors.clear();
             campBankCoins = 0;
             campKeys = 0;
             campKeysEarned = 0;

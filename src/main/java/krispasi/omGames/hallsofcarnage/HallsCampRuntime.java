@@ -57,6 +57,12 @@ public final class HallsCampRuntime {
         boolean applySpeedTotem(Player player, int level);
     }
 
+    public interface KeyAccount {
+        int keys();
+
+        boolean spendKey();
+    }
+
     private final JavaPlugin plugin;
     private final World world;
     private final HallsScenario scenario;
@@ -69,6 +75,13 @@ public final class HallsCampRuntime {
     private final Function<Integer, List<String>> scanner;
     private final Map<UUID, Plot> plotsByEntity = new HashMap<>();
     private final Map<Integer, Plot> plotsById = new HashMap<>();
+    private final Map<UUID, Door> doorsByEntity = new HashMap<>();
+    private final Map<Integer, Door> doorsById = new HashMap<>();
+    private final Set<Integer> unlockedDoorIds = new HashSet<>();
+    private final KeyAccount keyAccount;
+    private HallsCampLayout layout;
+    private int layoutStartX;
+    private int layoutStartZ;
 
     public HallsCampRuntime(JavaPlugin plugin,
                             World world,
@@ -79,7 +92,8 @@ public final class HallsCampRuntime {
                             ScrapAccount scrapAccount,
                             SculkAccount sculkAccount,
                             TotemAccount totemAccount,
-                            Function<Integer, List<String>> scanner) {
+                            Function<Integer, List<String>> scanner,
+                            KeyAccount keyAccount) {
         this.plugin = plugin;
         this.world = world;
         this.scenario = scenario;
@@ -90,19 +104,42 @@ public final class HallsCampRuntime {
         this.sculkAccount = sculkAccount;
         this.totemAccount = totemAccount;
         this.scanner = scanner;
+        this.keyAccount = keyAccount;
     }
 
     public void clear() {
         Set<Plot> plots = new HashSet<>(plotsById.values());
+        Set<Door> doors = new HashSet<>(doorsById.values());
         plotsById.clear();
         plotsByEntity.clear();
+        doorsById.clear();
+        doorsByEntity.clear();
+        unlockedDoorIds.clear();
+        layout = null;
         for (Plot plot : plots) {
             removeEntities(plot);
+        }
+        for (Door door : doors) {
+            Entity interaction = Bukkit.getEntity(door.interactionId());
+            if (interaction != null) {
+                interaction.remove();
+            }
         }
     }
 
     public boolean isCampEntity(Entity entity) {
-        return entity != null && plotsByEntity.containsKey(entity.getUniqueId());
+        return entity != null && (plotsByEntity.containsKey(entity.getUniqueId())
+                || doorsByEntity.containsKey(entity.getUniqueId()));
+    }
+
+    public void startLayout(HallsCampLayout layout, int startX, int y, int startZ, Set<Integer> unlockedDoors) {
+        this.layout = layout;
+        this.layoutStartX = startX;
+        this.layoutStartZ = startZ;
+        this.unlockedDoorIds.clear();
+        if (unlockedDoors != null) {
+            this.unlockedDoorIds.addAll(unlockedDoors);
+        }
     }
 
     public void addPlot(double worldX, int y, double worldZ, HallsCampLayout.BuildSpot spot) {
@@ -119,6 +156,23 @@ public final class HallsCampRuntime {
         plotsByEntity.put(interaction.getUniqueId(), plot);
     }
 
+    public void addDoor(int worldX, int y, int worldZ, HallsCampLayout.DoorCell cell) {
+        Location location = new Location(world, worldX + 0.5, y + 1.0, worldZ + 0.5);
+        Interaction interaction = world.spawn(location, Interaction.class, entity -> {
+            entity.setInteractionWidth(1.0f);
+            entity.setInteractionHeight(2.4f);
+            entity.setResponsive(true);
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_camp_door");
+        });
+        Door door = new Door(cell.id(), cell.x(), cell.z(), worldX, y, worldZ, interaction.getUniqueId());
+        doorsById.put(door.id(), door);
+        doorsByEntity.put(interaction.getUniqueId(), door);
+        if (unlockedDoorIds.contains(door.id()) || bothSidesReachable(door)) {
+            unlockDoor(door, false);
+        }
+    }
+
     public List<PlotState> snapshot() {
         List<PlotState> states = new ArrayList<>();
         for (Plot plot : plotsById.values()) {
@@ -129,6 +183,10 @@ public final class HallsCampRuntime {
                     plot.harvestRemaining(), plot.harvestUsed(), cloneStorage(plot.storageContents())));
         }
         return states;
+    }
+
+    public Set<Integer> unlockedDoors() {
+        return Set.copyOf(unlockedDoorIds);
     }
 
     public void restore(List<PlotState> states) {
@@ -162,7 +220,8 @@ public final class HallsCampRuntime {
         }
         Plot plot = plotsByEntity.get(entity.getUniqueId());
         if (plot == null) {
-            return false;
+            Door door = doorsByEntity.get(entity.getUniqueId());
+            return door != null && handleDoorInteract(player, door, player.isSneaking());
         }
         if (plot.buildingId() == null) {
             return buildFromBlueprint(player, plot);
@@ -174,6 +233,162 @@ public final class HallsCampRuntime {
         playBuildingSound(player, building, BuildingSound.OPEN);
         openBuildingMenu(player, plot);
         return true;
+    }
+
+    private boolean handleDoorInteract(Player player, Door door, boolean unlockIntent) {
+        if (unlockedDoorIds.contains(door.id())) {
+            player.sendActionBar(Component.text("This camp door is already open.", NamedTextColor.GRAY));
+            return true;
+        }
+        if (bothSidesReachable(door)) {
+            unlockDoor(door, true);
+            player.sendActionBar(Component.text("Opened redundant camp door.", NamedTextColor.GREEN));
+            return true;
+        }
+        if (!isDoorReachable(door)) {
+            player.sendActionBar(Component.text("Reach this door from an unlocked room first.", NamedTextColor.RED));
+            return true;
+        }
+        if (!unlockIntent) {
+            player.sendMessage(Component.text("Locked camp door. Shift-right-click to spend 1 key.", NamedTextColor.GOLD));
+            for (String line : doorPlotSummary(door)) {
+                player.sendMessage(Component.text(line, NamedTextColor.GRAY));
+            }
+            return true;
+        }
+        if (keyAccount == null || keyAccount.keys() <= 0) {
+            player.sendActionBar(Component.text("The camp has no keys.", NamedTextColor.RED));
+            return true;
+        }
+        if (!keyAccount.spendKey()) {
+            player.sendActionBar(Component.text("Could not spend a camp key.", NamedTextColor.RED));
+            return true;
+        }
+        unlockDoor(door, true);
+        player.sendMessage(Component.text("Unlocked a camp door. Keys left: " + keyAccount.keys() + ".", NamedTextColor.GREEN));
+        return true;
+    }
+
+    private void unlockDoor(Door door, boolean effects) {
+        unlockedDoorIds.add(door.id());
+        for (int dy = 0; dy < 3; dy++) {
+            world.getBlockAt(door.worldX(), door.y() + dy, door.worldZ()).setType(Material.AIR, false);
+        }
+        Entity interaction = Bukkit.getEntity(door.interactionId());
+        if (interaction != null) {
+            interaction.remove();
+        }
+        doorsByEntity.remove(door.interactionId());
+        if (effects) {
+            Location location = new Location(world, door.worldX() + 0.5, door.y() + 1.0, door.worldZ() + 0.5);
+            world.playSound(location, Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.8f);
+            world.spawnParticle(org.bukkit.Particle.WAX_OFF, location, 24, 0.35, 0.75, 0.35, 0.02);
+        }
+    }
+
+    private boolean isDoorReachable(Door door) {
+        Set<Cell> reachable = reachableCampCells(Set.of());
+        return adjacentOpenCells(door).stream().anyMatch(reachable::contains);
+    }
+
+    private boolean bothSidesReachable(Door door) {
+        List<Cell> sides = adjacentOpenCells(door);
+        if (sides.size() < 2) {
+            return false;
+        }
+        Set<Cell> reachable = reachableCampCells(Set.of());
+        int reachableSides = 0;
+        for (Cell side : sides) {
+            if (reachable.contains(side)) {
+                reachableSides++;
+            }
+        }
+        return reachableSides >= 2;
+    }
+
+    private List<String> doorPlotSummary(Door door) {
+        Set<Cell> reachable = reachableCampCells(Set.of(door.id()));
+        Set<Integer> hiddenPlotIds = new HashSet<>();
+        for (Plot plot : plotsById.values()) {
+            Cell cell = new Cell((int) Math.floor(plot.x() - layoutStartX), (int) Math.floor(plot.z() - layoutStartZ));
+            if (reachable.contains(cell) && !reachableCampCells(Set.of()).contains(cell)) {
+                hiddenPlotIds.add(plot.id());
+            }
+        }
+        if (hiddenPlotIds.isEmpty()) {
+            return List.of("No new build plots are visible beyond it.");
+        }
+        List<String> lines = new ArrayList<>();
+        lines.add("Build plots beyond:");
+        hiddenPlotIds.stream().sorted().forEach(id -> {
+            Plot plot = plotsById.get(id);
+            if (plot != null) {
+                lines.add("- Plot " + id + " (" + plot.size() + ")");
+            }
+        });
+        return lines;
+    }
+
+    private Set<Cell> reachableCampCells(Set<Integer> temporarilyOpenDoors) {
+        Set<Cell> reachable = new HashSet<>();
+        if (layout == null || layout.elevatorLink() == null) {
+            return reachable;
+        }
+        ArrayList<Cell> queue = new ArrayList<>();
+        Cell start = new Cell(layout.elevatorLink().x(), layout.elevatorLink().z());
+        if (!isPassable(start.x(), start.z(), temporarilyOpenDoors)) {
+            return reachable;
+        }
+        queue.add(start);
+        reachable.add(start);
+        for (int index = 0; index < queue.size(); index++) {
+            Cell cell = queue.get(index);
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                Cell next = new Cell(cell.x() + face.getModX(), cell.z() + face.getModZ());
+                if (reachable.contains(next) || !isPassable(next.x(), next.z(), temporarilyOpenDoors)) {
+                    continue;
+                }
+                reachable.add(next);
+                queue.add(next);
+            }
+        }
+        return reachable;
+    }
+
+    private boolean isPassable(int x, int z, Set<Integer> temporarilyOpenDoors) {
+        if (layout == null || x < 0 || z < 0 || x >= layout.width() || z >= layout.depth()) {
+            return false;
+        }
+        char cell = layout.at(x, z);
+        if (cell == 'X') {
+            return false;
+        }
+        if (cell != 'D') {
+            return true;
+        }
+        Door door = doorAt(x, z);
+        return door != null && (unlockedDoorIds.contains(door.id()) || temporarilyOpenDoors.contains(door.id()));
+    }
+
+    private Door doorAt(int x, int z) {
+        for (Door door : doorsById.values()) {
+            if (door.x() == x && door.z() == z) {
+                return door;
+            }
+        }
+        return null;
+    }
+
+    private List<Cell> adjacentOpenCells(Door door) {
+        List<Cell> cells = new ArrayList<>();
+        for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+            int x = door.x() + face.getModX();
+            int z = door.z() + face.getModZ();
+            if (layout != null && x >= 0 && z >= 0 && x < layout.width() && z < layout.depth() && layout.at(x, z) != 'X') {
+                cells.add(new Cell(x, z));
+            }
+        }
+        return cells;
     }
 
     public boolean handleInventoryClick(InventoryClickEvent event) {
@@ -1405,6 +1620,12 @@ public final class HallsCampRuntime {
         public PlotState {
             storageContents = storageContents == null ? new ItemStack[0] : storageContents.clone();
         }
+    }
+
+    private record Door(int id, int x, int z, int worldX, int y, int worldZ, UUID interactionId) {
+    }
+
+    private record Cell(int x, int z) {
     }
 
     private record CampMenu(int plotId) implements InventoryHolder {

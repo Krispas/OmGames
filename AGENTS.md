@@ -1336,6 +1336,7 @@ SQLite tables:
 - Halls scenarios may define top-level `camp.layout`, `camp.team-lives`, and `camp.key-costs`; camp floors use the scenario's shared camp layout instead of separate per-floor camp layouts.
 - Camp layout files preserve `X`, `O`, `D`, `L`, `C`, and `N/S/W/E`: `X` is solid, `D` marks a camp door, `L` marks the elevator link point, `C` expands a build plot, and `N/S/W/E` marks the plot anchor/facing.
 - Camp state is saved under the shared camp slot, with old per-floor save entries tolerated as a restore fallback. Full hard resets clear shared camp state; life-based camp restarts preserve it.
+- Shared camp unlocked door ids are saved as `camps.<id>.unlocked-doors` and restored before camp door fixtures are rendered.
 - Camp room walls use the active level type wall palette, camp corner/internal pillar-like columns use the pillar palette, and camp ceilings receive multiple embedded light blocks.
 - Camp build-spot floors are rendered as oak planks for visibility and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
 - Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.yml`; legacy `.txt` and `.yaml` files are still parsed if present.
@@ -1359,7 +1360,7 @@ SQLite tables:
 - Starting/loading a Halls session closes any open Halls lobby villager menu for selected participants before teleporting them into the generated session.
 - Load Save lists save files containing the clicking player, allows shift-right-click deletion of those saves, and requires every saved participant to be online in the Halls lobby and outside other Halls sessions before restoring the save.
 - Difficulty options are Normal/Hard/Extreme with multipliers `1.0`, `1.5`, and `2.0`; the first-pass implementation scales floor difficulty, coin quota, trapped-room count, holes, and sculk patch count.
-- Camp floors connect the elevator corridor to the nearest open north-edge layout cell instead of assuming the layout center is open, and should keep the camp room far enough from the elevator to allow a walkable connector with a sealed corridor-height entrance.
+- Camp floors with a bottom-edge `L` marker dock that marker just outside the elevator front and carve a south-side layout opening, so large shared camp layouts do not overlap the elevator shell. Older layouts without a bottom `L` still use the north-edge connector fallback.
 - Item recipes are parsed as stored-scrap and hotbar item costs. Cooking Pot, Weapon Bench, and Armory list scenario-unlocked recipes by station level and craft them from their building GUI.
 - The `/hoc recipes` GUI reads the active scenario's `allowed-items.buildings`, global and level-type blueprint pools, and crafting-station recipe unlocks; it should remain informational and should not craft or mutate state.
 - Item `stats` values are written into item PDC as `hoc_stat_<stat_id>` and rendered into item lore for test visibility. `melee-damage`, `attack-speed`, and `durability` are also applied to item meta where Bukkit/Paper exposes the relevant component APIs.
