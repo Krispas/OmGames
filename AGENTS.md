@@ -1370,6 +1370,7 @@ SQLite tables:
 - `vagabonds_club` is the default starter weapon. Every participant receives it when a Halls run starts or fully restarts after game over.
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control global fallback blueprint keyword drops.
 - Scenario blueprint pools may also be restricted by level type with `blueprint-pools.<level-type>.normal` and `blueprint-pools.<level-type>.rare`; runtime uses the active floor level type first and falls back to the global rarity pool when no level-specific pool exists.
+- If a data-folder scenario predates `research.nodes`, the scenario loader may use bundled research defaults at runtime without rewriting the server file; this is a compatibility fallback, not migration logic.
 - Blueprint defaults currently cover every buildable GDD building family: grindstone, forge, storage locker, mycelia farm, elevator drill, scanner, health totem, speed totem, and sculk purifiers by size. Camp Station is permanent and has no blueprint.
 - Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `utility`, `rare_weapon`, `rare_armor`, and `rare_utility`; `ranged` / `rare_ranged` are no longer supported Halls loot keywords.
 - The generic `blueprint` loot keyword rolls the active level type's scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools, falling back to global scenario pools when no level-specific pool exists.

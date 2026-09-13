@@ -1,6 +1,7 @@
 package krispasi.omGames.hallsofcarnage;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -56,6 +57,13 @@ public final class HallsScenarioLoader {
                 loadNestedStringListMap(config.getConfigurationSection("blueprint-pools"));
         Map<String, Map<Integer, List<String>>> craftingStations = loadCraftingStations(config.getConfigurationSection("crafting-stations"));
         Map<String, HallsResearchNode> researchNodes = loadResearchNodes(config.getConfigurationSection("research.nodes"));
+        if (researchNodes.isEmpty() && config.getConfigurationSection("research.nodes") == null) {
+            researchNodes = loadBundledResearchNodes(plugin, file);
+            if (!researchNodes.isEmpty()) {
+                plugin.getLogger().info("Using bundled Halls research defaults for scenario " + id
+                        + " because " + file.getName() + " has no research.nodes section.");
+            }
+        }
         HallsScenario.CampSettings camp = loadCampSettings(config.getConfigurationSection("camp"));
         List<HallsScenario.FloorDefinition> floors = loadFloors(config);
         int floorCount = floors.stream().mapToInt(HallsScenario.FloorDefinition::lastFloor).max().orElse(0);
@@ -65,7 +73,7 @@ public final class HallsScenarioLoader {
         }
         return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers,
                 floorCount, camp, allowedItems, blueprintPools, levelTypeBlueprintPools,
-                craftingStations, researchNodes, List.copyOf(floors), debugLines(file, config, floors));
+                craftingStations, researchNodes, List.copyOf(floors), debugLines(file, config, floors, researchNodes.size()));
     }
 
     private static Map<String, HallsResearchNode> loadResearchNodes(ConfigurationSection section) {
@@ -100,6 +108,22 @@ public final class HallsScenarioLoader {
             ));
         }
         return Map.copyOf(nodes);
+    }
+
+    private static Map<String, HallsResearchNode> loadBundledResearchNodes(JavaPlugin plugin, File file) {
+        String resourcePath = "hallsOfCarnage/scenarios/" + file.getName();
+        try (InputStream input = plugin.getResource(resourcePath)) {
+            if (input == null) {
+                return Map.of();
+            }
+            YamlConfiguration bundled = YamlConfiguration.loadConfiguration(
+                    new java.io.InputStreamReader(input, java.nio.charset.StandardCharsets.UTF_8));
+            return loadResearchNodes(bundled.getConfigurationSection("research.nodes"));
+        } catch (java.io.IOException ex) {
+            plugin.getLogger().warning("Could not read bundled Halls research defaults from "
+                    + resourcePath + ": " + ex.getMessage());
+            return Map.of();
+        }
     }
 
     private static HallsScenario.CampSettings loadCampSettings(ConfigurationSection section) {
@@ -222,9 +246,11 @@ public final class HallsScenarioLoader {
 
     private static List<String> debugLines(File file,
                                            YamlConfiguration config,
-                                           List<HallsScenario.FloorDefinition> floors) {
+                                           List<HallsScenario.FloorDefinition> floors,
+                                           int researchNodeCount) {
         List<String> lines = new ArrayList<>();
         lines.add("source-file: " + file.getName());
+        lines.add("research-nodes: " + Math.max(0, researchNodeCount));
         lines.add("parsed-floor-definitions:");
         if (floors.isEmpty()) {
             lines.add("  <none>");

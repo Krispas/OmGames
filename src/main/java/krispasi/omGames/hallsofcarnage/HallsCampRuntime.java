@@ -817,6 +817,14 @@ public final class HallsCampRuntime {
                 .sorted(java.util.Comparator.comparingInt((HallsResearchNode node) -> node.prerequisites().size())
                         .thenComparing(HallsResearchNode::id))
                 .toList();
+        if (nodes.isEmpty()) {
+            inventory.setItem(22, menuItem(Material.BARRIER, "No Research Loaded", NamedTextColor.RED,
+                    List.of("This scenario has no research nodes.",
+                            "Camp Station recipes will use legacy availability."), null, null));
+            inventory.setItem(45, menuItem(Material.ARROW, "Back", NamedTextColor.GRAY, List.of("Return to station."), "station_home", null));
+            player.openInventory(inventory);
+            return;
+        }
         int[][] slotsByDepth = {
                 {10, 19, 28, 37},
                 {12, 21, 30, 39},
