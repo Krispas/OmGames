@@ -763,6 +763,7 @@ public final class HallsCampRuntime {
         List<HallsItemType> categoryRecipes = recipes.stream()
                 .map(itemTypes::get)
                 .filter(type -> type != null && type.category().equals(category))
+                .filter(type -> researchAccount == null || researchAccount.isItemResearched(type.id()))
                 .toList();
         int maxPage = Math.max(0, (categoryRecipes.size() - 1) / RECIPE_SLOTS.length);
         int normalizedPage = Math.max(0, Math.min(maxPage, page));
@@ -773,6 +774,10 @@ public final class HallsCampRuntime {
         int start = normalizedPage * RECIPE_SLOTS.length;
         for (int i = 0; i < RECIPE_SLOTS.length && start + i < categoryRecipes.size(); i++) {
             inventory.setItem(RECIPE_SLOTS[i], recipeMenuItem(categoryRecipes.get(start + i)));
+        }
+        if (categoryRecipes.isEmpty()) {
+            inventory.setItem(22, menuItem(Material.BARRIER, "No Researched Recipes", NamedTextColor.GRAY,
+                    List.of("Unlock more research nodes to craft items in this category."), null, null));
         }
         inventory.setItem(45, menuItem(Material.ARROW, "Back", NamedTextColor.GRAY, List.of("Return to station."), "station_home", null));
         if (normalizedPage > 0) {
