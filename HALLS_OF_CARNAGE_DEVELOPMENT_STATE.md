@@ -59,7 +59,7 @@ Last updated: 2026-09-13
 - Scenarios now parse `allowed-items` by category and `blueprint-pools.normal` / `blueprint-pools.rare`.
 - Breakable loot can reference concrete item ids, scenario-aware category keywords (`weapon`, `armor`, `utility` and rare variants), and scenario blueprint keywords. Old `ranged` and `rare_ranged` loot keywords are compatibility aliases for weapon rolls.
 - The first-floor crate now forces a rare blueprint drop through the scenario rare blueprint pool.
-- `/hoc give <item> [amount]` is an OP-only self-target test command for loaded Halls item definitions.
+- `/hoc give <item> [amount]` is an OP-only self-target test command for loaded Halls item definitions, stored scrap deposits, and active-session research point grants via `research_points`.
 - `/hoc give` and Halls item loot share the same item factory so test-given items and dropped items get identical display, model, PDC, recipe, and stat metadata.
 - Halls armor items equip into empty matching armor slots from `/hoc give` and from right-click physics-drop pickup before falling back to hotbar insertion.
 - The first exploration room now uses validated doorway offsets for the elevator connection instead of always using the room's geometric center.
@@ -166,6 +166,10 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: size-specific Sculk Purifiers were removed from bundled resources and Untold Depths now uses one medium `sculk_purifier` plus `sculk_purifier_blueprint`. Camp Station now opens category views for weapons, armor, utilities, and food with pagination support. Scenario `research.nodes` now defines the camp-station research tree; roots unlock automatically, normal camp arrivals grant one point per exploration floor cleared since the prior camp, research gates crafting, and save/checkpoint data persists research points, unlocked nodes, and the pending floor counter.
 - Next reviewer slice applied: scenarios that predate `research.nodes` now load bundled research defaults at runtime when their data-folder scenario file has no research section, without rewriting server files. This prevents old Untold Depths configs from treating Camp Station recipes as fully legacy-unlocked and restores the research tree in the Camp Station menu. The research menu also shows an explicit "No Research Loaded" diagnostic instead of opening blank if a scenario truly has no research nodes.
 - Next reviewer slice applied: Camp Station category crafting views now hide recipes whose research node has not been unlocked yet, instead of showing them with a red research-required lore line. Empty researched categories show a clear placeholder directing players back to research.
+- Next reviewer slice applied: `/hoc give research_points [amount]` now adds test research points to the caller's active Halls session and saves the updated session state. Accepted aliases are `research_point`, `research`, and `rp`; tab completion lists `research_points`.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- Make it so elevator has a marker on the locator bar. You could do this by having an entity with certain attributes if I am correct, but find out yourself using docs.
+- Make it so each floor generates a research crate. It is a 2x2x2 magenta concrete. It can be picked up by player, but not into inventory, instead the player will hold it above the head. While holding it, player cannot use right or left click actions or open the inventory. Player can press shift to let go of it. If player brings it to the elevator and right clicks hopper, it will get deposited and team will receive 1 bonus research point. While carrying, player has slowness and resistance II (if nothing else is providing better resistance)
+- Give utilities durability

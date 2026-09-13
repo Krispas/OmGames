@@ -1335,6 +1335,14 @@ public final class HallsOfCarnageManager {
         String itemId = normalizeId(rawItemId);
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (isResearchPointsId(itemId)) {
+            if (session == null) {
+                return Result.fail("You must be in an active Halls session to add test research points.");
+            }
+            int total = session.addResearchPoints(amount);
+            return Result.ok("Added " + amount + " Halls research point" + (amount == 1 ? "" : "s")
+                    + ". Current points: " + total + ".");
+        }
         if (HallsSession.isScrapId(itemId)) {
             if (session == null) {
                 return Result.fail("You must be in an active Halls session to deposit test scrap.");
@@ -1358,6 +1366,13 @@ public final class HallsOfCarnageManager {
         }
         player.getInventory().setItem(slot, item);
         return Result.ok("Gave " + type.name() + ".");
+    }
+
+    private boolean isResearchPointsId(String itemId) {
+        return itemId != null && switch (itemId) {
+            case "research_point", "research_points", "research", "rp" -> true;
+            default -> false;
+        };
     }
 
     public Result toggleDebug(Player player) {

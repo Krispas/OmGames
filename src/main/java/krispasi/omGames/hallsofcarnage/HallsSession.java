@@ -3421,6 +3421,15 @@ public final class HallsSession {
         return true;
     }
 
+    public int addResearchPoints(int amount) {
+        if (amount <= 0) {
+            return researchPoints;
+        }
+        researchPoints += amount;
+        save("test-research-points");
+        return researchPoints;
+    }
+
     private boolean reducePlayerSculk(UUID playerId, double amount) {
         if (playerId == null || amount <= 0.0) {
             return false;

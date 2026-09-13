@@ -355,6 +355,7 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
             options.add("iron_scrap");
             options.add("diamond_scrap");
             options.add("redstone_scrap");
+            options.add("research_points");
             return filter(args[1], options.toArray(String[]::new));
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("reset")) {
