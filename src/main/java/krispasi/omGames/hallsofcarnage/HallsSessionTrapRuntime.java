@@ -1075,8 +1075,8 @@ final class HallsSessionTrapRuntime {
                     if (activeAge == 0L) {
                         world.playSound(center, Sound.BLOCK_BUBBLE_COLUMN_UPWARDS_AMBIENT, 1.0f, 1.35f);
                     }
-                    knockbackPlayersNear(center, trap.type().radius());
-                    knockbackMonstersNear(center, trap.type().radius());
+                    knockbackPlayersInGeyser(trap, center, trap.type().radius());
+                    knockbackMonstersInGeyser(trap, center, trap.type().radius());
                 } else if (activeAge == trap.type().activeTicks()) {
                     setGeyserLiquidColumn(trap, Material.WATER);
                 }
@@ -1483,6 +1483,12 @@ final class HallsSessionTrapRuntime {
         }
     }
 
+    private void knockbackPlayersInGeyser(HallsTrap trap, Location center, double radius) {
+        for (Player player : geyserParticipants(trap, radius)) {
+            applyGeyserKnockback(player, center);
+        }
+    }
+
     private void knockbackMonstersNear(Location center, double radius) {
         if (!canTrapAffectMonsters(center)) {
             return;
@@ -1490,6 +1496,18 @@ final class HallsSessionTrapRuntime {
         double radiusSquared = radius * radius;
         for (LivingEntity monster : sessionMonsters()) {
             if (monster.getLocation().distanceSquared(center) <= radiusSquared) {
+                applyGeyserKnockback(monster, center);
+            }
+        }
+    }
+
+    private void knockbackMonstersInGeyser(HallsTrap trap, Location center, double radius) {
+        if (!canTrapAffectMonsters(center)) {
+            return;
+        }
+        double radiusSquared = radius * radius;
+        for (LivingEntity monster : sessionMonsters()) {
+            if (isInGeyserColumn(monster.getLocation(), trap, radiusSquared)) {
                 applyGeyserKnockback(monster, center);
             }
         }
@@ -1518,6 +1536,32 @@ final class HallsSessionTrapRuntime {
             }
         }
         return players;
+    }
+
+    private List<Player> geyserParticipants(HallsTrap trap, double radius) {
+        double radiusSquared = radius * radius;
+        List<Player> players = new ArrayList<>();
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)
+                    && isAliveParticipant(player)
+                    && isInGeyserColumn(player.getLocation(), trap, radiusSquared)) {
+                players.add(player);
+            }
+        }
+        return players;
+    }
+
+    private boolean isInGeyserColumn(Location location, HallsTrap trap, double radiusSquared) {
+        if (location == null || !location.getWorld().equals(world)) {
+            return false;
+        }
+        double dx = location.getX() - (trap.x() + 0.5);
+        double dz = location.getZ() - (trap.z() + 0.5);
+        double feetY = location.getY();
+        double headY = feetY + 1.8;
+        boolean overlapsWaterColumn = headY >= origin.y() - 2.25 && feetY <= origin.y() + 1.35;
+        return overlapsWaterColumn && dx * dx + dz * dz <= radiusSquared;
     }
 
     private void damagePlayerFromTrap(Player player, double damage, String message) {

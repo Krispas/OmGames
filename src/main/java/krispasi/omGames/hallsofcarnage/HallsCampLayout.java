@@ -6,10 +6,13 @@ import org.bukkit.block.BlockFace;
 public record HallsCampLayout(List<String> rows,
                               int width,
                               int depth,
-                              List<BuildSpot> buildSpots) {
+                              List<BuildSpot> buildSpots,
+                              List<DoorCell> doors,
+                              Cell elevatorLink) {
     public HallsCampLayout {
         rows = List.copyOf(rows);
         buildSpots = List.copyOf(buildSpots);
+        doors = doors == null ? List.of() : List.copyOf(doors);
     }
 
     public char at(int x, int z) {
@@ -43,5 +46,11 @@ public record HallsCampLayout(List<String> rows,
         public double centerZ() {
             return (minZ + maxZ) / 2.0;
         }
+    }
+
+    public record DoorCell(int id, int x, int z) {
+    }
+
+    public record Cell(int x, int z) {
     }
 }

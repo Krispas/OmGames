@@ -32,6 +32,16 @@ public final class HallsCampFloorBuilder {
         return HallsCampLayoutLoader.load(new File(dataFolder, "level/" + layoutPath));
     }
 
+    public static HallsCampLayout load(File dataFolder, HallsScenario scenario) throws IOException {
+        String layoutPath = scenario == null || scenario.camp().layout().isBlank()
+                ? "camps/camp_1.txt"
+                : scenario.camp().layout();
+        if (layoutPath.startsWith("level/")) {
+            layoutPath = layoutPath.substring("level/".length());
+        }
+        return HallsCampLayoutLoader.load(new File(dataFolder, "level/" + layoutPath));
+    }
+
     public void build(HallsCampLayout layout,
                       int roomStartX,
                       int y,

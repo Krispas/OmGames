@@ -11,6 +11,7 @@ public record HallsScenario(
         int minPlayers,
         int maxPlayers,
         int floorCount,
+        CampSettings camp,
         Map<String, List<String>> allowedItems,
         Map<String, List<String>> blueprintPools,
         Map<String, Map<String, List<String>>> levelTypeBlueprintPools,
@@ -19,10 +20,32 @@ public record HallsScenario(
         List<String> debugLines
 ) {
     public HallsScenario {
+        camp = camp == null ? CampSettings.defaults() : camp;
         allowedItems = Map.copyOf(allowedItems);
         blueprintPools = Map.copyOf(blueprintPools);
         levelTypeBlueprintPools = deepCopyBlueprintPools(levelTypeBlueprintPools);
         craftingStations = deepCopyCraftingStations(craftingStations);
+    }
+
+    public record CampSettings(String layout, int teamLives, List<Integer> keyCosts) {
+        public CampSettings {
+            layout = layout == null ? "" : layout.trim();
+            teamLives = Math.max(0, teamLives);
+            keyCosts = keyCosts == null ? List.of() : keyCosts.stream()
+                    .filter(cost -> cost != null && cost > 0)
+                    .toList();
+        }
+
+        public static CampSettings defaults() {
+            return new CampSettings("camps/camp_1.txt", 3, List.of(30, 40, 50));
+        }
+
+        public int nextKeyCost(int earnedKeys) {
+            if (keyCosts.isEmpty()) {
+                return 0;
+            }
+            return keyCosts.get(Math.min(Math.max(0, earnedKeys), keyCosts.size() - 1));
+        }
     }
 
     public List<String> allowedItems(String category) {

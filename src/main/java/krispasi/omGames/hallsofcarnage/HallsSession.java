@@ -123,6 +123,11 @@ public final class HallsSession {
     private int diamondScrap;
     private int redstoneScrap;
     private int coins;
+    private int campBankCoins;
+    private int campKeys;
+    private int campKeysEarned;
+    private int remainingLives;
+    private int lastCampFloor;
     private ItemStack[] elevatorChestContents = new ItemStack[27];
     private int activeClearRadius = CLEAR_RADIUS;
     private String activeLevelTypeId = "howling_corridors";
@@ -209,6 +214,7 @@ public final class HallsSession {
             }
         }, this::scanUpcomingFloors);
         this.debugEnabled = debugEnabled == null ? ignored -> false : debugEnabled;
+        this.remainingLives = scenario.camp().teamLives();
     }
 
     public int id() {
@@ -836,7 +842,7 @@ public final class HallsSession {
             return;
         }
         if (initialSave == null) {
-            resetRunState();
+            resetRunState(true);
             buildStartArea();
         } else {
             restoreSavedSessionState(initialSave);
@@ -1031,27 +1037,33 @@ public final class HallsSession {
         activeClearRadius = CLEAR_RADIUS;
         HallsCampLayout layout;
         try {
-            layout = HallsCampFloorBuilder.load(dataFolder, floorDefinition);
+            layout = HallsCampFloorBuilder.load(dataFolder, scenario);
         } catch (IOException ex) {
             plugin.getLogger().warning("Failed to load Halls camp layout for session " + id + ": " + ex.getMessage());
             layout = new HallsCampLayout(List.of("OOOOO", "OCCCO", "OCNCO", "OCCCO", "OOOOO"), 5, 5,
-                    List.of(new HallsCampLayout.BuildSpot(1, 1, 3, 1, 3, 2, 2, BlockFace.NORTH, "medium")));
+                    List.of(new HallsCampLayout.BuildSpot(1, 1, 3, 1, 3, 2, 2, BlockFace.NORTH, "medium")),
+                    List.of(), null);
         }
         activeClearRadius = Math.max(CLEAR_RADIUS, 16 + Math.max(layout.width(), layout.depth()));
         clearBuildVolume();
         buildElevator();
         currentFloor = floor;
+        lastCampFloor = Math.max(lastCampFloor, floor);
         floorStartedAtMillis = System.currentTimeMillis();
-        int roomStartX = origin.x() - layout.width() / 2;
-        int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 10;
-        int entranceX = nearestCampEntranceX(layout, origin.x() - roomStartX);
+        HallsCampLayout.Cell link = layout.elevatorLink();
+        int linkX = link == null ? layout.width() / 2 : link.x();
+        int linkZ = link == null ? 0 : link.z();
+        int roomStartX = origin.x() - linkX;
+        int roomStartZ = origin.z() + ELEVATOR_OUTER_RADIUS + 10 - linkZ;
+        int entranceX = link == null || link.z() != 0 ? nearestCampEntranceX(layout, origin.x() - roomStartX) : link.x();
         new HallsCampFloorBuilder(this::setBlock, campRuntime).build(layout, roomStartX, origin.y(), roomStartZ,
                 levelType, entranceX);
-        campRuntime.restore(savedCampStates.get(floor));
-        buildCampConnector(roomStartX + entranceX, origin.y(), roomStartZ - 1, levelType);
+        campRuntime.restore(savedCampStates.getOrDefault(sharedCampStateKey(), savedCampStates.get(floor)));
+        buildCampConnector(roomStartX + linkX, origin.y(), roomStartZ + linkZ - 1, levelType);
+        depositCampBankCoins();
         restoreElevatorChestContents();
         closeElevatorDoors();
-        teleportParticipantsToElevator("Camp Floor " + floor, "Build, upgrade, and regroup.");
+        teleportParticipantsToElevator("Camp Floor " + floor, "Keys " + campKeys + " | " + nextCampKeyProgressLabel());
         save("camp-floor");
     }
 
@@ -2381,7 +2393,9 @@ public final class HallsSession {
                 .append(Component.text("Scrap W" + woodScrap + " I" + ironScrap
                         + " D" + diamondScrap + " R" + redstoneScrap, NamedTextColor.GOLD))
                 .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("Coins " + coins + "/" + currentCoinQuota(), NamedTextColor.YELLOW));
+                .append(campHudEconomyComponent())
+                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                .append(Component.text("Lives " + remainingLives, NamedTextColor.RED));
         if (!activeFloorModifiers.empty()) {
             shared = shared.append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                     .append(activeFloorModifiers.hudComponent());
@@ -2485,6 +2499,15 @@ public final class HallsSession {
             quota = Math.max(0, (int) Math.round(quota * activeFloorModifiers.coinQuotaMultiplier()));
         }
         return quota;
+    }
+
+    private Component campHudEconomyComponent() {
+        if (!isCurrentFloorCamp()) {
+            return Component.text("Coins " + coins + "/" + currentCoinQuota(), NamedTextColor.YELLOW);
+        }
+        int nextCost = scenario.camp().nextKeyCost(campKeysEarned);
+        String progress = nextCost <= 0 ? "complete" : campBankCoins + "/" + nextCost;
+        return Component.text("Keys " + campKeys + " | Bank " + progress, NamedTextColor.YELLOW);
     }
 
     private int nextFloorAfterCampDrill() {
@@ -3506,7 +3529,10 @@ public final class HallsSession {
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
-                player.sendTitle("Game Over", "Restarting from floor 1.", 10, 160, 20);
+                String subtitle = lastCampFloor > 1 && remainingLives > 0
+                        ? "Returning to camp. Lives left: " + (remainingLives - 1) + "."
+                        : "Restarting from floor 1.";
+                player.sendTitle("Game Over", subtitle, 10, 160, 20);
             }
         }
         gameOverTask = Bukkit.getScheduler().runTaskLater(plugin, this::restartFromGameOver, 200L);
@@ -3526,8 +3552,11 @@ public final class HallsSession {
             }
         }
         removeSessionEntities();
-        resetRunState();
-        resetCampHarvestForNewRun();
+        if (lastCampFloor > 1 && remainingLives > 0) {
+            restartFromLastCampLife(protectedSpawn);
+            return;
+        }
+        resetRunState(true);
         try {
             buildStartArea();
         } catch (IOException ex) {
@@ -3552,6 +3581,44 @@ public final class HallsSession {
             }
         }
         save("game-over-restart");
+    }
+
+    private void restartFromLastCampLife(Location protectedSpawn) {
+        remainingLives = Math.max(0, remainingLives - 1);
+        resetRunState(false);
+        resetCampHarvestForNewRun();
+        try {
+            buildCampFloor(lastCampFloor);
+        } catch (RuntimeException ex) {
+            plugin.getLogger().warning("Failed to return Halls session " + id + " to camp after game over: " + ex.getMessage());
+            if (protectedSpawn != null) {
+                for (UUID playerId : participants) {
+                    Player player = Bukkit.getPlayer(playerId);
+                    if (player != null && player.getWorld().equals(world)) {
+                        player.teleport(protectedSpawn);
+                        player.setFallDistance(0.0f);
+                    }
+                }
+            }
+            return;
+        }
+        openElevatorDoors();
+        Location spawn = elevatorSpawnLocation();
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null) {
+                player.getInventory().clear();
+                player.getInventory().setArmorContents(null);
+                player.getInventory().setItemInOffHand(null);
+                clearTotemBuffs(player);
+                player.setHealth(Math.min(player.getMaxHealth(), 20.0));
+                clearGhostState(player);
+                applyInventoryLimit(player);
+                teleportSessionPlayer(player, spawn);
+                player.sendTitle("Life Lost", remainingLives + " lives remain.", 0, 55, 15);
+            }
+        }
+        save("life-camp-restart");
     }
 
     public void save(String reason) {
@@ -3581,6 +3648,11 @@ public final class HallsSession {
             yaml.set("storage.diamond", diamondScrap);
             yaml.set("storage.redstone", redstoneScrap);
             yaml.set("storage.coins", coins);
+            yaml.set("camp-bank.coins", campBankCoins);
+            yaml.set("camp-bank.keys", campKeys);
+            yaml.set("camp-bank.keys-earned", campKeysEarned);
+            yaml.set("team-lives.remaining", remainingLives);
+            yaml.set("team-lives.last-camp-floor", lastCampFloor);
             yaml.set("elevator-chest", java.util.Arrays.asList(elevatorChestContents));
             savePlayers(yaml);
             saveCamps(yaml);
@@ -3601,6 +3673,11 @@ public final class HallsSession {
         diamondScrap = Math.max(0, save.diamondScrap());
         redstoneScrap = Math.max(0, save.redstoneScrap());
         coins = Math.max(0, save.coins());
+        campBankCoins = Math.max(0, save.campBankCoins());
+        campKeys = Math.max(0, save.campKeys());
+        campKeysEarned = Math.max(0, save.campKeysEarned());
+        remainingLives = Math.max(0, save.remainingLives());
+        lastCampFloor = Math.max(0, save.lastCampFloor());
         activeFloorModifiers = HallsFloorModifiers.none();
         firstGhostCoinCacheDropped = false;
         compassTrailCountdown = 0;
@@ -3700,10 +3777,48 @@ public final class HallsSession {
         }
         List<HallsCampRuntime.PlotState> snapshot = campRuntime.snapshot();
         if (snapshot.isEmpty()) {
-            savedCampStates.remove(currentFloor);
+            savedCampStates.remove(sharedCampStateKey());
             return;
         }
-        savedCampStates.put(currentFloor, snapshot);
+        savedCampStates.put(sharedCampStateKey(), snapshot);
+    }
+
+    private int sharedCampStateKey() {
+        return 0;
+    }
+
+    private void depositCampBankCoins() {
+        if (coins > 0) {
+            campBankCoins += coins;
+            coins = 0;
+        }
+        int earned = 0;
+        int nextCost = scenario.camp().nextKeyCost(campKeysEarned);
+        while (nextCost > 0 && campBankCoins >= nextCost) {
+            campBankCoins -= nextCost;
+            campKeys++;
+            campKeysEarned++;
+            earned++;
+            nextCost = scenario.camp().nextKeyCost(campKeysEarned);
+        }
+        if (earned <= 0) {
+            return;
+        }
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.sendMessage(Component.text("Camp bank produced " + earned + " key"
+                        + (earned == 1 ? "." : "s."), NamedTextColor.GOLD));
+            }
+        }
+    }
+
+    private String nextCampKeyProgressLabel() {
+        int nextCost = scenario.camp().nextKeyCost(campKeysEarned);
+        if (nextCost <= 0) {
+            return "key track complete";
+        }
+        return Math.max(0, nextCost - campBankCoins) + " coins to next key";
     }
 
     private boolean isCurrentFloorCamp() {
@@ -3713,7 +3828,7 @@ public final class HallsSession {
         return "camp".equalsIgnoreCase(scenario.floor(currentFloor).kind());
     }
 
-    private void resetRunState() {
+    private void resetRunState(boolean resetCampProgress) {
         ghostPlayers.clear();
         elevatorChestContents = new ItemStack[27];
         elevatorChestSnapshotLocked = false;
@@ -3722,6 +3837,14 @@ public final class HallsSession {
         diamondScrap = 0;
         redstoneScrap = 0;
         coins = 0;
+        if (resetCampProgress) {
+            savedCampStates.clear();
+            campBankCoins = 0;
+            campKeys = 0;
+            campKeysEarned = 0;
+            remainingLives = scenario.camp().teamLives();
+            lastCampFloor = 0;
+        }
         activeFloorModifiers = HallsFloorModifiers.none();
         firstGhostCoinCacheDropped = false;
         compassTrailCountdown = 0;

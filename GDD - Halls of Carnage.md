@@ -123,11 +123,18 @@ fight waves of randomized mobs defined by a pool from the scenario.
 
 Once all enemies are defeated, the elevator can be taken deeper.
 ### Camp Floors
-Camp floors are respites for players. Game can be saved there from a special terminal which the game generates somewhere in the room.
-They generate randomly, figure out some kind of algorithm yourself. Elevator must be present again. It can be a cave, a room or anything of that thing.
+Camp floors are respites for players. Each scenario has one shared camp layout for the entire campaign instead of separate random camps per camp floor. The camp is configured by the scenario and can use a large text layout such as `resources/hallsOfCarnage/level/camps/camp_untold_depths.txt`.
 
-Game needs to remember layout of these floors! Players can build buildings on build spots, which are scattered throughout the room. There are 3 types of slots.
-Small (1x1), Medium (3x3) and Large (5x5). More on those later, their amount is configured through scenario.
+The camp layout uses normal open/blocked room markers plus special markers:
+- `L` is the camp elevator link point.
+- `D` is a locked camp door.
+- `C` and facing markers (`N`, `S`, `E`, `W`) define build plots.
+
+Camp rooms behind locked doors start inaccessible. Right-clicking a locked door tells players what build plots are in the room behind it. Shift-right-clicking the door while the party has a key permanently unlocks it. If both sides of a door are already unlocked through other paths, that door can be opened for free.
+
+Players can build buildings on build spots scattered throughout the shared camp. There are 3 types of slots: Small (1x1), Medium (3x3), and Large (5x5). Smaller buildings can be built on larger spots. The shared camp is saved across camp visits, but it resets when the team suffers a full hard reset after running out of team lives.
+
+Camp floors replace the normal coin quota display with a key counter. When the party arrives at camp, extra carried coins are deposited into the camp bank. The scenario defines a key-cost sequence, for example 30, 40, 50. Bank progress accumulates across camp visits and grants a key each time the next threshold is reached. Keys are then spent to unlock reachable camp doors.
 ### Transition Floors
 Transition floors are like loading screen. Which should last at least 10 seconds or more if the game needs to. It is in the elevator with partiles going around.
 If going to exploration floor, modifiers are also picked here and displayed as title like a "gambling machine display."
@@ -290,7 +297,9 @@ Above hotbar on message line should be something akin to a ui, which will tell p
 ### Reviving
 If player dies and becomes a ghost, it gets revived on the next floor without their stuff.
 ### Loose conditions
-If all players become ghosts, the game fades into special elevator transition floors, announcing game over. The players are then moved to floor 1 and can begin another run.
+Players have shared team lives, configured by scenario and defaulting to 3. If all players become ghosts, the game fades into a game-over transition. If the team has reached at least one camp and still has a life left, one life is consumed and the last camp save is restored. The shared camp does not reset in this case.
+
+If the team wipes before reaching the first camp, the run hard-resets to floor 1 without consuming a life. If the team wipes with no lives left, the players are moved to floor 1, the shared camp resets, and they can begin another run.
 ## Sounds
 Add sound effects to stuff. You have full freedom over the choice as long as it seems suitable.
 ## Shame

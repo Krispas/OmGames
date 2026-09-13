@@ -55,6 +55,7 @@ public final class HallsScenarioLoader {
         Map<String, Map<String, List<String>>> levelTypeBlueprintPools =
                 loadNestedStringListMap(config.getConfigurationSection("blueprint-pools"));
         Map<String, Map<Integer, List<String>>> craftingStations = loadCraftingStations(config.getConfigurationSection("crafting-stations"));
+        HallsScenario.CampSettings camp = loadCampSettings(config.getConfigurationSection("camp"));
         List<HallsScenario.FloorDefinition> floors = loadFloors(config);
         int floorCount = floors.stream().mapToInt(HallsScenario.FloorDefinition::lastFloor).max().orElse(0);
         if (id.isBlank() || name == null || name.isBlank()) {
@@ -62,8 +63,27 @@ public final class HallsScenarioLoader {
             return null;
         }
         return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers,
-                floorCount, allowedItems, blueprintPools, levelTypeBlueprintPools,
+                floorCount, camp, allowedItems, blueprintPools, levelTypeBlueprintPools,
                 craftingStations, List.copyOf(floors), debugLines(file, config, floors));
+    }
+
+    private static HallsScenario.CampSettings loadCampSettings(ConfigurationSection section) {
+        HallsScenario.CampSettings defaults = HallsScenario.CampSettings.defaults();
+        if (section == null) {
+            return defaults;
+        }
+        List<Integer> keyCosts = new ArrayList<>();
+        for (Object value : section.getList("key-costs", List.of())) {
+            int cost = positiveInt(value, 0);
+            if (cost > 0) {
+                keyCosts.add(cost);
+            }
+        }
+        return new HallsScenario.CampSettings(
+                section.getString("layout", defaults.layout()),
+                section.getInt("team-lives", defaults.teamLives()),
+                keyCosts.isEmpty() ? defaults.keyCosts() : List.copyOf(keyCosts)
+        );
     }
 
     private static Map<String, List<String>> loadStringListMap(ConfigurationSection section) {

@@ -39,6 +39,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/level/special/start_floor.txt",
             "hallsOfCarnage/level/special/final_floor_1.txt",
             "hallsOfCarnage/level/camps/camp_1.txt",
+            "hallsOfCarnage/level/camps/camp_untold_depths.txt",
             "hallsOfCarnage/level/howling_corridors/exploration_1.txt",
             "hallsOfCarnage/level/howling_corridors/exploration_2.txt",
             "hallsOfCarnage/level/howling_corridors/exploration_3.txt",

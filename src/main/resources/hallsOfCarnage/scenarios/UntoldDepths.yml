@@ -3,10 +3,19 @@ name: "Untold Depths"
 difficulty: "Medium"
 description:
   - "A long descent through the first halls beneath Om Nom Lands."
-  - "Camps appear every fifth floor. The final floor is a combat arena."
+  - "A shared expedition camp anchors progression. The final floor is a combat arena."
 players:
   min: 1
   max: 6
+camp:
+  layout: camps/camp_untold_depths.txt
+  team-lives: 3
+  key-costs:
+    - 30
+    - 40
+    - 50
+    - 60
+    - 70
 allowed-items:
   scrap:
     - wood
@@ -276,7 +285,6 @@ floors:
   - number: 5
     kind: camp
     level-type: howling_corridors
-    layout: camps/camp_1.txt
   - number: 6
     kind: exploration
     level-type: infernal_chambers
@@ -332,7 +340,6 @@ floors:
   - number: 10
     kind: camp
     level-type: frozen_halls
-    layout: camps/camp_1.txt
   - number: 11-49
     kind: exploration
     level-type: deep_crypt

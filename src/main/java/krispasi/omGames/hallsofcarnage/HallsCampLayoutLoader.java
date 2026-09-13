@@ -25,7 +25,32 @@ public final class HallsCampLayoutLoader {
         List<String> padded = rows.stream()
                 .map(row -> row + "X".repeat(Math.max(0, width - row.length())))
                 .toList();
-        return new HallsCampLayout(padded, width, padded.size(), buildSpots(padded, width));
+        return new HallsCampLayout(padded, width, padded.size(), buildSpots(padded, width), doors(padded, width),
+                elevatorLink(padded, width));
+    }
+
+    private static List<HallsCampLayout.DoorCell> doors(List<String> rows, int width) {
+        List<HallsCampLayout.DoorCell> doors = new ArrayList<>();
+        int id = 1;
+        for (int z = 0; z < rows.size(); z++) {
+            for (int x = 0; x < width; x++) {
+                if (rows.get(z).charAt(x) == 'D') {
+                    doors.add(new HallsCampLayout.DoorCell(id++, x, z));
+                }
+            }
+        }
+        return List.copyOf(doors);
+    }
+
+    private static HallsCampLayout.Cell elevatorLink(List<String> rows, int width) {
+        for (int z = 0; z < rows.size(); z++) {
+            for (int x = 0; x < width; x++) {
+                if (rows.get(z).charAt(x) == 'L') {
+                    return new HallsCampLayout.Cell(x, z);
+                }
+            }
+        }
+        return null;
     }
 
     private static List<HallsCampLayout.BuildSpot> buildSpots(List<String> rows, int width) {

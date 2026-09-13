@@ -1333,8 +1333,9 @@ SQLite tables:
 - Halls player item defaults do not include ranged gear; do not add bows, crossbows, tridents, arrows, or fireworks as Halls player items unless the design changes again.
 - Armor `item-model` controls the item icon/model; armor `armor-model` is written to Paper's equippable component for the worn armor model.
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
-- Scenario floor definitions may include `layout`; camp floors use it to load `plugins/OmGames/HallsOfCarnage/level/<layout>`, such as `level/camps/camp_1.txt`.
-- Camp layout files preserve `X`, `O`, `C`, and `N/S/W/E`: `X` is solid, every other marker is open floor, `C` expands a build plot, and `N/S/W/E` marks the plot anchor/facing.
+- Halls scenarios may define top-level `camp.layout`, `camp.team-lives`, and `camp.key-costs`; camp floors use the scenario's shared camp layout instead of separate per-floor camp layouts.
+- Camp layout files preserve `X`, `O`, `D`, `L`, `C`, and `N/S/W/E`: `X` is solid, `D` marks a camp door, `L` marks the elevator link point, `C` expands a build plot, and `N/S/W/E` marks the plot anchor/facing.
+- Camp state is saved under the shared camp slot, with old per-floor save entries tolerated as a restore fallback. Full hard resets clear shared camp state; life-based camp restarts preserve it.
 - Camp room walls use the active level type wall palette, camp corner/internal pillar-like columns use the pillar palette, and camp ceilings receive multiple embedded light blocks.
 - Camp build-spot floors are rendered as oak planks for visibility and get session-owned `Interaction` hitboxes. Right-clicking an empty plot with a matching blueprint consumes the blueprint and builds the configured building.
 - Halls building definitions are loaded from `plugins/OmGames/HallsOfCarnage/buildings/*.yml`; legacy `.txt` and `.yaml` files are still parsed if present.
@@ -1350,7 +1351,7 @@ SQLite tables:
 - Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker and display parts are centered against plot centers/facing, including even-sized future plot footprints and scaled display parts.
 - Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Upgrade buttons show the stored-scrap cost plus practical effects such as newly unlocked station recipes or harvest changes.
 - Halls save snapshots live in `plugins/OmGames/HallsOfCarnage/saves/` as YAML files keyed by scenario id plus sorted participant UUIDs.
-- The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, per-player sculk pressure, per-player active totem buff levels, elevator chest contents, stored scrap/coins, and visited camp plot building state including building id, level, harvest counters, and storage locker contents.
+- The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, per-player sculk pressure, per-player active totem buff levels, elevator chest contents, stored scrap/coins, camp bank/key/team-life counters, and shared camp plot building state including building id, level, harvest counters, and storage locker contents.
 - Save snapshots are created/overwritten when a campaign starts, when the elevator leaves a floor, when arriving at a camp floor, when game-over restarts the run at floor 1, and when the host uses `/hoc leave` from the start floor or a camp floor.
 - `/hoc leave` is player-only, does not require OP, and only the active session host can use it to save and end the session from the start floor or a camp floor.
 - The lobby villager opens a GUI flow for New Campaign, Load Save, scenario selection, difficulty selection, and session settings.

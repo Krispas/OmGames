@@ -22,6 +22,11 @@ public record HallsSaveData(File file,
                             int diamondScrap,
                             int redstoneScrap,
                             int coins,
+                            int campBankCoins,
+                            int campKeys,
+                            int campKeysEarned,
+                            int remainingLives,
+                            int lastCampFloor,
                             ItemStack[] elevatorChest,
                             Map<UUID, PlayerState> players,
                             Map<Integer, List<HallsCampRuntime.PlotState>> camps,
@@ -65,10 +70,29 @@ public record HallsSaveData(File file,
                 yaml.getInt("storage.diamond", 0),
                 yaml.getInt("storage.redstone", 0),
                 yaml.getInt("storage.coins", 0),
+                yaml.getInt("camp-bank.coins", 0),
+                yaml.getInt("camp-bank.keys", 0),
+                yaml.getInt("camp-bank.keys-earned", Math.max(0, yaml.getInt("camp-bank.keys", 0))),
+                yaml.getInt("team-lives.remaining", 3),
+                yaml.getInt("team-lives.last-camp-floor", lastSavedCampFloor(yaml)),
                 itemArray(yaml.getList("elevator-chest"), 27),
                 Map.copyOf(players),
                 camps(yaml),
                 yaml.getLong("saved-at", file.lastModified()));
+    }
+
+    private static int lastSavedCampFloor(YamlConfiguration yaml) {
+        if (!yaml.isConfigurationSection("camps")) {
+            return 0;
+        }
+        int last = 0;
+        for (String key : yaml.getConfigurationSection("camps").getKeys(false)) {
+            try {
+                last = Math.max(last, Integer.parseInt(key));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return last;
     }
 
     public String displayName() {
