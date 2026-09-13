@@ -45,6 +45,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerItemDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -908,6 +909,7 @@ public final class HallsSession {
                 }
                 activateSmokeBomb(player, type);
                 applyUtilityCooldown(player, item, type);
+                damageUtilityItem(player, item, type);
                 yield true;
             }
             case "warding_totem" -> {
@@ -916,6 +918,7 @@ public final class HallsSession {
                 }
                 activateWardingTotem(player, type);
                 applyUtilityCooldown(player, item, type);
+                damageUtilityItem(player, item, type);
                 yield true;
             }
             case "mending_salve" -> {
@@ -924,6 +927,7 @@ public final class HallsSession {
                 }
                 if (activateHealingUtility(player, type)) {
                     applyUtilityCooldown(player, item, type);
+                    damageUtilityItem(player, item, type);
                 }
                 yield true;
             }
@@ -933,6 +937,7 @@ public final class HallsSession {
                 }
                 activateSelfBuffUtility(player, type, PotionEffectType.SPEED, "speed", "Adrenaline floods your legs.", Sound.ENTITY_RABBIT_JUMP);
                 applyUtilityCooldown(player, item, type);
+                damageUtilityItem(player, item, type);
                 yield true;
             }
             case "ironhide_salve" -> {
@@ -941,6 +946,7 @@ public final class HallsSession {
                 }
                 activateSelfBuffUtility(player, type, PotionEffectType.RESISTANCE, "resistance", "Ironhide seals your skin.", Sound.BLOCK_ANVIL_USE);
                 applyUtilityCooldown(player, item, type);
+                damageUtilityItem(player, item, type);
                 yield true;
             }
             case "storm_vial" -> {
@@ -950,6 +956,7 @@ public final class HallsSession {
                 activateMonsterPulseUtility(player, type, Particle.ELECTRIC_SPARK, Sound.ENTITY_LIGHTNING_BOLT_THUNDER,
                         "The vial bursts into chained sparks.");
                 applyUtilityCooldown(player, item, type);
+                damageUtilityItem(player, item, type);
                 yield true;
             }
             case "poison_bomb" -> {
@@ -958,6 +965,7 @@ public final class HallsSession {
                 }
                 activatePoisonBomb(player, type);
                 applyUtilityCooldown(player, item, type);
+                damageUtilityItem(player, item, type);
                 yield true;
             }
             default -> false;
@@ -2976,7 +2984,8 @@ public final class HallsSession {
         HallsScenario.FloorDefinition floor = adjustedDifficulty(scenario.floor(currentFloor));
         int quota = floor.coinQuota();
         if ("exploration".equalsIgnoreCase(floor.kind()) && !activeFloorModifiers.empty()) {
-            quota = Math.max(0, (int) Math.round(quota * activeFloorModifiers.coinQuotaMultiplier()));
+            quota = Math.max(0, (int) Math.round(quota * activeFloorModifiers.coinQuotaMultiplier())
+                    + activeFloorModifiers.coinQuotaDelta());
         }
         if ("exploration".equalsIgnoreCase(floor.kind())) {
             quota = Math.max(0, (int) Math.round(quota * elevatorDrillQuotaMultiplier()));
@@ -3791,6 +3800,30 @@ public final class HallsSession {
             meta.setUseCooldown(cooldown);
             item.setItemMeta(meta);
         }
+    }
+
+    private void damageUtilityItem(Player player, ItemStack item, HallsItemType type) {
+        if (player == null || item == null || item.getType().isAir()) {
+            return;
+        }
+        double configuredDurability = type.stats().getOrDefault("durability", 0.0);
+        if (configuredDurability <= 0.0 || !(item.getItemMeta() instanceof Damageable damageable)) {
+            return;
+        }
+        int maxDamage = damageable.getMaxDamage();
+        if (maxDamage <= 0) {
+            maxDamage = Math.max(1, (int) Math.round(configuredDurability));
+            damageable.setMaxDamage(maxDamage);
+        }
+        int nextDamage = damageable.getDamage() + 1;
+        if (nextDamage >= maxDamage) {
+            player.getInventory().setItemInMainHand(null);
+            world.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 0.8f, 1.0f);
+            player.sendActionBar(Component.text(type.name() + " broke.", NamedTextColor.RED));
+            return;
+        }
+        damageable.setDamage(nextDamage);
+        item.setItemMeta((ItemMeta) damageable);
     }
 
     private String utilityCooldownKey(Player player, HallsItemType type) {

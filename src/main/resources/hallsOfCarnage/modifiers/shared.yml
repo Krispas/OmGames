@@ -5,13 +5,13 @@ modifiers:
     icon: "☺"
     weight: 10
     effects: []
-  double_coins:
+  lower_quota:
     type: good
-    display-name: "Double Coins"
+    display-name: "Lower Quota"
     icon: "♦"
     weight: 4
     effects:
-      coin-multiplier: 2.0
+      coin-quota-delta: -5
   less_enemies:
     type: good
     display-name: "Less Enemies"
@@ -66,7 +66,7 @@ modifiers:
     type: bad
     display-name: "More Sculk"
     icon: "☻"
-    weight: 6
+    weight: 2
     effects:
       sculk-multiplier: 3.0
   special_enemy:

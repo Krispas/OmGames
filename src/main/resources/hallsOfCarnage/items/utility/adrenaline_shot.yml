@@ -8,6 +8,7 @@ max-stack-size: 1
 lore:
   - "Reusable stimulant for sprinting through bad rooms."
 stats:
+  durability: 5
   cooldown-seconds: 55
   speed-seconds: 8
   speed-amplifier: 2

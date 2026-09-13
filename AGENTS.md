@@ -1383,6 +1383,7 @@ SQLite tables:
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
 - Halls food items are catalog items with category `food`; `stats.heal` restores health when consumed while hunger remains locked full. Optional food buff stats use normalized keys such as `speed-seconds`, `resistance-seconds`, `regeneration-seconds`, `absorption-seconds`, and matching `*-amplifier`.
+- Halls utility items may define `stats.durability`; successful utility activation consumes one durability, while cooldown-blocked attempts do not. Depleted utilities break instead of being consumed on every right-click.
 - Mycelia Farm harvest counters persist in camp save state during an active run, but game-over run resets should restock saved Mycelia farms to their current level's full harvest uses.
 - Halls utility `smoke_bomb` clears nearby session monster targets, conceals the user from monster target selection for its duration, emits smoke, applies temporary invisibility, refreshes item use-cooldown metadata on use, and uses a per-player cooldown instead of being consumed on right-click.
 - Halls utility `warding_totem` gives nearby alive participants Resistance II for 10 seconds and uses a per-player cooldown instead of being consumed on right-click.

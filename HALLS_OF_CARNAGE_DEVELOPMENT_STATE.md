@@ -168,10 +168,9 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: Camp Station category crafting views now hide recipes whose research node has not been unlocked yet, instead of showing them with a red research-required lore line. Empty researched categories show a clear placeholder directing players back to research.
 - Next reviewer slice applied: `/hoc give research_points [amount]` now adds test research points to the caller's active Halls session and saves the updated session state. Accepted aliases are `research_point`, `research`, and `rp`; tab completion lists `research_points`.
 - Next reviewer slice applied: the elevator now spawns an invisible ArmorStand waypoint transmitter at the elevator spawn and raises participants' waypoint receive range so the elevator appears on the vanilla locator bar without changing the existing Compass modifier item/trail behavior. Generated start, exploration, and camp floors now place one 2x2x2 magenta research crate when a valid reserved-free footprint exists. Right-clicking the crate picks it up as BlockDisplay cargo above the player's head, blocks attacks/interactions/inventory opening/drop actions while carried, applies Slowness plus Resistance II unless a stronger Resistance is active, lets the carrier sneak to place it back down, and lets the carrier right-click the elevator hopper to deposit it for +1 team research point with an immediate save.
+- Next reviewer slice applied: bundled utility items now define durability and lose one durability only after successful activation; cooldown-blocked attempts and failed full-health Mending Salve uses do not spend durability. `vagabonds_club` now has a 4 wood-scrap recipe and is unlocked by the root Camp Tools research node. `poking_stick.yml` is now included in bundled resource seeding while remaining allowed, craftable, and root-researched in Untold Depths. The former Double Coins shared modifier is now `lower_quota`, displayed as Lower Quota, and subtracts 5 coins from the current exploration floor quota through a flat modifier delta.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Give utilities durability
-- Give vagabonds club 4 wood recipe and add it as a default item to one of the root nodes
-- Add poking stick into the untold depths scenerio and put it into research
-- Rework double coin modifier, instaed of double coins, it will now be "lower quota", decreasing the quoate for the current level by 5 coins.
+- Fix parched, it should not be a husk but parched, its an actual mob.
+- When crafting, make it so it doesnt boot you out of the submenu

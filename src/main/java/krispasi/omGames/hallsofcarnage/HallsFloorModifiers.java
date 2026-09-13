@@ -59,6 +59,14 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
         return multipliedEffect("coin_quota_multiplier", 1.0);
     }
 
+    public int coinQuotaDelta() {
+        int delta = 0;
+        for (HallsModifierType modifier : selected) {
+            delta += intEffect(modifier, "coin_quota_delta", 0);
+        }
+        return delta;
+    }
+
     public double scrapDropMultiplier() {
         return multipliedEffect("scrap_drop_multiplier", 1.0);
     }
@@ -143,7 +151,7 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
         int trappedRooms = Math.max(0, (int) Math.round(floor.trappedRooms() * trapMultiplier()));
         int holes = Math.max(0, (int) Math.round(floor.holes() * multipliedEffect("hole_multiplier", 1.0)));
         int sculkPatches = Math.max(0, (int) Math.round(floor.sculkPatches() * sculkMultiplier()));
-        int coinQuota = Math.max(0, (int) Math.round(floor.coinQuota() * coinQuotaMultiplier()));
+        int coinQuota = Math.max(0, (int) Math.round(floor.coinQuota() * coinQuotaMultiplier()) + coinQuotaDelta());
         return new HallsScenario.FloorDefinition(
                 floor.firstFloor(),
                 floor.lastFloor(),

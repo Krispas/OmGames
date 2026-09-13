@@ -183,7 +183,7 @@ However most are shared. There are good and bad modifiers. Good are yellow, bad 
 They are not defined in the resource files, so please add resource files for them.
 ### Good
 - Free - nothing
-- Double coins - doubles coins
+- Lower quota - decreases the current floor coin quota by 5 coins
 - Less enemies - 25% less enemy spawns
 ### Bad
 - More enemies - 25% more enemy spawns
@@ -269,7 +269,7 @@ Some food can apply status effects.
 ### Melee
 Swords, axes, spears and so on. All have durability, which is not a normal minecraft durability.
 ### Utility
-Shields, totems of undying and other stuff.
+Shields, totems of undying and other stuff. Utilities can have custom durability, losing durability on successful use instead of always being consumed.
 ### Armor
 Armor. Of course, stuff like melee weapons, utility and armor can have special attributes, to make things spicy. Define this in the files.
 ### Blueprints

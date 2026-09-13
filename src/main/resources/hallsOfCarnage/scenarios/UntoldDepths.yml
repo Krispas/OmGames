@@ -163,6 +163,7 @@ crafting-stations:
       - stonehide_chowder
       - ember_stew
       - golden_jerky
+      - vagabonds_club
       - rusty_sword
       - poking_stick
       - smoke_bomb
@@ -199,6 +200,7 @@ research:
       icon: STONE_AXE
       cost: 0
       unlocks:
+        - vagabonds_club
         - rusty_sword
         - poking_stick
         - smoke_bomb

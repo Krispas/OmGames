@@ -8,6 +8,7 @@ max-stack-size: 1
 lore:
   - "Deploys a toxic cloud that hurts monsters, not players."
 stats:
+  durability: 4
   cooldown-seconds: 75
   monster-damage: 3
   poison-seconds: 6

@@ -8,6 +8,7 @@ max-stack-size: 1
 lore:
   - "A gritty coating that hardens skin for a short push."
 stats:
+  durability: 5
   cooldown-seconds: 70
   resistance-seconds: 5
   resistance-amplifier: 5

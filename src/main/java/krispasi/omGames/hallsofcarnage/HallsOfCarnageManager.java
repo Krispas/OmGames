@@ -144,6 +144,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/monsters/splinter_baby.yml",
             "hallsOfCarnage/items/weapons/vagabonds_club.yml",
             "hallsOfCarnage/items/weapons/rusty_sword.yml",
+            "hallsOfCarnage/items/weapons/poking_stick.yml",
             "hallsOfCarnage/items/weapons/echo_blade.yml",
             "hallsOfCarnage/items/weapons/miner_pick.yml",
             "hallsOfCarnage/items/weapons/bone_cleaver.yml",
