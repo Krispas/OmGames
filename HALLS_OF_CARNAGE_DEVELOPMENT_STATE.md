@@ -166,3 +166,8 @@ This is the first implementation slice. It focuses on:
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
 - When players are left behind, they should get TPd into elevator before being dropped into the void by unloading of the level, killing them instantly when they respawn.
+- A large change:
+I added one plot to entrance of the camp of a size of 7x7. This giga plot will be used for camp station. A new building which is always in present in the camp, cannot get deconstructed and doesnt have levels, it doesnt have a blueprint, its just there permanently and each camp in each scenario has one. This structure should have access to all the recipes armory, cooking pot and weapon bench have.
+Next, remove armory, cooking pot and weapon bench and their respective blueprints, as they are not needed anymore.
+Next make storage locker a small plot building.
+There will be more features coming later for this new station, but this is the simplest dummy version without breaking too many things.
