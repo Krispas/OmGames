@@ -173,4 +173,20 @@ This is the first implementation slice. It focuses on:
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
 - Fix parched, it should not be a husk but parched, its an actual mob.
+- Make it so wardens start spawning not at 65%, but at 100% with a flat 20% chance
+- Add a food which removes 5% of sculk and a food which removes 10% of sculk
+- Make it so recipes for better foods require prerequisite items, add a new food "potato" which is simillar to mycelia, being a bad food used in more recipes. Then add carrot, the same deal.
 - When crafting, make it so it doesnt boot you out of the submenu
+- When carrying reserach crate, make it so its just a single large block display. Lower the whole thing down by 0.25 blocks. Also instead of slowness I, apply slowness II and instead of resistance II, apply resistance III
+
+Future slices (dont do yet):
+- New buildings, potato and carrot farms. Both are small buildigns and behave exactly like mycelia farms, but for potatoes and carrots
+- New building, alchemy cauldron. Alchemy cauldron allows you to convert X amount of any scrap into 1 of other scrap. X is replaced based on the level of the building (4,3,2). Building is medium and requires blueprint for upgrades.
+- New building, deconstructor. A medium building used for destroying items. Destroyed items will randomly yield 50% of their cost of recipe.
+- A lot of new items - boots, helmets, leggings, armor with special properties, new weapons with special properties, ranged weapons, new utilities
+- Library level type - The corridor generation for this level type is also a little bit different. Some corridors are corridors, some corridors are vents. Normal corridors are simillar the wide generation, however vents are slim 1 wide corridors with height of 2. Corridors can interject, creating vent openings.
+- Bunker level type - The corridor generation for this level type is also a little bit different. Simillarly to the sewers, there is a main corridor, this time however it is 3x3 with top corner blocks filled. From this corridor, there are small corridors leading into rooms, similar to sewer level type.
+- HUD rework - rework HUD into a sidebar scoreboard, only for players playing the game, warning players are already in some teams from their normal survival play, do not boot them out of those. Bedwars can do it, so I know its possible. Sidebar will replace the HUD currently above the hotbar. Keep the floor number, Make it so the time measures the time spent on current floor. Scrap display should be there too, it also now can use full names instead of W for example. Coin quota stays there too, Lives too, sculk too, elevator distance will get completely removed as it is now on the locator bar. Add 2 new fields. One is if research crate was deposited. Second is blueprint distiller was collected (future feature), modifiers should also be there too, dont make the fields too wide, we dont want the scoreboard to take half the screen.
+- Blueprint rework - Add a new feature, blueprint distillery. The distilery has a model. When going to exploration floor, 5 points on the floor are picked and reserved for the distillery. The distilleries generate there. When interacted with, they become enabled. When enabled they will create a particle beam leading towards the next inactive distillery (a direction, not route, for example it can point into a wall). Once all 5 are active, the player who activated the last one receives a blueprint based on level type pool. With 33% of it being a rare blueprint.
+- New research tree - I have added research.csv, rework the research based on this file
+- Compass rework - Since elevator is now on locator bar, compas modifier is pointless, rework it. Instead of compass, you receive a map, the map has the whole floor on it, do this via custom rendering. It should also show location of other players. If the modifier is double, it will also show enemies.
