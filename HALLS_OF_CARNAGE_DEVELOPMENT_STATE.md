@@ -182,7 +182,7 @@ Do all following for the next slice (and keep this line):
 Future slices (dont do yet):
 - New buildings, potato and carrot farms. Both are small buildigns and behave exactly like mycelia farms, but for potatoes and carrots
 - New building, alchemy cauldron. Alchemy cauldron allows you to convert X amount of any scrap into 1 of other scrap. X is replaced based on the level of the building (4,3,2). Building is medium and requires blueprint for upgrades.
-- New building, deconstructor. A medium building used for destroying items. Destroyed items will randomly yield 50% of their cost of recipe.
+- New building, deconstructor. A medium building used for destroying items. Destroyed items will randomly yield x% of their cost of recipe. x is defined by level (30, 40, 50)
 - A lot of new items - boots, helmets, leggings, armor with special properties, new weapons with special properties, ranged weapons, new utilities
 - Library level type - The corridor generation for this level type is also a little bit different. Some corridors are corridors, some corridors are vents. Normal corridors are simillar the wide generation, however vents are slim 1 wide corridors with height of 2. Corridors can interject, creating vent openings.
 - Bunker level type - The corridor generation for this level type is also a little bit different. Simillarly to the sewers, there is a main corridor, this time however it is 3x3 with top corner blocks filled. From this corridor, there are small corridors leading into rooms, similar to sewer level type.
