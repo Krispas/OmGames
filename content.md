@@ -69,6 +69,8 @@ A small spider (0.25 scale) with 1 hp and low damage.
 A zombie villager, swamp type, librarian. Is simillar to a normal zombie, but when it attack, it creates a small poison cloud. When killed, it also creates one.
 ### Rotting soldier
 A zombie kited in netherite armor, no weapon. It has 10 hp, when killed, it leaves behind a primed tnt (not a real tnt, we dont want to destroy the level). The tnt beeps and explodes after 3 seconds.
+### Bedrock Walker
+A husk in netherite armor. It is incredibly slow, packs a mean punch and has 60hp.
 # Traps
 ### Army coffin
 A 2 block wide trap. When right clicked on it, it will break, 50% of spawning breakable loot, 25% of spawning old bones, 25% chance of spawning brooding mother. Spawn in bunker.
