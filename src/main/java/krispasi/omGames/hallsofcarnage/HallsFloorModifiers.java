@@ -196,6 +196,16 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
                 .orElse("None");
     }
 
+    public String iconSummary() {
+        if (selected.isEmpty()) {
+            return "";
+        }
+        return selected.stream()
+                .map(HallsModifierType::icon)
+                .reduce((first, second) -> first + " | " + second)
+                .orElse("");
+    }
+
     private int countEffect(String key) {
         int count = 0;
         for (HallsModifierType modifier : selected) {

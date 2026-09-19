@@ -34,6 +34,7 @@ final class HallsExplorationGenerator {
     private final List<Room> rooms = new ArrayList<>();
     private final Set<Cell> corridorCells = new HashSet<>();
     private final Set<Cell> corridorShellCells = new HashSet<>();
+    private final Set<Cell> lowCeilingCorridorCells = new HashSet<>();
     private final Set<Cell> liquidCells = new HashSet<>();
     private final Set<Cell> roomShellCells = new HashSet<>();
     private final Set<Cell> roomInteriorCells = new HashSet<>();
@@ -125,6 +126,8 @@ final class HallsExplorationGenerator {
             addBackroomsGridOpenHalls();
         } else if (corridorMode == CorridorMode.OPEN_HALLS) {
             addRoomLocalOpenHalls();
+        } else if (corridorMode == CorridorMode.LIBRARY) {
+            addLibraryVentBranches();
         } else if (corridorMode == CorridorMode.CAVE) {
             addMazeBranches(Math.max(rooms.size() / 2, 4));
         }
@@ -139,7 +142,7 @@ final class HallsExplorationGenerator {
     }
 
     private boolean addFirstRoom(List<HallsLayout> layouts) {
-        if (corridorMode == CorridorMode.SEWER) {
+        if (corridorMode == CorridorMode.SEWER || corridorMode == CorridorMode.BUNKER) {
             return addFirstSewerRoom(layouts);
         }
         BlockFace face = elevatorFrontFace.getOppositeFace();
@@ -165,9 +168,10 @@ final class HallsExplorationGenerator {
                 continue;
             }
             int offset = doorOffset(layout, face);
+            int corridorDistance = corridorMode == CorridorMode.BUNKER ? 14 + random.nextInt(7) : 18 + random.nextInt(9);
             int corridorZ = elevatorFrontFace == BlockFace.NORTH
-                    ? originZ - 18 - random.nextInt(9)
-                    : originZ + 18 + random.nextInt(9);
+                    ? originZ - corridorDistance
+                    : originZ + corridorDistance;
             int sideGap = 8 + random.nextInt(7);
             int startX = face == BlockFace.WEST
                     ? originX + sideGap
@@ -393,7 +397,9 @@ final class HallsExplorationGenerator {
     }
 
     private boolean wideRoomOpenings() {
-        return corridorMode == CorridorMode.LARGE_CORRIDORS || corridorMode == CorridorMode.OPEN_HALLS;
+        return corridorMode == CorridorMode.LARGE_CORRIDORS
+                || corridorMode == CorridorMode.OPEN_HALLS
+                || corridorMode == CorridorMode.LIBRARY;
     }
 
     private boolean isSingleDoorOffsetOpen(HallsLayout layout, BlockFace face, int offset) {
@@ -443,7 +449,7 @@ final class HallsExplorationGenerator {
     private int connectorCandidateAttempts() {
         return switch (corridorMode) {
             case CAVE -> 44;
-            case LARGE_CORRIDORS -> 2;
+            case LARGE_CORRIDORS, LIBRARY, BUNKER -> 2;
             case MAZE, BACKROOMS -> 18;
             default -> CONNECTOR_CANDIDATE_ATTEMPTS;
         };
@@ -469,7 +475,10 @@ final class HallsExplorationGenerator {
     private List<Cell> orthogonalCandidatePath(Cell start, Cell target, int attempt) {
         List<Cell> waypoints = new ArrayList<>();
         boolean horizontalFirst = attempt % 2 == 0;
-        int detour = corridorMode == CorridorMode.LARGE_CORRIDORS || attempt < 4 ? 0 : 2 + random.nextInt(9);
+        int detour = corridorMode == CorridorMode.LARGE_CORRIDORS
+                || corridorMode == CorridorMode.BUNKER
+                || (corridorMode == CorridorMode.LIBRARY && attempt < 8)
+                || attempt < 4 ? 0 : 2 + random.nextInt(9);
         if (detour == 0) {
             waypoints.add(horizontalFirst ? new Cell(target.x(), start.z()) : new Cell(start.x(), target.z()));
         } else if (horizontalFirst) {
@@ -682,7 +691,9 @@ final class HallsExplorationGenerator {
         Set<Cell> carved = switch (corridorMode) {
             case CAVE -> naturalCaveCorridorCells(path);
             case LARGE_CORRIDORS -> largeCorridorCells(path);
+            case LIBRARY -> libraryCorridorCells(path);
             case SEWER -> sewerCorridorCells(path);
+            case BUNKER -> bunkerCorridorCells(path);
             case MAZE, BACKROOMS, OPEN_HALLS -> openHallConnectorCells(path);
             case NORMAL -> new HashSet<>(path);
         };
@@ -698,6 +709,32 @@ final class HallsExplorationGenerator {
     }
 
     private Set<Cell> largeCorridorCells(List<Cell> path) {
+        Set<Cell> cells = new HashSet<>(path);
+        for (int i = 0; i < path.size(); i++) {
+            Cell current = path.get(i);
+            boolean eastWest = isEastWestSegment(path, i);
+            List<Cell> widened = eastWest
+                    ? List.of(new Cell(current.x(), current.z() - 1), new Cell(current.x(), current.z() + 1))
+                    : List.of(new Cell(current.x() - 1, current.z()), new Cell(current.x() + 1, current.z()));
+            for (Cell cell : widened) {
+                if (canWidenCorridorInto(cell)) {
+                    cells.add(cell);
+                }
+            }
+        }
+        return cells;
+    }
+
+    private Set<Cell> libraryCorridorCells(List<Cell> path) {
+        boolean vent = path.size() >= 7 && random.nextInt(100) < 42;
+        Set<Cell> cells = vent ? new HashSet<>(path) : largeCorridorCells(path);
+        if (vent) {
+            lowCeilingCorridorCells.addAll(cells);
+        }
+        return cells;
+    }
+
+    private Set<Cell> bunkerCorridorCells(List<Cell> path) {
         Set<Cell> cells = new HashSet<>(path);
         for (int i = 0; i < path.size(); i++) {
             Cell current = path.get(i);
@@ -899,6 +936,54 @@ final class HallsExplorationGenerator {
             }
             rememberCorridor(branch);
             starts.addAll(branch);
+            added++;
+        }
+    }
+
+    private void addLibraryVentBranches() {
+        List<Cell> starts = new ArrayList<>(corridorCells);
+        if (starts.isEmpty()) {
+            return;
+        }
+        int targetBranches = Math.max(rooms.size() / 2, 4);
+        int added = 0;
+        int attempts = 0;
+        while (added < targetBranches && attempts++ < targetBranches * 16) {
+            Cell start = starts.get(random.nextInt(starts.size()));
+            BlockFace face = randomFace();
+            int length = 5 + random.nextInt(12);
+            List<Cell> branch = new ArrayList<>();
+            Cell current = start;
+            branch.add(current);
+            for (int i = 0; i < length; i++) {
+                if (i > 1 && random.nextInt(100) < 22) {
+                    face = randomTurn(face);
+                }
+                current = step(current, face);
+                if (corridorCells.contains(current) && branch.size() > 4) {
+                    branch.add(current);
+                    break;
+                }
+                if (!canCorridorOccupy(current, start, false, List.of(), false)) {
+                    break;
+                }
+                branch.add(current);
+            }
+            if (branch.size() < 5) {
+                continue;
+            }
+            Set<Cell> carved = new HashSet<>(branch);
+            corridorCells.addAll(carved);
+            networkCells.addAll(carved);
+            lowCeilingCorridorCells.addAll(carved);
+            for (Cell point : carved) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        corridorShellCells.add(new Cell(point.x() + dx, point.z() + dz));
+                    }
+                }
+            }
+            starts.addAll(carved);
             added++;
         }
     }
@@ -1314,6 +1399,7 @@ final class HallsExplorationGenerator {
                 List.copyOf(rooms),
                 Set.copyOf(corridorCells),
                 Set.copyOf(corridorShellCells),
+                Set.copyOf(lowCeilingCorridorCells),
                 Set.copyOf(liquidCells),
                 Set.copyOf(walkable),
                 allRoomsReachable(walkable)
@@ -1352,6 +1438,7 @@ final class HallsExplorationGenerator {
     record Plan(List<Room> rooms,
                 Set<Cell> corridorCells,
                 Set<Cell> corridorShellCells,
+                Set<Cell> lowCeilingCorridorCells,
                 Set<Cell> liquidCells,
                 Set<Cell> walkableCells,
                 boolean reachable) {
@@ -1437,7 +1524,9 @@ final class HallsExplorationGenerator {
         MAZE,
         BACKROOMS,
         OPEN_HALLS,
-        SEWER;
+        SEWER,
+        LIBRARY,
+        BUNKER;
 
         private static CorridorMode from(String value) {
             if (value == null) {
@@ -1450,6 +1539,8 @@ final class HallsExplorationGenerator {
                 case "backrooms", "backroom" -> BACKROOMS;
                 case "open_halls", "open_hall", "legacy_maze" -> OPEN_HALLS;
                 case "sewer", "sewers" -> SEWER;
+                case "library", "library_vents", "library_corridors" -> LIBRARY;
+                case "bunker", "bunker_corridors" -> BUNKER;
                 default -> NORMAL;
             };
         }

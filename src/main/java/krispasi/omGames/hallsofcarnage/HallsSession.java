@@ -2609,6 +2609,7 @@ public final class HallsSession {
         }
         Set<HallsExplorationGenerator.Cell> openCells = plan.corridorCells();
         boolean open = openCells.contains(point);
+        boolean lowCeiling = open && plan.lowCeilingCorridorCells().contains(point);
         boolean insideRoomShell = isInsideGeneratedRoomShell(point, plan.rooms());
         if (!open && insideRoomShell) {
             return;
@@ -2622,13 +2623,23 @@ public final class HallsSession {
                     corridorWallMaterial(levelType, point, origin.y() - 3, openCells));
         }
         if (!insideRoomShell) {
-            setBlock(point.x(), origin.y() + 3, point.z(),
+            int ceilingY = origin.y() + (lowCeiling ? 2 : 3);
+            setBlock(point.x(), ceilingY, point.z(),
                     open && isCorridorLightCell(point.x(), point.z()) ? levelType.light() : levelType.corridorCeiling());
+            if (lowCeiling) {
+                setBlock(point.x(), origin.y() + 3, point.z(), corridorWallMaterial(levelType, point,
+                        origin.y() + 3, openCells));
+            }
         }
-        for (int dy = 0; dy < 3; dy++) {
+        int clearHeight = lowCeiling ? 2 : 3;
+        for (int dy = 0; dy < clearHeight; dy++) {
             setBlock(point.x(), origin.y() + dy, point.z(), open
                     ? Material.AIR
                     : corridorWallMaterial(levelType, point, origin.y() + dy, openCells));
+        }
+        if (!open && lowCeiling) {
+            setBlock(point.x(), origin.y() + 2, point.z(), corridorWallMaterial(levelType, point,
+                    origin.y() + 2, openCells));
         }
     }
 
@@ -2959,7 +2970,7 @@ public final class HallsSession {
                 sculkRuntime.sculkPercent(player),
                 researchCrateDepositedThisFloor,
                 false,
-                activeFloorModifiers.displaySummary()
+                activeFloorModifiers.iconSummary()
         );
     }
 

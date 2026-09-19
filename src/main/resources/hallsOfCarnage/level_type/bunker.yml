@@ -1,0 +1,45 @@
+id: bunker
+name: "Bunker"
+corridor-generation: bunker
+materials:
+  floor: POLISHED_TUFF
+  ceiling: DEEPSLATE_TILES
+  corridor-floor: POLISHED_ANDESITE
+  corridor-ceiling: DEEPSLATE_TILES
+  light: REDSTONE_LAMP
+wall-palettes:
+  reinforced_tuff:
+    block: TUFF_BRICKS
+    special-blocks:
+      cracked:
+        block: CRACKED_DEEPSLATE_BRICKS
+        chance: 0.08
+      metal:
+        block: IRON_BLOCK
+        chance: 0.04
+  deepslate:
+    block: DEEPSLATE_BRICKS
+    special-blocks:
+      tiles:
+        block: DEEPSLATE_TILES
+        chance: 0.08
+pillar-palettes:
+  supports:
+    block: POLISHED_BASALT
+    special-blocks:
+      metal:
+        block: IRON_BLOCK
+        chance: 0.05
+monsters:
+  common:
+    - zombie
+    - pillager
+    - skeleton
+    - slime_medium
+  special:
+    - ravager
+    - breeze
+    - zombie_vanguard
+vegetation:
+  chance: 0.0
+  types: {}

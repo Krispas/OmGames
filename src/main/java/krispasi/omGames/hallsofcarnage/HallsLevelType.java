@@ -166,6 +166,50 @@ public record HallsLevelType(
                     new LiquidSettings(true, Material.WATER, 0.45)
             );
         }
+        if (normalizedId.equals("library")) {
+            return new HallsLevelType(
+                    normalizedId,
+                    "Library",
+                    "library",
+                    Material.DARK_OAK_PLANKS,
+                    Material.OAK_PLANKS,
+                    Material.DARK_OAK_PLANKS,
+                    Material.OAK_PLANKS,
+                    Material.OCHRE_FROGLIGHT,
+                    List.of(
+                            new BlockPalette(Material.BOOKSHELF, Material.CHISELED_BOOKSHELF, 0.10),
+                            new BlockPalette(Material.SPRUCE_PLANKS, Material.STRIPPED_SPRUCE_WOOD, 0.08)
+                    ),
+                    List.of(new BlockPalette(Material.DARK_OAK_LOG, Material.BOOKSHELF, 0.08)),
+                    List.of("zombie", "skeleton", "silverfish", "witch"),
+                    List.of("vindicator", "breeze", "creaking"),
+                    0.01,
+                    List.of(new VegetationEntry("deadbush", 1)),
+                    LiquidSettings.none()
+            );
+        }
+        if (normalizedId.equals("bunker")) {
+            return new HallsLevelType(
+                    normalizedId,
+                    "Bunker",
+                    "bunker",
+                    Material.POLISHED_TUFF,
+                    Material.DEEPSLATE_TILES,
+                    Material.POLISHED_ANDESITE,
+                    Material.DEEPSLATE_TILES,
+                    Material.REDSTONE_LAMP,
+                    List.of(
+                            new BlockPalette(Material.TUFF_BRICKS, Material.CRACKED_DEEPSLATE_BRICKS, 0.08),
+                            new BlockPalette(Material.DEEPSLATE_BRICKS, Material.IRON_BLOCK, 0.04)
+                    ),
+                    List.of(new BlockPalette(Material.POLISHED_BASALT, Material.IRON_BLOCK, 0.05)),
+                    List.of("zombie", "pillager", "skeleton", "slime_medium"),
+                    List.of("ravager", "breeze", "zombie_vanguard"),
+                    0.0,
+                    List.of(),
+                    LiquidSettings.none()
+            );
+        }
         return new HallsLevelType(
                 normalizedId,
                 "Howling Corridors",

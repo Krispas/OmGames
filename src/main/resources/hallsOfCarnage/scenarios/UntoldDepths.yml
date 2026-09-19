@@ -429,7 +429,7 @@ floors:
     level-type: howling_corridors
   - number: 11
     kind: exploration
-    level-type: frozen_halls
+    level-type: library
     difficulty: 14
     rooms: 13
     breakables: 38
@@ -442,7 +442,7 @@ floors:
     coin-quota: 23
   - number: 12
     kind: exploration
-    level-type: howling_corridors
+    level-type: bunker
     difficulty: 14
     rooms: 13
     breakables: 40

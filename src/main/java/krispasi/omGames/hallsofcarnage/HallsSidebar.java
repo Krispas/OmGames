@@ -8,6 +8,7 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
@@ -83,18 +84,34 @@ final class HallsSidebar {
 
     private List<String> buildLines(HallsSession.SidebarState state) {
         List<String> lines = new ArrayList<>();
-        lines.add("Floor: " + state.floor());
-        lines.add("Time: " + state.elapsed());
-        lines.add("Wood: " + state.woodScrap() + "  Iron: " + state.ironScrap());
-        lines.add("Diamond: " + state.diamondScrap() + "  Redstone: " + state.redstoneScrap());
-        lines.add(state.campFloor() ? "Keys: " + state.keys() + "  Bank: " + state.campBank()
-                : "Coins: " + state.coins() + "/" + state.coinQuota());
-        lines.add("Lives: " + state.lives());
-        lines.add("Sculk: " + state.sculkPercent() + "%");
-        lines.add("Research Crate: " + (state.researchCrateDeposited() ? "Yes" : "No"));
-        lines.add("Distiller: " + (state.blueprintDistillerCollected() ? "Yes" : "No"));
-        if (!state.modifiers().isBlank()) {
-            lines.add("Mods: " + truncate(state.modifiers(), 30));
+        lines.add(ChatColor.GOLD + "Floor " + ChatColor.WHITE + state.floor()
+                + ChatColor.DARK_GRAY + "  " + ChatColor.GRAY + state.elapsed());
+        lines.add(ChatColor.DARK_GREEN + "W" + ChatColor.WHITE + " " + state.woodScrap()
+                + ChatColor.DARK_GRAY + " | " + ChatColor.GRAY + "I" + ChatColor.WHITE + " " + state.ironScrap()
+                + ChatColor.DARK_GRAY + " | " + ChatColor.AQUA + "D" + ChatColor.WHITE + " " + state.diamondScrap()
+                + ChatColor.DARK_GRAY + " | " + ChatColor.RED + "R" + ChatColor.WHITE + " " + state.redstoneScrap());
+        if (state.campFloor()) {
+            lines.add(ChatColor.YELLOW + "Keys " + ChatColor.WHITE + state.keys()
+                    + ChatColor.DARK_GRAY + " | " + ChatColor.GOLD + "Bank " + ChatColor.WHITE + state.campBank());
+        } else {
+            lines.add(ChatColor.GOLD + "Coins " + ChatColor.WHITE + state.coins()
+                    + ChatColor.DARK_GRAY + "/" + ChatColor.WHITE + state.coinQuota());
+        }
+        if (state.lives() > 0) {
+            lines.add(ChatColor.RED + "Lives " + ChatColor.WHITE + state.lives());
+        }
+        if (!state.campFloor() && state.sculkPercent() > 0) {
+            lines.add(ChatColor.DARK_AQUA + "Sculk " + ChatColor.WHITE + state.sculkPercent() + "%");
+        }
+        if (!state.campFloor() && state.floor() > 1) {
+            lines.add(ChatColor.LIGHT_PURPLE + "Research " + ChatColor.WHITE
+                    + (state.researchCrateDeposited() ? "done" : "open"));
+        }
+        if (state.blueprintDistillerCollected()) {
+            lines.add(ChatColor.BLUE + "Distillery " + ChatColor.WHITE + "done");
+        }
+        if (!state.campFloor() && !state.modifiers().isBlank()) {
+            lines.add(ChatColor.DARK_PURPLE + state.modifiers());
         }
         for (int i = 0; i < lines.size(); i++) {
             lines.set(i, uniqueLine(lines.get(i), i));
@@ -103,11 +120,7 @@ final class HallsSidebar {
     }
 
     private String uniqueLine(String line, int index) {
-        String trimmed = line.length() > 38 ? line.substring(0, 38) : line;
+        String trimmed = line.length() > 64 ? line.substring(0, 64) : line;
         return trimmed + " ".repeat(index);
-    }
-
-    private String truncate(String value, int maxLength) {
-        return value.length() <= maxLength ? value : value.substring(0, maxLength - 1) + ".";
     }
 }

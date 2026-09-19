@@ -1,0 +1,46 @@
+id: library
+name: "Library"
+corridor-generation: library
+materials:
+  floor: DARK_OAK_PLANKS
+  ceiling: OAK_PLANKS
+  corridor-floor: DARK_OAK_PLANKS
+  corridor-ceiling: OAK_PLANKS
+  light: OCHRE_FROGLIGHT
+wall-palettes:
+  shelves:
+    block: BOOKSHELF
+    special-blocks:
+      chiseled:
+        block: CHISELED_BOOKSHELF
+        chance: 0.10
+      planks:
+        block: SPRUCE_PLANKS
+        chance: 0.06
+  study_walls:
+    block: SPRUCE_PLANKS
+    special-blocks:
+      stripped:
+        block: STRIPPED_SPRUCE_WOOD
+        chance: 0.08
+pillar-palettes:
+  old_posts:
+    block: DARK_OAK_LOG
+    special-blocks:
+      shelf:
+        block: BOOKSHELF
+        chance: 0.08
+monsters:
+  common:
+    - zombie
+    - skeleton
+    - silverfish
+    - witch
+  special:
+    - vindicator
+    - breeze
+    - creaking
+vegetation:
+  chance: 0.01
+  types:
+    deadbush: 1
