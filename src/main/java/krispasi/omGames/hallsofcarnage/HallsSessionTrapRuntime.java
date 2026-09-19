@@ -281,6 +281,9 @@ final class HallsSessionTrapRuntime {
             if (bridgeCells == null) {
                 continue;
             }
+            if (bridgeCells.containsAll(pitCells)) {
+                continue;
+            }
             buildPit(pitCells, bridgeCells, roomPitCells(candidate), type);
             TrapKind kind = bridgeCells.isEmpty() ? TrapKind.HOLE : TrapKind.HOLE_BRIDGE;
             for (HallsExplorationGenerator.Cell pitCell : pitCells) {
@@ -512,8 +515,9 @@ final class HallsSessionTrapRuntime {
         Set<HallsExplorationGenerator.Cell> existingPits = roomPitCells(candidate);
         Set<HallsExplorationGenerator.Cell> allPitCells = new HashSet<>(existingPits);
         allPitCells.addAll(pitCells);
+        boolean enforceRoomReachability = roomEntrancesReachable(candidate, existingPits, Set.of());
         if ((!globalReachabilityChecks || floorReachableWithout(walkable, allPitCells))
-                && roomEntrancesReachable(candidate, allPitCells, Set.of())) {
+                && (!enforceRoomReachability || roomEntrancesReachable(candidate, allPitCells, Set.of()))) {
             return Set.of();
         }
         int minX = pitCells.stream().mapToInt(HallsExplorationGenerator.Cell::x).min().orElse(0);
@@ -525,23 +529,23 @@ final class HallsSessionTrapRuntime {
         if ((maxX - minX) >= (maxZ - minZ)) {
             Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, walkable, allPitCells, pitCells,
                     widenBridgeOptions(horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ), pitCells, modifiers),
-                    globalReachabilityChecks);
+                    globalReachabilityChecks, enforceRoomReachability);
             if (bridge != null) {
                 return bridge;
             }
             return firstReachableBridge(candidate, walkable, allPitCells, pitCells,
                     widenBridgeOptions(verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX), pitCells, modifiers),
-                    globalReachabilityChecks);
+                    globalReachabilityChecks, enforceRoomReachability);
         } else {
             Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, walkable, allPitCells, pitCells,
                     widenBridgeOptions(verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX), pitCells, modifiers),
-                    globalReachabilityChecks);
+                    globalReachabilityChecks, enforceRoomReachability);
             if (bridge != null) {
                 return bridge;
             }
             return firstReachableBridge(candidate, walkable, allPitCells, pitCells,
                     widenBridgeOptions(horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ), pitCells, modifiers),
-                    globalReachabilityChecks);
+                    globalReachabilityChecks, enforceRoomReachability);
         }
     }
 
@@ -581,12 +585,13 @@ final class HallsSessionTrapRuntime {
                                                                      Set<HallsExplorationGenerator.Cell> allPitCells,
                                                                      Set<HallsExplorationGenerator.Cell> newPitCells,
                                                                      List<Set<HallsExplorationGenerator.Cell>> bridgeOptions,
-                                                                     boolean globalReachabilityChecks) {
+                                                                     boolean globalReachabilityChecks,
+                                                                     boolean enforceRoomReachability) {
         for (Set<HallsExplorationGenerator.Cell> bridge : bridgeOptions) {
             Set<HallsExplorationGenerator.Cell> passableBridge = intersection(bridge, candidate.roomCells());
             if (!passableBridge.isEmpty()
                     && (!globalReachabilityChecks || floorReachableWithout(walkable, difference(allPitCells, passableBridge)))
-                    && roomEntrancesReachable(candidate, allPitCells, passableBridge)) {
+                    && (!enforceRoomReachability || roomEntrancesReachable(candidate, allPitCells, passableBridge))) {
                 return passableBridge;
             }
         }
