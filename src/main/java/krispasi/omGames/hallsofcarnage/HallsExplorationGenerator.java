@@ -1064,27 +1064,52 @@ final class HallsExplorationGenerator {
             return;
         }
         for (Cell vent : lowCeilingCorridorCells) {
-            for (BlockFace face : CARDINAL_FACES) {
-                Cell neighbor = step(vent, face);
-                if (corridorCells.contains(neighbor) && !lowCeilingCorridorCells.contains(neighbor)) {
-                    ventGateCells.add(vent);
-                    break;
-                }
+            BlockFace face = libraryVentGateFace(vent);
+            if (face != BlockFace.SELF && libraryVentGateHasSideWalls(vent, face)) {
+                ventGateCells.add(vent);
             }
         }
         for (Room room : rooms) {
             for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
                 Cell door = doorCell(room, opening.getKey(), opening.getValue());
-                if (lowCeilingCorridorCells.contains(door)) {
+                if (lowCeilingCorridorCells.contains(door) && libraryVentGateHasSideWalls(door, opening.getKey().getOppositeFace())) {
                     ventGateCells.add(door);
                     continue;
                 }
                 Cell outside = step(door, opening.getKey());
-                if (lowCeilingCorridorCells.contains(outside)) {
+                if (lowCeilingCorridorCells.contains(outside) && libraryVentGateHasSideWalls(outside, opening.getKey().getOppositeFace())) {
                     ventGateCells.add(outside);
                 }
             }
         }
+    }
+
+    private BlockFace libraryVentGateFace(Cell vent) {
+        for (BlockFace face : CARDINAL_FACES) {
+            Cell neighbor = step(vent, face);
+            if (corridorCells.contains(neighbor) && !lowCeilingCorridorCells.contains(neighbor)) {
+                return face;
+            }
+        }
+        return BlockFace.SELF;
+    }
+
+    private boolean libraryVentGateHasSideWalls(Cell vent, BlockFace transitionFace) {
+        if (transitionFace == BlockFace.SELF) {
+            return false;
+        }
+        boolean eastWestTransition = transitionFace == BlockFace.EAST || transitionFace == BlockFace.WEST;
+        Cell firstSide = eastWestTransition
+                ? new Cell(vent.x(), vent.z() - 1)
+                : new Cell(vent.x() - 1, vent.z());
+        Cell secondSide = eastWestTransition
+                ? new Cell(vent.x(), vent.z() + 1)
+                : new Cell(vent.x() + 1, vent.z());
+        return libraryVentSideIsWall(firstSide) && libraryVentSideIsWall(secondSide);
+    }
+
+    private boolean libraryVentSideIsWall(Cell cell) {
+        return !corridorCells.contains(cell) && !roomInteriorCells.contains(cell);
     }
 
     private void widenBunkerSpine() {

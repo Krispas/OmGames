@@ -490,6 +490,12 @@ public final class HallsOfCarnageManager {
                     HallsRecipeBookMenu.openBuildings(plugin, player, session.scenario(), buildingTypes, itemTypes);
             case HallsRecipeBookMenu.ACTION_CRAFTING ->
                     HallsRecipeBookMenu.openCrafting(plugin, player, session.scenario(), buildingTypes, itemTypes);
+            case HallsRecipeBookMenu.ACTION_BUILDINGS_PAGE ->
+                    HallsRecipeBookMenu.openBuildings(plugin, player, session.scenario(), buildingTypes, itemTypes,
+                            parseRecipePage(value));
+            case HallsRecipeBookMenu.ACTION_CRAFTING_PAGE ->
+                    HallsRecipeBookMenu.openCrafting(plugin, player, session.scenario(), buildingTypes, itemTypes,
+                            parseRecipePage(value));
             case HallsRecipeBookMenu.ACTION_BUILDING_DETAIL -> {
                 HallsBuildingType building = buildingTypes.get(normalizeId(value));
                 if (building == null) {
@@ -505,6 +511,17 @@ public final class HallsOfCarnageManager {
             }
         }
         return true;
+    }
+
+    private int parseRecipePage(String value) {
+        if (value == null || value.isBlank()) {
+            return 0;
+        }
+        try {
+            return Math.max(0, Integer.parseInt(value));
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
     }
 
     public boolean handleMainMenuClick(org.bukkit.event.inventory.InventoryClickEvent event) {

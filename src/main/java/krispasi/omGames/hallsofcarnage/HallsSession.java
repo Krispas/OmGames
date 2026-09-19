@@ -2916,7 +2916,7 @@ public final class HallsSession {
     }
 
     private boolean litBunkerLamp(HallsExplorationGenerator.Cell point) {
-        return Math.floorMod((point.x() * 43) ^ (point.z() * 19) ^ (id * 7) ^ currentFloor, 100) < 15;
+        return Math.floorMod((point.x() * 43) ^ (point.z() * 19) ^ (id * 7) ^ currentFloor, 100) < 40;
     }
 
     private BlockFace ventGateBarFacing(HallsExplorationGenerator.Plan plan, HallsExplorationGenerator.Cell point) {

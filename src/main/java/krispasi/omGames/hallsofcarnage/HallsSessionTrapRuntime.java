@@ -465,7 +465,7 @@ final class HallsSessionTrapRuntime {
                             candidate.cell().x() + dx,
                             candidate.cell().z() + dz
                     );
-                    if (candidate.allRoomCells().contains(cell)) {
+                    if (candidate.roomCells().contains(cell)) {
                         openPitCells.add(cell);
                     }
                 }

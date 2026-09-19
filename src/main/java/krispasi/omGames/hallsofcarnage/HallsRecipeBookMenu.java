@@ -24,6 +24,8 @@ final class HallsRecipeBookMenu {
     static final String ACTION_CRAFTING = "crafting";
     static final String ACTION_BUILDING_DETAIL = "building_detail";
     static final String ACTION_BACK = "back";
+    static final String ACTION_BUILDINGS_PAGE = "buildings_page";
+    static final String ACTION_CRAFTING_PAGE = "crafting_page";
 
     private static final int[] CONTENT_SLOTS = {
             10, 11, 12, 13, 14, 15, 16,
@@ -36,7 +38,7 @@ final class HallsRecipeBookMenu {
     }
 
     static void openIndex(JavaPlugin plugin, Player player, HallsScenario scenario) {
-        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.INDEX, null), 27,
+        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.INDEX, null, 0), 27,
                 Component.text("Halls Recipes", NamedTextColor.DARK_RED));
         inventory.setItem(11, item(plugin, Material.BRICKS, "Buildings", NamedTextColor.GOLD,
                 List.of("Blueprint locations for this run."),
@@ -54,27 +56,44 @@ final class HallsRecipeBookMenu {
                               HallsScenario scenario,
                               Map<String, HallsBuildingType> buildingTypes,
                               Map<String, HallsItemType> itemTypes) {
-        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.BUILDINGS, null), 54,
+        openBuildings(plugin, player, scenario, buildingTypes, itemTypes, 0);
+    }
+
+    static void openBuildings(JavaPlugin plugin,
+                              Player player,
+                              HallsScenario scenario,
+                              Map<String, HallsBuildingType> buildingTypes,
+                              Map<String, HallsItemType> itemTypes,
+                              int page) {
+        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.BUILDINGS, null, Math.max(0, page)), 54,
                 Component.text("Building Blueprints", NamedTextColor.DARK_RED));
         List<String> allowed = scenario.allowedItems("buildings");
         List<HallsBuildingType> buildings = buildingTypes.values().stream()
                 .filter(building -> allowed.isEmpty() || allowed.contains(building.id()))
                 .sorted(java.util.Comparator.comparing(HallsBuildingType::name))
                 .toList();
+        int maxPage = maxPage(buildings.size());
+        int normalizedPage = Math.max(0, Math.min(maxPage, page));
+        inventory.setItem(4, item(plugin, Material.OAK_SIGN, "Building Blueprints", NamedTextColor.GOLD,
+                List.of("Page " + (normalizedPage + 1) + "/" + (maxPage + 1)), null, null));
         int index = 0;
-        for (HallsBuildingType building : buildings) {
-            if (index >= CONTENT_SLOTS.length) {
-                break;
-            }
-            inventory.setItem(CONTENT_SLOTS[index++], buildingItem(plugin, scenario, building, itemTypes));
+        int start = normalizedPage * CONTENT_SLOTS.length;
+        for (int i = start; i < buildings.size() && index < CONTENT_SLOTS.length; i++) {
+            inventory.setItem(CONTENT_SLOTS[index++], buildingItem(plugin, scenario, buildings.get(i), itemTypes));
         }
         if (index == 0) {
             inventory.setItem(22, item(plugin, Material.BARRIER, "No Buildings", NamedTextColor.GRAY,
                     List.of("This scenario does not expose building recipes."), null, null));
         }
         inventory.setItem(45, item(plugin, Material.ARROW, "Back", NamedTextColor.GRAY, List.of(), ACTION_BACK, null));
+        if (normalizedPage > 0) {
+            inventory.setItem(48, pageItem(plugin, "Previous Page", ACTION_BUILDINGS_PAGE, normalizedPage - 1));
+        }
         inventory.setItem(49, item(plugin, Material.CRAFTING_TABLE, "Crafting", NamedTextColor.AQUA,
                 List.of("View station recipe unlocks."), ACTION_CRAFTING, null));
+        if (normalizedPage < maxPage) {
+            inventory.setItem(50, pageItem(plugin, "Next Page", ACTION_BUILDINGS_PAGE, normalizedPage + 1));
+        }
         player.openInventory(inventory);
     }
 
@@ -83,7 +102,7 @@ final class HallsRecipeBookMenu {
                                    HallsScenario scenario,
                                    HallsBuildingType building,
                                    Map<String, HallsItemType> itemTypes) {
-        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.BUILDING_DETAIL, building.id()), 27,
+        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.BUILDING_DETAIL, building.id(), 0), 27,
                 Component.text(building.name(), NamedTextColor.DARK_RED));
         inventory.setItem(4, buildingItem(plugin, scenario, building, itemTypes));
         HallsItemType blueprint = itemTypes.get(building.blueprint());
@@ -104,9 +123,18 @@ final class HallsRecipeBookMenu {
                              HallsScenario scenario,
                              Map<String, HallsBuildingType> buildingTypes,
                              Map<String, HallsItemType> itemTypes) {
-        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.CRAFTING, null), 54,
+        openCrafting(plugin, player, scenario, buildingTypes, itemTypes, 0);
+    }
+
+    static void openCrafting(JavaPlugin plugin,
+                             Player player,
+                             HallsScenario scenario,
+                             Map<String, HallsBuildingType> buildingTypes,
+                             Map<String, HallsItemType> itemTypes,
+                             int page) {
+        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.CRAFTING, null, Math.max(0, page)), 54,
                 Component.text("Crafting Recipes", NamedTextColor.DARK_RED));
-        int index = 0;
+        List<ItemStack> recipeItems = new ArrayList<>();
         for (String stationId : List.of("camp_station", "cooking_pot", "weapon_bench", "armory")) {
             HallsBuildingType station = buildingTypes.get(stationId);
             if (station == null) {
@@ -116,21 +144,36 @@ final class HallsRecipeBookMenu {
                 List<String> recipes = recipesUnlockedAt(scenario, stationId, level);
                 for (String itemId : recipes) {
                     HallsItemType itemType = itemTypes.get(itemId);
-                    if (itemType == null || index >= CONTENT_SLOTS.length) {
+                    if (itemType == null) {
                         continue;
                     }
-                    inventory.setItem(CONTENT_SLOTS[index++], recipeItem(plugin, itemType, station.name(),
+                    recipeItems.add(recipeItem(plugin, itemType, station.name(),
                             station.id().equals("camp_station") ? 0 : level));
                 }
             }
+        }
+        int maxPage = maxPage(recipeItems.size());
+        int normalizedPage = Math.max(0, Math.min(maxPage, page));
+        inventory.setItem(4, item(plugin, Material.OAK_SIGN, "Crafting Recipes", NamedTextColor.AQUA,
+                List.of("Page " + (normalizedPage + 1) + "/" + (maxPage + 1)), null, null));
+        int index = 0;
+        int start = normalizedPage * CONTENT_SLOTS.length;
+        for (int i = start; i < recipeItems.size() && index < CONTENT_SLOTS.length; i++) {
+            inventory.setItem(CONTENT_SLOTS[index++], recipeItems.get(i));
         }
         if (index == 0) {
             inventory.setItem(22, item(plugin, Material.BARRIER, "No Recipes", NamedTextColor.GRAY,
                     List.of("This scenario has no station recipes."), null, null));
         }
         inventory.setItem(45, item(plugin, Material.ARROW, "Back", NamedTextColor.GRAY, List.of(), ACTION_BACK, null));
+        if (normalizedPage > 0) {
+            inventory.setItem(48, pageItem(plugin, "Previous Page", ACTION_CRAFTING_PAGE, normalizedPage - 1));
+        }
         inventory.setItem(49, item(plugin, Material.BRICKS, "Buildings", NamedTextColor.GOLD,
                 List.of("View blueprint locations."), ACTION_BUILDINGS, null));
+        if (normalizedPage < maxPage) {
+            inventory.setItem(50, pageItem(plugin, "Next Page", ACTION_CRAFTING_PAGE, normalizedPage + 1));
+        }
         player.openInventory(inventory);
     }
 
@@ -280,6 +323,15 @@ final class HallsRecipeBookMenu {
         return item;
     }
 
+    private static ItemStack pageItem(JavaPlugin plugin, String name, String action, int page) {
+        return item(plugin, Material.SPECTRAL_ARROW, name, NamedTextColor.YELLOW,
+                List.of("Page " + (page + 1)), action, Integer.toString(page));
+    }
+
+    private static int maxPage(int count) {
+        return Math.max(0, (count - 1) / CONTENT_SLOTS.length);
+    }
+
     private static String readable(String value) {
         if (value == null || value.isBlank()) {
             return "unknown";
@@ -312,7 +364,7 @@ final class HallsRecipeBookMenu {
         CRAFTING
     }
 
-    record MenuHolder(MenuType type, String context) implements InventoryHolder {
+    record MenuHolder(MenuType type, String context, int page) implements InventoryHolder {
         @Override
         public Inventory getInventory() {
             return null;
