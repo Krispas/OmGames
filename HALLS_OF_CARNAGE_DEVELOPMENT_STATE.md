@@ -141,6 +141,7 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: research crates now generate only on exploration floors, no longer on the start floor or camp floors. Carried research crates were lowered by another 0.1 blocks and use full display brightness so low ceilings should not make the carried crate render black.
 
 ## Reviewer note (Delete entries once done, but keep the header)
+Do all following for the next slice (and keep this line):
 - Make it so when deconstructing the building, blueprint is returned, if blueprint is needed for upgrades, return the amount spent on the building. Do not return other resources such as diamonds.
 - A new building, research table. A medium building. Common, requires blueprint for upgrade. Blueprints can be deposited into this building, giving it blueprint points. When X amount of points is achieved, a blueprint of any choice can be picked to be fabricated. The X depends on the level (5,3,3). On third level, abillity to craft rare bluepirnts is unlocked for dobule the price. Depositing rare blueprints gives 2 points.
 - New buildings, potato and carrot farms. Both are small buildigns and behave exactly like mycelia farms, but for potatoes and carrots
