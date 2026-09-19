@@ -339,6 +339,15 @@ public final class HallsSession {
         return running && !transitioning && (currentFloor == 1 || isCurrentFloorCamp());
     }
 
+    public void saveAndLeave(String reason) {
+        if (campRuntime != null) {
+            campRuntime.closeOpenViewers();
+        }
+        closeOpenElevatorChestViewers();
+        captureElevatorChestContents(false);
+        save(reason);
+    }
+
     public boolean isParticipant(UUID playerId) {
         return participants.contains(playerId);
     }

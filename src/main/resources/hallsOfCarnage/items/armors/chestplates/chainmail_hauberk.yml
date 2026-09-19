@@ -8,7 +8,8 @@ max-stack-size: 1
 lore:
   - "Linked scrap rings that catch glancing blows."
 stats:
-  armor: 10
+  armor: 5
   durability: 75
 recipe:
   iron_scrap: 8
+

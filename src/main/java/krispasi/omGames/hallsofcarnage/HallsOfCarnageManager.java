@@ -156,12 +156,30 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/weapons/bone_cleaver.yml",
             "hallsOfCarnage/items/weapons/frost_lance.yml",
             "hallsOfCarnage/items/weapons/sculk_maul.yml",
-            "hallsOfCarnage/items/armors/padded_armor.yml",
-            "hallsOfCarnage/items/armors/reinforced_chestplate.yml",
-            "hallsOfCarnage/items/armors/chainmail_hauberk.yml",
-            "hallsOfCarnage/items/armors/ironbound_chestplate.yml",
-            "hallsOfCarnage/items/armors/cinderplate.yml",
-            "hallsOfCarnage/items/armors/deepguard_plate.yml",
+            "hallsOfCarnage/items/armors/helmets/padded_cap.yml",
+            "hallsOfCarnage/items/armors/helmets/chainmail_coif.yml",
+            "hallsOfCarnage/items/armors/helmets/ironbound_helmet.yml",
+            "hallsOfCarnage/items/armors/helmets/cinder_helmet.yml",
+            "hallsOfCarnage/items/armors/helmets/reinforced_helmet.yml",
+            "hallsOfCarnage/items/armors/helmets/deepguard_helmet.yml",
+            "hallsOfCarnage/items/armors/chestplates/padded_armor.yml",
+            "hallsOfCarnage/items/armors/chestplates/chainmail_hauberk.yml",
+            "hallsOfCarnage/items/armors/chestplates/ironbound_chestplate.yml",
+            "hallsOfCarnage/items/armors/chestplates/cinderplate.yml",
+            "hallsOfCarnage/items/armors/chestplates/reinforced_chestplate.yml",
+            "hallsOfCarnage/items/armors/chestplates/deepguard_plate.yml",
+            "hallsOfCarnage/items/armors/leggings/padded_leggings.yml",
+            "hallsOfCarnage/items/armors/leggings/chainmail_leggings.yml",
+            "hallsOfCarnage/items/armors/leggings/ironbound_leggings.yml",
+            "hallsOfCarnage/items/armors/leggings/cinder_leggings.yml",
+            "hallsOfCarnage/items/armors/leggings/reinforced_leggings.yml",
+            "hallsOfCarnage/items/armors/leggings/deepguard_leggings.yml",
+            "hallsOfCarnage/items/armors/boots/padded_boots.yml",
+            "hallsOfCarnage/items/armors/boots/chainmail_boots.yml",
+            "hallsOfCarnage/items/armors/boots/ironbound_boots.yml",
+            "hallsOfCarnage/items/armors/boots/cinder_boots.yml",
+            "hallsOfCarnage/items/armors/boots/reinforced_boots.yml",
+            "hallsOfCarnage/items/armors/boots/deepguard_boots.yml",
             "hallsOfCarnage/items/food/stale_bread.yml",
             "hallsOfCarnage/items/food/raw_mycelia.yml",
             "hallsOfCarnage/items/food/potato.yml",
@@ -1173,7 +1191,7 @@ public final class HallsOfCarnageManager {
         if (!session.canSaveAndLeave()) {
             return Result.fail("/hoc leave can only save from the start floor or a camp floor.");
         }
-        session.save("host-leave");
+        session.saveAndLeave("host-leave");
         stopSession(sessionId, true);
         return Result.ok("Saved and ended Halls session " + sessionId + ".");
     }

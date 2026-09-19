@@ -1,0 +1,16 @@
+id: cinder_boots
+name: "Cinder Boots"
+category: armor
+rarity: rare
+material: GOLDEN_BOOTS
+armor-model: minecraft:gold
+max-stack-size: 1
+lore:
+  - "Bright boots with a faint furnace hum."
+stats:
+  armor: 1
+  durability: 50
+recipe:
+  iron_scrap: 4
+  redstone_scrap: 2
+

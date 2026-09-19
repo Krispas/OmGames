@@ -1,0 +1,16 @@
+id: ironbound_leggings
+name: "Ironbound Leggings"
+category: armor
+rarity: normal
+material: IRON_LEGGINGS
+armor-model: minecraft:iron
+max-stack-size: 1
+lore:
+  - "Heavy iron plates lashed for hard travel."
+stats:
+  armor: 5
+  durability: 85
+recipe:
+  iron_scrap: 10
+  redstone_scrap: 1
+

@@ -1,0 +1,15 @@
+id: ironbound_boots
+name: "Ironbound Boots"
+category: armor
+rarity: normal
+material: IRON_BOOTS
+armor-model: minecraft:iron
+max-stack-size: 1
+lore:
+  - "Iron-shod boots that bite into rubble."
+stats:
+  armor: 2
+  durability: 65
+recipe:
+  iron_scrap: 6
+

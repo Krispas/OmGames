@@ -1,0 +1,15 @@
+id: chainmail_boots
+name: "Chainmail Boots"
+category: armor
+rarity: normal
+material: CHAINMAIL_BOOTS
+armor-model: minecraft:chainmail
+max-stack-size: 1
+lore:
+  - "Linked guards over worn expedition boots."
+stats:
+  armor: 1
+  durability: 45
+recipe:
+  iron_scrap: 3
+

@@ -1,0 +1,15 @@
+id: padded_boots
+name: "Padded Boots"
+category: armor
+rarity: normal
+material: LEATHER_BOOTS
+armor-model: minecraft:leather
+max-stack-size: 1
+lore:
+  - "Soft soles for sprinting over broken floors."
+stats:
+  armor: 1
+  durability: 40
+recipe:
+  iron_scrap: 2
+

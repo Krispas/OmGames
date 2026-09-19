@@ -1,0 +1,15 @@
+id: padded_cap
+name: "Padded Cap"
+category: armor
+rarity: normal
+material: LEATHER_HELMET
+armor-model: minecraft:leather
+max-stack-size: 1
+lore:
+  - "A stitched hood for low ceilings and lower odds."
+stats:
+  armor: 1
+  durability: 45
+recipe:
+  iron_scrap: 2
+

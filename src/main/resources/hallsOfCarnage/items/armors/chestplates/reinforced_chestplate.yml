@@ -9,9 +9,10 @@ max-stack-size: 1
 lore:
   - "A rare plate patched with dense salvage."
 stats:
-  armor: 14
-  toughness: 2
+  armor: 8
+  armor-toughness: 2
   durability: 95
 recipe:
   iron_scrap: 15
   redstone_scrap: 6
+

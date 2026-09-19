@@ -1,0 +1,16 @@
+id: cinder_leggings
+name: "Cinder Leggings"
+category: armor
+rarity: rare
+material: GOLDEN_LEGGINGS
+armor-model: minecraft:gold
+max-stack-size: 1
+lore:
+  - "Heat-bright plates that hold their nerve."
+stats:
+  armor: 3
+  durability: 70
+recipe:
+  iron_scrap: 8
+  redstone_scrap: 3
+

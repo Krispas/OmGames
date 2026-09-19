@@ -1334,6 +1334,7 @@ SQLite tables:
 - Vegetation yaw must compensate for `BlockDisplay`'s lower-corner origin so random rotation pivots around the cell center.
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, optional `recipe` cost map, and an optional `stats` map.
+- Bundled Halls armor item resources are organized by equipped slot under `items/armors/helmets/`, `items/armors/chestplates/`, `items/armors/leggings/`, and `items/armors/boots/`.
 - Halls player item defaults do not include ranged gear; do not add bows, crossbows, tridents, arrows, or fireworks as Halls player items unless the design changes again.
 - Armor `item-model` controls the item icon/model; armor `armor-model` is written to Paper's equippable component for the worn armor model.
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.

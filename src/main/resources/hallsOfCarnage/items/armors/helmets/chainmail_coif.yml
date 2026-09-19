@@ -1,0 +1,15 @@
+id: chainmail_coif
+name: "Chainmail Coif"
+category: armor
+rarity: normal
+material: CHAINMAIL_HELMET
+armor-model: minecraft:chainmail
+max-stack-size: 1
+lore:
+  - "A rattling hood of linked camp metal."
+stats:
+  armor: 2
+  durability: 55
+recipe:
+  iron_scrap: 4
+

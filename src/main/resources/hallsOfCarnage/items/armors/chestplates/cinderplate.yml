@@ -8,10 +8,10 @@ max-stack-size: 1
 lore:
   - "Warm salvage plating that keeps panic out."
 stats:
-  armor: 10
-  toughness: 1
+  armor: 5
   durability: 80
   resistance-seconds: 4
 recipe:
   iron_scrap: 10
   redstone_scrap: 4
+

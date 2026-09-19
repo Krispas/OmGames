@@ -1,0 +1,17 @@
+id: reinforced_boots
+name: "Reinforced Boots"
+category: armor
+rarity: rare
+material: DIAMOND_BOOTS
+armor-model: om:astral
+max-stack-size: 1
+lore:
+  - "Dense boots for standing your ground."
+stats:
+  armor: 3
+  armor-toughness: 2
+  durability: 70
+recipe:
+  iron_scrap: 7
+  redstone_scrap: 3
+

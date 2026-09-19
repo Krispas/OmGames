@@ -1,0 +1,15 @@
+id: padded_leggings
+name: "Padded Leggings"
+category: armor
+rarity: normal
+material: LEATHER_LEGGINGS
+armor-model: minecraft:leather
+max-stack-size: 1
+lore:
+  - "Quilted salvage layers for hurried retreats."
+stats:
+  armor: 2
+  durability: 55
+recipe:
+  iron_scrap: 3
+

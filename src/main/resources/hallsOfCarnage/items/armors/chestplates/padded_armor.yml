@@ -8,7 +8,8 @@ max-stack-size: 1
 lore:
   - "Better than entering the halls in cloth."
 stats:
-  armor: 6
+  armor: 3
   durability: 60
 recipe:
   iron_scrap: 4
+
