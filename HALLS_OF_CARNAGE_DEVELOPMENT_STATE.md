@@ -153,6 +153,8 @@ Do all following for the next slice (and keep this line):
 - Give distilleries bigger model and make their pointing particles the villager happy particles, so they can be seen better.
 - The bunker generation is now a lot better, however make the main corridor more winding, also dont let it make loops,make the redstone lamps in the middle line of the corridor disabled. Its great that the elevator connects to it, keep it that way.
 - Something about saving seems wrong, (I think it was the elevator chest content somehow not saving properly?) No idea, investigate it. `/hoc leave` transfer-chest capture was fixed; keep this only if further save issues reproduce.
+- Display sculk amount on camp floors and display research points in camp
+- Make it so that if building is used and then deconstructed, the info about its state will be saved on the blueprint, so building it again wont recharge it. Be careful about deconstructing leveled up buildings, so it doesnt lead to situation when level 1 building has level 3 stats for example.
 
 Future slices (dont do yet):
 - Add a ton of new content, I wrote about it in content.md. Implement EVERYTHING, you have the whole development slice dedicated just to this document.
