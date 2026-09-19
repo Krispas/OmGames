@@ -152,6 +152,7 @@ Do all following for the next slice (and keep this line):
 
 
 Future slices (dont do yet):
+- Something about saving seems wrong, (I think it was the elevator chest content somehow not saving properly?) No idea, investigate it.
 - Add boots, helmets and leggings support. Finish all the sets of armor. Balance their armor and toughness based on the vanilla items they inherit (not codevise, just copy the values from the wiki/game into .yml files, it is for balancing). Rebalance chestplates to fit the new system, separate the armor types into their own folders (based on the slot they are equiped onto)
 - Library level type - The corridor generation for this level type is also a little bit different. Some corridors are corridors, some corridors are vents. Normal corridors are simillar the wide generation, however vents are slim 1 wide corridors with height of 2. Corridors can interject, creating vent openings. Replace floor 11 with this type.
 - Bunker level type - The corridor generation for this level type is also a little bit different. Simillarly to the sewers, there is a main corridor, this time however it is 3x3 with top corner blocks filled. From this corridor, there are small corridors leading into rooms, similar to sewer level type. Replace floor 12 with this type.
@@ -166,5 +167,6 @@ Future slices (dont do yet):
 
 For reviewer to figure out:
 - New research tree - I have added research.csv, rework the research tree fully based on this file
-- New models
+- New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, mycelia_farm, research_table, scanner, sculk purifier, speed totem, storage locker.
 - New breakables
+- Texture all items
