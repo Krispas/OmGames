@@ -1,6 +1,7 @@
 package krispasi.omGames.hallsofcarnage;
 
 import java.awt.Color;
+import java.io.File;
 import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
@@ -50,6 +51,8 @@ final class HallsFloorMapRenderer extends MapRenderer {
     }
 
     static ItemStack create(JavaPlugin plugin,
+                            File dataFolder,
+                            String mapKey,
                             Player owner,
                             World world,
                             int originX,
@@ -57,7 +60,10 @@ final class HallsFloorMapRenderer extends MapRenderer {
                             Set<HallsExplorationGenerator.Cell> cells,
                             Set<UUID> participants,
                             boolean showEnemies) {
-        MapView view = Bukkit.createMap(world);
+        MapView view = HallsMapIdStore.floorMap(plugin, dataFolder, world, mapKey);
+        if (view == null) {
+            view = Bukkit.createMap(world);
+        }
         for (MapRenderer renderer : view.getRenderers()) {
             view.removeRenderer(renderer);
         }

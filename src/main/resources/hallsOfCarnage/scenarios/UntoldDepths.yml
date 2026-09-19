@@ -57,8 +57,10 @@ allowed-items:
     - raw_mycelia
     - potato
     - carrot
+    - raw_pufferfish
     - stale_bread
     - cooked_mycelia
+    - pufferfish_stew
     - sculk_cleansing_hash
     - deeproot_purge_stew
     - hearty_mycelia_stew
@@ -206,6 +208,7 @@ crafting-stations:
     1:
       - cooked_mycelia
       - sculk_cleansing_hash
+      - pufferfish_stew
       - deeproot_purge_stew
       - hearty_mycelia_stew
       - fleetfoot_ration
@@ -243,6 +246,7 @@ research:
         - cooked_mycelia
         - potato
         - carrot
+        - raw_pufferfish
         - sculk_cleansing_hash
         - hearty_mycelia_stew
         - fleetfoot_ration
@@ -267,6 +271,7 @@ research:
       unlocks:
         - ember_stew
         - golden_jerky
+        - pufferfish_stew
     mining_arms:
       name: "Mining Arms"
       icon: IRON_PICKAXE

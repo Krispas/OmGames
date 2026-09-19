@@ -120,6 +120,9 @@ public final class HallsOfCarnageListener implements Listener {
             manager.handleSessionMonsterDeath(event.getEntity(), event.getEntity().getKiller());
             event.getDrops().clear();
             event.setDroppedExp(0);
+        } else if (manager.handleTrapPufferfishDeath(event.getEntity())) {
+            event.getDrops().clear();
+            event.setDroppedExp(0);
         }
     }
 

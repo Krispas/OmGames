@@ -117,6 +117,7 @@ public final class HallsSession {
     private final HallsSessionMonsterRuntime monsterRuntime;
     private final HallsSessionSculkRuntime sculkRuntime;
     private final HallsCampRuntime campRuntime;
+    private final HallsSidebar sidebar = new HallsSidebar();
     private final java.util.function.Predicate<UUID> debugEnabled;
     private final String elevatorLocatorIconItemModel;
     private final Set<UUID> ghostPlayers = new HashSet<>();
@@ -157,6 +158,7 @@ public final class HallsSession {
     private Set<HallsExplorationGenerator.Cell> activeFloorMapCells = Set.of();
     private int compassTrailCountdown;
     private ResearchCrate researchCrate;
+    private boolean researchCrateDepositedThisFloor;
     private UUID elevatorWaypointId;
 
     public HallsSession(JavaPlugin plugin,
@@ -397,6 +399,19 @@ public final class HallsSession {
         monsterRuntime.handleMonsterDeath(entity, killer);
     }
 
+    public boolean handleTrapPufferfishDeath(org.bukkit.entity.LivingEntity entity) {
+        if (entity == null || !entity.getScoreboardTags().contains("omgames_hoc_trap")
+                || entity.getType() != org.bukkit.entity.EntityType.PUFFERFISH) {
+            return false;
+        }
+        HallsItemType type = itemTypes.get("raw_pufferfish");
+        ItemStack drop = type == null
+                ? new ItemStack(Material.PUFFERFISH)
+                : HallsItemFactory.create(plugin, type, 1);
+        dropSessionItem(entity.getLocation(), drop);
+        return true;
+    }
+
     public boolean handlePhysicsDropPickup(Player player, Entity entity) {
         if (player == null || entity == null || !running || !player.getWorld().equals(world)) {
             return false;
@@ -468,6 +483,7 @@ public final class HallsSession {
         }
         removeCarriedResearchCrate(player.getUniqueId());
         researchPoints++;
+        researchCrateDepositedThisFloor = true;
         save("research-crate");
         world.playSound(block.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.9f, 1.35f);
         world.spawnParticle(Particle.ENCHANT, block.getLocation().add(0.5, 0.7, 0.5), 40, 0.35, 0.35, 0.35, 0.06);
@@ -657,6 +673,7 @@ public final class HallsSession {
         }
         removeCarriedResearchCrate(player.getUniqueId());
         clearTotemAttributeModifiers(player);
+        sidebar.restore(player.getUniqueId());
     }
 
     public void pushOutOfSessionProps(Player player) {
@@ -907,6 +924,7 @@ public final class HallsSession {
         applyFoodBuff(player, type, "resistance", PotionEffectType.RESISTANCE);
         applyFoodBuff(player, type, "regeneration", PotionEffectType.REGENERATION);
         applyFoodBuff(player, type, "absorption", PotionEffectType.ABSORPTION);
+        applyFoodBuff(player, type, "poison", PotionEffectType.POISON);
     }
 
     private void applyFoodBuff(Player player, HallsItemType type, String key, PotionEffectType effectType) {
@@ -1068,7 +1086,9 @@ public final class HallsSession {
                 player.setFlying(false);
                 player.setAllowFlight(false);
                 player.removePotionEffect(PotionEffectType.INVISIBILITY);
+                player.removePotionEffect(PotionEffectType.GLOWING);
                 clearTotemBuffs(player);
+                sidebar.restore(playerId);
                 player.teleport(fallback);
                 player.setFallDistance(0.0f);
                 player.sendTitle("Leaving the Halls", "", 0, 35, 10);
@@ -1079,7 +1099,9 @@ public final class HallsSession {
                 player.setFlying(false);
                 player.setAllowFlight(false);
                 player.removePotionEffect(PotionEffectType.INVISIBILITY);
+                player.removePotionEffect(PotionEffectType.GLOWING);
                 clearTotemBuffs(player);
+                sidebar.restore(playerId);
                 if (fallback != null) {
                     player.setRespawnLocation(fallback, true);
                 }
@@ -1089,12 +1111,14 @@ public final class HallsSession {
         removeSessionEntities();
         removeElevatorWaypoint();
         stopHudTask();
+        sidebar.clear();
         cancelGameOverTask();
         running = false;
     }
 
     private void buildStartArea() throws IOException {
         currentFloor = 1;
+        researchCrateDepositedThisFloor = false;
         activeFloorModifiers = HallsFloorModifiers.none();
         floorStartedAtMillis = System.currentTimeMillis();
         HallsScenario.FloorDefinition floorDefinition = scenario.floor(1);
@@ -1178,6 +1202,7 @@ public final class HallsSession {
         clearBuildVolume();
         buildElevator();
         currentFloor = floor;
+        researchCrateDepositedThisFloor = false;
         explorationFloorsSinceCamp++;
         floorStartedAtMillis = System.currentTimeMillis();
         renderExplorationRooms(build);
@@ -1226,6 +1251,7 @@ public final class HallsSession {
         buildElevator();
         ensureElevatorWaypoint();
         currentFloor = floor;
+        researchCrateDepositedThisFloor = false;
         lastCampFloor = Math.max(lastCampFloor, floor);
         floorStartedAtMillis = System.currentTimeMillis();
         HallsCampLayout.Cell link = layout.elevatorLink();
@@ -2310,7 +2336,7 @@ public final class HallsSession {
     private void buildElevator() {
         Material corner = Material.REINFORCED_DEEPSLATE;
         Material side = Material.RED_NETHER_BRICKS;
-        Material back = Material.DEEPSLATE_BRICKS;
+        Material back = firstMaterial("CINNABAR_BRICKS", "DEEPSLATE_BRICKS");
         Material machine = Material.matchMaterial("CHISELED_TUFF_BRICKS") == null
                 ? Material.TUFF_BRICKS
                 : Material.matchMaterial("CHISELED_TUFF_BRICKS");
@@ -2655,7 +2681,7 @@ public final class HallsSession {
             }
         }
         for (int x = -1; x <= 1; x++) {
-            setBlock(origin.x() + x, origin.y() + 3, elevatorDoorZ(), Material.DEEPSLATE_BRICKS);
+            setBlock(origin.x() + x, origin.y() + 3, elevatorDoorZ(), firstMaterial("CINNABAR_BRICKS", "DEEPSLATE_BRICKS"));
         }
         buildElevatorVestibule(true);
     }
@@ -2668,7 +2694,7 @@ public final class HallsSession {
             }
         }
         for (int x = -1; x <= 1; x++) {
-            setBlock(origin.x() + x, origin.y() + 3, elevatorDoorZ(), Material.DEEPSLATE_BRICKS);
+            setBlock(origin.x() + x, origin.y() + 3, elevatorDoorZ(), firstMaterial("CINNABAR_BRICKS", "DEEPSLATE_BRICKS"));
         }
         buildElevatorVestibule(false);
     }
@@ -2901,37 +2927,40 @@ public final class HallsSession {
         if (!running) {
             return;
         }
-        Component shared = Component.text("Floor " + currentFloor, NamedTextColor.DARK_RED)
-                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(Component.text(formatElapsedSeconds(), NamedTextColor.GRAY))
-                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("Scrap W" + woodScrap + " I" + ironScrap
-                        + " D" + diamondScrap + " R" + redstoneScrap, NamedTextColor.GOLD))
-                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(campHudEconomyComponent())
-                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(Component.text("Lives " + remainingLives, NamedTextColor.RED));
-        if (!activeFloorModifiers.empty()) {
-            shared = shared.append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                    .append(activeFloorModifiers.hudComponent());
-        }
         tickDeathFog();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
-                String elevatorDistance = elevatorDistanceLabel(player);
-                Component message = shared
-                        .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                        .append(Component.text("Sculk " + sculkRuntime.sculkPercent(player) + "%", NamedTextColor.AQUA))
-                        .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                        .append(Component.text("Elevator " + elevatorDistance, NamedTextColor.LIGHT_PURPLE));
-                player.sendActionBar(message);
+                sidebar.update(player, sidebarState(player));
                 if (ghostPlayers.contains(playerId)) {
                     world.spawnParticle(Particle.SOUL_FIRE_FLAME, player.getLocation().add(0.0, 0.9, 0.0),
                             8, 0.35, 0.45, 0.35, 0.01);
                 }
+            } else {
+                sidebar.restore(playerId);
             }
         }
+    }
+
+    private SidebarState sidebarState(Player player) {
+        return new SidebarState(
+                currentFloor,
+                formatFloorElapsedSeconds(),
+                woodScrap,
+                ironScrap,
+                diamondScrap,
+                redstoneScrap,
+                coins,
+                currentCoinQuota(),
+                isCurrentFloorCamp(),
+                campKeys,
+                campHudBankProgress(),
+                remainingLives,
+                sculkRuntime.sculkPercent(player),
+                researchCrateDepositedThisFloor,
+                false,
+                activeFloorModifiers.displaySummary()
+        );
     }
 
     private void tickDeathFog() {
@@ -2963,20 +2992,6 @@ public final class HallsSession {
 
     private void tickCompassTrail() {
         compassTrailCountdown = 0;
-    }
-
-    private String elevatorDistanceLabel(Player player) {
-        if (player == null || !player.getWorld().equals(world)) {
-            return "FAR";
-        }
-        double distance = player.getLocation().distance(elevatorSpawnLocation());
-        if (distance <= 30.0) {
-            return "NEAR";
-        }
-        if (distance <= 50.0) {
-            return "MEDIUM";
-        }
-        return "FAR";
     }
 
     private int currentCoinQuota() {
@@ -3014,13 +3029,9 @@ public final class HallsSession {
         return savedCampStates.getOrDefault(sharedCampStateKey(), List.of());
     }
 
-    private Component campHudEconomyComponent() {
-        if (!isCurrentFloorCamp()) {
-            return Component.text("Coins " + coins + "/" + currentCoinQuota(), NamedTextColor.YELLOW);
-        }
+    private String campHudBankProgress() {
         int nextCost = scenario.camp().nextKeyCost(campKeysEarned);
-        String progress = nextCost <= 0 ? "complete" : campBankCoins + "/" + nextCost;
-        return Component.text("Keys " + campKeys + " | Bank " + progress, NamedTextColor.YELLOW);
+        return nextCost <= 0 ? "complete" : campBankCoins + "/" + nextCost;
     }
 
     private HallsScenario.FloorDefinition adjustedDifficulty(HallsScenario.FloorDefinition floor) {
@@ -3067,7 +3078,10 @@ public final class HallsSession {
             if (!hasCompass(player.getInventory())) {
                 int slot = firstAvailableHotbarSlot(player.getInventory());
                 if (slot >= 0) {
-                    player.getInventory().setItem(slot, HallsFloorMapRenderer.create(plugin, player, world,
+                    player.getInventory().setItem(slot, HallsFloorMapRenderer.create(plugin, dataFolder,
+                            "origin_" + origin.x() + "_" + origin.z() + "_floor_" + currentFloor
+                                    + "_compass_" + activeFloorModifiers.compassLevel(),
+                            player, world,
                             origin.x(), origin.z(), activeFloorMapCells, participants, activeFloorModifiers.compassLevel() >= 2));
                 }
             }
@@ -3096,8 +3110,9 @@ public final class HallsSession {
         return sculkRuntime.maxSculkPercent(this::isAliveParticipant);
     }
 
-    private String formatElapsedSeconds() {
-        long elapsedSeconds = Math.max(0L, (System.currentTimeMillis() - startedAtMillis) / 1000L);
+    private String formatFloorElapsedSeconds() {
+        long base = floorStartedAtMillis <= 0L ? startedAtMillis : floorStartedAtMillis;
+        long elapsedSeconds = Math.max(0L, (System.currentTimeMillis() - base) / 1000L);
         long minutes = elapsedSeconds / 60L;
         long seconds = elapsedSeconds % 60L;
         return String.format("%02d:%02d", minutes, seconds);
@@ -4229,6 +4244,7 @@ public final class HallsSession {
         player.getInventory().clear();
         applyInventoryLimit(player);
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, PotionEffect.INFINITE_DURATION, 0, true, false, false));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, PotionEffect.INFINITE_DURATION, 0, true, false, false));
     }
 
     private void clearGhostState(Player player) {
@@ -4240,6 +4256,7 @@ public final class HallsSession {
         player.setFlying(false);
         player.setAllowFlight(false);
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
+        player.removePotionEffect(PotionEffectType.GLOWING);
     }
 
     private void healForElevatorArrival(Player player, boolean wasGhost) {
@@ -5462,6 +5479,7 @@ public final class HallsSession {
             clearRadius = Math.max(clearRadius, activeClearRadius);
             clearX = origin.x() - clearRadius;
             currentFloor = floor;
+            researchCrateDepositedThisFloor = false;
             stage = 1;
         }
 
@@ -5593,6 +5611,24 @@ public final class HallsSession {
     }
 
     private record CratePlacement(int x, int y, int z, Set<HallsExplorationGenerator.Cell> footprint) {
+    }
+
+    record SidebarState(int floor,
+                        String elapsed,
+                        int woodScrap,
+                        int ironScrap,
+                        int diamondScrap,
+                        int redstoneScrap,
+                        int coins,
+                        int coinQuota,
+                        boolean campFloor,
+                        int keys,
+                        String campBank,
+                        int lives,
+                        int sculkPercent,
+                        boolean researchCrateDeposited,
+                        boolean blueprintDistillerCollected,
+                        String modifiers) {
     }
 
     private static final class PhysicsDrop {

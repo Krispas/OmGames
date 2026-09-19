@@ -160,7 +160,9 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/food/raw_mycelia.yml",
             "hallsOfCarnage/items/food/potato.yml",
             "hallsOfCarnage/items/food/carrot.yml",
+            "hallsOfCarnage/items/food/raw_pufferfish.yml",
             "hallsOfCarnage/items/food/cooked_mycelia.yml",
+            "hallsOfCarnage/items/food/pufferfish_stew.yml",
             "hallsOfCarnage/items/food/sculk_cleansing_hash.yml",
             "hallsOfCarnage/items/food/deeproot_purge_stew.yml",
             "hallsOfCarnage/items/food/ember_stew.yml",
@@ -751,6 +753,18 @@ public final class HallsOfCarnageManager {
                 return;
             }
         }
+    }
+
+    public boolean handleTrapPufferfishDeath(org.bukkit.entity.LivingEntity entity) {
+        if (entity == null) {
+            return false;
+        }
+        for (HallsSession session : activeSessions.values()) {
+            if (session.handleTrapPufferfishDeath(entity)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean isActiveSessionParticipant(Player player) {
