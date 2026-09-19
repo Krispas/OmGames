@@ -11,10 +11,25 @@ camp:
   layout: camps/camp_untold_depths.txt
   team-lives: 3
   key-costs:
-    - 30
+    - 20
+    - 24
+    - 28
+    - 32
+    - 36
     - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
     - 50
+    - 55
     - 60
+    - 65
     - 70
 allowed-items:
   scrap:
