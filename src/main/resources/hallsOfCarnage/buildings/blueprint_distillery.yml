@@ -1,0 +1,31 @@
+id: blueprint_distillery
+name: "Blueprint Distillery"
+size: small
+blueprint: ""
+implemented: true
+levels:
+  1:
+    parts:
+      - material: COPPER_BLOCK
+        offset: [0, 0, 0]
+        scale: [0.72, 0.85, 0.72]
+      - material: LIGHTNING_ROD
+        offset: [0, 0.86, 0]
+        scale: [0.65, 0.65, 0.65]
+      - material: CHISELED_BOOKSHELF
+        offset: [0, 0.18, -0.42]
+        scale: [0.46, 0.36, 0.16]
+  2:
+    parts:
+      - material: WAXED_EXPOSED_COPPER
+        offset: [0, 0, 0]
+        scale: [0.72, 0.85, 0.72]
+      - material: LIGHTNING_ROD
+        offset: [0, 0.86, 0]
+        scale: [0.65, 0.65, 0.65]
+      - material: EMERALD_BLOCK
+        offset: [0, 0.34, 0]
+        scale: [0.34, 0.34, 0.34]
+      - material: CHISELED_BOOKSHELF
+        offset: [0, 0.18, -0.42]
+        scale: [0.46, 0.36, 0.16]

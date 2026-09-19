@@ -125,102 +125,69 @@ allowed-items:
     - speed_totem
     - sculk_purifier
 blueprint-pools:
-  normal:
-    - forge_blueprint
-    - grindstone_blueprint
-    - storage_locker_blueprint
-    - mycelia_farm_blueprint
-    - potato_farm_blueprint
-    - carrot_farm_blueprint
-    - research_table_blueprint
-    - alchemy_cauldron_blueprint
-    - deconstructor_blueprint
-    - scanner_blueprint
-  rare:
-    - elevator_drill_blueprint
-    - health_totem_blueprint
-    - speed_totem_blueprint
-    - sculk_purifier_blueprint
   howling_corridors:
     normal:
-      - grindstone_blueprint
-      - storage_locker_blueprint
       - mycelia_farm_blueprint
-      - potato_farm_blueprint
-      - carrot_farm_blueprint
-      - research_table_blueprint
-      - scanner_blueprint
-    rare:
-      - health_totem_blueprint
-      - speed_totem_blueprint
       - sculk_purifier_blueprint
+      - deconstructor_blueprint
+    rare:
+      - alchemy_cauldron_blueprint
   frozen_halls:
     normal:
-      - forge_blueprint
-      - storage_locker_blueprint
-      - mycelia_farm_blueprint
       - potato_farm_blueprint
-      - alchemy_cauldron_blueprint
       - sculk_purifier_blueprint
+      - research_table_blueprint
     rare:
-      - speed_totem_blueprint
-      - sculk_purifier_blueprint
+      - health_totem_blueprint
   deep_crypt:
     normal:
-      - forge_blueprint
-      - grindstone_blueprint
-      - scanner_blueprint
-      - deconstructor_blueprint
+      - carrot_farm_blueprint
       - sculk_purifier_blueprint
+      - storage_locker_blueprint
     rare:
       - elevator_drill_blueprint
-      - health_totem_blueprint
-      - sculk_purifier_blueprint
   infernal_chambers:
     normal:
+      - mycelia_farm_blueprint
       - forge_blueprint
-      - storage_locker_blueprint
-      - grindstone_blueprint
-      - deconstructor_blueprint
-      - health_totem_blueprint
+      - speed_totem_blueprint
     rare:
-      - elevator_drill_blueprint
-      - health_totem_blueprint
+      - alchemy_cauldron_blueprint
   factory:
     normal:
+      - potato_farm_blueprint
       - forge_blueprint
       - storage_locker_blueprint
-      - research_table_blueprint
-      - scanner_blueprint
-      - grindstone_blueprint
     rare:
       - elevator_drill_blueprint
-      - speed_totem_blueprint
   backrooms:
     normal:
-      - storage_locker_blueprint
-      - mycelia_farm_blueprint
       - carrot_farm_blueprint
+      - forge_blueprint
       - research_table_blueprint
-      - scanner_blueprint
-      - speed_totem_blueprint
     rare:
-      - elevator_drill_blueprint
       - health_totem_blueprint
-      - speed_totem_blueprint
   sewer:
     normal:
-      - forge_blueprint
-      - storage_locker_blueprint
       - mycelia_farm_blueprint
-      - potato_farm_blueprint
-      - carrot_farm_blueprint
+      - grindstone_blueprint
+      - speed_totem_blueprint
+    rare:
       - alchemy_cauldron_blueprint
-      - sculk_purifier_blueprint
+  bunker:
+    normal:
+      - potato_farm_blueprint
+      - scanner_blueprint
+      - deconstructor_blueprint
+    rare:
+      - health_totem_blueprint
+  library:
+    normal:
+      - carrot_farm_blueprint
+      - grindstone_blueprint
+      - scanner_blueprint
     rare:
       - elevator_drill_blueprint
-      - health_totem_blueprint
-      - sculk_purifier_blueprint
 crafting-stations:
   camp_station:
     1:

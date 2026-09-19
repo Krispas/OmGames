@@ -96,6 +96,10 @@ final class HallsExplorationGenerator {
         }
         int targetRooms = Math.max(1, floorDefinition.rooms());
         seedElevatorNetwork();
+        if (corridorMode == CorridorMode.BUNKER) {
+            generateBunkerLayout(layouts, targetRooms);
+            return;
+        }
         if (!addFirstRoom(layouts)) {
             return;
         }
@@ -127,8 +131,6 @@ final class HallsExplorationGenerator {
             addBackroomsGridOpenHalls();
         } else if (corridorMode == CorridorMode.OPEN_HALLS) {
             addRoomLocalOpenHalls();
-        } else if (corridorMode == CorridorMode.BUNKER) {
-            widenBunkerSpine();
         } else if (corridorMode == CorridorMode.CAVE) {
             addMazeBranches(Math.max(rooms.size() / 2, 4));
         }
@@ -354,7 +356,7 @@ final class HallsExplorationGenerator {
     }
 
     private int roomSpacing() {
-        return corridorMode == CorridorMode.MAZE ? 0 : 2;
+        return corridorMode == CorridorMode.MAZE || corridorMode == CorridorMode.BUNKER ? 0 : 2;
     }
 
     private int doorOffset(HallsLayout layout, BlockFace face) {
@@ -966,6 +968,97 @@ final class HallsExplorationGenerator {
         }
     }
 
+    private void generateBunkerLayout(List<HallsLayout> layouts, int targetRooms) {
+        List<Cell> trunk = bunkerTrunkPath();
+        rememberBunkerMainCorridor(trunk);
+        int attempts = 0;
+        while (rooms.size() < targetRooms && attempts++ < targetRooms * 120) {
+            HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
+            if (placeBunkerRoom(layout, trunk)) {
+                continue;
+            }
+            trunk = new ArrayList<>(corridorCells);
+        }
+        addRoomToRoomLoops();
+        int extraBranches = Math.max(4, rooms.size() / 2);
+        addMazeBranches(extraBranches);
+    }
+
+    private List<Cell> bunkerTrunkPath() {
+        int radius = Math.min(clearRadius - 10, Math.max(32, 38 + rooms.size() * 2));
+        int frontZ = elevatorFrontCell(4).z();
+        int northZ = clamp(originZ - radius, originZ - clearRadius + 3, originZ + clearRadius - 3);
+        int southZ = clamp(originZ + radius / 2, originZ - clearRadius + 3, originZ + clearRadius - 3);
+        int eastX = clamp(originX + radius, originX - clearRadius + 3, originX + clearRadius - 3);
+        int westX = clamp(originX - radius, originX - clearRadius + 3, originX + clearRadius - 3);
+        List<Cell> waypoints = List.of(
+                new Cell(originX, northZ),
+                new Cell(eastX, northZ),
+                new Cell(eastX, southZ),
+                new Cell(westX, southZ),
+                new Cell(westX, frontZ),
+                new Cell(originX, frontZ)
+        );
+        return pathThrough(elevatorFrontCell(1), waypoints);
+    }
+
+    private boolean placeBunkerRoom(HallsLayout layout, List<Cell> trunk) {
+        List<Cell> anchors = new ArrayList<>(trunk);
+        Collections.shuffle(anchors, random);
+        for (Cell anchor : anchors) {
+            List<BlockFace> faces = new ArrayList<>(List.of(CARDINAL_FACES));
+            Collections.shuffle(faces, random);
+            for (BlockFace attachFace : faces) {
+                BlockFace roomFace = attachFace.getOppositeFace();
+                if (validDoorOffsets(layout, roomFace).isEmpty()) {
+                    continue;
+                }
+                int offset = doorOffset(layout, roomFace);
+                int gap = 3 + random.nextInt(4);
+                Cell door = anchor;
+                for (int i = 0; i < gap; i++) {
+                    door = step(door, attachFace);
+                }
+                Room room = bunkerRoomFromDoor(layout, roomFace, offset, door);
+                if (!canPlaceRoom(room)) {
+                    continue;
+                }
+                List<Cell> path = pathThrough(anchor, List.of(door));
+                if (!isValidConnectorPath(path, anchor, Set.of(door), List.of(Bounds.of(room)))) {
+                    continue;
+                }
+                room.openings().put(roomFace, offset);
+                addRoom(room);
+                rememberCorridor(path);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Room bunkerRoomFromDoor(HallsLayout layout, BlockFace roomFace, int offset, Cell door) {
+        return switch (roomFace) {
+            case NORTH -> new Room(layout, door.x() - offset, door.z() + 1);
+            case SOUTH -> new Room(layout, door.x() - offset, door.z() - layout.depth());
+            case EAST -> new Room(layout, door.x() - layout.width(), door.z() - offset);
+            case WEST -> new Room(layout, door.x() + 1, door.z() - offset);
+            default -> new Room(layout, door.x() - layout.width() / 2, door.z() - layout.depth() / 2);
+        };
+    }
+
+    private void rememberBunkerMainCorridor(List<Cell> path) {
+        Set<Cell> carved = largeCorridorCells(path);
+        corridorCells.addAll(carved);
+        networkCells.addAll(carved);
+        for (Cell point : carved) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    corridorShellCells.add(new Cell(point.x() + dx, point.z() + dz));
+                }
+            }
+        }
+    }
+
     private void markLibraryVentGates() {
         if (lowCeilingCorridorCells.isEmpty()) {
             return;
@@ -976,6 +1069,19 @@ final class HallsExplorationGenerator {
                 if (corridorCells.contains(neighbor) && !lowCeilingCorridorCells.contains(neighbor)) {
                     ventGateCells.add(vent);
                     break;
+                }
+            }
+        }
+        for (Room room : rooms) {
+            for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
+                Cell door = doorCell(room, opening.getKey(), opening.getValue());
+                if (lowCeilingCorridorCells.contains(door)) {
+                    ventGateCells.add(door);
+                    continue;
+                }
+                Cell outside = step(door, opening.getKey());
+                if (lowCeilingCorridorCells.contains(outside)) {
+                    ventGateCells.add(outside);
                 }
             }
         }

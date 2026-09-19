@@ -216,6 +216,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/blueprints/deconstructor_blueprint.yml",
             "hallsOfCarnage/items/blueprints/sculk_purifier_blueprint.yml",
             "hallsOfCarnage/buildings/camp_station.yml",
+            "hallsOfCarnage/buildings/blueprint_distillery.yml",
             "hallsOfCarnage/buildings/forge.yml",
             "hallsOfCarnage/buildings/mycelia_farm.yml",
             "hallsOfCarnage/buildings/potato_farm.yml",

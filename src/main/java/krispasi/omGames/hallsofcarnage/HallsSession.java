@@ -371,7 +371,7 @@ public final class HallsSession {
                 || (researchCrate != null && researchCrate.entityIds().contains(entity.getUniqueId()))
                 || carriedResearchCrates.values().stream().anyMatch(crate -> crate.displayIds().contains(entity.getUniqueId()))
                 || blueprintDistilleries.containsKey(entity.getUniqueId())
-                || blueprintDistilleries.values().stream().anyMatch(distillery -> entity.getUniqueId().equals(distillery.displayId()))
+                || blueprintDistilleries.values().stream().anyMatch(distillery -> distillery.displayIds().contains(entity.getUniqueId()))
                 || entity.getUniqueId().equals(elevatorWaypointId));
     }
 
@@ -1868,31 +1868,77 @@ public final class HallsSession {
 
     private void spawnBlueprintDistillery(int x, int y, int z) {
         Location displayLocation = new Location(world, x + 0.5, y, z + 0.5);
-        BlockDisplay display = world.spawn(displayLocation, BlockDisplay.class, entity -> {
-            entity.setBlock(Material.COPPER_BLOCK.createBlockData());
-            entity.setTransformation(new Transformation(
-                    new Vector3f(-0.3f, 0.0f, -0.3f),
-                    new Quaternionf(),
-                    new Vector3f(0.6f, 1.2f, 0.6f),
-                    new Quaternionf()));
-            entity.setBrightness(FULL_BRIGHTNESS);
-            entity.setPersistent(false);
-        });
         Interaction interaction = world.spawn(displayLocation, Interaction.class, entity -> {
             entity.setInteractionWidth(1.4f);
             entity.setInteractionHeight(1.7f);
             entity.setResponsive(true);
             entity.setPersistent(false);
         });
+        BlueprintDistillery distillery = new BlueprintDistillery(interaction.getUniqueId(), new ArrayList<>(), x, y, z);
         blueprintDistilleries.put(interaction.getUniqueId(),
-                new BlueprintDistillery(interaction.getUniqueId(), display.getUniqueId(), x, y, z));
+                distillery);
+        setBlueprintDistilleryDisplays(distillery);
     }
 
     private void updateBlueprintDistilleryDisplay(BlueprintDistillery distillery) {
-        Entity entity = Bukkit.getEntity(distillery.displayId());
-        if (entity instanceof BlockDisplay display) {
-            display.setBlock((distillery.active() ? Material.EMERALD_BLOCK : Material.COPPER_BLOCK).createBlockData());
+        setBlueprintDistilleryDisplays(distillery);
+    }
+
+    private void setBlueprintDistilleryDisplays(BlueprintDistillery distillery) {
+        for (UUID displayId : List.copyOf(distillery.displayIds())) {
+            Entity entity = Bukkit.getEntity(displayId);
+            if (entity != null) {
+                entity.remove();
+            }
         }
+        distillery.displayIds().clear();
+        List<HallsBuildingType.Part> parts = blueprintDistilleryParts(distillery.active());
+        if (parts.isEmpty()) {
+            spawnBlueprintDistilleryPart(distillery,
+                    new HallsBuildingType.Part(
+                            distillery.active() ? Material.EMERALD_BLOCK : Material.COPPER_BLOCK,
+                            "",
+                            0.0, 0.0, 0.0,
+                            0.6, 1.2, 0.6,
+                            0.0, 0.0, 0.0));
+            return;
+        }
+        for (HallsBuildingType.Part part : parts) {
+            spawnBlueprintDistilleryPart(distillery, part);
+        }
+    }
+
+    private List<HallsBuildingType.Part> blueprintDistilleryParts(boolean active) {
+        HallsBuildingType type = buildingTypes.get("blueprint_distillery");
+        if (type == null) {
+            return List.of();
+        }
+        HallsBuildingType.Level level = type.level(active ? 2 : 1);
+        if (!level.parts().isEmpty()) {
+            return level.parts();
+        }
+        return type.level(1).parts();
+    }
+
+    private void spawnBlueprintDistilleryPart(BlueprintDistillery distillery, HallsBuildingType.Part part) {
+        Location location = new Location(world,
+                distillery.x() + 0.5 + part.offsetX(),
+                distillery.y() + part.offsetY(),
+                distillery.z() + 0.5 + part.offsetZ());
+        BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
+            entity.setBlock(displayBlockData(part.material(), part.blockData()));
+            entity.setBillboard(Display.Billboard.FIXED);
+            entity.setTransformation(new Transformation(
+                    new Vector3f((float) (-part.scaleX() * 0.5), 0.0f, (float) (-part.scaleZ() * 0.5)),
+                    new Quaternionf().rotateXYZ((float) Math.toRadians(part.rotationX()),
+                            (float) Math.toRadians(part.rotationY()),
+                            (float) Math.toRadians(part.rotationZ())),
+                    new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
+                    new Quaternionf()));
+            entity.setBrightness(FULL_BRIGHTNESS);
+            entity.setPersistent(false);
+        });
+        distillery.displayIds().add(display.getUniqueId());
     }
 
     private boolean allBlueprintDistilleriesActive() {
@@ -2837,7 +2883,7 @@ public final class HallsSession {
                     ? levelType.light()
                     : levelType.corridorCeiling();
             if (open && isBunkerCenterLamp(levelType, ceilingMaterial)) {
-                setBlock(point.x(), ceilingY, point.z(), ceilingMaterial, null, false);
+                setBlock(point.x(), ceilingY, point.z(), ceilingMaterial, null, litBunkerLamp(point));
             } else {
                 setBlock(point.x(), ceilingY, point.z(), ceilingMaterial);
             }
@@ -2867,6 +2913,10 @@ public final class HallsSession {
         return levelType != null
                 && "bunker".equalsIgnoreCase(levelType.id())
                 && ceilingMaterial == Material.REDSTONE_LAMP;
+    }
+
+    private boolean litBunkerLamp(HallsExplorationGenerator.Cell point) {
+        return Math.floorMod((point.x() * 43) ^ (point.z() * 19) ^ (id * 7) ^ currentFloor, 100) < 15;
     }
 
     private BlockFace ventGateBarFacing(HallsExplorationGenerator.Plan plan, HallsExplorationGenerator.Cell point) {
@@ -3764,9 +3814,11 @@ public final class HallsSession {
             if (interaction != null) {
                 interaction.remove();
             }
-            Entity display = Bukkit.getEntity(distillery.displayId());
-            if (display != null) {
-                display.remove();
+            for (UUID displayId : distillery.displayIds()) {
+                Entity display = Bukkit.getEntity(displayId);
+                if (display != null) {
+                    display.remove();
+                }
             }
         }
         blueprintDistilleries.clear();
@@ -5923,15 +5975,15 @@ public final class HallsSession {
 
     private static final class BlueprintDistillery {
         private final UUID interactionId;
-        private final UUID displayId;
+        private final List<UUID> displayIds;
         private final int x;
         private final int y;
         private final int z;
         private boolean active;
 
-        private BlueprintDistillery(UUID interactionId, UUID displayId, int x, int y, int z) {
+        private BlueprintDistillery(UUID interactionId, List<UUID> displayIds, int x, int y, int z) {
             this.interactionId = interactionId;
-            this.displayId = displayId;
+            this.displayIds = displayIds;
             this.x = x;
             this.y = y;
             this.z = z;
@@ -5941,8 +5993,8 @@ public final class HallsSession {
             return interactionId;
         }
 
-        private UUID displayId() {
-            return displayId;
+        private List<UUID> displayIds() {
+            return displayIds;
         }
 
         private int x() {
