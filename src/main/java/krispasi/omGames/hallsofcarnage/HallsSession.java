@@ -2121,14 +2121,14 @@ public final class HallsSession {
     }
 
     private void spawnLibraryVentPart(LibraryVent vent, HallsBuildingType.Part part) {
-        double yaw = yawDegrees(vent.face());
-        double radians = Math.toRadians(yaw);
-        double rotatedX = part.offsetX() * Math.cos(radians) - part.offsetZ() * Math.sin(radians);
-        double rotatedZ = part.offsetX() * Math.sin(radians) + part.offsetZ() * Math.cos(radians);
+        double yaw = wallFixtureYawDegrees(vent.face());
+        double lateralX = vent.face().getModZ();
+        double lateralZ = -vent.face().getModX();
+        double depth = -part.offsetZ();
         Location location = new Location(world,
-                vent.x() + 0.5 + rotatedX,
+                vent.x() + 0.5 + lateralX * part.offsetX() + vent.face().getModX() * depth,
                 vent.y() + part.offsetY(),
-                vent.z() + 0.5 + rotatedZ);
+                vent.z() + 0.5 + lateralZ * part.offsetX() + vent.face().getModZ() * depth);
         BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
             entity.setBlock(displayBlockData(part.material(), part.blockData()));
             entity.setBillboard(Display.Billboard.FIXED);
@@ -2150,6 +2150,16 @@ public final class HallsSession {
             case SOUTH -> 180.0;
             case EAST -> 90.0;
             case WEST -> -90.0;
+            default -> 0.0;
+        };
+    }
+
+    private double wallFixtureYawDegrees(BlockFace face) {
+        return switch (face) {
+            case NORTH -> 180.0;
+            case SOUTH -> 0.0;
+            case EAST -> -90.0;
+            case WEST -> 90.0;
             default -> 0.0;
         };
     }

@@ -270,28 +270,29 @@ final class HallsSessionTrapRuntime {
                               boolean globalReachabilityChecks,
                               HallsFloorModifiers modifiers,
                               Set<HallsExplorationGenerator.Cell> liquidCells) {
-        Set<HallsExplorationGenerator.Cell> pitCells = pitMask(candidate, random, type);
-        if (pitCells.isEmpty()) {
-            return false;
-        }
-        if (!Collections.disjoint(pitCells, liquidCells)) {
-            return false;
-        }
-        Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(candidate, plan.walkableCells(),
-                pitCells, globalReachabilityChecks, modifiers);
-        if (bridgeCells == null) {
-            return false;
-        }
-        buildPit(pitCells, bridgeCells, roomPitCells(candidate), type);
-        TrapKind kind = bridgeCells.isEmpty() ? TrapKind.HOLE : TrapKind.HOLE_BRIDGE;
-        for (HallsExplorationGenerator.Cell pitCell : pitCells) {
-            if (!bridgeCells.contains(pitCell)) {
-                addTrap(new HallsTrap(kind, pitCell.x(), pitCell.z(), random.nextInt(80), type,
-                        null, List.of(), BlockFace.SELF, 0), random);
+        for (Set<HallsExplorationGenerator.Cell> pitCells : pitMasks(candidate, random, type)) {
+            if (pitCells.isEmpty()
+                    || !Collections.disjoint(pitCells, liquidCells)
+                    || !Collections.disjoint(pitCells, occupied)) {
+                continue;
             }
+            Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(candidate, plan.walkableCells(),
+                    pitCells, globalReachabilityChecks, modifiers);
+            if (bridgeCells == null) {
+                continue;
+            }
+            buildPit(pitCells, bridgeCells, roomPitCells(candidate), type);
+            TrapKind kind = bridgeCells.isEmpty() ? TrapKind.HOLE : TrapKind.HOLE_BRIDGE;
+            for (HallsExplorationGenerator.Cell pitCell : pitCells) {
+                if (!bridgeCells.contains(pitCell)) {
+                    addTrap(new HallsTrap(kind, pitCell.x(), pitCell.z(), random.nextInt(80), type,
+                            null, List.of(), BlockFace.SELF, 0), random);
+                }
+            }
+            occupied.addAll(pitCells);
+            return true;
         }
-        occupied.addAll(pitCells);
-        return true;
+        return false;
     }
 
     private boolean globalReachabilityChecks(HallsLevelType levelType) {
@@ -461,33 +462,46 @@ final class HallsSessionTrapRuntime {
         return Math.max(0, weight);
     }
 
-    private Set<HallsExplorationGenerator.Cell> pitMask(TrapCandidate candidate, Random random, HallsTrapType type) {
+    private List<Set<HallsExplorationGenerator.Cell>> pitMasks(TrapCandidate candidate, Random random, HallsTrapType type) {
         int minSize = Math.max(5, type.minSize());
         int maxSize = Math.max(minSize, type.maxSize());
         int size = minSize + random.nextInt(maxSize - minSize + 1);
         if (size % 2 == 0) {
             size++;
         }
+        List<Set<HallsExplorationGenerator.Cell>> masks = new ArrayList<>();
         for (int currentSize = size; currentSize >= minSize; currentSize -= 2) {
-            int radius = currentSize / 2;
-            Set<HallsExplorationGenerator.Cell> openPitCells = new HashSet<>();
-            int maskCells = currentSize * currentSize;
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(
-                            candidate.cell().x() + dx,
-                            candidate.cell().z() + dz
-                    );
-                    if (candidate.roomCells().contains(cell)) {
-                        openPitCells.add(cell);
-                    }
+            addPitMaskCandidate(masks, candidate, currentSize, Math.max(5, currentSize * currentSize / 3));
+        }
+        for (int currentSize = Math.min(3, minSize - 2); currentSize >= 1; currentSize -= 2) {
+            addPitMaskCandidate(masks, candidate, currentSize, 1);
+        }
+        if (masks.isEmpty()) {
+            masks.add(Set.of(candidate.cell()));
+        }
+        return masks;
+    }
+
+    private void addPitMaskCandidate(List<Set<HallsExplorationGenerator.Cell>> masks,
+                                     TrapCandidate candidate,
+                                     int size,
+                                     int minimumOpenCells) {
+        int radius = size / 2;
+        Set<HallsExplorationGenerator.Cell> openPitCells = new HashSet<>();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(
+                        candidate.cell().x() + dx,
+                        candidate.cell().z() + dz
+                );
+                if (candidate.roomCells().contains(cell)) {
+                    openPitCells.add(cell);
                 }
             }
-            if (openPitCells.size() >= Math.max(5, maskCells / 3)) {
-                return openPitCells;
-            }
         }
-        return Set.of();
+        if (openPitCells.size() >= minimumOpenCells) {
+            masks.add(openPitCells);
+        }
     }
 
     private Set<HallsExplorationGenerator.Cell> bridgeCellsIfNeeded(TrapCandidate candidate,
