@@ -321,17 +321,30 @@ final class HallsSessionTrapRuntime {
 
     private List<TrapCandidate> holeCandidates(HallsExplorationGenerator.Plan plan) {
         Set<HallsExplorationGenerator.Cell> walkable = plan.walkableCells();
-        List<TrapCandidate> candidates = new ArrayList<>();
-        for (HallsExplorationGenerator.Room room : plan.rooms()) {
+        List<TrapCandidate> preferred = new ArrayList<>();
+        List<TrapCandidate> fallback = new ArrayList<>();
+        List<HallsExplorationGenerator.Room> rooms = plan.rooms();
+        for (int roomIndex = 0; roomIndex < rooms.size(); roomIndex++) {
+            HallsExplorationGenerator.Room room = rooms.get(roomIndex);
             Set<HallsExplorationGenerator.Cell> openCells = Set.copyOf(roomOpenCells(room));
             Set<HallsExplorationGenerator.Cell> roomCells = Set.copyOf(roomAllCells(room));
             for (HallsExplorationGenerator.Cell cell : openCells) {
-                if (walkable.contains(cell) && farFromElevator(cell)) {
-                    candidates.add(new TrapCandidate(room, cell, openCells, roomCells));
+                if (!walkable.contains(cell) || nearRoomOpening(room, cell)) {
+                    continue;
+                }
+                TrapCandidate candidate = new TrapCandidate(room, cell, openCells, roomCells);
+                if (farFromElevator(cell)) {
+                    preferred.add(candidate);
+                } else if (roomIndex > 0) {
+                    fallback.add(candidate);
                 }
             }
         }
-        return candidates;
+        if (preferred.isEmpty()) {
+            return fallback;
+        }
+        preferred.addAll(fallback);
+        return preferred;
     }
 
     private HallsTrapType trapTypeForRoom(TrapCandidate candidate,

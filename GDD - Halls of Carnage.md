@@ -161,7 +161,7 @@ Yellowed liminal halls with maze-style open spaces, long wall runs, and sparse u
 ### Sewer
 Wet brick service tunnels with wide 5-block corridors and a 3-block liquid channel. Rooms can generate broad contiguous puddles, including along room borders, and adjacent puddles/channels should merge without separating walls; liquid is configured by level type so water is used now and lava can be used by future content. Bear traps and proximity mines are blacklisted from this level type. Sewer bubbles and geysers use display-only bottom fixtures in puddles; geysers knock entities upward without direct damage.
 ### Library
-Old shelf-lined halls with mixed circulation. Normal corridors use wide-corridor generation, while some connectors become 1-wide, 2-block-tall vents that can reconnect into other corridors.
+Old shelf-lined halls with mixed circulation. Normal corridors use wide-corridor generation. Library floors may also place paired wall-mounted vent entrances; right-clicking one transports the player to its linked entrance, unless a monster is within 5 blocks of the linked exit. Vent visuals are editable through the bundled `library_vent` building display resource.
 ### Bunker
 Reinforced service halls. Generation follows the sewer-style main-corridor approach without liquid, using 3-wide bunker corridors with smaller branches into rooms.
 ### Other levels

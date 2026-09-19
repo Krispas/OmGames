@@ -112,6 +112,7 @@ public final class HallsSession {
     private final Set<UUID> sculkMaulSplashing = new HashSet<>();
     private final Map<UUID, CarriedResearchCrate> carriedResearchCrates = new HashMap<>();
     private final Map<UUID, BlueprintDistillery> blueprintDistilleries = new HashMap<>();
+    private final Map<UUID, LibraryVent> libraryVents = new HashMap<>();
     private final Map<Integer, List<HallsCampRuntime.PlotState>> savedCampStates = new HashMap<>();
     private final Map<Integer, Set<Integer>> savedCampUnlockedDoors = new HashMap<>();
     private final Map<Integer, HallsFloorModifiers> scannedFloorModifiers = new HashMap<>();
@@ -372,6 +373,8 @@ public final class HallsSession {
                 || carriedResearchCrates.values().stream().anyMatch(crate -> crate.displayIds().contains(entity.getUniqueId()))
                 || blueprintDistilleries.containsKey(entity.getUniqueId())
                 || blueprintDistilleries.values().stream().anyMatch(distillery -> distillery.displayIds().contains(entity.getUniqueId()))
+                || libraryVents.containsKey(entity.getUniqueId())
+                || libraryVents.values().stream().anyMatch(vent -> vent.displayIds().contains(entity.getUniqueId()))
                 || entity.getUniqueId().equals(elevatorWaypointId));
     }
 
@@ -1283,7 +1286,9 @@ public final class HallsSession {
         Set<HallsExplorationGenerator.Cell> researchCrateCells = placeResearchCrate(build, contentReservedCells);
         Set<HallsExplorationGenerator.Cell> distilleryCells = placeBlueprintDistilleries(build,
                 withReserved(contentReservedCells, researchCrateCells));
-        renderExplorationContents(build, withReserved(withReserved(contentReservedCells, researchCrateCells), distilleryCells));
+        Set<HallsExplorationGenerator.Cell> ventCells = placeLibraryVents(build,
+                withReserved(withReserved(contentReservedCells, researchCrateCells), distilleryCells));
+        renderExplorationContents(build, withReserved(withReserved(withReserved(contentReservedCells, researchCrateCells), distilleryCells), ventCells));
         startExplorationMonsters(build);
         restoreElevatorChestContents();
         closeElevatorDoors();
@@ -1964,6 +1969,231 @@ public final class HallsSession {
                         NamedTextColor.BLUE));
             }
         }
+    }
+
+    private Set<HallsExplorationGenerator.Cell> placeLibraryVents(ExplorationBuild build,
+                                                                  Set<HallsExplorationGenerator.Cell> reservedCells) {
+        removeLibraryVents();
+        if (build == null || build.plan().rooms().size() <= 1
+                || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())
+                || !"library".equalsIgnoreCase(build.levelType().id())) {
+            return Set.of();
+        }
+        List<LibraryVentCandidate> candidates = libraryVentCandidates(build, reservedCells);
+        java.util.Collections.shuffle(candidates, build.random());
+        int targetPairs = Math.min(3, Math.max(1, build.plan().rooms().size() / 5));
+        Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
+        int pairs = 0;
+        while (pairs < targetPairs && candidates.size() >= 2) {
+            LibraryVentCandidate first = candidates.removeFirst();
+            if (reserved.contains(first.cell())) {
+                continue;
+            }
+            int partnerIndex = bestLibraryVentPartnerIndex(first, candidates, reserved);
+            if (partnerIndex < 0) {
+                continue;
+            }
+            LibraryVentCandidate second = candidates.remove(partnerIndex);
+            LibraryVent firstVent = spawnLibraryVent(first);
+            LibraryVent secondVent = spawnLibraryVent(second);
+            firstVent.setLinkedInteractionId(secondVent.interactionId());
+            secondVent.setLinkedInteractionId(firstVent.interactionId());
+            reserved.add(first.cell());
+            reserved.add(second.cell());
+            pairs++;
+        }
+        if (pairs < targetPairs) {
+            debug("Placed " + pairs + "/" + targetPairs + " library vent pairs on floor " + build.floor() + ".");
+        }
+        return Set.copyOf(reserved);
+    }
+
+    private List<LibraryVentCandidate> libraryVentCandidates(ExplorationBuild build,
+                                                            Set<HallsExplorationGenerator.Cell> reservedCells) {
+        List<LibraryVentCandidate> candidates = new ArrayList<>();
+        for (int roomIndex = 1; roomIndex < build.plan().rooms().size(); roomIndex++) {
+            HallsExplorationGenerator.Room room = build.plan().rooms().get(roomIndex);
+            for (Cell local : openInteriorCells(room)) {
+                HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(
+                        room.startX() + local.x(), room.startZ() + local.z());
+                if ((reservedCells != null && reservedCells.contains(absolute))
+                        || build.plan().liquidCells().contains(absolute)
+                        || libraryVentNearRoomOpening(room, absolute)) {
+                    continue;
+                }
+                List<BlockFace> faces = new ArrayList<>();
+                for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                    if (isLibraryVentWall(room, local, face)) {
+                        faces.add(face);
+                    }
+                }
+                java.util.Collections.shuffle(faces, build.random());
+                for (BlockFace face : faces) {
+                    candidates.add(new LibraryVentCandidate(roomIndex, absolute, face));
+                    break;
+                }
+            }
+        }
+        return candidates;
+    }
+
+    private boolean libraryVentNearRoomOpening(HallsExplorationGenerator.Room room, HallsExplorationGenerator.Cell cell) {
+        for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
+            HallsExplorationGenerator.Cell interior = switch (opening.getKey()) {
+                case NORTH -> new HallsExplorationGenerator.Cell(room.startX() + opening.getValue(), room.startZ());
+                case SOUTH -> new HallsExplorationGenerator.Cell(room.startX() + opening.getValue(), room.startZ() + room.layout().depth() - 1);
+                case EAST -> new HallsExplorationGenerator.Cell(room.startX() + room.layout().width() - 1, room.startZ() + opening.getValue());
+                case WEST -> new HallsExplorationGenerator.Cell(room.startX(), room.startZ() + opening.getValue());
+                default -> cell;
+            };
+            if (Math.abs(cell.x() - interior.x()) + Math.abs(cell.z() - interior.z()) <= 2) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isLibraryVentWall(HallsExplorationGenerator.Room room, Cell local, BlockFace face) {
+        int x = local.x() + face.getModX();
+        int z = local.z() + face.getModZ();
+        if (x < 0 || z < 0 || x >= room.layout().width() || z >= room.layout().depth()) {
+            return true;
+        }
+        return room.layout().at(x, z) != 'O';
+    }
+
+    private int bestLibraryVentPartnerIndex(LibraryVentCandidate first,
+                                            List<LibraryVentCandidate> candidates,
+                                            Set<HallsExplorationGenerator.Cell> reserved) {
+        int bestIndex = -1;
+        int bestDistance = -1;
+        for (int i = 0; i < candidates.size(); i++) {
+            LibraryVentCandidate candidate = candidates.get(i);
+            if (reserved.contains(candidate.cell()) || candidate.roomIndex() == first.roomIndex()) {
+                continue;
+            }
+            int distance = Math.abs(candidate.cell().x() - first.cell().x())
+                    + Math.abs(candidate.cell().z() - first.cell().z());
+            if (distance > bestDistance) {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    }
+
+    private LibraryVent spawnLibraryVent(LibraryVentCandidate candidate) {
+        Location interactionLocation = new Location(world, candidate.cell().x() + 0.5, origin.y(), candidate.cell().z() + 0.5);
+        Interaction interaction = world.spawn(interactionLocation, Interaction.class, entity -> {
+            entity.setInteractionWidth(1.1f);
+            entity.setInteractionHeight(1.8f);
+            entity.setResponsive(true);
+            entity.setPersistent(false);
+        });
+        LibraryVent vent = new LibraryVent(interaction.getUniqueId(), new ArrayList<>(),
+                candidate.cell().x(), origin.y(), candidate.cell().z(), candidate.face());
+        libraryVents.put(interaction.getUniqueId(), vent);
+        setLibraryVentDisplays(vent);
+        return vent;
+    }
+
+    private void setLibraryVentDisplays(LibraryVent vent) {
+        List<HallsBuildingType.Part> parts = libraryVentParts();
+        if (parts.isEmpty()) {
+            parts = List.of(new HallsBuildingType.Part(
+                    Material.IRON_TRAPDOOR,
+                    "",
+                    0.0, 1.05, -0.49,
+                    0.9, 0.9, 0.08,
+                    0.0, 0.0, 0.0));
+        }
+        for (HallsBuildingType.Part part : parts) {
+            spawnLibraryVentPart(vent, part);
+        }
+    }
+
+    private List<HallsBuildingType.Part> libraryVentParts() {
+        HallsBuildingType type = buildingTypes.get("library_vent");
+        if (type == null) {
+            return List.of();
+        }
+        return type.level(1).parts();
+    }
+
+    private void spawnLibraryVentPart(LibraryVent vent, HallsBuildingType.Part part) {
+        double yaw = yawDegrees(vent.face());
+        double radians = Math.toRadians(yaw);
+        double rotatedX = part.offsetX() * Math.cos(radians) - part.offsetZ() * Math.sin(radians);
+        double rotatedZ = part.offsetX() * Math.sin(radians) + part.offsetZ() * Math.cos(radians);
+        Location location = new Location(world,
+                vent.x() + 0.5 + rotatedX,
+                vent.y() + part.offsetY(),
+                vent.z() + 0.5 + rotatedZ);
+        BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
+            entity.setBlock(displayBlockData(part.material(), part.blockData()));
+            entity.setBillboard(Display.Billboard.FIXED);
+            entity.setTransformation(new Transformation(
+                    new Vector3f((float) (-part.scaleX() * 0.5), 0.0f, (float) (-part.scaleZ() * 0.5)),
+                    new Quaternionf().rotateXYZ((float) Math.toRadians(part.rotationX()),
+                            (float) Math.toRadians(part.rotationY() + yaw),
+                            (float) Math.toRadians(part.rotationZ())),
+                    new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
+                    new Quaternionf()));
+            entity.setBrightness(FULL_BRIGHTNESS);
+            entity.setPersistent(false);
+        });
+        vent.displayIds().add(display.getUniqueId());
+    }
+
+    private double yawDegrees(BlockFace face) {
+        return switch (face) {
+            case SOUTH -> 180.0;
+            case EAST -> 90.0;
+            case WEST -> -90.0;
+            default -> 0.0;
+        };
+    }
+
+    public boolean handleLibraryVentInteract(Player player, Entity entity) {
+        if (player == null || entity == null || !running || !player.getWorld().equals(world)) {
+            return false;
+        }
+        LibraryVent vent = libraryVents.get(entity.getUniqueId());
+        if (vent == null) {
+            return false;
+        }
+        Entity linkedEntity = vent.linkedInteractionId() == null ? null : Bukkit.getEntity(vent.linkedInteractionId());
+        LibraryVent linked = linkedEntity == null ? null : libraryVents.get(linkedEntity.getUniqueId());
+        if (linked == null) {
+            player.sendActionBar(Component.text("The vent is blocked.", NamedTextColor.GRAY));
+            return true;
+        }
+        Location destination = new Location(world, linked.x() + 0.5, linked.y(), linked.z() + 0.5,
+                player.getLocation().getYaw(), player.getLocation().getPitch());
+        if (!isVentDestinationClear(new HallsExplorationGenerator.Cell(linked.x(), linked.z()))) {
+            player.sendActionBar(Component.text("The vent is blocked.", NamedTextColor.GRAY));
+            return true;
+        }
+        if (isMonsterNear(destination, 5.0)) {
+            player.sendActionBar(Component.text("The vent is blocked by a monster.", NamedTextColor.RED));
+            world.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_ATTACK_IRON_DOOR, 0.55f, 1.6f);
+            return true;
+        }
+        player.teleport(destination);
+        player.setFallDistance(0.0f);
+        world.playSound(destination, Sound.BLOCK_IRON_TRAPDOOR_OPEN, 0.7f, 1.45f);
+        return true;
+    }
+
+    private boolean isMonsterNear(Location location, double radius) {
+        double radiusSquared = radius * radius;
+        for (LivingEntity entity : world.getLivingEntities()) {
+            if (entity.getScoreboardTags().contains("omgames_hoc_monster")
+                    && entity.getLocation().distanceSquared(location) <= radiusSquared) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Location ventGateDestination(Location playerLocation, HallsExplorationGenerator.Cell gate) {
@@ -3825,6 +4055,22 @@ public final class HallsSession {
         blueprintDistilleryRewardClaimedThisFloor = false;
     }
 
+    private void removeLibraryVents() {
+        for (LibraryVent vent : Set.copyOf(libraryVents.values())) {
+            Entity interaction = Bukkit.getEntity(vent.interactionId());
+            if (interaction != null) {
+                interaction.remove();
+            }
+            for (UUID displayId : vent.displayIds()) {
+                Entity display = Bukkit.getEntity(displayId);
+                if (display != null) {
+                    display.remove();
+                }
+            }
+        }
+        libraryVents.clear();
+    }
+
     private void removeCarriedResearchCrate(UUID playerId) {
         CarriedResearchCrate carried = carriedResearchCrates.remove(playerId);
         if (carried == null) {
@@ -4495,6 +4741,7 @@ public final class HallsSession {
         removeResearchCrate();
         removeAllCarriedResearchCrates();
         removeBlueprintDistilleries();
+        removeLibraryVents();
         for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
             removeBreakableProp(prop);
         }
@@ -5890,6 +6137,7 @@ public final class HallsSession {
             reservedCells = withReserved(reservedCells, vegetationCells);
             reservedCells = withReserved(reservedCells, placeResearchCrate(build, reservedCells));
             reservedCells = withReserved(reservedCells, placeBlueprintDistilleries(build, reservedCells));
+            reservedCells = withReserved(reservedCells, placeLibraryVents(build, reservedCells));
             rareBreakableRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
             contentStartedNanos = System.nanoTime();
             contentBreakablesBefore = new HashSet<>(breakableProps.values()).size();
@@ -6015,6 +6263,60 @@ public final class HallsSession {
 
         private void setActive(boolean active) {
             this.active = active;
+        }
+    }
+
+    private record LibraryVentCandidate(int roomIndex, HallsExplorationGenerator.Cell cell, BlockFace face) {
+    }
+
+    private static final class LibraryVent {
+        private final UUID interactionId;
+        private final List<UUID> displayIds;
+        private final int x;
+        private final int y;
+        private final int z;
+        private final BlockFace face;
+        private UUID linkedInteractionId;
+
+        private LibraryVent(UUID interactionId, List<UUID> displayIds, int x, int y, int z, BlockFace face) {
+            this.interactionId = interactionId;
+            this.displayIds = displayIds;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.face = face;
+        }
+
+        private UUID interactionId() {
+            return interactionId;
+        }
+
+        private List<UUID> displayIds() {
+            return displayIds;
+        }
+
+        private int x() {
+            return x;
+        }
+
+        private int y() {
+            return y;
+        }
+
+        private int z() {
+            return z;
+        }
+
+        private BlockFace face() {
+            return face;
+        }
+
+        private UUID linkedInteractionId() {
+            return linkedInteractionId;
+        }
+
+        private void setLinkedInteractionId(UUID linkedInteractionId) {
+            this.linkedInteractionId = linkedInteractionId;
         }
     }
 

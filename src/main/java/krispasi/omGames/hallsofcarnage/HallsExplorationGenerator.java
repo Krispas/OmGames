@@ -767,7 +767,7 @@ final class HallsExplorationGenerator {
     }
 
     private boolean shouldUseLibraryVentConnector(List<Cell> path) {
-        return corridorMode == CorridorMode.LIBRARY && path.size() >= 7 && random.nextInt(100) < 42;
+        return false;
     }
 
     private Set<Cell> libraryCorridorCells(List<Cell> path, boolean forceVent) {

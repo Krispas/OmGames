@@ -191,6 +191,11 @@ public final class HallsOfCarnageListener implements Listener {
             return;
         }
         if (event.getHand() == EquipmentSlot.HAND
+                && manager.handleLibraryVentInteract(event.getPlayer(), event.getRightClicked())) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getHand() == EquipmentSlot.HAND
                 && manager.isResearchCrateCarrier(event.getPlayer())) {
             event.setCancelled(true);
             event.getPlayer().sendActionBar(Component.text("Set the research crate down first.", NamedTextColor.LIGHT_PURPLE));

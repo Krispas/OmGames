@@ -217,6 +217,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/blueprints/sculk_purifier_blueprint.yml",
             "hallsOfCarnage/buildings/camp_station.yml",
             "hallsOfCarnage/buildings/blueprint_distillery.yml",
+            "hallsOfCarnage/buildings/library_vent.yml",
             "hallsOfCarnage/buildings/forge.yml",
             "hallsOfCarnage/buildings/mycelia_farm.yml",
             "hallsOfCarnage/buildings/potato_farm.yml",
@@ -891,6 +892,15 @@ public final class HallsOfCarnageManager {
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         return session != null && session.handleBlueprintDistilleryInteract(player, entity);
+    }
+
+    public boolean handleLibraryVentInteract(Player player, Entity entity) {
+        if (player == null || entity == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleLibraryVentInteract(player, entity);
     }
 
     public boolean handleVentGateInteract(Player player, org.bukkit.block.Block block) {
