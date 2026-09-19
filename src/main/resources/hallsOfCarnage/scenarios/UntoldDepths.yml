@@ -40,8 +40,12 @@ allowed-items:
     - deepguard_plate
   food:
     - raw_mycelia
+    - potato
+    - carrot
     - stale_bread
     - cooked_mycelia
+    - sculk_cleansing_hash
+    - deeproot_purge_stew
     - hearty_mycelia_stew
     - fleetfoot_ration
     - stonehide_chowder
@@ -158,6 +162,8 @@ crafting-stations:
   camp_station:
     1:
       - cooked_mycelia
+      - sculk_cleansing_hash
+      - deeproot_purge_stew
       - hearty_mycelia_stew
       - fleetfoot_ration
       - stonehide_chowder
@@ -192,6 +198,9 @@ research:
       cost: 0
       unlocks:
         - cooked_mycelia
+        - potato
+        - carrot
+        - sculk_cleansing_hash
         - hearty_mycelia_stew
         - fleetfoot_ration
         - stonehide_chowder
@@ -264,6 +273,7 @@ research:
       unlocks:
         - poison_bomb
         - sculk_maul
+        - deeproot_purge_stew
         - reinforced_chestplate
         - deepguard_plate
 floors:

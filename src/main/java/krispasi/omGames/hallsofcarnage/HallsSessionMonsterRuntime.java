@@ -110,9 +110,11 @@ final class HallsSessionMonsterRuntime {
         monsterCoinDropChancePercent = Math.max(0, (int) Math.round(10.0
                 * (modifiers == null ? 1.0 : modifiers.monsterCoinDropChanceMultiplier())));
         double playerStack = participantStackMultiplier();
-        this.baseMaxAlive = Math.max(2, Math.min(36, (int) Math.round((1 + rooms / 4.0 + difficulty / 15.0) * playerStack * enemyMultiplier)));
+        this.baseMaxAlive = Math.max(2, Math.min(36, (int) Math.round((1 + rooms / 4.0 + difficulty / 15.0) * playerStack)));
         this.maxAlive = baseMaxAlive;
-        this.capExtensionIntervalTicks = Math.max(MIN_CAP_EXTENSION_INTERVAL_TICKS, (int) Math.round(capExtensionIntervalTicks(difficulty) / playerStack));
+        double capPacingMultiplier = enemyMultiplier <= 0.0 ? 1.0 : enemyMultiplier;
+        this.capExtensionIntervalTicks = Math.max(MIN_CAP_EXTENSION_INTERVAL_TICKS,
+                (int) Math.round(capExtensionIntervalTicks(difficulty) / playerStack / capPacingMultiplier));
         this.baseCapExtensionIntervalTicks = capExtensionIntervalTicks;
         this.capExtensionCooldownTicks = capExtensionIntervalTicks;
         this.floorStartedAtMillis = System.currentTimeMillis();
@@ -465,11 +467,10 @@ final class HallsSessionMonsterRuntime {
 
     private HallsMonsterType rollWarden() {
         int sculk = maxSculkSupplier.getAsInt();
-        if (sculk < 65) {
+        if (sculk < 100) {
             return null;
         }
-        double chance = Math.min(sculk - 55, 35) / 10.0;
-        if (random.nextDouble() * 100.0 >= chance) {
+        if (random.nextDouble() >= 0.20) {
             return null;
         }
         HallsMonsterType configured = monsterTypes.get("warden");

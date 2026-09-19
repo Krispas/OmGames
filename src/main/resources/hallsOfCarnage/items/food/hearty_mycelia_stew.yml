@@ -11,4 +11,6 @@ stats:
   regeneration-seconds: 8
   regeneration-amplifier: 1
 recipe:
+  cooked_mycelia: 1
+  potato: 1
   wood_scrap: 3

@@ -90,9 +90,6 @@ final class HallsMonsterTypeLoader {
         if (value == null || value.isBlank()) {
             return null;
         }
-        if (normalizeId(value).equals("parched")) {
-            return EntityType.HUSK;
-        }
         if (normalizeId(value).equals("hoglin_slow")) {
             return EntityType.HOGLIN;
         }

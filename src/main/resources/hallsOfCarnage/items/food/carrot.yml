@@ -1,0 +1,10 @@
+id: carrot
+name: "Carrot"
+category: food
+rarity: normal
+material: CARROT
+max-stack-size: 1
+lore:
+  - "Crunchy, dry, and useful in better meals."
+stats:
+  heal: 2

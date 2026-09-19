@@ -859,20 +859,31 @@ public final class HallsSession {
         }
         double heal = Math.max(0.0, type.stats().getOrDefault("heal", 0.0)
                 * activeFloorModifiers.foodHealMultiplier());
-        if (heal <= 0.0) {
+        double sculkReduction = Math.max(0.0, type.stats().getOrDefault("sculk_reduction_percent", 0.0));
+        if (heal <= 0.0 && sculkReduction <= 0.0) {
             return true;
         }
-        double maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH) == null
-                ? player.getMaxHealth()
-                : player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
-        double nextHealth = Math.min(maxHealth, player.getHealth() + heal);
-        player.setHealth(nextHealth);
+        if (heal > 0.0) {
+            double maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH) == null
+                    ? player.getMaxHealth()
+                    : player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH).getValue();
+            double nextHealth = Math.min(maxHealth, player.getHealth() + heal);
+            player.setHealth(nextHealth);
+        }
+        boolean reducedSculk = sculkRuntime.reduce(player.getUniqueId(), sculkReduction);
         applyFoodBuffs(player, type);
         if (consumeHeld) {
             consumeOneHeldItem(player);
         }
         world.playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 0.6f, 1.25f);
-        player.sendActionBar(Component.text("Restored " + formatStatAmount(heal) + " health.", NamedTextColor.GREEN));
+        String message = heal > 0.0 ? "Restored " + formatStatAmount(heal) + " health." : "";
+        if (reducedSculk) {
+            message = message.isBlank()
+                    ? "Reduced sculk pressure by " + formatStatAmount(sculkReduction) + "%."
+                    : message + " Sculk -" + formatStatAmount(sculkReduction) + "%.";
+        }
+        player.sendActionBar(Component.text(message.isBlank() ? "Consumed " + type.name() + "." : message,
+                NamedTextColor.GREEN));
         return true;
     }
 
@@ -3313,33 +3324,31 @@ public final class HallsSession {
         }
         researchCrate = null;
         List<UUID> displays = new ArrayList<>();
-        for (int dx = 0; dx <= 1; dx++) {
-            for (int dz = 0; dz <= 1; dz++) {
-                for (int dy = 0; dy <= 1; dy++) {
-                    Location location = carriedCrateBlockLocation(player, dx, dy, dz);
-                    BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
-                        entity.setBlock(Material.MAGENTA_CONCRETE.createBlockData());
-                        entity.setInterpolationDelay(0);
-                        entity.setTeleportDuration(1);
-                        entity.setPersistent(false);
-                        entity.addScoreboardTag(RESEARCH_CRATE_TAG);
-                    });
-                    displays.add(display.getUniqueId());
-                }
-            }
-        }
+        BlockDisplay display = world.spawn(carriedCrateBlockLocation(player), BlockDisplay.class, entity -> {
+            entity.setBlock(Material.MAGENTA_CONCRETE.createBlockData());
+            entity.setInterpolationDelay(0);
+            entity.setTeleportDuration(1);
+            entity.setTransformation(new Transformation(
+                    new Vector3f(),
+                    new Quaternionf(),
+                    new Vector3f(2.0f, 2.0f, 2.0f),
+                    new Quaternionf()));
+            entity.setPersistent(false);
+            entity.addScoreboardTag(RESEARCH_CRATE_TAG);
+        });
+        displays.add(display.getUniqueId());
         carriedResearchCrates.put(player.getUniqueId(), new CarriedResearchCrate(displays));
         startResearchCrateTask();
         player.sendActionBar(Component.text("Research crate lifted. Sneak to drop it.", NamedTextColor.LIGHT_PURPLE));
         world.playSound(player.getLocation(), Sound.BLOCK_WOOL_BREAK, 0.7f, 0.8f);
     }
 
-    private Location carriedCrateBlockLocation(Player player, int dx, int dy, int dz) {
+    private Location carriedCrateBlockLocation(Player player) {
         Location base = player.getLocation();
         return new Location(world,
-                base.getX() - 1.0 + dx,
-                base.getY() + 2.25 + dy,
-                base.getZ() - 1.0 + dz,
+                base.getX() - 1.0,
+                base.getY() + 2.0,
+                base.getZ() - 1.0,
                 0.0f,
                 0.0f);
     }
@@ -3369,23 +3378,15 @@ public final class HallsSession {
                 removeCarriedResearchCrate(entry.getKey());
                 continue;
             }
-            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 0, true, true, true));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1, true, true, true));
             PotionEffect resistance = player.getPotionEffect(PotionEffectType.RESISTANCE);
-            if (resistance == null || resistance.getAmplifier() < 1 || resistance.getDuration() < 25) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, 1, true, true, true));
+            if (resistance == null || resistance.getAmplifier() < 2 || resistance.getDuration() < 25) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 40, 2, true, true, true));
             }
-            int index = 0;
-            for (int dx = 0; dx <= 1; dx++) {
-                for (int dz = 0; dz <= 1; dz++) {
-                    for (int dy = 0; dy <= 1; dy++) {
-                        if (index >= entry.getValue().displayIds().size()) {
-                            continue;
-                        }
-                        Entity display = Bukkit.getEntity(entry.getValue().displayIds().get(index++));
-                        if (display != null) {
-                            display.teleport(carriedCrateBlockLocation(player, dx, dy, dz));
-                        }
-                    }
+            for (UUID displayId : entry.getValue().displayIds()) {
+                Entity display = Bukkit.getEntity(displayId);
+                if (display != null) {
+                    display.teleport(carriedCrateBlockLocation(player));
                 }
             }
         }

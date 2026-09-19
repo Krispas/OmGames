@@ -137,16 +137,12 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: `/hoc give research_points [amount]` now adds test research points to the caller's active Halls session and saves the updated session state. Accepted aliases are `research_point`, `research`, and `rp`; tab completion lists `research_points`.
 - Next reviewer slice applied: the elevator now spawns an invisible ArmorStand waypoint transmitter at the elevator spawn and raises participants' waypoint receive range so the elevator appears on the vanilla locator bar without changing the existing Compass modifier item/trail behavior. Generated start, exploration, and camp floors now place one 2x2x2 magenta research crate when a valid reserved-free footprint exists. Right-clicking the crate picks it up as BlockDisplay cargo above the player's head, blocks attacks/interactions/inventory opening/drop actions while carried, applies Slowness plus Resistance II unless a stronger Resistance is active, lets the carrier sneak to place it back down, and lets the carrier right-click the elevator hopper to deposit it for +1 team research point with an immediate save.
 - Next reviewer slice applied: bundled utility items now define durability and lose one durability only after successful activation; cooldown-blocked attempts and failed full-health Mending Salve uses do not spend durability. `vagabonds_club` now has a 4 wood-scrap recipe and is unlocked by the root Camp Tools research node. `poking_stick.yml` is now included in bundled resource seeding while remaining allowed, craftable, and root-researched in Untold Depths. The former Double Coins shared modifier is now `lower_quota`, displayed as Lower Quota, and subtracts 5 coins from the current exploration floor quota through a flat modifier delta.
+- Next reviewer slice applied: Parched monster loading no longer maps to Husk and now uses the configured `PARCHED` entity type; warden replacement rolls now require 100% alive-player sculk pressure with a flat 20% chance; less/more-enemy modifiers now adjust monster cap-extension pacing instead of the initial live cap; Camp Station craft clicks reopen the same category page; carried research crates render as one scaled block display lowered by 0.25 blocks and apply Slowness II plus Resistance III; food stats now support `sculk-reduction-percent`; bundled foods add potato, carrot, Sculk-Cleansing Hash (-5% sculk), and Deeproot Purge Stew (-10% sculk), with stronger food recipes requiring prerequisite food items.
 
 ## Reviewer note (Delete entries once done, but keep the header)
-Do all following for the next slice (and keep this line):
-- Fix parched, it should not be a husk but parched, its an actual mob.
-- Make it so wardens start spawning not at 65%, but at 100% with a flat 20% chance
-- Add a food which removes 5% of sculk and a food which removes 10% of sculk
-- Make it so recipes for better foods require prerequisite items, add a new food "potato" which is simillar to mycelia, being a bad food used in more recipes. Then add carrot, the same deal.
-- When crafting, make it so it doesnt boot you out of the submenu
-- When carrying reserach crate, make it so its just a single large block display. Lower the whole thing down by 0.25 blocks. Also instead of slowness I, apply slowness II and instead of resistance II, apply resistance III
-- Not sure how its implemented now, but if less/more enemies or anything else that affects them is active, it shouldnt change the initial cap, what it should change is the timer that affects the gradual expension of the cap.
+- Research crates should generate only on exploration floors.
+- When carrying, lower the research crates further by 0.1 blocks. Also is it somehow possible to prevent them going black when the ceiling is too low and they get "suffocated"?
+
 
 Future slices (dont do yet):
 - New buildings, potato and carrot farms. Both are small buildigns and behave exactly like mycelia farms, but for potatoes and carrots

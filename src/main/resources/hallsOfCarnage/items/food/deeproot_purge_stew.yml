@@ -1,0 +1,15 @@
+id: deeproot_purge_stew
+name: "Deeproot Purge Stew"
+category: food
+rarity: rare
+material: SUSPICIOUS_STEW
+max-stack-size: 1
+lore:
+  - "A bitter stew that quiets sculk pressure fast."
+stats:
+  heal: 6
+  sculk-reduction-percent: 10
+recipe:
+  carrot: 1
+  sculk_cleansing_hash: 1
+  redstone_scrap: 1

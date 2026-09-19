@@ -7,8 +7,10 @@ If fitting, sound effects should be added for custom features of the features.
 An iron spear, with normal durability, lower damage, but it chains its damage accross to X enemies, default is 5.
 ### Smasher
 A netherite axe with lower durability and 30 damage, it is offset by having insanely long chargup rate, taking 20 seconds to charge up the attack (use attack speed for this)
-###
-###
+### Bonker
+A wooden axe. Stuns the oponents for 2 seconds on charged hits. Stun is simulated by slowness X.
+### Royal Halberd
+A diamond spear with 3 more damage than usual. It has slower attack speed and gives user speed I when holding it.
 ###
 ###
 ## Ranged

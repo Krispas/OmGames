@@ -1,0 +1,10 @@
+id: potato
+name: "Potato"
+category: food
+rarity: normal
+material: POTATO
+max-stack-size: 1
+lore:
+  - "Dungeon-stored starch. Filling enough to matter."
+stats:
+  heal: 2

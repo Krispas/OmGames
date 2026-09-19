@@ -510,7 +510,14 @@ public final class HallsCampRuntime {
                 String itemId = clicked.getItemMeta().getPersistentDataContainer()
                         .get(new NamespacedKey(plugin, "hoc_camp_item"), PersistentDataType.STRING);
                 craftRecipe(player, plot, building, itemId);
-                openBuildingMenu(player, plot);
+                if (menu.view().equals("craft")) {
+                    openCraftingCategory(player, plot,
+                            menuItem(Material.PAPER, "Category", NamedTextColor.GRAY, List.of(),
+                                    "craft_category", menu.category()),
+                            menu.page());
+                } else {
+                    openBuildingMenu(player, plot);
+                }
             }
             case "station_home" -> openBuildingMenu(player, plot);
             case "craft_category" -> openCraftingCategory(player, plot, clicked, 0);

@@ -131,6 +131,18 @@ final class HallsSessionSculkRuntime {
         playerSculk.put(playerId, Math.max(0.0, Math.min(100.0, value)));
     }
 
+    boolean reduce(UUID playerId, double amount) {
+        if (playerId == null || amount <= 0.0) {
+            return false;
+        }
+        double current = playerSculk.getOrDefault(playerId, 0.0);
+        if (current <= 0.0) {
+            return false;
+        }
+        playerSculk.put(playerId, Math.max(0.0, current - amount));
+        return true;
+    }
+
     boolean blocksEating(Player player) {
         return false;
     }

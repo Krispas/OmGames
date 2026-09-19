@@ -11,4 +11,6 @@ stats:
   speed-seconds: 20
   speed-amplifier: 1
 recipe:
+  carrot: 1
+  stale_bread: 1
   wood_scrap: 4

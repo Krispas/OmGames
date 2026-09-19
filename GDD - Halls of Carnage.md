@@ -266,6 +266,7 @@ Stuff like barels, chests, tables, chairs and so on can generate. Breakables sho
 ### Food
 Food is meant for regenerating lost health, as natural regeneration is turned off (you must disable this yourself).
 Some food can apply status effects.
+Some food can reduce sculk pressure through item stats. Current baseline ingredient foods include raw mycelia, potato, and carrot; stronger meals should be allowed to require earlier food items as recipe prerequisites.
 ### Melee
 Swords, axes, spears and so on. All have durability, which is not a normal minecraft durability.
 ### Utility
