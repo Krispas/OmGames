@@ -79,6 +79,7 @@ public final class HallsSession {
     private static final long SCULK_MAUL_SPLASH_COOLDOWN_MILLIS = 350L;
     private static final String RESEARCH_CRATE_TAG = "omgames_hoc_research_crate";
     private static final String ELEVATOR_WAYPOINT_TAG = "omgames_hoc_elevator_waypoint";
+    private static final Display.Brightness FULL_BRIGHTNESS = new Display.Brightness(15, 15);
 
     private final JavaPlugin plugin;
     private final int id;
@@ -1107,9 +1108,6 @@ public final class HallsSession {
                 origin.y() + 1.0, roomStartZ + layout.depth() / 2.0 + 0.5, 0.0f, 0.0f);
         spawnBreakableProp(roomStartX + blueprintCell.x(), origin.y(), roomStartZ + blueprintCell.z(),
                 breakableType("barrel"), 3, List.of(new HallsBreakableType.LootEntry("rare_blueprint", 1, 1, 1)), 1);
-        placeResearchCrate(layout, roomStartX, roomStartZ, Set.of(
-                new HallsExplorationGenerator.Cell(roomStartX + blueprintCell.x(), roomStartZ + blueprintCell.z())
-        ));
         closeElevatorDoors();
     }
 
@@ -1244,7 +1242,6 @@ public final class HallsSession {
                 levelType, entranceX, southDock ? BlockFace.SOUTH : BlockFace.NORTH);
         renderLayoutVegetation(layout, roomStartX, origin.y(), roomStartZ, levelType,
                 new Random((((long) id) << 32) ^ (((long) floor) << 16) ^ 0xCA4F), campVegetationReservedCells(layout, roomStartX, roomStartZ), 0.75);
-        placeResearchCrate(layout, roomStartX, roomStartZ, campVegetationReservedCells(layout, roomStartX, roomStartZ));
         campRuntime.restore(savedCampStates.getOrDefault(sharedCampStateKey(), savedCampStates.get(floor)));
         if (refreshRunUses) {
             refreshCurrentCampRunUses();
@@ -3326,6 +3323,7 @@ public final class HallsSession {
         List<UUID> displays = new ArrayList<>();
         BlockDisplay display = world.spawn(carriedCrateBlockLocation(player), BlockDisplay.class, entity -> {
             entity.setBlock(Material.MAGENTA_CONCRETE.createBlockData());
+            entity.setBrightness(FULL_BRIGHTNESS);
             entity.setInterpolationDelay(0);
             entity.setTeleportDuration(1);
             entity.setTransformation(new Transformation(
@@ -3347,7 +3345,7 @@ public final class HallsSession {
         Location base = player.getLocation();
         return new Location(world,
                 base.getX() - 1.0,
-                base.getY() + 2.0,
+                base.getY() + 1.9,
                 base.getZ() - 1.0,
                 0.0f,
                 0.0f);
