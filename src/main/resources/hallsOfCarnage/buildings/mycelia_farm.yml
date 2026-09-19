@@ -21,21 +21,21 @@ levels:
         offset: [0, 0, 0]
         scale: [1, 0.25, 1]
       - material: SPRUCE_SHELF
-        offset: [0, -0.25, 0]
-        scale: [1, 0.5, 0.5]
-        rotation: [0, 0, 0]
+        offset: [0, 0, 0]
+        block-data: "facing=north"
+        scale: [1, 1, 1]
       - material: SPRUCE_SHELF
-        offset: [0, -0.25, 0]
-        scale: [1, 0.5, 0.5]
-        rotation: [0, 90, 0]
+        offset: [0, 0, 0]
+        block-data: "facing=south"
+        scale: [1, 1, 1]
       - material: SPRUCE_SHELF
-        offset: [0, -0.25, 0]
-        scale: [1, 0.5, 0.5]
-        rotation: [-1, 180, 0]
+        offset: [0, 0, 0]
+        block-data: "facing=east"
+        scale: [1, 1, 1]
       - material: SPRUCE_SHELF
-        offset: [0, -0.25, 0]
-        scale: [1, 0.5, 0.5]
-        rotation: [0, 270, 0]
+        offset: [0, 0, 0]
+        block-data: "facing=west"
+        scale: [1, 1, 1]
   2:
     upgrade-cost: {diamond: 2}
     harvest:
