@@ -848,6 +848,24 @@ public final class HallsOfCarnageManager {
         return session != null && session.handleResearchCrateInteract(player, entity);
     }
 
+    public boolean handleBlueprintDistilleryInteract(Player player, Entity entity) {
+        if (player == null || entity == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleBlueprintDistilleryInteract(player, entity);
+    }
+
+    public boolean handleVentGateInteract(Player player, org.bukkit.block.Block block) {
+        if (player == null || block == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleVentGateInteract(player, block);
+    }
+
     public boolean handleResearchCrateBlockInteract(Player player, org.bukkit.block.Block block) {
         if (player == null || block == null) {
             return false;

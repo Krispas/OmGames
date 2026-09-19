@@ -86,7 +86,7 @@ final class HallsSidebar {
         List<String> lines = new ArrayList<>();
         lines.add(ChatColor.GOLD + "Floor " + ChatColor.WHITE + state.floor()
                 + ChatColor.DARK_GRAY + "  " + ChatColor.GRAY + state.elapsed());
-        lines.add(ChatColor.DARK_GREEN + "W" + ChatColor.WHITE + " " + state.woodScrap()
+        lines.add(ChatColor.GOLD + "W" + ChatColor.WHITE + " " + state.woodScrap()
                 + ChatColor.DARK_GRAY + " | " + ChatColor.GRAY + "I" + ChatColor.WHITE + " " + state.ironScrap()
                 + ChatColor.DARK_GRAY + " | " + ChatColor.AQUA + "D" + ChatColor.WHITE + " " + state.diamondScrap()
                 + ChatColor.DARK_GRAY + " | " + ChatColor.RED + "R" + ChatColor.WHITE + " " + state.redstoneScrap());
@@ -105,10 +105,11 @@ final class HallsSidebar {
         }
         if (!state.campFloor() && state.floor() > 1) {
             lines.add(ChatColor.LIGHT_PURPLE + "Research " + ChatColor.WHITE
-                    + (state.researchCrateDeposited() ? "done" : "open"));
+                    + (state.researchCrateDeposited() ? ChatColor.GREEN + "✓" : ChatColor.RED + "x"));
         }
-        if (state.blueprintDistillerCollected()) {
-            lines.add(ChatColor.BLUE + "Distillery " + ChatColor.WHITE + "done");
+        if (!state.campFloor() && state.floor() > 1) {
+            lines.add(ChatColor.BLUE + "Distillery " + ChatColor.WHITE
+                    + (state.blueprintDistillerCollected() ? ChatColor.GREEN + "✓" : ChatColor.RED + "x"));
         }
         if (!state.campFloor() && !state.modifiers().isBlank()) {
             lines.add(ChatColor.DARK_PURPLE + state.modifiers());

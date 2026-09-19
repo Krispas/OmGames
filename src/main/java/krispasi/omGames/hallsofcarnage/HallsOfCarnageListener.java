@@ -186,6 +186,11 @@ public final class HallsOfCarnageListener implements Listener {
             return;
         }
         if (event.getHand() == EquipmentSlot.HAND
+                && manager.handleBlueprintDistilleryInteract(event.getPlayer(), event.getRightClicked())) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getHand() == EquipmentSlot.HAND
                 && manager.isResearchCrateCarrier(event.getPlayer())) {
             event.setCancelled(true);
             event.getPlayer().sendActionBar(Component.text("Set the research crate down first.", NamedTextColor.LIGHT_PURPLE));
@@ -254,6 +259,12 @@ public final class HallsOfCarnageListener implements Listener {
             return;
         }
         if (event.getClickedBlock().getType() == Material.SMITHING_TABLE) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getAction() == Action.RIGHT_CLICK_BLOCK
+                && event.getClickedBlock().getType() == Material.IRON_BARS
+                && manager.handleVentGateInteract(event.getPlayer(), event.getClickedBlock())) {
             event.setCancelled(true);
             return;
         }

@@ -35,6 +35,7 @@ final class HallsExplorationGenerator {
     private final Set<Cell> corridorCells = new HashSet<>();
     private final Set<Cell> corridorShellCells = new HashSet<>();
     private final Set<Cell> lowCeilingCorridorCells = new HashSet<>();
+    private final Set<Cell> ventGateCells = new HashSet<>();
     private final Set<Cell> liquidCells = new HashSet<>();
     private final Set<Cell> roomShellCells = new HashSet<>();
     private final Set<Cell> roomInteriorCells = new HashSet<>();
@@ -128,6 +129,9 @@ final class HallsExplorationGenerator {
             addRoomLocalOpenHalls();
         } else if (corridorMode == CorridorMode.LIBRARY) {
             addLibraryVentBranches();
+            markLibraryVentGates();
+        } else if (corridorMode == CorridorMode.BUNKER) {
+            addBunkerMainTrunk();
         } else if (corridorMode == CorridorMode.CAVE) {
             addMazeBranches(Math.max(rooms.size() / 2, 4));
         }
@@ -693,7 +697,7 @@ final class HallsExplorationGenerator {
             case LARGE_CORRIDORS -> largeCorridorCells(path);
             case LIBRARY -> libraryCorridorCells(path);
             case SEWER -> sewerCorridorCells(path);
-            case BUNKER -> bunkerCorridorCells(path);
+            case BUNKER -> new HashSet<>(path);
             case MAZE, BACKROOMS, OPEN_HALLS -> openHallConnectorCells(path);
             case NORMAL -> new HashSet<>(path);
         };
@@ -730,23 +734,6 @@ final class HallsExplorationGenerator {
         Set<Cell> cells = vent ? new HashSet<>(path) : largeCorridorCells(path);
         if (vent) {
             lowCeilingCorridorCells.addAll(cells);
-        }
-        return cells;
-    }
-
-    private Set<Cell> bunkerCorridorCells(List<Cell> path) {
-        Set<Cell> cells = new HashSet<>(path);
-        for (int i = 0; i < path.size(); i++) {
-            Cell current = path.get(i);
-            boolean eastWest = isEastWestSegment(path, i);
-            List<Cell> widened = eastWest
-                    ? List.of(new Cell(current.x(), current.z() - 1), new Cell(current.x(), current.z() + 1))
-                    : List.of(new Cell(current.x() - 1, current.z()), new Cell(current.x() + 1, current.z()));
-            for (Cell cell : widened) {
-                if (canWidenCorridorInto(cell)) {
-                    cells.add(cell);
-                }
-            }
         }
         return cells;
     }
@@ -985,6 +972,49 @@ final class HallsExplorationGenerator {
             }
             starts.addAll(carved);
             added++;
+        }
+    }
+
+    private void markLibraryVentGates() {
+        if (lowCeilingCorridorCells.isEmpty()) {
+            return;
+        }
+        for (Cell vent : lowCeilingCorridorCells) {
+            for (BlockFace face : CARDINAL_FACES) {
+                Cell neighbor = step(vent, face);
+                if (corridorCells.contains(neighbor) && !lowCeilingCorridorCells.contains(neighbor)) {
+                    ventGateCells.add(vent);
+                    break;
+                }
+            }
+        }
+    }
+
+    private void addBunkerMainTrunk() {
+        if (rooms.isEmpty()) {
+            return;
+        }
+        List<Room> ordered = new ArrayList<>(rooms);
+        ordered.sort(java.util.Comparator.comparingInt(Room::centerZ).thenComparingInt(Room::centerX));
+        int west = ordered.stream().mapToInt(room -> room.startX() - 5).min().orElse(originX - 20);
+        int east = ordered.stream().mapToInt(room -> room.startX() + room.layout().width() + 5).max().orElse(originX + 20);
+        int z = originZ + (elevatorFrontFace == BlockFace.NORTH ? -18 : 18);
+        List<Cell> trunk = new ArrayList<>();
+        trunk.add(elevatorFrontCell(1));
+        trunk.add(new Cell(originX, z));
+        boolean eastFirst = random.nextBoolean();
+        trunk.add(new Cell(eastFirst ? east : west, z));
+        trunk.add(new Cell(eastFirst ? east : west, z + (random.nextBoolean() ? 8 : -8)));
+        trunk.add(new Cell(eastFirst ? west : east, z + (random.nextBoolean() ? 8 : -8)));
+        Set<Cell> carved = largeCorridorCells(pathThrough(trunk.getFirst(), trunk.subList(1, trunk.size())));
+        corridorCells.addAll(carved);
+        networkCells.addAll(carved);
+        for (Cell point : carved) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    corridorShellCells.add(new Cell(point.x() + dx, point.z() + dz));
+                }
+            }
         }
     }
 
@@ -1400,6 +1430,7 @@ final class HallsExplorationGenerator {
                 Set.copyOf(corridorCells),
                 Set.copyOf(corridorShellCells),
                 Set.copyOf(lowCeilingCorridorCells),
+                Set.copyOf(ventGateCells),
                 Set.copyOf(liquidCells),
                 Set.copyOf(walkable),
                 allRoomsReachable(walkable)
@@ -1439,6 +1470,7 @@ final class HallsExplorationGenerator {
                 Set<Cell> corridorCells,
                 Set<Cell> corridorShellCells,
                 Set<Cell> lowCeilingCorridorCells,
+                Set<Cell> ventGateCells,
                 Set<Cell> liquidCells,
                 Set<Cell> walkableCells,
                 boolean reachable) {

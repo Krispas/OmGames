@@ -80,6 +80,7 @@ public final class HallsSession {
     private static final String RESEARCH_CRATE_TAG = "omgames_hoc_research_crate";
     private static final String ELEVATOR_WAYPOINT_TAG = "omgames_hoc_elevator_waypoint";
     private static final Display.Brightness FULL_BRIGHTNESS = new Display.Brightness(15, 15);
+    private static final int BLUEPRINT_DISTILLERY_TARGET_COUNT = 5;
 
     private final JavaPlugin plugin;
     private final int id;
@@ -105,10 +106,12 @@ public final class HallsSession {
     private final Set<UUID> vegetationDisplays = new HashSet<>();
     private final Map<UUID, PhysicsDrop> physicsDrops = new HashMap<>();
     private Set<HallsExplorationGenerator.Cell> activeLiquidCells = Set.of();
+    private Set<HallsExplorationGenerator.Cell> activeVentGateCells = Set.of();
     private final Map<String, Long> utilityCooldowns = new HashMap<>();
     private final Map<String, Long> sculkMaulSplashCooldowns = new HashMap<>();
     private final Set<UUID> sculkMaulSplashing = new HashSet<>();
     private final Map<UUID, CarriedResearchCrate> carriedResearchCrates = new HashMap<>();
+    private final Map<UUID, BlueprintDistillery> blueprintDistilleries = new HashMap<>();
     private final Map<Integer, List<HallsCampRuntime.PlotState>> savedCampStates = new HashMap<>();
     private final Map<Integer, Set<Integer>> savedCampUnlockedDoors = new HashMap<>();
     private final Map<Integer, HallsFloorModifiers> scannedFloorModifiers = new HashMap<>();
@@ -159,6 +162,7 @@ public final class HallsSession {
     private int compassTrailCountdown;
     private ResearchCrate researchCrate;
     private boolean researchCrateDepositedThisFloor;
+    private boolean blueprintDistilleryRewardClaimedThisFloor;
     private UUID elevatorWaypointId;
 
     public HallsSession(JavaPlugin plugin,
@@ -357,6 +361,8 @@ public final class HallsSession {
                 || campRuntime.isCampEntity(entity)
                 || (researchCrate != null && researchCrate.entityIds().contains(entity.getUniqueId()))
                 || carriedResearchCrates.values().stream().anyMatch(crate -> crate.displayIds().contains(entity.getUniqueId()))
+                || blueprintDistilleries.containsKey(entity.getUniqueId())
+                || blueprintDistilleries.values().stream().anyMatch(distillery -> entity.getUniqueId().equals(distillery.displayId()))
                 || entity.getUniqueId().equals(elevatorWaypointId));
     }
 
@@ -502,6 +508,58 @@ public final class HallsSession {
             return false;
         }
         dropCarriedResearchCrate(player);
+        return true;
+    }
+
+    public boolean handleBlueprintDistilleryInteract(Player player, Entity entity) {
+        if (player == null || entity == null || !running || !player.getWorld().equals(world)) {
+            return false;
+        }
+        BlueprintDistillery distillery = blueprintDistilleries.get(entity.getUniqueId());
+        if (distillery == null) {
+            return false;
+        }
+        if (ghostPlayers.contains(player.getUniqueId())) {
+            player.sendActionBar(Component.text("Ghosts cannot activate distilleries.", NamedTextColor.GRAY));
+            return true;
+        }
+        if (distillery.active()) {
+            player.sendActionBar(Component.text("This distillery is already active.", NamedTextColor.BLUE));
+            return true;
+        }
+        distillery.setActive(true);
+        updateBlueprintDistilleryDisplay(distillery);
+        world.playSound(new Location(world, distillery.x() + 0.5, distillery.y() + 0.5, distillery.z() + 0.5),
+                Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 1.55f);
+        world.spawnParticle(Particle.ENCHANT, new Location(world, distillery.x() + 0.5, distillery.y() + 1.1, distillery.z() + 0.5),
+                35, 0.35, 0.45, 0.35, 0.05);
+        if (blueprintDistilleryRewardClaimedThisFloor || !allBlueprintDistilleriesActive()) {
+            return true;
+        }
+        blueprintDistilleryRewardClaimedThisFloor = true;
+        giveBlueprintDistilleryReward(player);
+        return true;
+    }
+
+    public boolean handleVentGateInteract(Player player, Block block) {
+        if (player == null || block == null || !running || !player.getWorld().equals(world)
+                || block.getType() != Material.IRON_BARS) {
+            return false;
+        }
+        HallsExplorationGenerator.Cell gate = new HallsExplorationGenerator.Cell(block.getX(), block.getZ());
+        if (!activeVentGateCells.contains(gate)) {
+            return false;
+        }
+        Location destination = ventGateDestination(player.getLocation(), gate);
+        if (destination == null) {
+            player.sendActionBar(Component.text("The vent is blocked.", NamedTextColor.GRAY));
+            return true;
+        }
+        destination.setYaw(player.getLocation().getYaw());
+        destination.setPitch(player.getLocation().getPitch());
+        player.teleport(destination);
+        player.setFallDistance(0.0f);
+        world.playSound(destination, Sound.BLOCK_IRON_TRAPDOOR_OPEN, 0.7f, 1.45f);
         return true;
     }
 
@@ -1214,7 +1272,9 @@ public final class HallsSession {
         renderExplorationSculk(build, liquidReservedCells);
         Set<HallsExplorationGenerator.Cell> contentReservedCells = withReserved(reservedCells, vegetationCells);
         Set<HallsExplorationGenerator.Cell> researchCrateCells = placeResearchCrate(build, contentReservedCells);
-        renderExplorationContents(build, withReserved(contentReservedCells, researchCrateCells));
+        Set<HallsExplorationGenerator.Cell> distilleryCells = placeBlueprintDistilleries(build,
+                withReserved(contentReservedCells, researchCrateCells));
+        renderExplorationContents(build, withReserved(withReserved(contentReservedCells, researchCrateCells), distilleryCells));
         startExplorationMonsters(build);
         restoreElevatorChestContents();
         closeElevatorDoors();
@@ -1458,6 +1518,8 @@ public final class HallsSession {
         activeLevelTypeId = levelType.id();
         activeTargetRooms = Math.max(1, floorDefinition.rooms());
         activeGeneratedRooms = 0;
+        activeVentGateCells = Set.of();
+        blueprintDistilleryRewardClaimedThisFloor = false;
         List<HallsLayout> layouts = loadExplorationLayouts(levelType);
         HallsExplorationGenerator.Plan plan = HallsExplorationGenerator.generate(
                 origin.x(),
@@ -1495,6 +1557,7 @@ public final class HallsSession {
         }
         activeGeneratedRooms = plan.rooms().size();
         activeFloorMapCells = plan.walkableCells();
+        activeVentGateCells = plan.ventGateCells();
         debugGeneration("plan", started, "rooms " + activeGeneratedRooms + "/" + activeTargetRooms
                 + ", corridors " + plan.corridorCells().size() + ", reachable " + plan.reachable());
         return new ExplorationBuild(floor, floorDefinition, levelType, random, plan);
@@ -1613,6 +1676,9 @@ public final class HallsSession {
             return Set.of();
         }
         List<HallsExplorationGenerator.Room> rooms = new ArrayList<>(build.plan().rooms());
+        if (rooms.size() > 1) {
+            rooms.removeFirst();
+        }
         java.util.Collections.shuffle(rooms, build.random());
         for (HallsExplorationGenerator.Room room : rooms) {
             List<Cell> cells = openInteriorCells(room);
@@ -1743,6 +1809,140 @@ public final class HallsSession {
         });
         researchCrate = new ResearchCrate(blocks, footprint, Set.of(interaction.getUniqueId()));
         debug("Placed research crate at " + x + "," + y + "," + z + ".");
+    }
+
+    private Set<HallsExplorationGenerator.Cell> placeBlueprintDistilleries(ExplorationBuild build,
+                                                                           Set<HallsExplorationGenerator.Cell> reservedCells) {
+        removeBlueprintDistilleries();
+        if (build == null || build.plan().rooms().size() <= 1
+                || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())) {
+            return Set.of();
+        }
+        Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
+        Set<HallsExplorationGenerator.Cell> occupied = reservedCells == null ? Set.of() : reservedCells;
+        List<HallsExplorationGenerator.Room> rooms = new ArrayList<>(build.plan().rooms());
+        rooms.removeFirst();
+        java.util.Collections.shuffle(rooms, build.random());
+        int placed = 0;
+        for (HallsExplorationGenerator.Room room : rooms) {
+            List<Cell> cells = openInteriorCells(room);
+            java.util.Collections.shuffle(cells, build.random());
+            for (Cell cell : cells) {
+                int x = room.startX() + cell.x();
+                int z = room.startZ() + cell.z();
+                HallsExplorationGenerator.Cell footprint = new HallsExplorationGenerator.Cell(x, z);
+                if (occupied.contains(footprint) || reserved.contains(footprint) || activeLiquidCells.contains(footprint)) {
+                    continue;
+                }
+                if (cell.x() < 1 || cell.z() < 1
+                        || cell.x() >= room.layout().width() - 1
+                        || cell.z() >= room.layout().depth() - 1
+                        || room.layout().at(cell.x(), cell.z()) != 'O'
+                        || isNearRoomExit(room, cell.x(), cell.z())) {
+                    continue;
+                }
+                spawnBlueprintDistillery(x, origin.y(), z);
+                reserved.add(footprint);
+                placed++;
+                break;
+            }
+            if (placed >= BLUEPRINT_DISTILLERY_TARGET_COUNT) {
+                break;
+            }
+        }
+        if (placed < BLUEPRINT_DISTILLERY_TARGET_COUNT) {
+            debug("Placed " + placed + "/" + BLUEPRINT_DISTILLERY_TARGET_COUNT
+                    + " blueprint distilleries on floor " + build.floor() + ".");
+        }
+        return Set.copyOf(reserved);
+    }
+
+    private void spawnBlueprintDistillery(int x, int y, int z) {
+        Location displayLocation = new Location(world, x + 0.5, y, z + 0.5);
+        BlockDisplay display = world.spawn(displayLocation, BlockDisplay.class, entity -> {
+            entity.setBlock(Material.COPPER_BLOCK.createBlockData());
+            entity.setTransformation(new Transformation(
+                    new Vector3f(-0.15f, 0.0f, -0.15f),
+                    new Quaternionf(),
+                    new Vector3f(0.3f, 0.75f, 0.3f),
+                    new Quaternionf()));
+            entity.setBrightness(FULL_BRIGHTNESS);
+            entity.setPersistent(false);
+        });
+        Interaction interaction = world.spawn(displayLocation, Interaction.class, entity -> {
+            entity.setInteractionWidth(1.0f);
+            entity.setInteractionHeight(1.4f);
+            entity.setResponsive(true);
+            entity.setPersistent(false);
+        });
+        blueprintDistilleries.put(interaction.getUniqueId(),
+                new BlueprintDistillery(interaction.getUniqueId(), display.getUniqueId(), x, y, z));
+    }
+
+    private void updateBlueprintDistilleryDisplay(BlueprintDistillery distillery) {
+        Entity entity = Bukkit.getEntity(distillery.displayId());
+        if (entity instanceof BlockDisplay display) {
+            display.setBlock((distillery.active() ? Material.EMERALD_BLOCK : Material.COPPER_BLOCK).createBlockData());
+        }
+    }
+
+    private boolean allBlueprintDistilleriesActive() {
+        return !blueprintDistilleries.isEmpty()
+                && blueprintDistilleries.size() >= BLUEPRINT_DISTILLERY_TARGET_COUNT
+                && blueprintDistilleries.values().stream().allMatch(BlueprintDistillery::active);
+    }
+
+    private void giveBlueprintDistilleryReward(Player player) {
+        ItemStack reward = blueprintFromScenario("normal", 33);
+        int slot = firstAvailableHotbarSlot(player.getInventory());
+        if (slot >= 0) {
+            player.getInventory().setItem(slot, reward);
+        } else {
+            dropSessionItem(player.getLocation(), reward);
+            player.sendActionBar(Component.text("Your hotbar is full. The blueprint dropped at your feet.", NamedTextColor.AQUA));
+        }
+        world.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.9f, 1.2f);
+        for (UUID playerId : participants) {
+            Player participant = Bukkit.getPlayer(playerId);
+            if (participant != null && participant.getWorld().equals(world)) {
+                participant.sendMessage(Component.text(player.getName() + " completed the blueprint distillery chain.",
+                        NamedTextColor.BLUE));
+            }
+        }
+    }
+
+    private Location ventGateDestination(Location playerLocation, HallsExplorationGenerator.Cell gate) {
+        if (playerLocation == null) {
+            return null;
+        }
+        HallsExplorationGenerator.Cell from = new HallsExplorationGenerator.Cell(
+                playerLocation.getBlockX(), playerLocation.getBlockZ());
+        List<HallsExplorationGenerator.Cell> candidates = new ArrayList<>();
+        int dx = Integer.compare(gate.x() - from.x(), 0);
+        int dz = Integer.compare(gate.z() - from.z(), 0);
+        if (Math.abs(gate.x() - from.x()) >= Math.abs(gate.z() - from.z()) && dx != 0) {
+            candidates.add(new HallsExplorationGenerator.Cell(gate.x() + dx, gate.z()));
+        }
+        if (dz != 0) {
+            candidates.add(new HallsExplorationGenerator.Cell(gate.x(), gate.z() + dz));
+        }
+        for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+            candidates.add(new HallsExplorationGenerator.Cell(gate.x() + face.getModX(), gate.z() + face.getModZ()));
+        }
+        for (HallsExplorationGenerator.Cell candidate : candidates) {
+            if (candidate.equals(gate) || !isVentDestinationClear(candidate)) {
+                continue;
+            }
+            return new Location(world, candidate.x() + 0.5, origin.y(), candidate.z() + 0.5);
+        }
+        return null;
+    }
+
+    private boolean isVentDestinationClear(HallsExplorationGenerator.Cell cell) {
+        Material feet = world.getBlockAt(cell.x(), origin.y(), cell.z()).getType();
+        Material head = world.getBlockAt(cell.x(), origin.y() + 1, cell.z()).getType();
+        Material floor = world.getBlockAt(cell.x(), origin.y() - 1, cell.z()).getType();
+        return feet.isAir() && head.isAir() && floor.isSolid();
     }
 
     private Set<HallsExplorationGenerator.Cell> renderExplorationVegetation(ExplorationBuild build,
@@ -2641,6 +2841,10 @@ public final class HallsSession {
             setBlock(point.x(), origin.y() + 2, point.z(), corridorWallMaterial(levelType, point,
                     origin.y() + 2, openCells));
         }
+        if (open && plan.ventGateCells().contains(point)) {
+            setBlock(point.x(), origin.y(), point.z(), Material.IRON_BARS);
+            setBlock(point.x(), origin.y() + 1, point.z(), Material.IRON_BARS);
+        }
     }
 
     private boolean isCorridorPillarColumn(HallsExplorationGenerator.Cell point,
@@ -2939,6 +3143,7 @@ public final class HallsSession {
             return;
         }
         tickDeathFog();
+        tickBlueprintDistilleryBeams();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
@@ -2969,9 +3174,43 @@ public final class HallsSession {
                 remainingLives,
                 sculkRuntime.sculkPercent(player),
                 researchCrateDepositedThisFloor,
-                false,
+                blueprintDistilleryRewardClaimedThisFloor,
                 activeFloorModifiers.iconSummary()
         );
+    }
+
+    private void tickBlueprintDistilleryBeams() {
+        if (blueprintDistilleries.isEmpty() || blueprintDistilleryRewardClaimedThisFloor) {
+            return;
+        }
+        List<BlueprintDistillery> ordered = blueprintDistilleries.values().stream()
+                .sorted(Comparator.comparingInt(BlueprintDistillery::x).thenComparingInt(BlueprintDistillery::z))
+                .toList();
+        Optional<BlueprintDistillery> nextInactive = ordered.stream()
+                .filter(distillery -> !distillery.active())
+                .findFirst();
+        if (nextInactive.isEmpty()) {
+            return;
+        }
+        for (BlueprintDistillery active : ordered) {
+            if (active.active()) {
+                renderDistilleryBeam(active, nextInactive.get());
+            }
+        }
+    }
+
+    private void renderDistilleryBeam(BlueprintDistillery from, BlueprintDistillery to) {
+        Location start = new Location(world, from.x() + 0.5, from.y() + 1.15, from.z() + 0.5);
+        Vector delta = new Vector(to.x() - from.x(), 0.0, to.z() - from.z());
+        if (delta.lengthSquared() < 0.01) {
+            return;
+        }
+        Vector step = delta.normalize().multiply(0.6);
+        Location point = start.clone();
+        for (int i = 0; i < 18; i++) {
+            world.spawnParticle(Particle.ENCHANT, point, 1, 0.02, 0.02, 0.02, 0.0);
+            point.add(step);
+        }
     }
 
     private void tickDeathFog() {
@@ -3481,6 +3720,21 @@ public final class HallsSession {
             }
         }
         researchCrate = null;
+    }
+
+    private void removeBlueprintDistilleries() {
+        for (BlueprintDistillery distillery : Set.copyOf(blueprintDistilleries.values())) {
+            Entity interaction = Bukkit.getEntity(distillery.interactionId());
+            if (interaction != null) {
+                interaction.remove();
+            }
+            Entity display = Bukkit.getEntity(distillery.displayId());
+            if (display != null) {
+                display.remove();
+            }
+        }
+        blueprintDistilleries.clear();
+        blueprintDistilleryRewardClaimedThisFloor = false;
     }
 
     private void removeCarriedResearchCrate(UUID playerId) {
@@ -4149,8 +4403,10 @@ public final class HallsSession {
         trapRuntime.clear();
         campRuntime.clear();
         activeLiquidCells = Set.of();
+        activeVentGateCells = Set.of();
         removeResearchCrate();
         removeAllCarriedResearchCrates();
+        removeBlueprintDistilleries();
         for (BreakableProp prop : Set.copyOf(breakableProps.values())) {
             removeBreakableProp(prop);
         }
@@ -5541,6 +5797,7 @@ public final class HallsSession {
             renderExplorationSculk(build, liquidReservedCells);
             reservedCells = withReserved(reservedCells, vegetationCells);
             reservedCells = withReserved(reservedCells, placeResearchCrate(build, reservedCells));
+            reservedCells = withReserved(reservedCells, placeBlueprintDistilleries(build, reservedCells));
             rareBreakableRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
             contentStartedNanos = System.nanoTime();
             contentBreakablesBefore = new HashSet<>(breakableProps.values()).size();
@@ -5622,6 +5879,51 @@ public final class HallsSession {
     }
 
     private record CratePlacement(int x, int y, int z, Set<HallsExplorationGenerator.Cell> footprint) {
+    }
+
+    private static final class BlueprintDistillery {
+        private final UUID interactionId;
+        private final UUID displayId;
+        private final int x;
+        private final int y;
+        private final int z;
+        private boolean active;
+
+        private BlueprintDistillery(UUID interactionId, UUID displayId, int x, int y, int z) {
+            this.interactionId = interactionId;
+            this.displayId = displayId;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        private UUID interactionId() {
+            return interactionId;
+        }
+
+        private UUID displayId() {
+            return displayId;
+        }
+
+        private int x() {
+            return x;
+        }
+
+        private int y() {
+            return y;
+        }
+
+        private int z() {
+            return z;
+        }
+
+        private boolean active() {
+            return active;
+        }
+
+        private void setActive(boolean active) {
+            this.active = active;
+        }
     }
 
     record SidebarState(int floor,
