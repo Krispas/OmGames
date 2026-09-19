@@ -166,6 +166,5 @@ Future slices (dont do yet):
 
 For reviewer to figure out:
 - New research tree - I have added research.csv, rework the research tree fully based on this file
-- Camp structure
 - New models
 - New breakables
