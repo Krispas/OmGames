@@ -8,14 +8,12 @@ loot:
   - item: food
     weight: 18
   - item: rare_food
-    weight: 2
+    weight: 1
   - item: blueprint
-    weight: 9
+    weight: 3
   - item: utility
     weight: 5
   - item: weapon
     weight: 5
   - item: armor
     weight: 5
-  - item: rare_blueprint
-    weight: 1

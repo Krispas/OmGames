@@ -6,5 +6,11 @@ loot:
     weight: 5
   - item: rare_utility
     weight: 5
-  - item: rare_blueprint
-    weight: 25
+  - item: blueprint
+    weight: 3
+  - item: utility
+    weight: 15
+  - item: weapon
+    weight: 15
+  - item: armor
+    weight: 15
