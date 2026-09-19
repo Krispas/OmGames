@@ -1,0 +1,8 @@
+id: potato_farm_blueprint
+name: "Blueprint: Potato Farm"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Unlocks renewable potatoes in camp."

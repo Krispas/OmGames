@@ -1,0 +1,8 @@
+id: deconstructor_blueprint
+name: "Blueprint: Deconstructor"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Destroys crafted items for partial scrap recovery."

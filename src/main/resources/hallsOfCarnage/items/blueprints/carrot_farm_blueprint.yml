@@ -1,0 +1,8 @@
+id: carrot_farm_blueprint
+name: "Blueprint: Carrot Farm"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Unlocks renewable carrots in camp."

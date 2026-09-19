@@ -68,12 +68,22 @@ allowed-items:
     - health_totem_blueprint
     - speed_totem_blueprint
     - mycelia_farm_blueprint
+    - potato_farm_blueprint
+    - carrot_farm_blueprint
+    - research_table_blueprint
+    - alchemy_cauldron_blueprint
+    - deconstructor_blueprint
     - sculk_purifier_blueprint
   buildings:
     - forge
     - grindstone
     - storage_locker
     - mycelia_farm
+    - potato_farm
+    - carrot_farm
+    - research_table
+    - alchemy_cauldron
+    - deconstructor
     - elevator_drill
     - scanner
     - health_totem
@@ -84,6 +94,11 @@ blueprint-pools:
     - forge_blueprint
     - storage_locker_blueprint
     - mycelia_farm_blueprint
+    - potato_farm_blueprint
+    - carrot_farm_blueprint
+    - research_table_blueprint
+    - alchemy_cauldron_blueprint
+    - deconstructor_blueprint
     - scanner_blueprint
   rare:
     - grindstone_blueprint
@@ -95,6 +110,9 @@ blueprint-pools:
     normal:
       - storage_locker_blueprint
       - mycelia_farm_blueprint
+      - potato_farm_blueprint
+      - carrot_farm_blueprint
+      - research_table_blueprint
       - scanner_blueprint
     rare:
       - grindstone_blueprint
@@ -106,6 +124,8 @@ blueprint-pools:
       - forge_blueprint
       - storage_locker_blueprint
       - mycelia_farm_blueprint
+      - potato_farm_blueprint
+      - alchemy_cauldron_blueprint
       - sculk_purifier_blueprint
     rare:
       - speed_totem_blueprint
@@ -114,6 +134,7 @@ blueprint-pools:
     normal:
       - forge_blueprint
       - scanner_blueprint
+      - deconstructor_blueprint
       - sculk_purifier_blueprint
     rare:
       - grindstone_blueprint
@@ -124,6 +145,7 @@ blueprint-pools:
     normal:
       - forge_blueprint
       - storage_locker_blueprint
+      - deconstructor_blueprint
       - health_totem_blueprint
     rare:
       - grindstone_blueprint
@@ -133,6 +155,7 @@ blueprint-pools:
     normal:
       - forge_blueprint
       - storage_locker_blueprint
+      - research_table_blueprint
       - scanner_blueprint
     rare:
       - elevator_drill_blueprint
@@ -142,6 +165,8 @@ blueprint-pools:
     normal:
       - storage_locker_blueprint
       - mycelia_farm_blueprint
+      - carrot_farm_blueprint
+      - research_table_blueprint
       - scanner_blueprint
       - speed_totem_blueprint
     rare:
@@ -153,6 +178,9 @@ blueprint-pools:
       - forge_blueprint
       - storage_locker_blueprint
       - mycelia_farm_blueprint
+      - potato_farm_blueprint
+      - carrot_farm_blueprint
+      - alchemy_cauldron_blueprint
       - sculk_purifier_blueprint
     rare:
       - elevator_drill_blueprint

@@ -203,7 +203,7 @@ They can be built on special spots in camps. Smaller buildings can be built on l
 
 More building will be added later.
 
-Demolishing a building costs nothing, but blueprint is not returned.
+Demolishing a building costs nothing and returns the building blueprint. If that building spent matching blueprints on level 2/3 upgrades, those spent upgrade blueprints are returned too. Other upgrade resources are not returned.
 Building a building costs nothing, but blueprint is consumed.
 Building has upgrades defines under resources/hallsOfCarnage/buildings/<building_name>/level_<number>. The file contains cost of building (scrap materials needed).
 The block layout as a visual represantation of it and other info needed for them to function. Figure this out yourself.
@@ -231,6 +231,26 @@ Has 9/18/27 storage slots by level. Allows storing items for future runs. Upgrad
 - Size: Small
 
 Grows basic food for free. Bigger level = more.
+### Potato Farm
+- Size: Small
+
+Behaves like Mycelia Farm, but grows potatoes.
+### Carrot Farm
+- Size: Small
+
+Behaves like Mycelia Farm, but grows carrots.
+### Research Table
+- Size: Medium
+
+Common building. Upgrading requires another Research Table blueprint. Blueprints can be deposited into it for blueprint points: normal blueprints give 1 point and rare blueprints give 2 points. At level 1, fabricating a normal blueprint costs 5 points. At levels 2 and 3, fabricating a normal blueprint costs 3 points. Level 3 unlocks rare blueprint fabrication for double the normal point cost.
+### Alchemy Cauldron
+- Size: Medium
+
+Common building. Upgrading requires another Alchemy Cauldron blueprint. Converts stored scrap into another scrap type at 4:1, 3:1, and 2:1 by level.
+### Deconstructor
+- Size: Medium
+
+Destroys held recipe-backed Halls items and returns random stored scrap from direct recipe scrap costs. Refund chance is 30%, 40%, and 50% by level.
 ### Elevator Drill
 - Size: Large
 

@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-14
+Last updated: 2026-09-19
 
 ## Implemented
 
@@ -139,16 +139,14 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: bundled utility items now define durability and lose one durability only after successful activation; cooldown-blocked attempts and failed full-health Mending Salve uses do not spend durability. `vagabonds_club` now has a 4 wood-scrap recipe and is unlocked by the root Camp Tools research node. `poking_stick.yml` is now included in bundled resource seeding while remaining allowed, craftable, and root-researched in Untold Depths. The former Double Coins shared modifier is now `lower_quota`, displayed as Lower Quota, and subtracts 5 coins from the current exploration floor quota through a flat modifier delta.
 - Next reviewer slice applied: Parched monster loading no longer maps to Husk and now uses the configured `PARCHED` entity type; warden replacement rolls now require 100% alive-player sculk pressure with a flat 20% chance; less/more-enemy modifiers now adjust monster cap-extension pacing instead of the initial live cap; Camp Station craft clicks reopen the same category page; carried research crates render as one scaled block display lowered by 0.25 blocks and apply Slowness II plus Resistance III; food stats now support `sculk-reduction-percent`; bundled foods add potato, carrot, Sculk-Cleansing Hash (-5% sculk), and Deeproot Purge Stew (-10% sculk), with stronger food recipes requiring prerequisite food items.
 - Next reviewer slice applied: research crates now generate only on exploration floors, no longer on the start floor or camp floors. Carried research crates were lowered by another 0.1 blocks and use full display brightness so low ceilings should not make the carried crate render black.
+- Next reviewer slice applied: camp deconstruction now returns the original building blueprint and any matching upgrade blueprints spent on the current building level, while still not refunding stored scrap or other upgrade resources. Potato Farm and Carrot Farm were added as small camp buildings that reuse the Mycelia Farm harvest runtime for potato/carrot output, with bundled building/blueprint defaults, resource seeding, and Untold Depths availability.
+- Next reviewer slice applied: Research Table, Alchemy Cauldron, and Deconstructor were added as medium camp buildings with bundled building/blueprint defaults, resource seeding, and Untold Depths availability. Research Table stores blueprint points on the plot, accepts normal/rare blueprints for 1/2 points, fabricates normal blueprints for 5/3/3 points by level, and unlocks rare fabrication at level 3 for double price. Alchemy Cauldron converts any stored scrap type into any other at 4/3/2:1 by level. Deconstructor destroys held recipe-backed Halls items and refunds stored scrap from direct recipe scrap costs at 30/40/50% by level. These three buildings require matching blueprints for level 2/3 upgrades.
+- Next reviewer slice applied: the Compass modifier now grants a custom-rendered filled map instead of an elevator compass. The map shows the active generated floor and participant positions; a double Compass modifier also renders session monsters. Old Halls map/compass cleanup now only removes items marked with Halls metadata. The elevator remains on the vanilla locator bar, and `halls-of-carnage.yml -> elevator.locator-icon-item-model` stores a configurable placeholder item-model id as plugin metadata because the inspected Paper API exposes waypoint range attributes but no public locator-icon setter.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Make it so when deconstructing the building, blueprint is returned, if blueprint is needed for upgrades, return the amount spent on the building. Do not return other resources such as diamonds.
-- A new building, research table. A medium building. Common, requires blueprint for upgrade. Blueprints can be deposited into this building, giving it blueprint points. When X amount of points is achieved, a blueprint of any choice can be picked to be fabricated. The X depends on the level (5,3,3). On third level, abillity to craft rare bluepirnts is unlocked for dobule the price. Depositing rare blueprints gives 2 points.
-- New buildings, potato and carrot farms. Both are small buildigns and behave exactly like mycelia farms, but for potatoes and carrots
-- New building, alchemy cauldron. Alchemy cauldron allows you to convert X amount of any scrap into 1 of other scrap. X is replaced based on the level of the building (4,3,2). Building is medium and requires blueprint for upgrades.
-- New building, deconstructor. A medium building used for destroying items. Destroyed items will randomly yield x% of their cost of recipe. x is defined by level (30, 40, 50)
-- Compass rework - Since elevator is now on locator bar, compas modifier is pointless, rework it. Instead of compass, you receive a map, the map has the whole floor on it, do this via custom rendering. It should also show location of other players. If the modifier is double, it will also show enemies.
-- Use a custom icon for the elevator on locator bar, is it possible to use existing texture like redstone_lamp without adding stuff to do resoruce_pack? If not, just leave a placeholder textuere ID which I will later supply via resourcepack. If we do it this way, add abillity to change it to the config.
+- When the map modifier is active, make sure it uses an unused map id, the server has a bunch of maps. If a new map is created, store the id for future use/sessions, as that id now belongs to halls of carnage. New id should be only generated if there isnt existing id available for use.
+- Make elevator use cinnabar_bricks instead of deepslate_bricks (those blocks exist)
 
 
 Future slices (dont do yet):

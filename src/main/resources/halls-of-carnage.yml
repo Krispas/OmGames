@@ -23,5 +23,8 @@ sessions:
   max-players: 6
   disconnect-grace-seconds: 300
 
+elevator:
+  locator-icon-item-model: "om:hoc_elevator"
+
 leaderboard:
   limit: 10

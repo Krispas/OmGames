@@ -18,6 +18,7 @@ public final class HallsConfig {
     private final int sessionSpacing;
     private final int maxPlayers;
     private final int disconnectGraceSeconds;
+    private final String elevatorLocatorIconItemModel;
 
     private HallsConfig(String lobbyWorldName,
                         LocationValues lobbySpawn,
@@ -26,7 +27,8 @@ public final class HallsConfig {
                         BlockPoint firstSessionOrigin,
                         int sessionSpacing,
                         int maxPlayers,
-                        int disconnectGraceSeconds) {
+                        int disconnectGraceSeconds,
+                        String elevatorLocatorIconItemModel) {
         this.lobbyWorldName = lobbyWorldName;
         this.lobbySpawn = lobbySpawn;
         this.menuVillager = menuVillager;
@@ -35,6 +37,7 @@ public final class HallsConfig {
         this.sessionSpacing = sessionSpacing;
         this.maxPlayers = maxPlayers;
         this.disconnectGraceSeconds = disconnectGraceSeconds;
+        this.elevatorLocatorIconItemModel = elevatorLocatorIconItemModel == null ? "" : elevatorLocatorIconItemModel.trim();
     }
 
     public static HallsConfig load(File file) {
@@ -51,7 +54,9 @@ public final class HallsConfig {
         int spacing = Math.max(250, config.getInt("sessions.spacing", 1000));
         int maxPlayers = clamp(config.getInt("sessions.max-players", 6), 1, 6);
         int graceSeconds = Math.max(1, config.getInt("sessions.disconnect-grace-seconds", 300));
-        return new HallsConfig(world, spawn, villager, villagerEnabled, firstOrigin, spacing, maxPlayers, graceSeconds);
+        String locatorIcon = config.getString("elevator.locator-icon-item-model", "om:hoc_elevator");
+        return new HallsConfig(world, spawn, villager, villagerEnabled, firstOrigin, spacing, maxPlayers, graceSeconds,
+                locatorIcon);
     }
 
     public String lobbyWorldName() {
@@ -64,6 +69,10 @@ public final class HallsConfig {
 
     public int disconnectGraceSeconds() {
         return disconnectGraceSeconds;
+    }
+
+    public String elevatorLocatorIconItemModel() {
+        return elevatorLocatorIconItemModel;
     }
 
     public BlockPoint sessionOrigin(int slot) {

@@ -1,0 +1,8 @@
+id: alchemy_cauldron_blueprint
+name: "Blueprint: Alchemy Cauldron"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Converts stored scrap into other stored scrap."

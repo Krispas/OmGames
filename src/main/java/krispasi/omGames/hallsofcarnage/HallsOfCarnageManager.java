@@ -183,10 +183,20 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/blueprints/health_totem_blueprint.yml",
             "hallsOfCarnage/items/blueprints/speed_totem_blueprint.yml",
             "hallsOfCarnage/items/blueprints/mycelia_farm_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/potato_farm_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/carrot_farm_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/research_table_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/alchemy_cauldron_blueprint.yml",
+            "hallsOfCarnage/items/blueprints/deconstructor_blueprint.yml",
             "hallsOfCarnage/items/blueprints/sculk_purifier_blueprint.yml",
             "hallsOfCarnage/buildings/camp_station.yml",
             "hallsOfCarnage/buildings/forge.yml",
             "hallsOfCarnage/buildings/mycelia_farm.yml",
+            "hallsOfCarnage/buildings/potato_farm.yml",
+            "hallsOfCarnage/buildings/carrot_farm.yml",
+            "hallsOfCarnage/buildings/research_table.yml",
+            "hallsOfCarnage/buildings/alchemy_cauldron.yml",
+            "hallsOfCarnage/buildings/deconstructor.yml",
             "hallsOfCarnage/buildings/storage_locker.yml",
             "hallsOfCarnage/buildings/grindstone.yml",
             "hallsOfCarnage/buildings/elevator_drill.yml",
@@ -1076,7 +1086,8 @@ public final class HallsOfCarnageManager {
         DifficultyOption selectedDifficulty = difficulty == null ? NORMAL_DIFFICULTY : difficulty;
         HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot),
                 getDataFolder(), levelTypes, breakableTypes, vegetationTypes, itemTypes, trapTypes, monsterTypes, modifierTypes,
-                buildingTypes, hostId, selectedDifficulty.id(), selectedDifficulty.multiplier(), saveData, players,
+                buildingTypes, hostId, selectedDifficulty.id(), selectedDifficulty.multiplier(),
+                config.elevatorLocatorIconItemModel(), saveData, players,
                 debugPlayers::contains);
         try {
             closeOpenHallsMenus(players);

@@ -118,6 +118,7 @@ public final class HallsSession {
     private final HallsSessionSculkRuntime sculkRuntime;
     private final HallsCampRuntime campRuntime;
     private final java.util.function.Predicate<UUID> debugEnabled;
+    private final String elevatorLocatorIconItemModel;
     private final Set<UUID> ghostPlayers = new HashSet<>();
     private final Map<UUID, Map<Integer, Integer>> healthTotemLevels = new HashMap<>();
     private final Map<UUID, Map<Integer, Integer>> speedTotemLevels = new HashMap<>();
@@ -153,6 +154,7 @@ public final class HallsSession {
     private Location startRoomSpawn;
     private long floorStartedAtMillis;
     private HallsFloorModifiers activeFloorModifiers = HallsFloorModifiers.none();
+    private Set<HallsExplorationGenerator.Cell> activeFloorMapCells = Set.of();
     private int compassTrailCountdown;
     private ResearchCrate researchCrate;
     private UUID elevatorWaypointId;
@@ -174,6 +176,7 @@ public final class HallsSession {
                         UUID hostId,
                         String difficultyId,
                         double difficultyMultiplier,
+                        String elevatorLocatorIconItemModel,
                         HallsSaveData initialSave,
                         List<Player> players,
                         java.util.function.Predicate<UUID> debugEnabled) {
@@ -194,6 +197,7 @@ public final class HallsSession {
         this.hostId = hostId;
         this.difficultyId = normalizeId(difficultyId == null || difficultyId.isBlank() ? "normal" : difficultyId);
         this.difficultyMultiplier = Math.max(1.0, difficultyMultiplier);
+        this.elevatorLocatorIconItemModel = elevatorLocatorIconItemModel == null ? "" : elevatorLocatorIconItemModel.trim();
         this.initialSave = initialSave;
         this.participants = new HashSet<>();
         for (Player player : players) {
@@ -217,6 +221,16 @@ public final class HallsSession {
             @Override
             public boolean spend(Map<String, Integer> cost) {
                 return spendStoredScrap(cost);
+            }
+
+            @Override
+            public void add(String scrapId, int amount) {
+                addStoredScrapNoCoins(scrapId, amount);
+            }
+
+            @Override
+            public int amount(String scrapId) {
+                return storedScrapAmount(scrapId);
             }
         }, this::reducePlayerSculk, new HallsCampRuntime.TotemAccount() {
             @Override
@@ -1454,6 +1468,7 @@ public final class HallsSession {
             return new ExplorationBuild(floor, floorDefinition, levelType, random, plan);
         }
         activeGeneratedRooms = plan.rooms().size();
+        activeFloorMapCells = plan.walkableCells();
         debugGeneration("plan", started, "rooms " + activeGeneratedRooms + "/" + activeTargetRooms
                 + ", corridors " + plan.corridorCells().size() + ", reachable " + plan.reachable());
         return new ExplorationBuild(floor, floorDefinition, levelType, random, plan);
@@ -2354,6 +2369,10 @@ public final class HallsSession {
             entity.customName(Component.text("Elevator", NamedTextColor.LIGHT_PURPLE));
             entity.setCustomNameVisible(false);
             entity.addScoreboardTag(ELEVATOR_WAYPOINT_TAG);
+            if (!elevatorLocatorIconItemModel.isBlank()) {
+                entity.getPersistentDataContainer().set(new org.bukkit.NamespacedKey(plugin, "hoc_locator_icon_item_model"),
+                        PersistentDataType.STRING, elevatorLocatorIconItemModel);
+            }
             AttributeInstance transmit = entity.getAttribute(Attribute.WAYPOINT_TRANSMIT_RANGE);
             if (transmit != null) {
                 transmit.setBaseValue(512.0);
@@ -2897,14 +2916,10 @@ public final class HallsSession {
                     .append(activeFloorModifiers.hudComponent());
         }
         tickDeathFog();
-        tickCompassTrail();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
                 String elevatorDistance = elevatorDistanceLabel(player);
-                if (activeFloorModifiers.compassLevel() >= 2) {
-                    elevatorDistance += " " + Math.round(player.getLocation().distance(elevatorSpawnLocation())) + "b";
-                }
                 Component message = shared
                         .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
                         .append(Component.text("Sculk " + sculkRuntime.sculkPercent(player) + "%", NamedTextColor.AQUA))
@@ -2947,31 +2962,7 @@ public final class HallsSession {
     }
 
     private void tickCompassTrail() {
-        if (activeFloorModifiers.compassLevel() < 3 || currentFloor <= 1 || transitioning) {
-            return;
-        }
-        if (compassTrailCountdown-- > 0) {
-            return;
-        }
-        compassTrailCountdown = 5;
-        Location target = elevatorSpawnLocation();
-        for (UUID playerId : participants) {
-            Player player = Bukkit.getPlayer(playerId);
-            if (player == null || !player.getWorld().equals(world) || ghostPlayers.contains(playerId)) {
-                continue;
-            }
-            Location start = player.getLocation().clone().add(0.0, 0.25, 0.0);
-            Vector direction = target.toVector().subtract(start.toVector());
-            double length = direction.length();
-            if (length < 1.0) {
-                continue;
-            }
-            direction.normalize();
-            for (double distance = 1.0; distance < Math.min(length, 18.0); distance += 1.5) {
-                Location point = start.clone().add(direction.clone().multiply(distance));
-                world.spawnParticle(Particle.END_ROD, point, 1, 0.03, 0.03, 0.03, 0.0);
-            }
-        }
+        compassTrailCountdown = 0;
     }
 
     private String elevatorDistanceLabel(Player player) {
@@ -3076,9 +3067,8 @@ public final class HallsSession {
             if (!hasCompass(player.getInventory())) {
                 int slot = firstAvailableHotbarSlot(player.getInventory());
                 if (slot >= 0) {
-                    ItemStack compass = namedItem(Material.COMPASS, "Elevator Compass", NamedTextColor.GREEN);
-                    markElevatorCompass(compass);
-                    player.getInventory().setItem(slot, compass);
+                    player.getInventory().setItem(slot, HallsFloorMapRenderer.create(plugin, player, world,
+                            origin.x(), origin.z(), activeFloorMapCells, participants, activeFloorModifiers.compassLevel() >= 2));
                 }
             }
         }
@@ -3087,7 +3077,7 @@ public final class HallsSession {
     private boolean hasCompass(PlayerInventory inventory) {
         for (int slot = 0; slot <= 8; slot++) {
             ItemStack item = inventory.getItem(slot);
-            if (item != null && item.getType() == Material.COMPASS) {
+            if (isElevatorCompass(item)) {
                 return true;
             }
         }
@@ -3203,15 +3193,14 @@ public final class HallsSession {
     }
 
     private boolean isElevatorCompass(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS) {
+        if (item == null || (item.getType() != Material.COMPASS && item.getType() != Material.FILLED_MAP)) {
             return false;
         }
         if (!item.hasItemMeta()) {
-            return true;
+            return false;
         }
         return item.getItemMeta().getPersistentDataContainer()
-                .has(new org.bukkit.NamespacedKey(plugin, "hoc_elevator_compass"), PersistentDataType.BYTE)
-                || item.getItemMeta().displayName() != null;
+                .has(new org.bukkit.NamespacedKey(plugin, "hoc_elevator_compass"), PersistentDataType.BYTE);
     }
 
     private Container elevatorChestContainer() {
@@ -3908,6 +3897,37 @@ public final class HallsSession {
         }
         coins += multipliedCoins(amount);
         return true;
+    }
+
+    private boolean addStoredScrapNoCoins(String rawType, int amount) {
+        PropReward scrapType = parseScrapReward(rawType);
+        if (scrapType == null || amount <= 0) {
+            return false;
+        }
+        switch (scrapType) {
+            case WOOD_SCRAP -> woodScrap += amount;
+            case IRON_SCRAP -> ironScrap += amount;
+            case DIAMOND_SCRAP -> diamondScrap += amount;
+            case REDSTONE_SCRAP -> redstoneScrap += amount;
+            default -> {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private int storedScrapAmount(String rawType) {
+        PropReward scrapType = parseScrapReward(rawType);
+        if (scrapType == null) {
+            return 0;
+        }
+        return switch (scrapType) {
+            case WOOD_SCRAP -> woodScrap;
+            case IRON_SCRAP -> ironScrap;
+            case DIAMOND_SCRAP -> diamondScrap;
+            case REDSTONE_SCRAP -> redstoneScrap;
+            default -> 0;
+        };
     }
 
     public int addResearchPoints(int amount) {
