@@ -1871,16 +1871,16 @@ public final class HallsSession {
         BlockDisplay display = world.spawn(displayLocation, BlockDisplay.class, entity -> {
             entity.setBlock(Material.COPPER_BLOCK.createBlockData());
             entity.setTransformation(new Transformation(
-                    new Vector3f(-0.15f, 0.0f, -0.15f),
+                    new Vector3f(-0.3f, 0.0f, -0.3f),
                     new Quaternionf(),
-                    new Vector3f(0.3f, 0.75f, 0.3f),
+                    new Vector3f(0.6f, 1.2f, 0.6f),
                     new Quaternionf()));
             entity.setBrightness(FULL_BRIGHTNESS);
             entity.setPersistent(false);
         });
         Interaction interaction = world.spawn(displayLocation, Interaction.class, entity -> {
-            entity.setInteractionWidth(1.0f);
-            entity.setInteractionHeight(1.4f);
+            entity.setInteractionWidth(1.4f);
+            entity.setInteractionHeight(1.7f);
             entity.setResponsive(true);
             entity.setPersistent(false);
         });
@@ -2833,8 +2833,14 @@ public final class HallsSession {
         }
         if (!insideRoomShell) {
             int ceilingY = origin.y() + (lowCeiling ? 2 : 3);
-            setBlock(point.x(), ceilingY, point.z(),
-                    open && isCorridorLightCell(point.x(), point.z()) ? levelType.light() : levelType.corridorCeiling());
+            Material ceilingMaterial = open && isCorridorLightCell(point.x(), point.z())
+                    ? levelType.light()
+                    : levelType.corridorCeiling();
+            if (open && isBunkerCenterLamp(levelType, ceilingMaterial)) {
+                setBlock(point.x(), ceilingY, point.z(), ceilingMaterial, null, false);
+            } else {
+                setBlock(point.x(), ceilingY, point.z(), ceilingMaterial);
+            }
             if (lowCeiling) {
                 setBlock(point.x(), origin.y() + 3, point.z(), corridorWallMaterial(levelType, point,
                         origin.y() + 3, openCells));
@@ -2851,9 +2857,29 @@ public final class HallsSession {
                     origin.y() + 2, openCells));
         }
         if (open && plan.ventGateCells().contains(point)) {
-            setBlock(point.x(), origin.y(), point.z(), Material.IRON_BARS);
-            setBlock(point.x(), origin.y() + 1, point.z(), Material.IRON_BARS);
+            BlockFace barFacing = ventGateBarFacing(plan, point);
+            setBlock(point.x(), origin.y(), point.z(), Material.IRON_BARS, barFacing);
+            setBlock(point.x(), origin.y() + 1, point.z(), Material.IRON_BARS, barFacing);
         }
+    }
+
+    private boolean isBunkerCenterLamp(HallsLevelType levelType, Material ceilingMaterial) {
+        return levelType != null
+                && "bunker".equalsIgnoreCase(levelType.id())
+                && ceilingMaterial == Material.REDSTONE_LAMP;
+    }
+
+    private BlockFace ventGateBarFacing(HallsExplorationGenerator.Plan plan, HallsExplorationGenerator.Cell point) {
+        for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+            HallsExplorationGenerator.Cell neighbor = new HallsExplorationGenerator.Cell(
+                    point.x() + face.getModX(),
+                    point.z() + face.getModZ()
+            );
+            if (plan.corridorCells().contains(neighbor) && !plan.lowCeilingCorridorCells().contains(neighbor)) {
+                return face == BlockFace.NORTH || face == BlockFace.SOUTH ? BlockFace.EAST : BlockFace.NORTH;
+            }
+        }
+        return BlockFace.NORTH;
     }
 
     private boolean isCorridorPillarColumn(HallsExplorationGenerator.Cell point,
@@ -3180,6 +3206,7 @@ public final class HallsSession {
                 isCurrentFloorCamp(),
                 campKeys,
                 campHudBankProgress(),
+                researchPoints,
                 remainingLives,
                 sculkRuntime.sculkPercent(player),
                 researchCrateDepositedThisFloor,
@@ -3209,15 +3236,15 @@ public final class HallsSession {
     }
 
     private void renderDistilleryBeam(BlueprintDistillery from, BlueprintDistillery to) {
-        Location start = new Location(world, from.x() + 0.5, from.y() + 1.15, from.z() + 0.5);
+        Location start = new Location(world, from.x() + 0.5, from.y() + 1.45, from.z() + 0.5);
         Vector delta = new Vector(to.x() - from.x(), 0.0, to.z() - from.z());
         if (delta.lengthSquared() < 0.01) {
             return;
         }
-        Vector step = delta.normalize().multiply(0.6);
+        Vector step = delta.normalize().multiply(0.45);
         Location point = start.clone();
-        for (int i = 0; i < 18; i++) {
-            world.spawnParticle(Particle.ENCHANT, point, 1, 0.02, 0.02, 0.02, 0.0);
+        for (int i = 0; i < 28; i++) {
+            world.spawnParticle(Particle.HAPPY_VILLAGER, point, 2, 0.04, 0.04, 0.04, 0.0);
             point.add(step);
         }
     }
@@ -5662,6 +5689,10 @@ public final class HallsSession {
     }
 
     private void setBlock(int x, int y, int z, Material material, BlockFace facing) {
+        setBlock(x, y, z, material, facing, true);
+    }
+
+    private void setBlock(int x, int y, int z, Material material, BlockFace facing, boolean lightRedstoneLamp) {
         Block block = world.getBlockAt(x, y, z);
         snapshots.add(new BlockSnapshot(x, y, z, block.getBlockData().clone()));
         if (block.getState(false) instanceof Container container) {
@@ -5669,7 +5700,7 @@ public final class HallsSession {
         }
         block.setType(material, false);
         if (material == Material.REDSTONE_LAMP && block.getBlockData() instanceof Lightable lightable) {
-            lightable.setLit(true);
+            lightable.setLit(lightRedstoneLamp);
             block.setBlockData(lightable, false);
         }
         if (facing != null && block.getBlockData() instanceof Directional directional) {
@@ -5946,6 +5977,7 @@ public final class HallsSession {
                         boolean campFloor,
                         int keys,
                         String campBank,
+                        int researchPoints,
                         int lives,
                         int sculkPercent,
                         boolean researchCrateDeposited,

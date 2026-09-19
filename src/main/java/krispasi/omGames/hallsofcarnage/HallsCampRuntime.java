@@ -621,6 +621,7 @@ public final class HallsCampRuntime {
     }
 
     private boolean buildFromBlueprint(Player player, Plot plot) {
+        ItemStack heldBlueprint = player.getInventory().getItemInMainHand();
         HallsItemType blueprint = heldItemType(player);
         if (blueprint == null || !blueprint.category().equals("blueprint")) {
             player.sendActionBar(Component.text("Hold a building blueprint for this plot.", NamedTextColor.YELLOW));
@@ -640,7 +641,8 @@ public final class HallsCampRuntime {
         }
         consumeHeld(player);
         setBuilding(plot, building, 1);
-        initializeHarvest(plot, building);
+        restoreBlueprintBuildingState(heldBlueprint, plot, building);
+        refreshDisplayForCurrentState(plot, building);
         player.sendMessage(Component.text("Built " + building.name() + ".", NamedTextColor.GREEN));
         playBuildingSound(player, building, BuildingSound.BUILD);
         return true;
@@ -1090,14 +1092,23 @@ public final class HallsCampRuntime {
             return;
         }
         removeDisplays(plot);
+        int harvestRemaining = plot.harvestRemaining();
+        int harvestUsed = plot.harvestUsed();
         plot.clearBuilding();
-        returnBlueprints(player, building.blueprint(), blueprintCount);
+        returnBlueprints(player, building, blueprintCount, harvestRemaining, harvestUsed);
         playBuildingSound(player, building, BuildingSound.DESTROY);
         player.sendMessage(Component.text("Destroyed " + building.name() + ".", NamedTextColor.RED));
     }
 
-    private void returnBlueprints(Player player, String blueprintId, int count) {
-        HallsItemType blueprint = itemTypes.get(blueprintId);
+    private void returnBlueprints(Player player,
+                                  HallsBuildingType building,
+                                  int count,
+                                  int harvestRemaining,
+                                  int harvestUsed) {
+        if (building == null) {
+            return;
+        }
+        HallsItemType blueprint = itemTypes.get(building.blueprint());
         if (blueprint == null) {
             return;
         }
@@ -1106,7 +1117,11 @@ public final class HallsCampRuntime {
             if (slot < 0) {
                 return;
             }
-            player.getInventory().setItem(slot, itemFactory.apply(blueprint));
+            ItemStack item = itemFactory.apply(blueprint);
+            if (i == 0) {
+                applyBlueprintBuildingState(item, building, harvestRemaining, harvestUsed);
+            }
+            player.getInventory().setItem(slot, item);
         }
     }
 
@@ -1115,9 +1130,77 @@ public final class HallsCampRuntime {
         plot.setHarvestRemaining(defaultRunUses(building, plot.level()));
     }
 
+    private void restoreBlueprintBuildingState(ItemStack blueprint, Plot plot, HallsBuildingType building) {
+        if (blueprint == null || !blueprint.hasItemMeta()) {
+            initializeHarvest(plot, building);
+            return;
+        }
+        ItemMeta meta = blueprint.getItemMeta();
+        String stateBuildingId = meta.getPersistentDataContainer()
+                .get(new NamespacedKey(plugin, "hoc_blueprint_building_state_id"), PersistentDataType.STRING);
+        if (!building.id().equals(stateBuildingId)) {
+            initializeHarvest(plot, building);
+            return;
+        }
+        int defaultUses = defaultRunUses(building, plot.level());
+        int used = Math.max(0, optionalInt(meta, "hoc_blueprint_harvest_used", 0));
+        int remaining = Math.max(0, optionalInt(meta, "hoc_blueprint_harvest_remaining", defaultUses));
+        if (building.id().equals("research_table")) {
+            plot.setHarvestUsed(0);
+            plot.setHarvestRemaining(remaining);
+            return;
+        }
+        plot.setHarvestUsed(used);
+        plot.setHarvestRemaining(Math.max(0, Math.min(defaultUses, defaultUses - used)));
+    }
+
+    private void applyBlueprintBuildingState(ItemStack blueprint,
+                                             HallsBuildingType building,
+                                             int harvestRemaining,
+                                             int harvestUsed) {
+        if (blueprint == null || !blueprint.hasItemMeta() || building == null) {
+            return;
+        }
+        int defaultUses = defaultRunUses(building, 1);
+        if (defaultUses <= 0 && !building.id().equals("research_table")) {
+            return;
+        }
+        ItemMeta meta = blueprint.getItemMeta();
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_blueprint_building_state_id"),
+                PersistentDataType.STRING, building.id());
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_blueprint_harvest_remaining"),
+                PersistentDataType.INTEGER, Math.max(0, harvestRemaining));
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_blueprint_harvest_used"),
+                PersistentDataType.INTEGER, Math.max(0, harvestUsed));
+        List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
+        if (!lore.isEmpty()) {
+            lore.add(Component.empty());
+        }
+        if (building.id().equals("research_table")) {
+            lore.add(Component.text("Saved blueprint points: " + Math.max(0, harvestRemaining), NamedTextColor.DARK_AQUA));
+        } else {
+            int rebuiltRemaining = Math.max(0, Math.min(defaultUses, defaultUses - Math.max(0, harvestUsed)));
+            lore.add(Component.text("Saved run uses: " + rebuiltRemaining + "/" + defaultUses, NamedTextColor.DARK_AQUA));
+        }
+        meta.lore(lore);
+        blueprint.setItemMeta(meta);
+    }
+
+    private int optionalInt(ItemMeta meta, String key, int fallback) {
+        Integer value = meta.getPersistentDataContainer().get(new NamespacedKey(plugin, key), PersistentDataType.INTEGER);
+        return value == null ? fallback : value;
+    }
+
     private void refreshHarvestForLevel(Plot plot, HallsBuildingType building) {
         HallsBuildingType.Level level = building.level(plot.level());
         plot.setHarvestRemaining(Math.max(0, defaultRunUses(building, plot.level()) - plot.harvestUsed()));
+        if (plot.harvestRemaining() <= 0 && !level.emptyParts().isEmpty()) {
+            setDisplays(plot, building, level.emptyParts());
+        }
+    }
+
+    private void refreshDisplayForCurrentState(Plot plot, HallsBuildingType building) {
+        HallsBuildingType.Level level = building.level(plot.level());
         if (plot.harvestRemaining() <= 0 && !level.emptyParts().isEmpty()) {
             setDisplays(plot, building, level.emptyParts());
         }

@@ -93,6 +93,7 @@ final class HallsSidebar {
         if (state.campFloor()) {
             lines.add(ChatColor.YELLOW + "Keys " + ChatColor.WHITE + state.keys()
                     + ChatColor.DARK_GRAY + " | " + ChatColor.GOLD + "Bank " + ChatColor.WHITE + state.campBank());
+            lines.add(ChatColor.LIGHT_PURPLE + "Research " + ChatColor.WHITE + state.researchPoints());
         } else {
             lines.add(ChatColor.GOLD + "Coins " + ChatColor.WHITE + state.coins()
                     + ChatColor.DARK_GRAY + "/" + ChatColor.WHITE + state.coinQuota());
@@ -100,7 +101,7 @@ final class HallsSidebar {
         if (state.lives() > 0) {
             lines.add(ChatColor.RED + "Lives " + ChatColor.WHITE + state.lives());
         }
-        if (!state.campFloor() && state.sculkPercent() > 0) {
+        if (state.sculkPercent() > 0) {
             lines.add(ChatColor.DARK_AQUA + "Sculk " + ChatColor.WHITE + state.sculkPercent() + "%");
         }
         if (!state.campFloor() && state.floor() > 1) {
