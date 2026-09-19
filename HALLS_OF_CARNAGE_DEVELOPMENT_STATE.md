@@ -147,7 +147,9 @@ Future slices (dont do yet):
 - Rework the floor structure for the whole scenario based on Extra Resources/halls_of_carnage/UntoldDepthsLevels.csv
 - Boss 1 - Add first boss: Overdrive Spawner, documented in overdrive_spawner.md. Use boss_floor.md for design as they are replacements for fight floors. Put it on floor 50 for now.
 - Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too).  Replace it on floor 50 for now, later will get replaced with new scenario structure.
-
+- Make it so wall spikes cannot damage you if you are lower than the floor (underwater for example)
+- Make it possible for proximity mines to be disarmed by throwing items near them.
+- Make it so liquids cannot generate right next to the holes, so there is at least 1 block border of ground between them.
 
 For reviewer to figure out:
 - New research tree - I have added research.csv, rework the research tree fully based on this file
