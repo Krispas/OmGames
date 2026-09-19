@@ -149,6 +149,7 @@ Do all following for the next slice (and keep this line):
 - Make elevator use cinnabar_bricks instead of deepslate_bricks (those blocks exist)
 - Make it so pufferfish item dropped by pufferfish trap can be eaten and add a meal which is cooked from it in the camp.
 - HUD rework - rework HUD into a sidebar scoreboard, only for players playing the game, warning players are already in some teams from their normal survival play, do not boot them out of those. Bedwars can do it, so I know its possible. Sidebar will replace the HUD currently above the hotbar. Keep the floor number, Make it so the time measures the time spent on current floor. Scrap display should be there too, it also now can use full names instead of W for example. Coin quota stays there too, Lives too, sculk too, elevator distance will get completely removed as it is now on the locator bar. Add 2 new fields. One is if research crate was deposited. Second is blueprint distiller was collected (future feature), modifiers should also be there too, dont make the fields too wide, we dont want the scoreboard to take half the screen.
+- Give ghost players glowing effect
 
 
 Future slices (dont do yet):
