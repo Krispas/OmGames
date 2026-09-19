@@ -737,8 +737,8 @@ final class HallsSessionTrapRuntime {
 
     private boolean floorReachableWithout(Set<HallsExplorationGenerator.Cell> walkable,
                                           Set<HallsExplorationGenerator.Cell> blocked) {
-        HallsExplorationGenerator.Cell start = new HallsExplorationGenerator.Cell(origin.x(), origin.z() + ELEVATOR_OUTER_RADIUS + 1);
-        if (!walkable.contains(start) || blocked.contains(start)) {
+        HallsExplorationGenerator.Cell start = floorReachabilityStart(walkable, blocked);
+        if (start == null) {
             return false;
         }
         Set<HallsExplorationGenerator.Cell> reachable = new HashSet<>();
@@ -766,6 +766,22 @@ final class HallsSessionTrapRuntime {
             }
         }
         return true;
+    }
+
+    private HallsExplorationGenerator.Cell floorReachabilityStart(Set<HallsExplorationGenerator.Cell> walkable,
+                                                                  Set<HallsExplorationGenerator.Cell> blocked) {
+        List<HallsExplorationGenerator.Cell> starts = List.of(
+                new HallsExplorationGenerator.Cell(origin.x(), origin.z() - ELEVATOR_OUTER_RADIUS - 1),
+                new HallsExplorationGenerator.Cell(origin.x(), origin.z() + ELEVATOR_OUTER_RADIUS + 1),
+                new HallsExplorationGenerator.Cell(origin.x() + ELEVATOR_OUTER_RADIUS + 1, origin.z()),
+                new HallsExplorationGenerator.Cell(origin.x() - ELEVATOR_OUTER_RADIUS - 1, origin.z())
+        );
+        for (HallsExplorationGenerator.Cell start : starts) {
+            if (walkable.contains(start) && !blocked.contains(start)) {
+                return start;
+            }
+        }
+        return null;
     }
 
     private List<UUID> buildTrap(TrapKind kind, HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type, int laneSpan) {
