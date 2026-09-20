@@ -139,8 +139,7 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- The ventilation shafts on library floors have their model still positioned badly. Rework it, start with the exact same logic wall spike traps use and then edit the visual.
-- Add a ton of new content, I wrote about it in content.md. Implement EVERYTHING, you have almost the whole development slice dedicated just to this document. As you add stuff, progressively remove it from the doc. Before you start create backup version of the doc unless it already exists.
+- Add a ton of new content, I wrote about it in content.md. Implement EVERYTHING, you have the whole development slice dedicated just to this document. As you add stuff, progressively remove it from the doc. Before you start create backup version of the doc unless it already exists.
 
 Future slices (dont do yet):
 - Make it so dropping item into hitbox of a building, it will get teleported out, so it can be picked up
@@ -150,6 +149,7 @@ Future slices (dont do yet):
 - Make it so wall spikes cannot damage you if you are lower than the floor (underwater for example)
 - Make it possible for proximity mines to be disarmed by throwing items near them.
 - Make it so liquids cannot generate right next to the holes, so there is at least 1 block border of ground between them.
+- The ventilation shafts on library floors have their model still positioned badly. Rework it, start with the exact same logic wall spike traps use and then edit the visual.
 
 For reviewer to figure out:
 - New research tree - I have added research.csv, rework the research tree fully based on this file
