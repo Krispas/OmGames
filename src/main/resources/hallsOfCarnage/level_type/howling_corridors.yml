@@ -1,5 +1,6 @@
 id: howling_corridors
 name: "Howling Corridors"
+name-color: DARK_RED
 corridor-generation: normal
 materials:
   floor: PACKED_MUD

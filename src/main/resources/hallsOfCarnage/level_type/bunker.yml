@@ -1,5 +1,6 @@
 id: bunker
 name: "Bunker"
+name-color: DARK_GRAY
 corridor-generation: bunker
 materials:
   floor: POLISHED_TUFF

@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -49,6 +50,7 @@ public final class HallsLevelTypeLoader {
         return new HallsLevelType(
                 id,
                 config.getString("name", fallback.name()),
+                chatColor(config.getString("name-color"), fallback.nameColor(), plugin, file),
                 normalizeId(config.getString("corridor-generation", fallback.corridorGeneration())),
                 material(config.getString("materials.floor"), fallback.floor(), plugin, file),
                 material(config.getString("materials.ceiling"), fallback.ceiling(), plugin, file),
@@ -160,6 +162,20 @@ public final class HallsLevelTypeLoader {
             return fallback;
         }
         return material;
+    }
+
+    private static ChatColor chatColor(String value, ChatColor fallback, JavaPlugin plugin, File file) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        try {
+            return ChatColor.valueOf(value.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_'));
+        } catch (IllegalArgumentException ex) {
+            if (plugin != null) {
+                plugin.getLogger().warning("Invalid Halls level type color '" + value + "' in " + file.getName() + ".");
+            }
+            return fallback;
+        }
     }
 
     private static double clamp(double value, double min, double max) {

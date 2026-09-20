@@ -65,8 +65,16 @@ public final class HallsTrapTypeLoader {
                 yaml.getDouble("radius", defaultRadius(kind)),
                 yaml.getInt("interval-ticks", defaultInterval(kind)),
                 yaml.getInt("active-ticks", defaultActiveTicks(kind)),
-                (float) yaml.getDouble("explosion-power", 2.4)
+                (float) yaml.getDouble("explosion-power", 2.4),
+                yaml.getInt("hit-points", defaultHitPoints(kind))
         );
+    }
+
+    private static int defaultHitPoints(String kind) {
+        return switch (kind) {
+            case "enchanted_book" -> 10;
+            default -> 1;
+        };
     }
 
     private static double defaultDamage(String kind) {
@@ -135,17 +143,17 @@ public final class HallsTrapTypeLoader {
 
     private static Map<String, HallsTrapType> fallbackTypes() {
         Map<String, HallsTrapType> types = new LinkedHashMap<>();
-        add(types, "hole", "hole", 3, List.of(), List.of(), Material.AIR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 5, 15, 10, 200.0, 1.0, 60, 16, 2.4f);
-        add(types, "bear_trap", "bear_trap", 4, List.of(), List.of("sewer"), Material.IRON_TRAPDOOR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 1.0, 60, 16, 2.4f);
-        add(types, "proximity_mine", "proximity_mine", 3, List.of(), List.of("sewer"), Material.STONE_PRESSURE_PLATE, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 18.0, 3.0, 60, 16, 2.4f);
-        add(types, "swinging_blade", "swinging_blade", 3, List.of(), List.of(), Material.IRON_BARS, Material.AIR, Material.IRON_SWORD, "", 1.4f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.15, 60, 16, 2.4f);
-        add(types, "wall_spikes", "wall_spikes", 6, List.of(), List.of(), Material.BLACK_CONCRETE, Material.AIR, Material.IRON_SWORD, "", 1.1f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 3.0, 70, 12, 2.4f);
-        add(types, "falling_ice", "falling_ice", 9, List.of("frozen_halls"), List.of(), Material.AIR, Material.POINTED_DRIPSTONE, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.0, 55, 1, 2.4f);
-        add(types, "poison_darts", "poison_darts", 9, List.of("deep_crypt"), List.of(), Material.DISPENSER, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 5.0, 60, 1, 2.4f);
-        add(types, "steam_vent", "steam_vent", 9, List.of("factory"), List.of(), Material.HEAVY_WEIGHTED_PRESSURE_PLATE, Material.AIR, Material.HEAVY_WEIGHTED_PRESSURE_PLATE, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 5.0, 1.75, 100, 35, 2.4f);
-        add(types, "bubbles", "bubbles", 8, List.of("sewer"), List.of(), Material.MAGMA_BLOCK, Material.AIR, Material.MAGMA_BLOCK, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 0.9, 20, 20, 2.4f);
-        add(types, "geyser", "geyser", 8, List.of("sewer"), List.of(), Material.SOUL_SAND, Material.AIR, Material.SOUL_SAND, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 2.0, 2.5, 80, 12, 2.4f);
-        add(types, "pufferfish", "pufferfish", 5, List.of("sewer"), List.of(), Material.AIR, Material.AIR, Material.PUFFERFISH, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 1.0, 60, 16, 2.4f);
+        add(types, "hole", "hole", 3, List.of(), List.of(), Material.AIR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 5, 15, 10, 200.0, 1.0, 60, 16, 2.4f, 1);
+        add(types, "bear_trap", "bear_trap", 4, List.of(), List.of("sewer"), Material.IRON_TRAPDOOR, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 1.0, 60, 16, 2.4f, 1);
+        add(types, "proximity_mine", "proximity_mine", 3, List.of(), List.of("sewer"), Material.STONE_PRESSURE_PLATE, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 18.0, 3.0, 60, 16, 2.4f, 1);
+        add(types, "swinging_blade", "swinging_blade", 3, List.of(), List.of(), Material.IRON_BARS, Material.AIR, Material.IRON_SWORD, "", 1.4f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.15, 60, 16, 2.4f, 1);
+        add(types, "wall_spikes", "wall_spikes", 6, List.of(), List.of(), Material.BLACK_CONCRETE, Material.AIR, Material.IRON_SWORD, "", 1.1f, Material.SPRUCE_PLANKS, 1, 1, 10, 12.0, 3.0, 70, 12, 2.4f, 1);
+        add(types, "falling_ice", "falling_ice", 9, List.of("frozen_halls"), List.of(), Material.AIR, Material.POINTED_DRIPSTONE, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 200.0, 1.0, 55, 1, 2.4f, 1);
+        add(types, "poison_darts", "poison_darts", 9, List.of("deep_crypt"), List.of(), Material.DISPENSER, Material.AIR, Material.IRON_NUGGET, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 5.0, 60, 1, 2.4f, 1);
+        add(types, "steam_vent", "steam_vent", 9, List.of("factory"), List.of(), Material.HEAVY_WEIGHTED_PRESSURE_PLATE, Material.AIR, Material.HEAVY_WEIGHTED_PRESSURE_PLATE, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 5.0, 1.75, 100, 35, 2.4f, 1);
+        add(types, "bubbles", "bubbles", 8, List.of("sewer"), List.of(), Material.MAGMA_BLOCK, Material.AIR, Material.MAGMA_BLOCK, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 0.9, 20, 20, 2.4f, 1);
+        add(types, "geyser", "geyser", 8, List.of("sewer"), List.of(), Material.SOUL_SAND, Material.AIR, Material.SOUL_SAND, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 2.0, 2.5, 80, 12, 2.4f, 1);
+        add(types, "pufferfish", "pufferfish", 5, List.of("sewer"), List.of(), Material.AIR, Material.AIR, Material.PUFFERFISH, "", 1.0f, Material.SPRUCE_PLANKS, 1, 1, 10, 4.0, 1.0, 60, 16, 2.4f, 1);
         return Map.copyOf(types);
     }
 
@@ -168,9 +176,10 @@ public final class HallsTrapTypeLoader {
                             double radius,
                             int intervalTicks,
                             int activeTicks,
-                            float explosionPower) {
+                            float explosionPower,
+                            int hitPoints) {
         types.put(id, new HallsTrapType(id, kind, weight, levelTypes, blacklistedLevelTypes, blockMaterial, ceilingMaterial,
                 modelMaterial, itemModel, modelScale, bridgeMaterial, minSize, maxSize, depth, damage,
-                radius, intervalTicks, activeTicks, explosionPower));
+                radius, intervalTicks, activeTicks, explosionPower, hitPoints));
     }
 }

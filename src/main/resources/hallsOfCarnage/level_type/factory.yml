@@ -1,5 +1,6 @@
 id: factory
 name: "Factory"
+name-color: GRAY
 corridor-generation: open_halls
 materials:
   floor: SMOOTH_STONE

@@ -1,5 +1,6 @@
 id: library
 name: "Library"
+name-color: LIGHT_PURPLE
 corridor-generation: library
 materials:
   floor: DARK_OAK_PLANKS

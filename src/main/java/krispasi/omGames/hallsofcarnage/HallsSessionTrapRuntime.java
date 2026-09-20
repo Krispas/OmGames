@@ -64,6 +64,7 @@ final class HallsSessionTrapRuntime {
     private final List<HallsTrap> traps = new ArrayList<>();
     private final Map<UUID, Long> trapDamageCooldowns = new java.util.HashMap<>();
     private final Map<HallsTrap, Long> trapNextTriggerTicks = new IdentityHashMap<>();
+    private final Map<HallsTrap, Integer> trapHitPoints = new IdentityHashMap<>();
     private final Set<UUID> transientTrapDisplays = new HashSet<>();
     private BukkitTask trapTask;
     private long trapRuntimeTick;
@@ -157,7 +158,7 @@ final class HallsSessionTrapRuntime {
                 continue;
             }
             if (trap.kind() == TrapKind.ENCHANTED_BOOK) {
-                destroyEnchantedBookTrap(trap, player);
+                damageEnchantedBookTrap(trap, player);
                 return true;
             }
             if (trap.kind() == TrapKind.ARMY_COFFIN) {
@@ -173,13 +174,13 @@ final class HallsSessionTrapRuntime {
             return false;
         }
         for (HallsTrap trap : List.copyOf(traps)) {
-            if (trap.kind() != TrapKind.PROXIMITY_MINE) {
+            if (trap.kind() != TrapKind.PROXIMITY_MINE && trap.kind() != TrapKind.BEAR_TRAP) {
                 continue;
             }
-            Location mine = new Location(world, trap.x() + 0.5, origin.y() + 0.1, trap.z() + 0.5);
-            if (location.distanceSquared(mine) <= 1.35 * 1.35) {
-                world.spawnParticle(Particle.SMOKE, mine, 18, 0.35, 0.15, 0.35, 0.02);
-                world.playSound(mine, Sound.BLOCK_LEVER_CLICK, 0.75f, 0.55f);
+            Location center = new Location(world, trap.x() + 0.5, origin.y() + 0.1, trap.z() + 0.5);
+            if (location.distanceSquared(center) <= 1.35 * 1.35) {
+                world.spawnParticle(Particle.SMOKE, center, 18, 0.35, 0.15, 0.35, 0.02);
+                world.playSound(center, Sound.BLOCK_LEVER_CLICK, 0.75f, 0.55f);
                 removeTrap(trap);
                 return true;
             }
@@ -1095,6 +1096,7 @@ final class HallsSessionTrapRuntime {
 
     private void addTrap(HallsTrap trap, Random random) {
         traps.add(trap);
+        trapHitPoints.put(trap, trap.type().hitPoints());
         if (trap.kind() == TrapKind.FALLING_ICE) {
             trapNextTriggerTicks.put(trap, trapRuntimeTick + 25L + random.nextInt(Math.max(1, trap.type().intervalTicks())));
         } else if (trap.kind() == TrapKind.POISON_DARTS) {
@@ -1389,7 +1391,17 @@ final class HallsSessionTrapRuntime {
         removeTrap(trap);
     }
 
-    private void destroyEnchantedBookTrap(HallsTrap trap, Player player) {
+    private void damageEnchantedBookTrap(HallsTrap trap, Player player) {
+        int remaining = trapHitPoints.getOrDefault(trap, trap.type().hitPoints()) - 1;
+        if (remaining > 0) {
+            trapHitPoints.put(trap, remaining);
+            Location location = new Location(world, trap.x() + 0.5, origin.y() + 0.6, trap.z() + 0.5);
+            world.spawnParticle(Particle.ENCHANT, location, 8, 0.25, 0.18, 0.25, 0.02);
+            world.playSound(location, Sound.ITEM_BOOK_PAGE_TURN, 0.45f, 1.65f);
+            player.sendActionBar(Component.text("Enchanted book HP: " + remaining + "/" + trap.type().hitPoints() + ".",
+                    NamedTextColor.LIGHT_PURPLE));
+            return;
+        }
         Location location = new Location(world, trap.x() + 0.5, origin.y() + 0.6, trap.z() + 0.5);
         world.spawnParticle(Particle.ENCHANT, location, 28, 0.35, 0.25, 0.35, 0.03);
         world.playSound(location, Sound.ITEM_BOOK_PUT, 0.8f, 0.7f);
@@ -1427,6 +1439,7 @@ final class HallsSessionTrapRuntime {
         }
         traps.removeIf(candidate -> candidate == trap);
         trapNextTriggerTicks.remove(trap);
+        trapHitPoints.remove(trap);
     }
 
     private java.util.Optional<Location> moveTrapDisplay(HallsTrap trap, long age) {

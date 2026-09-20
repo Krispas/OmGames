@@ -15,6 +15,7 @@ import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -1425,8 +1426,8 @@ public final class HallsSession {
         floorStartedAtMillis = System.currentTimeMillis();
         renderExplorationRooms(build);
         renderExplorationCorridors(build);
-        activeLiquidCells = renderExplorationLiquids(build, Set.of());
-        Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build, activeLiquidCells);
+        Set<HallsExplorationGenerator.Cell> reservedCells = renderExplorationTraps(build, Set.of());
+        activeLiquidCells = renderExplorationLiquids(build, reservedCells);
         Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
         Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
         renderExplorationSculk(build, liquidReservedCells);
@@ -1440,7 +1441,7 @@ public final class HallsSession {
         startExplorationMonsters(build);
         restoreElevatorChestContents();
         closeElevatorDoors();
-        teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
+        teleportParticipantsToElevator("Floor " + floor, explorationFloorSubtitle(build.levelType()));
         applyCompassModifier();
     }
 
@@ -1586,6 +1587,14 @@ public final class HallsSession {
                 player.sendTitle(title, subtitle, 10, 45, 15);
             }
         }
+    }
+
+    private String explorationFloorSubtitle(HallsLevelType levelType) {
+        if (levelType == null) {
+            return "Unknown Halls";
+        }
+        ChatColor color = levelType.nameColor() == null ? ChatColor.WHITE : levelType.nameColor();
+        return color + levelType.name();
     }
 
     private void teleportSessionPlayer(Player player, Location target) {
@@ -5972,10 +5981,7 @@ public final class HallsSession {
         drop.location().setX(next.getX());
         drop.location().setY(next.getY());
         drop.location().setZ(next.getZ());
-        if (trapRuntime.disarmProximityMineNear(next)) {
-            removePhysicsDrop(drop);
-            return;
-        }
+        trapRuntime.disarmProximityMineNear(next);
         Location ejected = campRuntime.ejectDropFromBuildingHitbox(next);
         if (ejected != null) {
             drop.location().setX(ejected.getX());
@@ -6383,8 +6389,8 @@ public final class HallsSession {
         }
 
         private void buildTraps() {
-            activeLiquidCells = renderExplorationLiquids(build, Set.of());
-            reservedCells = renderExplorationTraps(build, activeLiquidCells);
+            reservedCells = renderExplorationTraps(build, Set.of());
+            activeLiquidCells = renderExplorationLiquids(build, reservedCells);
             Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
             Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
             renderExplorationSculk(build, liquidReservedCells);
@@ -6419,7 +6425,7 @@ public final class HallsSession {
             restoreElevatorChestContents();
             closeElevatorDoors();
             floorStartedAtMillis = System.currentTimeMillis();
-            teleportParticipantsToElevator("Floor " + floor, "Gather what you can.");
+            teleportParticipantsToElevator("Floor " + floor, explorationFloorSubtitle(build.levelType()));
             applyCompassModifier();
             openElevatorDoors();
             transitioning = false;

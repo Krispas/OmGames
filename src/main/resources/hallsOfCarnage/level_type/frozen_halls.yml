@@ -1,5 +1,6 @@
 id: frozen_halls
 name: "Frozen Halls"
+name-color: AQUA
 corridor-generation: cave
 materials:
   floor: PACKED_ICE

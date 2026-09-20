@@ -1,5 +1,6 @@
 id: deep_crypt
 name: "Deep Crypt"
+name-color: GOLD
 corridor-generation: maze
 materials:
   floor: SMOOTH_SANDSTONE

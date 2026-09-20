@@ -1,5 +1,6 @@
 id: backrooms
 name: "Backrooms"
+name-color: YELLOW
 corridor-generation: backrooms
 materials:
   floor: STRIPPED_BIRCH_WOOD

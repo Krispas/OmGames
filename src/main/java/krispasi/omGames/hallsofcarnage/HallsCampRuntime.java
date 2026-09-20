@@ -159,9 +159,6 @@ public final class HallsCampRuntime {
             return null;
         }
         for (Plot plot : plotsById.values()) {
-            if (plot.buildingId() == null) {
-                continue;
-            }
             double half = plotHalfSize(plot);
             double minX = plot.x() + 0.5 - half;
             double maxX = plot.x() + 0.5 + half;
