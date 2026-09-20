@@ -86,10 +86,10 @@ final class HallsSidebar {
         List<String> lines = new ArrayList<>();
         lines.add(ChatColor.GOLD + "Floor " + ChatColor.WHITE + state.floor()
                 + ChatColor.DARK_GRAY + "  " + ChatColor.GRAY + state.elapsed());
-        lines.add(ChatColor.GOLD + "W" + ChatColor.WHITE + " " + state.woodScrap()
-                + ChatColor.DARK_GRAY + " | " + ChatColor.GRAY + "I" + ChatColor.WHITE + " " + state.ironScrap()
-                + ChatColor.DARK_GRAY + " | " + ChatColor.AQUA + "D" + ChatColor.WHITE + " " + state.diamondScrap()
-                + ChatColor.DARK_GRAY + " | " + ChatColor.RED + "R" + ChatColor.WHITE + " " + state.redstoneScrap());
+        lines.add(ChatColor.GOLD + "" + state.woodScrap()
+                + ChatColor.DARK_GRAY + " | " + ChatColor.GRAY + state.ironScrap()
+                + ChatColor.DARK_GRAY + " | " + ChatColor.AQUA + state.diamondScrap()
+                + ChatColor.DARK_GRAY + " | " + ChatColor.RED + state.redstoneScrap());
         if (state.campFloor()) {
             lines.add(ChatColor.YELLOW + "Keys " + ChatColor.WHITE + state.keys()
                     + ChatColor.DARK_GRAY + " | " + ChatColor.GOLD + "Bank " + ChatColor.WHITE + state.campBank());
