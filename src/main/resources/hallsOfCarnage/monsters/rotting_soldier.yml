@@ -1,7 +1,7 @@
 id: rotting_soldier
 name: "Rotting Soldier"
 entity-type: ZOMBIE
-health: 10
+health: 5
 equipment:
   armor:
     helmet: NETHERITE_HELMET

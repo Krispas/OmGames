@@ -471,7 +471,7 @@ floors:
       max: 7
     holes: 7
     sculk-patches: 3
-    coin-quota: 19
+    coin-quota: 18
   - number: 7
     kind: exploration
     level-type: factory
@@ -497,11 +497,14 @@ floors:
       max: 7
     holes: 8
     sculk-patches: 4
-    coin-quota: 21
+    coin-quota: 22
   - number: 9
+    kind: camp
+    level-type: howling_corridors
+  - number: 10
     kind: exploration
     level-type: sewer
-    difficulty: 12
+    difficulty: 14
     rooms: 12
     breakables: 36
     traps: 11
@@ -510,10 +513,7 @@ floors:
       max: 7
     holes: 8
     sculk-patches: 5
-    coin-quota: 22
-  - number: 10
-    kind: camp
-    level-type: howling_corridors
+    coin-quota: 20
   - number: 11
     kind: exploration
     level-type: library
@@ -539,11 +539,14 @@ floors:
       max: 7
     holes: 10
     sculk-patches: 5
-    coin-quota: 24
+    coin-quota: 26
   - number: 13
+    kind: camp
+    level-type: howling_corridors
+  - number: 14
     kind: exploration
-    level-type: sewer
-    difficulty: 14
+    level-type: frozen_halls
+    difficulty: 16
     rooms: 14
     breakables: 42
     traps: 12
@@ -552,11 +555,11 @@ floors:
       max: 7
     holes: 10
     sculk-patches: 6
-    coin-quota: 25
-  - number: 14
+    coin-quota: 22
+  - number: 15
     kind: exploration
-    level-type: infernal_chambers
-    difficulty: 14
+    level-type: library
+    difficulty: 16
     rooms: 14
     breakables: 44
     traps: 12
@@ -566,12 +569,9 @@ floors:
     holes: 11
     sculk-patches: 6
     coin-quota: 26
-  - number: 15
-    kind: camp
-    level-type: howling_corridors
   - number: 16
     kind: exploration
-    level-type: backrooms
+    level-type: howling_corridors
     difficulty: 16
     rooms: 15
     breakables: 46
@@ -581,11 +581,14 @@ floors:
       max: 7
     holes: 12
     sculk-patches: 6
-    coin-quota: 27
+    coin-quota: 30
   - number: 17
+    kind: camp
+    level-type: howling_corridors
+  - number: 18
     kind: exploration
-    level-type: deep_crypt
-    difficulty: 16
+    level-type: backrooms
+    difficulty: 18
     rooms: 15
     breakables: 48
     traps: 13
@@ -594,11 +597,11 @@ floors:
       max: 7
     holes: 12
     sculk-patches: 7
-    coin-quota: 28
-  - number: 18
+    coin-quota: 25
+  - number: 19
     kind: exploration
-    level-type: factory
-    difficulty: 16
+    level-type: bunker
+    difficulty: 18
     rooms: 16
     breakables: 50
     traps: 13
@@ -608,10 +611,10 @@ floors:
     holes: 13
     sculk-patches: 7
     coin-quota: 29
-  - number: 19
+  - number: 20
     kind: exploration
-    level-type: frozen_halls
-    difficulty: 16
+    level-type: infernal_chambers
+    difficulty: 18
     rooms: 16
     breakables: 52
     traps: 13
@@ -620,14 +623,14 @@ floors:
       max: 7
     holes: 14
     sculk-patches: 7
-    coin-quota: 30
-  - number: 20
+    coin-quota: 33
+  - number: 21
     kind: camp
     level-type: howling_corridors
-  - number: 21
+  - number: 22
     kind: exploration
-    level-type: infernal_chambers
-    difficulty: 18
+    level-type: deep_crypt
+    difficulty: 20
     rooms: 17
     breakables: 54
     traps: 14
@@ -636,11 +639,11 @@ floors:
       max: 7
     holes: 14
     sculk-patches: 8
-    coin-quota: 31
-  - number: 22
+    coin-quota: 27
+  - number: 23
     kind: exploration
     level-type: sewer
-    difficulty: 18
+    difficulty: 20
     rooms: 17
     breakables: 56
     traps: 14
@@ -650,10 +653,10 @@ floors:
     holes: 15
     sculk-patches: 8
     coin-quota: 32
-  - number: 23
+  - number: 24
     kind: exploration
-    level-type: howling_corridors
-    difficulty: 18
+    level-type: factory
+    difficulty: 20
     rooms: 18
     breakables: 58
     traps: 14
@@ -662,11 +665,27 @@ floors:
       max: 7
     holes: 16
     sculk-patches: 8
-    coin-quota: 33
-  - number: 24
+    coin-quota: 37
+  - number: 25
+    kind: camp
+    level-type: howling_corridors
+  - number: 26
+    kind: combat
+    level-type: howling_corridors
+    difficulty: 80
+    layout: special/final_floor_1.txt
+    enemy-pool:
+      - zombie
+      - skeleton
+      - husk
+      - stray
+  - number: 27
+    kind: camp
+    level-type: howling_corridors
+  - number: 28
     kind: exploration
-    level-type: deep_crypt
-    difficulty: 18
+    level-type: library
+    difficulty: 22
     rooms: 18
     breakables: 60
     traps: 15
@@ -675,14 +694,11 @@ floors:
       max: 7
     holes: 16
     sculk-patches: 9
-    coin-quota: 34
-  - number: 25
-    kind: camp
-    level-type: howling_corridors
-  - number: 26
+    coin-quota: 29
+  - number: 29
     kind: exploration
-    level-type: backrooms
-    difficulty: 20
+    level-type: infernal_chambers
+    difficulty: 22
     rooms: 19
     breakables: 62
     traps: 15
@@ -692,10 +708,10 @@ floors:
     holes: 17
     sculk-patches: 9
     coin-quota: 35
-  - number: 27
+  - number: 30
     kind: exploration
-    level-type: sewer
-    difficulty: 20
+    level-type: backrooms
+    difficulty: 22
     rooms: 19
     breakables: 64
     traps: 15
@@ -704,11 +720,14 @@ floors:
       max: 7
     holes: 18
     sculk-patches: 9
-    coin-quota: 36
-  - number: 28
+    coin-quota: 41
+  - number: 31
+    kind: camp
+    level-type: howling_corridors
+  - number: 32
     kind: exploration
     level-type: frozen_halls
-    difficulty: 20
+    difficulty: 24
     rooms: 20
     breakables: 66
     traps: 16
@@ -717,11 +736,11 @@ floors:
       max: 7
     holes: 18
     sculk-patches: 10
-    coin-quota: 37
-  - number: 29
+    coin-quota: 32
+  - number: 33
     kind: exploration
-    level-type: factory
-    difficulty: 20
+    level-type: bunker
+    difficulty: 24
     rooms: 20
     breakables: 68
     traps: 16
@@ -731,24 +750,191 @@ floors:
     holes: 19
     sculk-patches: 10
     coin-quota: 38
-  - number: 30
-    kind: camp
-    level-type: howling_corridors
-  - number: 31-49
+  - number: 34
     kind: exploration
-    level-type: deep_crypt
-    difficulty: "20 + floor"
-    rooms: 24
-    breakables: 40
-    traps: 9
+    level-type: sewer
+    difficulty: 24
+    rooms: 21
+    breakables: 70
+    traps: 16
     traps-per-room:
       min: 1
       max: 7
-    holes: 3
-    sculk-patches: 6
-    camp-every: 5
-    coin-quota: 20
+    holes: 19
+    sculk-patches: 10
+    coin-quota: 42
+  - number: 35
+    kind: camp
+    level-type: howling_corridors
+  - number: 36
+    kind: exploration
+    level-type: factory
+    difficulty: 26
+    rooms: 21
+    breakables: 72
+    traps: 17
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 20
+    sculk-patches: 11
+    coin-quota: 34
+  - number: 37
+    kind: exploration
+    level-type: howling_corridors
+    difficulty: 26
+    rooms: 22
+    breakables: 74
+    traps: 17
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 20
+    sculk-patches: 11
+    coin-quota: 41
+  - number: 38
+    kind: exploration
+    level-type: library
+    difficulty: 26
+    rooms: 22
+    breakables: 76
+    traps: 17
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 21
+    sculk-patches: 11
+    coin-quota: 48
+  - number: 39
+    kind: camp
+    level-type: howling_corridors
+  - number: 40
+    kind: exploration
+    level-type: deep_crypt
+    difficulty: 28
+    rooms: 23
+    breakables: 78
+    traps: 18
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 21
+    sculk-patches: 12
+    coin-quota: 36
+  - number: 41
+    kind: exploration
+    level-type: infernal_chambers
+    difficulty: 28
+    rooms: 23
+    breakables: 80
+    traps: 18
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 22
+    sculk-patches: 12
+    coin-quota: 44
+  - number: 42
+    kind: exploration
+    level-type: backrooms
+    difficulty: 28
+    rooms: 24
+    breakables: 82
+    traps: 18
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 22
+    sculk-patches: 12
+    coin-quota: 52
+  - number: 43
+    kind: camp
+    level-type: howling_corridors
+  - number: 44
+    kind: exploration
+    level-type: sewer
+    difficulty: 30
+    rooms: 24
+    breakables: 84
+    traps: 19
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 23
+    sculk-patches: 13
+    coin-quota: 38
+  - number: 45
+    kind: exploration
+    level-type: deep_crypt
+    difficulty: 30
+    rooms: 25
+    breakables: 86
+    traps: 19
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 23
+    sculk-patches: 13
+    coin-quota: 47
+  - number: 46
+    kind: exploration
+    level-type: frozen_halls
+    difficulty: 30
+    rooms: 25
+    breakables: 88
+    traps: 19
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 24
+    sculk-patches: 13
+    coin-quota: 56
+  - number: 47
+    kind: camp
+    level-type: howling_corridors
+  - number: 48
+    kind: exploration
+    level-type: bunker
+    difficulty: 32
+    rooms: 26
+    breakables: 90
+    traps: 20
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 24
+    sculk-patches: 14
+    coin-quota: 40
+  - number: 49
+    kind: exploration
+    level-type: factory
+    difficulty: 32
+    rooms: 26
+    breakables: 95
+    traps: 20
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 25
+    sculk-patches: 14
+    coin-quota: 50
   - number: 50
+    kind: exploration
+    level-type: howling_corridors
+    difficulty: 32
+    rooms: 30
+    breakables: 100
+    traps: 25
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 30
+    sculk-patches: 14
+    coin-quota: 60
+  - number: 51
+    kind: camp
+    level-type: howling_corridors
+  - number: 52
     kind: combat
     level-type: howling_corridors
     difficulty: 80
