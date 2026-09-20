@@ -147,8 +147,8 @@ Do all following for the next slice (and keep this line):
 - Poison bomb still seems to have no cooldown or visual particles for the clouds.
 - You messed up the south facing library vent model again... can you just not make it generate EXACTLY how wall spikes generate? We have done this once? Why it cannot be consistent? The north ones face great (but are quite not touching the walls)
 - Homing mines are almost perfect, put their model 0.25 blocks higher and add another spruce fence as part of their model, make the fence be connected on all 4 sides so it looks like antenna.
-- 
-Future slices (dont do yet):
+
+- Future slices (dont do yet):
 - Boss 1 - Add first boss: Overdrive Spawner, documented in overdrive_spawner.md. Use boss_floor.md for design as they are replacements for fight floors. Place it on the first fight floor.
 - Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too). Place it on the last fight floor.
 
