@@ -2503,7 +2503,7 @@ public final class HallsSession {
             return true;
         }
         Location destination = new Location(world, linked.x() + 0.5, linked.y(), linked.z() + 0.5,
-                player.getLocation().getYaw(), player.getLocation().getPitch());
+                (float) wallFixtureYawDegrees(linked.face().getOppositeFace()), player.getLocation().getPitch());
         if (!isVentDestinationClear(new HallsExplorationGenerator.Cell(linked.x(), linked.z()))) {
             player.sendActionBar(Component.text("The vent is blocked.", NamedTextColor.GRAY));
             return true;

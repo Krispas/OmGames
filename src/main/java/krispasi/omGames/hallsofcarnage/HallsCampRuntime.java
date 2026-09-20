@@ -284,9 +284,6 @@ public final class HallsCampRuntime {
             setBuilding(plot, building, level);
             plot.setHarvestRemaining(state.harvestRemaining());
             plot.setHarvestUsed(state.harvestUsed());
-            if (state.harvestRemaining() <= 0 && state.harvestUsed() <= 0 && defaultRunUses(building, level) > 0) {
-                plot.setHarvestRemaining(defaultRunUses(building, level));
-            }
             plot.setStorageContents(state.storageContents());
             HallsBuildingType.Level buildingLevel = building.level(level);
             if (plot.harvestRemaining() <= 0 && !buildingLevel.emptyParts().isEmpty()) {

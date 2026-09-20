@@ -38,8 +38,6 @@ import org.joml.Quaternionf;
 final class HallsSessionBossRuntime {
     private static final String BOSS_TAG = "omgames_hoc_boss";
     private static final double HIT_FLASH_RADIUS = 1.8;
-    private static final float MIN_MELEE_ATTACK_COOLDOWN = 0.88f;
-    private static final long MELEE_COOLDOWN_MESSAGE_TICKS = 10L;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -52,7 +50,6 @@ final class HallsSessionBossRuntime {
     private final Runnable defeatedCallback;
     private final NamespacedKey bossIdKey;
     private final Random random = new Random();
-    private final Map<UUID, Long> cooldownMessageTicks = new java.util.HashMap<>();
 
     private ActiveBoss activeBoss;
     private BossBar bossBar;
@@ -123,13 +120,6 @@ final class HallsSessionBossRuntime {
         }
         if (!activeBoss.active()) {
             activate(player);
-            return true;
-        }
-        float attackCooldown = player.getAttackCooldown();
-        if (attackCooldown < MIN_MELEE_ATTACK_COOLDOWN) {
-            sendCooldownMessage(player);
-            world.spawnParticle(Particle.SMOKE, entity.getLocation().clone().add(0.0, 1.2, 0.0),
-                    6, 0.25, 0.25, 0.25, 0.01);
             return true;
         }
         damage(Math.max(1.0, damage), player.getLocation());
@@ -673,8 +663,9 @@ final class HallsSessionBossRuntime {
                     continue;
                 }
                 double horizontal = Math.hypot(player.getLocation().getX() - center.getX(), player.getLocation().getZ() - center.getZ());
-                boolean jumped = player.getLocation().getY() - Math.floor(player.getLocation().getY()) > 0.38 || player.getVelocity().getY() > 0.12;
-                if (Math.abs(horizontal - radius) <= 0.85 && !jumped) {
+                double yFraction = player.getLocation().getY() - Math.floor(player.getLocation().getY());
+                boolean jumped = !player.isOnGround() || yFraction > 0.08 || player.getVelocity().getY() > 0.02;
+                if (Math.abs(horizontal - radius) <= 0.6 && !jumped) {
                     hit.add(player.getUniqueId());
                     player.damage(damage);
                 }
@@ -684,16 +675,6 @@ final class HallsSessionBossRuntime {
                 cancel();
             }
         }
-    }
-
-    private void sendCooldownMessage(Player player) {
-        long now = world.getFullTime();
-        Long previous = cooldownMessageTicks.get(player.getUniqueId());
-        if (previous != null && now - previous < MELEE_COOLDOWN_MESSAGE_TICKS) {
-            return;
-        }
-        cooldownMessageTicks.put(player.getUniqueId(), now);
-        player.sendActionBar(Component.text("Time your swings to damage the boss.", NamedTextColor.GRAY));
     }
 
     private final class RetractAnimation extends org.bukkit.scheduler.BukkitRunnable {

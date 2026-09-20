@@ -146,7 +146,7 @@ public final class HallsOfCarnageListener implements Listener {
         }
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler
     public void onPrePlayerAttackEntity(PrePlayerAttackEntityEvent event) {
         if (manager.isResearchCrateCarrier(event.getPlayer())) {
             event.setCancelled(true);
