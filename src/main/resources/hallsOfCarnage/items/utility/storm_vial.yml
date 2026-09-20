@@ -9,7 +9,7 @@ lore:
 stats:
   durability: 4
   cooldown-seconds: 80
-  monster-damage: 6
+  monster-damage: 10
   radius: 5
 recipe:
   redstone_scrap: 8
