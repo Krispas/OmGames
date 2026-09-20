@@ -7,11 +7,11 @@ levels:
   1:
     parts:
       - material: CHISELED_BOOKSHELF
-        offset: [0, 0.95, -0.50]
+        offset: [0, 0.95, 0.04]
         scale: [0.92, 0.92, 0.08]
       - material: IRON_TRAPDOOR
-        offset: [0, 0.95, -0.56]
+        offset: [0, 0.95, 0.08]
         scale: [0.86, 0.86, 0.06]
       - material: COPPER_GRATE
-        offset: [0, 0.95, -0.60]
+        offset: [0, 0.95, 0.12]
         scale: [0.70, 0.70, 0.04]

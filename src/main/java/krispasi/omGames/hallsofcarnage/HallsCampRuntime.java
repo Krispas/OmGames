@@ -154,6 +154,46 @@ public final class HallsCampRuntime {
                 || doorsByEntity.containsKey(entity.getUniqueId()));
     }
 
+    public Location ejectDropFromBuildingHitbox(Location location) {
+        if (location == null || !world.equals(location.getWorld())) {
+            return null;
+        }
+        for (Plot plot : plotsById.values()) {
+            if (plot.buildingId() == null) {
+                continue;
+            }
+            double half = plotHalfSize(plot);
+            double minX = plot.x() + 0.5 - half;
+            double maxX = plot.x() + 0.5 + half;
+            double minZ = plot.z() + 0.5 - half;
+            double maxZ = plot.z() + 0.5 + half;
+            if (location.getX() < minX || location.getX() > maxX
+                    || location.getZ() < minZ || location.getZ() > maxZ
+                    || location.getY() < plot.y() - 0.25 || location.getY() > plot.y() + 3.25) {
+                continue;
+            }
+            double left = Math.abs(location.getX() - minX);
+            double right = Math.abs(maxX - location.getX());
+            double north = Math.abs(location.getZ() - minZ);
+            double south = Math.abs(maxZ - location.getZ());
+            double edge = Math.min(Math.min(left, right), Math.min(north, south));
+            Location result = location.clone();
+            double padding = 0.35;
+            if (edge == left) {
+                result.setX(minX - padding);
+            } else if (edge == right) {
+                result.setX(maxX + padding);
+            } else if (edge == north) {
+                result.setZ(minZ - padding);
+            } else {
+                result.setZ(maxZ + padding);
+            }
+            result.setY(Math.max(result.getY(), plot.y() + 0.15));
+            return result;
+        }
+        return null;
+    }
+
     public void startLayout(HallsCampLayout layout, int startX, int y, int startZ, Set<Integer> unlockedDoors) {
         this.layout = layout;
         this.layoutStartX = startX;
@@ -646,6 +686,15 @@ public final class HallsCampRuntime {
         player.sendMessage(Component.text("Built " + building.name() + ".", NamedTextColor.GREEN));
         playBuildingSound(player, building, BuildingSound.BUILD);
         return true;
+    }
+
+    private double plotHalfSize(Plot plot) {
+        return switch (plot.size()) {
+            case "station" -> 3.5;
+            case "large" -> 2.5;
+            case "medium" -> 1.5;
+            default -> 0.5;
+        };
     }
 
     private boolean upgrade(Player player, Plot plot) {

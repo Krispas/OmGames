@@ -2269,19 +2269,19 @@ public final class HallsSession {
     }
 
     private void spawnLibraryVentPart(LibraryVent vent, HallsBuildingType.Part part) {
-        double yaw = wallFixtureYawDegrees(vent.face());
+        double yaw = yawDegrees(vent.face().getOppositeFace());
         double lateralX = vent.face().getModZ();
         double lateralZ = -vent.face().getModX();
-        double depth = -part.offsetZ();
+        double depth = Math.max(0.0, part.offsetZ());
         Location location = new Location(world,
-                vent.x() + 0.5 + lateralX * part.offsetX() + vent.face().getModX() * depth,
+                vent.x() + 0.5 + lateralX * part.offsetX() + vent.face().getModX() * (0.5 - depth),
                 vent.y() + part.offsetY(),
-                vent.z() + 0.5 + lateralZ * part.offsetX() + vent.face().getModZ() * depth);
+                vent.z() + 0.5 + lateralZ * part.offsetX() + vent.face().getModZ() * (0.5 - depth));
         BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
             entity.setBlock(displayBlockData(part.material(), part.blockData()));
             entity.setBillboard(Display.Billboard.FIXED);
             entity.setTransformation(new Transformation(
-                    new Vector3f((float) (-part.scaleX() * 0.5), 0.0f, (float) (-part.scaleZ() * 0.5)),
+                    wallVentDisplayTranslation(vent.face(), part),
                     new Quaternionf().rotateXYZ((float) Math.toRadians(part.rotationX()),
                             (float) Math.toRadians(part.rotationY() + yaw),
                             (float) Math.toRadians(part.rotationZ())),
@@ -2291,6 +2291,14 @@ public final class HallsSession {
             entity.setPersistent(false);
         });
         vent.displayIds().add(display.getUniqueId());
+    }
+
+    private Vector3f wallVentDisplayTranslation(BlockFace face, HallsBuildingType.Part part) {
+        float width = (float) part.scaleX();
+        float depth = (float) part.scaleZ();
+        float x = face == BlockFace.EAST || face == BlockFace.WEST ? -depth / 2.0f : -width / 2.0f;
+        float z = face == BlockFace.NORTH || face == BlockFace.SOUTH ? -depth / 2.0f : -width / 2.0f;
+        return new Vector3f(x, 0.0f, z);
     }
 
     private double yawDegrees(BlockFace face) {
@@ -5967,6 +5975,17 @@ public final class HallsSession {
         if (trapRuntime.disarmProximityMineNear(next)) {
             removePhysicsDrop(drop);
             return;
+        }
+        Location ejected = campRuntime.ejectDropFromBuildingHitbox(next);
+        if (ejected != null) {
+            drop.location().setX(ejected.getX());
+            drop.location().setY(ejected.getY());
+            drop.location().setZ(ejected.getZ());
+            drop.velocity().setX((ejected.getX() - next.getX()) * 0.25);
+            drop.velocity().setY(Math.max(0.04, drop.velocity().getY()));
+            drop.velocity().setZ((ejected.getZ() - next.getZ()) * 0.25);
+            drop.setSettled(false);
+            next = ejected;
         }
         display.teleport(next);
         interaction.teleport(next.clone().add(0.0, -0.15, 0.0));
