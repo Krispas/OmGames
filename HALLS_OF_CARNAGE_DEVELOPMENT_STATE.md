@@ -162,7 +162,7 @@ Future slices (dont do yet):
 - Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too). Place it on the last fight floor.
 
 For reviewer to figure out:
-- New research tree - I have added research.csv, rework the research tree fully based on this file
+- New research tree - I have added research.md, rework the research tree fully based on this file, make research UI have 5 nodes on each second row and arrows between the nodes pointing in the research direction, look at the file how its structured and you will know what I mean
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, mycelia_farm, research_table, scanner, sculk purifier, speed totem, storage locker.
 - New breakables
 - Texture all items
