@@ -674,6 +674,7 @@ floors:
     level-type: howling_corridors
     difficulty: 80
     layout: special/final_floor_1.txt
+    boss: overdrive_spawner
     enemy-pool:
       - zombie
       - skeleton

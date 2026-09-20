@@ -237,7 +237,8 @@ public final class HallsScenarioLoader {
                     positiveInt(map.get("holes"), 1),
                     positiveInt(map.get("sculk-patches"), 2),
                     positiveInt(map.get("coin-quota"), 0),
-                    stringValue(map.get("layout"), "")
+                    stringValue(map.get("layout"), ""),
+                    normalizeId(stringValue(map.get("boss"), ""))
             ));
         }
         floors.sort(Comparator.comparingInt(HallsScenario.FloorDefinition::firstFloor));

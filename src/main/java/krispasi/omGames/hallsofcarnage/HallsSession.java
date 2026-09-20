@@ -95,6 +95,7 @@ public final class HallsSession {
     private final Map<String, HallsVegetationType> vegetationTypes;
     private final Map<String, HallsItemType> itemTypes;
     private final Map<String, HallsTrapType> trapTypes;
+    private final Map<String, HallsBossType> bossTypes;
     private final Map<String, HallsMonsterType> monsterTypes;
     private final Map<String, HallsModifierType> modifierTypes;
     private final Map<String, HallsBuildingType> buildingTypes;
@@ -120,6 +121,7 @@ public final class HallsSession {
     private final Map<Integer, HallsFloorModifiers> scannedFloorModifiers = new HashMap<>();
     private final Set<String> unlockedResearch = new HashSet<>();
     private final HallsSessionTrapRuntime trapRuntime;
+    private final HallsSessionBossRuntime bossRuntime;
     private final HallsSessionMonsterRuntime monsterRuntime;
     private final HallsSessionSculkRuntime sculkRuntime;
     private final HallsCampRuntime campRuntime;
@@ -179,6 +181,7 @@ public final class HallsSession {
                         Map<String, HallsVegetationType> vegetationTypes,
                         Map<String, HallsItemType> itemTypes,
                         Map<String, HallsTrapType> trapTypes,
+                        Map<String, HallsBossType> bossTypes,
                         Map<String, HallsMonsterType> monsterTypes,
                         Map<String, HallsModifierType> modifierTypes,
                         Map<String, HallsBuildingType> buildingTypes,
@@ -200,6 +203,7 @@ public final class HallsSession {
         this.vegetationTypes = vegetationTypes == null ? Map.of() : Map.copyOf(vegetationTypes);
         this.itemTypes = itemTypes == null ? Map.of() : Map.copyOf(itemTypes);
         this.trapTypes = trapTypes == null ? Map.of() : Map.copyOf(trapTypes);
+        this.bossTypes = bossTypes == null ? Map.of() : Map.copyOf(bossTypes);
         this.monsterTypes = monsterTypes == null ? Map.of() : Map.copyOf(monsterTypes);
         this.modifierTypes = modifierTypes == null ? Map.of() : Map.copyOf(modifierTypes);
         this.buildingTypes = buildingTypes == null ? Map.of() : Map.copyOf(buildingTypes);
@@ -221,6 +225,9 @@ public final class HallsSession {
                 this::setBlock, this.trapTypes,
                 () -> activeFloorModifiers.trapDamageMultiplier(),
                 location -> dropSessionItem(location, coinItem(1)), monsterRuntime::spawnConfiguredMonster);
+        this.bossRuntime = new HallsSessionBossRuntime(plugin, world, participants, this.bossTypes,
+                this::isAliveParticipant, monsterRuntime::spawnConfiguredMonster,
+                this::setBlock, this::unlockBossFloorExit);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
                 type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
             @Override
@@ -378,6 +385,7 @@ public final class HallsSession {
                 || blueprintDistilleries.values().stream().anyMatch(distillery -> distillery.displayIds().contains(entity.getUniqueId()))
                 || libraryVents.containsKey(entity.getUniqueId())
                 || libraryVents.values().stream().anyMatch(vent -> vent.displayIds().contains(entity.getUniqueId()))
+                || bossRuntime.isBossEntity(entity)
                 || entity.getUniqueId().equals(elevatorWaypointId));
     }
 
@@ -598,6 +606,9 @@ public final class HallsSession {
     }
 
     public boolean handleBreakableAttack(Player player, Entity entity) {
+        if (bossRuntime.handleAttack(player, entity, meleeDamage(player))) {
+            return true;
+        }
         if (trapRuntime.handleTrapAttack(player, entity)) {
             return true;
         }
@@ -631,6 +642,10 @@ public final class HallsSession {
                 || block.getY() != origin.y() + 1
                 || block.getZ() != origin.z()) {
             return false;
+        }
+        if (isCurrentFloorBoss() && !bossRuntime.exitUnlocked()) {
+            player.sendMessage(Component.text("The elevator will not descend until the boss is defeated.", NamedTextColor.RED));
+            return true;
         }
         if (transitioning) {
             player.sendMessage(Component.text("The elevator is already moving.", NamedTextColor.YELLOW));
@@ -822,6 +837,10 @@ public final class HallsSession {
     }
 
     public boolean handleWeaponHit(Player player, Entity target, EntityDamageByEntityEvent event) {
+        if (event != null && bossRuntime.handleProjectileHit(player, target, eventDamageWithProjectileMetadata(event))) {
+            event.setCancelled(true);
+            return true;
+        }
         if (player == null || target == null || !running || !participants.contains(player.getUniqueId())
                 || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())
                 || !(target instanceof LivingEntity living) || !monsterRuntime.isSessionMonster(living)) {
@@ -848,6 +867,31 @@ public final class HallsSession {
         applyWeaponSplashEffect(player, type, living);
         applyWeaponKnockbackEffect(type, living.getLocation(), living, player);
         return false;
+    }
+
+    private double eventDamageWithProjectileMetadata(EntityDamageByEntityEvent event) {
+        double damage = event == null ? 1.0 : event.getDamage();
+        if (event != null && event.getDamager() instanceof org.bukkit.entity.Projectile projectile) {
+            Double projectileDamage = projectile.getPersistentDataContainer().get(
+                    new org.bukkit.NamespacedKey(plugin, "hoc_projectile_damage"),
+                    PersistentDataType.DOUBLE
+            );
+            if (projectileDamage != null && projectileDamage > 0.0) {
+                return projectileDamage;
+            }
+        }
+        return damage;
+    }
+
+    private double meleeDamage(Player player) {
+        if (player == null) {
+            return 1.0;
+        }
+        HallsItemType type = itemType(player.getInventory().getItemInMainHand());
+        if (type != null) {
+            return Math.max(1.0, type.stats().getOrDefault("melee_damage", 1.0));
+        }
+        return 1.0;
     }
 
     private void applyWeaponStatusEffects(HallsItemType type, LivingEntity target) {
@@ -1409,6 +1453,10 @@ public final class HallsSession {
             buildCampFloor(floor);
             return;
         }
+        if ("combat".equalsIgnoreCase(definition.kind()) && !definition.boss().isBlank()) {
+            buildBossFloor(floor);
+            return;
+        }
         buildExplorationFloor(floor);
     }
 
@@ -1447,6 +1495,94 @@ public final class HallsSession {
 
     private void buildCampFloor(int floor) {
         buildCampFloor(floor, true);
+    }
+
+    private void buildBossFloor(int floor) {
+        captureCurrentCampState();
+        captureElevatorChestContents();
+        removeSessionEntities();
+        HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
+        HallsLevelType levelType = levelTypeFor(floorDefinition);
+        activeLevelTypeId = levelType.id();
+        activeTargetRooms = 1;
+        activeGeneratedRooms = 1;
+        activeFloorModifiers = HallsFloorModifiers.none();
+        activeClearRadius = CLEAR_RADIUS;
+        activeFloorMapCells = Set.of();
+        activeLiquidCells = Set.of();
+        activeVentGateCells = Set.of();
+        clearBuildVolume();
+        buildElevator();
+        ensureElevatorWaypoint();
+        currentFloor = floor;
+        researchCrateDepositedThisFloor = false;
+        floorStartedAtMillis = System.currentTimeMillis();
+        HallsLayout layout = loadBossLayout(floorDefinition);
+        int roomStartX = origin.x() - layout.width() / 2;
+        int roomStartZ = origin.z() - ELEVATOR_OUTER_RADIUS - 6 - layout.depth();
+        int openingX = layout.width() / 2;
+        buildBossLayoutRoom(layout, roomStartX, origin.y(), roomStartZ,
+                Map.of(BlockFace.SOUTH, openingX), levelType, new Random((((long) id) << 32) ^ floor));
+        buildConnector(origin.x(), origin.y(), elevatorFrontZ(1), roomStartZ + layout.depth(), levelType, 1);
+        restoreElevatorChestContents();
+        closeElevatorDoors();
+        openElevatorDoors();
+        Location bossLocation = new Location(world, roomStartX + layout.width() / 2.0 + 0.5,
+                origin.y(), roomStartZ + layout.depth() / 2.0 + 0.5, 0.0f, 0.0f);
+        HallsSessionBossRuntime.DoorSeal seal = new HallsSessionBossRuntime.DoorSeal(
+                roomStartX + openingX - 1,
+                roomStartX + openingX + 1,
+                origin.y(),
+                roomStartZ + layout.depth(),
+                roomStartZ + layout.depth(),
+                wallMaterial(levelType, roomStartX + openingX, origin.y(), roomStartZ + layout.depth(), false, 0xB055)
+        );
+        bossRuntime.prepare(floorDefinition.boss(), bossLocation, seal);
+        teleportParticipantsToElevator("Floor " + floor, "Boss: " + bossName(floorDefinition.boss()));
+    }
+
+    private HallsLayout loadBossLayout(HallsScenario.FloorDefinition floorDefinition) {
+        String layoutPath = floorDefinition.layout().isBlank() ? "special/final_floor_1.txt" : floorDefinition.layout();
+        try {
+            return HallsLayoutLoader.load(new File(dataFolder, "level/" + layoutPath));
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Failed to load Halls boss layout " + layoutPath
+                    + " for session " + id + ": " + ex.getMessage());
+            return new HallsLayout(List.of(
+                    "OOOOOOOOOOO",
+                    "OOOOOOOOOOO",
+                    "OOOOOOOOOOO",
+                    "OOOOOOOOOOO",
+                    "OOOOOOOOOOO",
+                    "OOOOOOOOOOO",
+                    "OOOOOOOOOOO",
+                    "OOOOOOOOOOO",
+                    "OOOOOOOOOOO",
+                    "OOOOOOOOOOO",
+                    "OOOOOOOOOOO"
+            ), 11, 11);
+        }
+    }
+
+    private String bossName(String bossId) {
+        HallsBossType type = bossTypes.get(normalizeId(bossId));
+        return type == null ? bossId : type.name();
+    }
+
+    private boolean isCurrentFloorBoss() {
+        HallsScenario.FloorDefinition definition = scenario.floor(currentFloor);
+        return "combat".equalsIgnoreCase(definition.kind()) && !definition.boss().isBlank();
+    }
+
+    private void unlockBossFloorExit() {
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.sendTitle("Boss defeated", "The elevator can descend again.", 10, 55, 15);
+            }
+        }
+        world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                Sound.BLOCK_BEACON_ACTIVATE, 0.9f, 1.1f);
     }
 
     private void buildCampFloor(int floor, boolean refreshRunUses) {
@@ -1555,6 +1691,19 @@ public final class HallsSession {
         HallsScenario.FloorDefinition definition = scenario.floor(floor);
         if ("camp".equalsIgnoreCase(definition.kind())) {
             buildCampFloor(floor);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!running) {
+                    return;
+                }
+                openElevatorDoors();
+                transitioning = false;
+                world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                        Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.8f);
+            }, MIN_ELEVATOR_TRANSITION_TICKS);
+            return;
+        }
+        if ("combat".equalsIgnoreCase(definition.kind()) && !definition.boss().isBlank()) {
+            buildBossFloor(floor);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (!running) {
                     return;
@@ -3131,6 +3280,52 @@ public final class HallsSession {
         placeRoomCeilingLights(layout, startX, y, startZ, levelType, random);
     }
 
+    private void buildBossLayoutRoom(HallsLayout layout,
+                                     int startX,
+                                     int y,
+                                     int startZ,
+                                     Map<BlockFace, Integer> openings,
+                                     HallsLevelType levelType,
+                                     Random random) {
+        Material floor = levelType.floor();
+        Material ceiling = levelType.ceiling();
+        int height = 10;
+        for (int z = -1; z <= layout.depth(); z++) {
+            for (int x = -1; x <= layout.width(); x++) {
+                boolean border = x < 0 || z < 0 || x >= layout.width() || z >= layout.depth();
+                boolean opening = border && isRoomOpening(layout, x, z, openings, levelType);
+                char cell = border ? 'X' : layout.at(x, z);
+                int blockX = startX + x;
+                int blockZ = startZ + z;
+                boolean wallColumn = !opening && (border || cell == 'X');
+                setBlock(blockX, y - 1, blockZ, wallColumn
+                        ? roomWallMaterial(levelType, layout, x, z, blockX, y - 1, blockZ)
+                        : floor);
+                setBlock(blockX, y + height, blockZ, ceiling);
+                for (int dy = 0; dy < height; dy++) {
+                    setBlock(blockX, y + dy, blockZ,
+                            wallColumn
+                                    ? roomWallMaterial(levelType, layout, x, z, blockX, y + dy, blockZ)
+                                    : opening && dy >= 3
+                                            ? roomWallMaterial(levelType, layout, x, z, blockX, y + dy, blockZ)
+                                            : Material.AIR);
+                }
+            }
+        }
+        for (int z = 2; z < layout.depth(); z += 5) {
+            for (int x = 2; x < layout.width(); x += 5) {
+                if (layout.at(x, z) == 'O') {
+                    setBlock(startX + x, y + height, startZ + z, levelType.light());
+                }
+            }
+        }
+        if (random != null) {
+            world.spawnParticle(Particle.DUST_PLUME,
+                    new Location(world, startX + layout.width() / 2.0 + 0.5, y + 0.2, startZ + layout.depth() / 2.0 + 0.5),
+                    40, 3.0, 0.1, 3.0, 0.02);
+        }
+    }
+
     private boolean isRoomOpening(HallsLayout layout,
                                   int x,
                                   int z,
@@ -3815,7 +4010,8 @@ public final class HallsSession {
                 holes,
                 sculkPatches,
                 coinQuota,
-                floor.layout());
+                floor.layout(),
+                floor.boss());
     }
 
     private int multipliedCoins(int amount) {
@@ -5019,6 +5215,7 @@ public final class HallsSession {
 
     private void removeSessionEntities() {
         sculkRuntime.clearFloor();
+        bossRuntime.clear();
         monsterRuntime.clear();
         trapRuntime.clear();
         campRuntime.clear();

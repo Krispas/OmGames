@@ -171,7 +171,8 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
                 holes,
                 sculkPatches,
                 coinQuota,
-                floor.layout()
+                floor.layout(),
+                floor.boss()
         );
     }
 

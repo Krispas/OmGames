@@ -136,7 +136,8 @@ public record HallsScenario(
             int holes,
             int sculkPatches,
             int coinQuota,
-            String layout
+            String layout,
+            String boss
     ) {
         public FloorDefinition {
             trappedRooms = Math.max(0, trappedRooms);
@@ -144,6 +145,7 @@ public record HallsScenario(
             maxTrapsPerRoom = Math.max(minTrapsPerRoom, maxTrapsPerRoom);
             coinQuota = Math.max(0, coinQuota);
             layout = layout == null ? "" : layout.trim();
+            boss = normalize(boss);
         }
 
         public boolean includes(int floor) {
@@ -151,12 +153,12 @@ public record HallsScenario(
         }
 
         public static FloorDefinition fallback(int floor) {
-            return new FloorDefinition(floor, floor, "exploration", "howling_corridors", "0", 8, 0, 16, 3, 1, 2, 1, 2, 10, "");
+            return new FloorDefinition(floor, floor, "exploration", "howling_corridors", "0", 8, 0, 16, 3, 1, 2, 1, 2, 10, "", "");
         }
 
         public FloorDefinition atFloor(int floor) {
             return new FloorDefinition(floor, floor, kind, levelType, difficulty, rooms, items, breakables,
-                    trappedRooms, minTrapsPerRoom, maxTrapsPerRoom, holes, sculkPatches, coinQuota, layout);
+                    trappedRooms, minTrapsPerRoom, maxTrapsPerRoom, holes, sculkPatches, coinQuota, layout, boss);
         }
     }
 
