@@ -2278,7 +2278,7 @@ public final class HallsSession {
     }
 
     private void spawnLibraryVentPart(LibraryVent vent, HallsBuildingType.Part part) {
-        double yaw = yawDegrees(vent.face().getOppositeFace());
+        double yaw = wallFixtureYawDegrees(vent.face());
         double lateralX = vent.face().getModZ();
         double lateralZ = -vent.face().getModX();
         double depth = Math.max(0.0, part.offsetZ());
@@ -2303,11 +2303,7 @@ public final class HallsSession {
     }
 
     private Vector3f wallVentDisplayTranslation(BlockFace face, HallsBuildingType.Part part) {
-        float width = (float) part.scaleX();
-        float depth = (float) part.scaleZ();
-        float x = face == BlockFace.EAST || face == BlockFace.WEST ? -depth / 2.0f : -width / 2.0f;
-        float z = face == BlockFace.NORTH || face == BlockFace.SOUTH ? -depth / 2.0f : -width / 2.0f;
-        return new Vector3f(x, 0.0f, z);
+        return new Vector3f((float) (-part.scaleX() / 2.0), 0.0f, (float) (-part.scaleZ() / 2.0));
     }
 
     private double yawDegrees(BlockFace face) {
@@ -4511,6 +4507,7 @@ public final class HallsSession {
         int poisonTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("poison_seconds", 5.0) * 20.0));
         int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("poison_amplifier", 1.0)) - 1);
         Location center = player.getLocation();
+        int affected = 0;
         for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
             if (nearby instanceof LivingEntity living
                     && monsterRuntime.isSessionMonster(living)
@@ -4519,14 +4516,35 @@ public final class HallsSession {
                 if (damage > 0.0) {
                     living.damage(damage, player);
                 }
+                affected++;
             }
         }
-        world.spawnParticle(Particle.ENTITY_EFFECT, center.clone().add(0.0, 1.0, 0.0),
-                90, radius * 0.35, 0.65, radius * 0.35, 0.08);
-        world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, center.clone().add(0.0, 0.6, 0.0),
-                70, radius * 0.3, 0.45, radius * 0.3, 0.04);
+        spawnPoisonBombCloud(center, radius, Math.min(poisonTicks, 160));
         world.playSound(center, Sound.ENTITY_SPLASH_POTION_BREAK, 0.8f, 0.75f);
-        player.sendActionBar(Component.text("Poison vapor eats into nearby monsters.", NamedTextColor.DARK_GREEN));
+        player.sendActionBar(Component.text("Poison vapor eats into nearby monsters"
+                + (affected > 0 ? ": " + affected : "") + ".", NamedTextColor.DARK_GREEN));
+    }
+
+    private void spawnPoisonBombCloud(Location center, double radius, int durationTicks) {
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+            private int ticks;
+
+            @Override
+            public void run() {
+                if (!running || world == null || ticks > durationTicks) {
+                    return;
+                }
+                double pulse = 0.55 + Math.sin(ticks / 8.0) * 0.15;
+                world.spawnParticle(Particle.ENTITY_EFFECT, center.clone().add(0.0, 0.9, 0.0),
+                        90, radius * pulse, 0.45, radius * pulse, 0.05);
+                world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, center.clone().add(0.0, 0.65, 0.0),
+                        65, radius * 0.45, 0.35, radius * 0.45, 0.025);
+                world.spawnParticle(Particle.SMOKE, center.clone().add(0.0, 0.35, 0.0),
+                        30, radius * 0.35, 0.2, radius * 0.35, 0.01);
+                ticks += 10;
+            }
+        }, 1L, 10L);
+        Bukkit.getScheduler().runTaskLater(plugin, task::cancel, durationTicks + 2L);
     }
 
     private void activateLodestone(Player player, HallsItemType type) {

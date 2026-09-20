@@ -25,6 +25,7 @@ import org.bukkit.World;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
+import org.bukkit.block.data.MultipleFacing;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
@@ -866,7 +867,7 @@ final class HallsSessionTrapRuntime {
             case PUFFERFISH -> List.of(spawnPufferfish(cell));
             case ARMY_COFFIN -> withInteraction(cell,
                     spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 90.0), 1.35f, 1.0f);
-            case HOMING_MINE -> List.of(spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 0.0));
+            case HOMING_MINE -> buildHomingMine(cell, face, type);
             case ENCHANTED_BOOK -> withInteraction(cell,
                     spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 0.0), 0.8f, 0.9f);
             default -> List.of();
@@ -928,6 +929,42 @@ final class HallsSessionTrapRuntime {
 
     private List<UUID> buildPoisonDartLauncher(HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type) {
         return List.of(spawnWallBlockDisplay(cell, face, type.blockMaterial(), 0.08f, 0.65f, 0.65f));
+    }
+
+    private List<UUID> buildHomingMine(HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type) {
+        UUID plate = spawnTrapItemDisplay(TrapKind.HOMING_MINE, cell, face, type, type.modelMaterial(), 0.0);
+        UUID antenna = spawnHomingMineAntenna(cell);
+        return List.of(plate, antenna);
+    }
+
+    private UUID spawnHomingMineAntenna(HallsExplorationGenerator.Cell cell) {
+        Location location = new Location(world, cell.x() + 0.5, origin.y() + 0.85, cell.z() + 0.5);
+        BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
+            entity.setBlock(connectedFenceData());
+            entity.setBillboard(Display.Billboard.FIXED);
+            entity.setInterpolationDelay(1);
+            entity.setTeleportDuration(2);
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_trap");
+            entity.setTransformation(new Transformation(
+                    new Vector3f(-0.5f, -0.1f, -0.5f),
+                    new Quaternionf(),
+                    new Vector3f(1.0f, 0.75f, 1.0f),
+                    new Quaternionf()));
+        });
+        return display.getUniqueId();
+    }
+
+    private BlockData connectedFenceData() {
+        BlockData data = Material.SPRUCE_FENCE.createBlockData();
+        if (data instanceof MultipleFacing multipleFacing) {
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                if (multipleFacing.getAllowedFaces().contains(face)) {
+                    multipleFacing.setFace(face, true);
+                }
+            }
+        }
+        return data;
     }
 
     private List<UUID> buildSewerWaterFixture(HallsExplorationGenerator.Cell cell, HallsTrapType type) {
@@ -1254,14 +1291,32 @@ final class HallsSessionTrapRuntime {
                 return;
             }
             if (delta.lengthSquared() > 0.04) {
+                Location previous = display.getLocation().clone();
                 Location next = display.getLocation().add(delta.normalize().multiply(0.22));
-                next.setY(origin.y() + 0.15);
+                next.setY(homingMinePlateY());
                 display.teleport(next);
+                moveHomingMineDisplays(trap, previous, next);
                 world.spawnParticle(Particle.SMOKE, next.clone().add(0.0, 0.2, 0.0), 2, 0.08, 0.04, 0.08, 0.01);
             }
         }
         if (tick % 10L == 0L) {
             world.playSound(display == null ? center : display.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.35f, 1.8f);
+        }
+    }
+
+    private void moveHomingMineDisplays(HallsTrap trap, Location previousAnchor, Location nextAnchor) {
+        Vector movement = nextAnchor.toVector().subtract(previousAnchor.toVector());
+        if (movement.lengthSquared() <= 0.0) {
+            return;
+        }
+        for (UUID displayId : trap.displayIds()) {
+            if (displayId.equals(trap.movingDisplayId())) {
+                continue;
+            }
+            Entity entity = Bukkit.getEntity(displayId);
+            if (entity != null && entity.isValid()) {
+                entity.teleport(entity.getLocation().add(movement));
+            }
         }
     }
 
@@ -1459,6 +1514,9 @@ final class HallsSessionTrapRuntime {
         if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.HOMING_MINE) {
             y += 0.4;
         }
+        if (kind == TrapKind.HOMING_MINE) {
+            y = homingMinePlateY();
+        }
 
         if (kind == TrapKind.SWINGING_BLADE) {
             y = origin.y() + 2.85;
@@ -1480,6 +1538,10 @@ final class HallsSessionTrapRuntime {
                 cell.x() + 0.5 + face.getModX() * (0.5 - depth),
                 origin.y() + 1.5,
                 cell.z() + 0.5 + face.getModZ() * (0.5 - depth));
+    }
+
+    private double homingMinePlateY() {
+        return origin.y() + 0.73;
     }
 
     private Vector3f wallDisplayTranslation(BlockFace face, float depth, float width, float height) {
