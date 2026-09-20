@@ -32,10 +32,8 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
 import org.joml.Quaternionf;
-import org.joml.Vector3f;
 
 final class HallsSessionBossRuntime {
     private static final String BOSS_TAG = "omgames_hoc_boss";
@@ -443,36 +441,32 @@ final class HallsSessionBossRuntime {
                     stack.setItemMeta(meta);
                 }
             }
-            Location location = base.clone().add(part.offsetX(), part.offsetY() + yOffset, part.offsetZ());
+            Location location = displayLocation(base, part, yOffset, new Vector());
             ItemDisplay display = world.spawn(location, ItemDisplay.class, entity -> {
                 entity.setItemStack(stack);
                 entity.setBillboard(Display.Billboard.FIXED);
                 entity.setPersistent(false);
                 entity.setInterpolationDelay(1);
                 entity.setTeleportDuration(2);
-                entity.setTransformation(new Transformation(
-                        new Vector3f(),
-                        new Quaternionf().rotateY((float) Math.toRadians(yaw)),
-                        new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
-                        new Quaternionf()));
+                entity.setTransformation(HallsDisplayTransforms.centeredBlock(
+                        part.scaleX(), part.scaleY(), part.scaleZ(),
+                        new Quaternionf().rotateY((float) Math.toRadians(yaw))));
                 entity.addScoreboardTag(BOSS_TAG);
             });
             ids.add(display.getUniqueId());
             return ids;
         }
         for (HallsBossType.DisplayPart part : parts) {
-            Location location = base.clone().add(part.offsetX(), part.offsetY() + yOffset, part.offsetZ());
+            Location location = displayLocation(base, part, yOffset, new Vector());
             BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
                 entity.setBlock(part.material().createBlockData());
                 entity.setBillboard(Display.Billboard.FIXED);
                 entity.setPersistent(false);
                 entity.setInterpolationDelay(1);
                 entity.setTeleportDuration(2);
-                entity.setTransformation(new Transformation(
-                        new Vector3f(),
-                        new Quaternionf().rotateY((float) Math.toRadians(yaw)),
-                        new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
-                        new Quaternionf()));
+                entity.setTransformation(HallsDisplayTransforms.centeredBlock(
+                        part.scaleX(), part.scaleY(), part.scaleZ(),
+                        new Quaternionf().rotateY((float) Math.toRadians(yaw))));
                 entity.addScoreboardTag(BOSS_TAG);
             });
             ids.add(display.getUniqueId());
@@ -493,20 +487,25 @@ final class HallsSessionBossRuntime {
                 continue;
             }
             HallsBossType.DisplayPart part = parts.get(Math.min(index, parts.size() - 1));
-            Location target = activeBoss.location().clone()
-                    .add(part.offsetX() + offset.getX(), part.offsetY() + yOffset + offset.getY(), part.offsetZ() + offset.getZ());
+            Location target = displayLocation(activeBoss.location(), part, yOffset, offset);
             entity.teleport(target);
             if (entity instanceof Display display) {
                 display.setInterpolationDelay(1);
                 display.setTeleportDuration(2);
-                display.setTransformation(new Transformation(
-                        new Vector3f(),
-                        new Quaternionf().rotateY((float) Math.toRadians(yaw)),
-                        new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
-                        new Quaternionf()));
+                display.setTransformation(HallsDisplayTransforms.centeredBlock(
+                        part.scaleX(), part.scaleY(), part.scaleZ(),
+                        new Quaternionf().rotateY((float) Math.toRadians(yaw))));
             }
             index++;
         }
+    }
+
+    private Location displayLocation(Location base, HallsBossType.DisplayPart part, double yOffset, Vector animationOffset) {
+        Vector offset = animationOffset == null ? new Vector() : animationOffset;
+        return base.clone().add(
+                part.offsetX() + offset.getX(),
+                part.offsetY() + yOffset + offset.getY() + part.scaleY() * 0.5,
+                part.offsetZ() + offset.getZ());
     }
 
     private void refreshBossBarPlayers() {

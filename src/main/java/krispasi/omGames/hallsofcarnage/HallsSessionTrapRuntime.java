@@ -946,11 +946,7 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(
-                    new Vector3f(-0.5f, -0.1f, -0.5f),
-                    new Quaternionf(),
-                    new Vector3f(1.0f, 0.75f, 1.0f),
-                    new Quaternionf()));
+            entity.setTransformation(HallsDisplayTransforms.bottomCenteredBlock(1.0f, 0.75f, 1.0f));
         });
         return display.getUniqueId();
     }
@@ -994,11 +990,7 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(
-                    new Vector3f(-0.18f, -0.55f, -0.18f),
-                    new Quaternionf(),
-                    new Vector3f(0.36f, 1.1f, 0.36f),
-                    new Quaternionf()));
+            entity.setTransformation(HallsDisplayTransforms.centeredBlock(0.36f, 1.1f, 0.36f));
         });
         return display.getUniqueId();
     }
@@ -1014,11 +1006,8 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(
-                    new Vector3f(-0.4f * normalizedScale, 0.0f, -0.4f * normalizedScale),
-                    new Quaternionf(),
-                    new Vector3f(0.8f * normalizedScale, 0.06f, 0.8f * normalizedScale),
-                    new Quaternionf()));
+            entity.setTransformation(HallsDisplayTransforms.bottomCenteredBlock(
+                    0.8f * normalizedScale, 0.06f, 0.8f * normalizedScale));
         });
         return display.getUniqueId();
     }
@@ -1034,11 +1023,8 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(
-                    new Vector3f(-0.4f * normalizedScale, 0.0f, -0.4f * normalizedScale),
-                    new Quaternionf(),
-                    new Vector3f(0.8f * normalizedScale, 0.06f, 0.8f * normalizedScale),
-                    new Quaternionf()));
+            entity.setTransformation(HallsDisplayTransforms.bottomCenteredBlock(
+                    0.8f * normalizedScale, 0.06f, 0.8f * normalizedScale));
         });
         return display.getUniqueId();
     }
@@ -1054,11 +1040,9 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(
-                    eastWest ? new Vector3f(-half, -0.08f, -0.08f) : new Vector3f(-0.08f, -0.08f, -half),
-                    new Quaternionf(),
-                    eastWest ? new Vector3f(length, 0.16f, 0.16f) : new Vector3f(0.16f, 0.16f, length),
-                    new Quaternionf()));
+            entity.setTransformation(eastWest
+                    ? HallsDisplayTransforms.centeredBlock(length, 0.16f, 0.16f)
+                    : HallsDisplayTransforms.centeredBlock(0.16f, 0.16f, length));
         });
         return display.getUniqueId();
     }
@@ -1634,8 +1618,7 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(new Vector3f(-0.25f, -0.25f, -0.25f), new Quaternionf(),
-                    new Vector3f(0.5f, 1.2f, 0.5f), new Quaternionf()));
+            entity.setTransformation(HallsDisplayTransforms.centeredBlock(0.5f, 1.2f, 0.5f));
         });
         transientTrapDisplays.add(display.getUniqueId());
         new BukkitRunnable() {

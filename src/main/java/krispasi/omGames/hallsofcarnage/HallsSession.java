@@ -2234,18 +2234,16 @@ public final class HallsSession {
     private void spawnBlueprintDistilleryPart(BlueprintDistillery distillery, HallsBuildingType.Part part) {
         Location location = new Location(world,
                 distillery.x() + 0.5 + part.offsetX(),
-                distillery.y() + part.offsetY(),
+                distillery.y() + part.offsetY() + part.scaleY() * 0.5,
                 distillery.z() + 0.5 + part.offsetZ());
         BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
             entity.setBlock(displayBlockData(part.material(), part.blockData()));
             entity.setBillboard(Display.Billboard.FIXED);
-            entity.setTransformation(new Transformation(
-                    new Vector3f((float) (-part.scaleX() * 0.5), 0.0f, (float) (-part.scaleZ() * 0.5)),
+            entity.setTransformation(HallsDisplayTransforms.centeredBlock(
+                    part.scaleX(), part.scaleY(), part.scaleZ(),
                     new Quaternionf().rotateXYZ((float) Math.toRadians(part.rotationX()),
                             (float) Math.toRadians(part.rotationY()),
-                            (float) Math.toRadians(part.rotationZ())),
-                    new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
-                    new Quaternionf()));
+                            (float) Math.toRadians(part.rotationZ()))));
             entity.setBrightness(FULL_BRIGHTNESS);
             entity.setPersistent(false);
         });
@@ -4193,7 +4191,7 @@ public final class HallsSession {
                                     int lootRolls) {
         List<UUID> displayIds = new ArrayList<>();
         for (HallsBreakableType.Part part : archetype.parts()) {
-            displayIds.add(spawnPropDisplay(x + part.offsetX(), y + part.offsetY(), z + part.offsetZ(), part));
+            displayIds.add(spawnPropDisplay(x + 0.5 + part.offsetX(), y + 0.5 + part.offsetY(), z + 0.5 + part.offsetZ(), part));
         }
         Location hitboxLocation = new Location(world, x + 0.5, y, z + 0.5);
         Interaction interaction = world.spawn(hitboxLocation, Interaction.class, entity -> {
@@ -5185,13 +5183,11 @@ public final class HallsSession {
         float scaleX = randomDisplayScale(1.0f);
         float scaleY = randomDisplayScale(1.0f);
         float scaleZ = randomDisplayScale(1.0f);
-        return new Transformation(
-                new Vector3f((1.0f - scaleX) * 0.5f, 0.0f, (1.0f - scaleZ) * 0.5f),
+        return HallsDisplayTransforms.centeredBlock(
+                scaleX, scaleY, scaleZ,
                 new Quaternionf().rotateXYZ((float) Math.toRadians(rotationX),
                         (float) Math.toRadians(rotationY),
-                        (float) Math.toRadians(rotationZ)),
-                new Vector3f(scaleX, scaleY, scaleZ),
-                new Quaternionf());
+                        (float) Math.toRadians(rotationZ)));
     }
 
     private BlockData displayBlockData(Material material, String configured) {

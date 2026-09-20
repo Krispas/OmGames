@@ -36,9 +36,7 @@ import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.util.Transformation;
 import org.joml.Quaternionf;
-import org.joml.Vector3f;
 
 public final class HallsCampRuntime {
     public interface ScrapAccount {
@@ -1141,16 +1139,13 @@ public final class HallsCampRuntime {
             double[] offset = rotatedOffset(part.offsetX(), part.offsetZ(), plot.facing());
             Location location = new Location(world,
                     plot.x() + 0.5 + offset[0],
-                    plot.y() + part.offsetY(),
+                    plot.y() + part.offsetY() + part.scaleY() * 0.5,
                     plot.z() + 0.5 + offset[1]);
             BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
                 entity.setBlock(blockData(part.material(), part.blockData()));
                 entity.setBillboard(Display.Billboard.FIXED);
-                entity.setTransformation(new Transformation(
-                        centerOnDisplayOrigin(part.scaleX(), part.scaleZ(), plot.facing()),
-                        partRotation(part, plot.facing()),
-                        new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
-                        new Quaternionf()));
+                entity.setTransformation(HallsDisplayTransforms.centeredBlock(
+                        part.scaleX(), part.scaleY(), part.scaleZ(), partRotation(part, plot.facing())));
                 entity.setPersistent(false);
                 entity.addScoreboardTag("omgames_hoc_camp_building");
             });
@@ -1990,15 +1985,6 @@ public final class HallsCampRuntime {
                 .rotateXYZ((float) Math.toRadians(part.rotationX()),
                         (float) Math.toRadians(part.rotationY()),
                         (float) Math.toRadians(part.rotationZ()));
-    }
-
-    private Vector3f centerOnDisplayOrigin(double scaleX, double scaleZ, BlockFace facing) {
-        return switch (facing) {
-            case EAST -> new Vector3f((float) (-scaleZ * 0.5), 0.0f, (float) (scaleX * 0.5));
-            case SOUTH -> new Vector3f((float) (scaleX * 0.5), 0.0f, (float) (scaleZ * 0.5));
-            case WEST -> new Vector3f((float) (scaleZ * 0.5), 0.0f, (float) (-scaleX * 0.5));
-            default -> new Vector3f((float) (-scaleX * 0.5), 0.0f, (float) (-scaleZ * 0.5));
-        };
     }
 
     private double[] rotatedOffset(double x, double z, BlockFace facing) {
