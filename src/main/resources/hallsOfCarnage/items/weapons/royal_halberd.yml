@@ -7,7 +7,7 @@ max-stack-size: 1
 lore:
   - "A ceremonial spear balanced for decisive lunges."
 stats:
-  melee-damage: 8
+  melee-damage: 7
   attack-speed: 1.0
   movement-speed-percent: 20
   durability: 110

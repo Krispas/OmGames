@@ -166,3 +166,4 @@ For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, mycelia_farm, research_table, scanner, sculk purifier, speed totem, storage locker.
 - New breakables
 - Texture all items
+- Fix skins from OmVeins side

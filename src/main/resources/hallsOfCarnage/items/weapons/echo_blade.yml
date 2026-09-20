@@ -8,7 +8,7 @@ max-stack-size: 1
 lore:
   - "A rare blade that hums near old blood."
 stats:
-  melee-damage: 8
+  melee-damage: 9
   attack-speed: 1.8
   durability: 160
 recipe:

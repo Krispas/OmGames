@@ -8,7 +8,7 @@ lore:
   - "A dense head of humming salvage and dead sensors."
   - "Heavy hits ripple through nearby monsters."
 stats:
-  melee-damage: 9
+  melee-damage: 11
   attack-speed: 0.9
   aoe-damage: 1.5
   aoe-radius: 2.75
