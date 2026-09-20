@@ -4,3 +4,4 @@ entity-type: SPIDER
 health: 1
 scale: 0.35
 movement-speed-multiplier: 0.7
+attack-damage: 1

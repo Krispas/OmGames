@@ -18,6 +18,8 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.BlockDisplay;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Ageable;
 import org.bukkit.entity.Creature;
 import org.bukkit.entity.Entity;
@@ -35,6 +37,10 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.Transformation;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 final class HallsSessionMonsterRuntime {
     private static final int SPAWN_INTERVAL_TICKS = 100;
@@ -256,16 +262,49 @@ final class HallsSessionMonsterRuntime {
         }
         if (typeId.equals("rotting_soldier")) {
             Location location = entity.getLocation().clone();
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                world.spawnParticle(org.bukkit.Particle.EXPLOSION, location.clone().add(0.0, 0.4, 0.0), 1);
-                world.spawnParticle(org.bukkit.Particle.SMOKE, location.clone().add(0.0, 0.5, 0.0), 40, 0.9, 0.4, 0.9, 0.04);
-                world.playSound(location, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 0.85f, 1.25f);
-                for (Entity nearby : world.getNearbyEntities(location, 2.75, 2.75, 2.75)) {
-                    if (nearby instanceof LivingEntity living && living.getLocation().distanceSquared(location) <= 2.75 * 2.75) {
-                        living.damage(10.0, entity);
+            BlockDisplay tnt = world.spawn(location.clone().add(0.0, 0.1, 0.0), BlockDisplay.class, display -> {
+                display.setBlock(Material.TNT.createBlockData());
+                display.setBillboard(Display.Billboard.FIXED);
+                display.setPersistent(false);
+                display.addScoreboardTag("omgames_hoc_monster");
+                display.setTransformation(new Transformation(
+                        new Vector3f(-0.3f, 0.0f, -0.3f),
+                        new Quaternionf(),
+                        new Vector3f(0.6f, 0.6f, 0.6f),
+                        new Quaternionf()));
+            });
+            new BukkitRunnable() {
+                private int ticks;
+
+                @Override
+                public void run() {
+                    if (!tnt.isValid()) {
+                        cancel();
+                        return;
                     }
+                    if (ticks < 60) {
+                        if (ticks % 10 == 0) {
+                            float pitch = 0.75f + ticks / 60.0f;
+                            world.playSound(location, org.bukkit.Sound.BLOCK_NOTE_BLOCK_HAT, 0.75f, pitch);
+                            world.spawnParticle(org.bukkit.Particle.SMOKE, location.clone().add(0.0, 0.55, 0.0),
+                                    6, 0.25, 0.15, 0.25, 0.01);
+                        }
+                        ticks++;
+                        return;
+                    }
+                    tnt.remove();
+                    world.spawnParticle(org.bukkit.Particle.EXPLOSION, location.clone().add(0.0, 0.4, 0.0), 1);
+                    world.spawnParticle(org.bukkit.Particle.SMOKE, location.clone().add(0.0, 0.5, 0.0), 55, 1.2, 0.45, 1.2, 0.05);
+                    world.playSound(location, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.05f);
+                    double radius = 4.0;
+                    for (Entity nearby : world.getNearbyEntities(location, radius, radius, radius)) {
+                        if (nearby instanceof LivingEntity living && living.getLocation().distanceSquared(location) <= radius * radius) {
+                            living.damage(13.0, entity);
+                        }
+                    }
+                    cancel();
                 }
-            }, 60L);
+            }.runTaskTimer(plugin, 1L, 1L);
         } else if (typeId.equals("dammed_librarian")) {
             spawnPoisonCloud(entity.getLocation());
         }
@@ -433,6 +472,11 @@ final class HallsSessionMonsterRuntime {
             if (attackDamage != null) {
                 attackDamage.setBaseValue(4.0);
             }
+        } else if (type.attackDamage() >= 0.0) {
+            AttributeInstance attackDamage = living.getAttribute(Attribute.ATTACK_DAMAGE);
+            if (attackDamage != null) {
+                attackDamage.setBaseValue(type.attackDamage());
+            }
         }
     }
 
@@ -529,7 +573,7 @@ final class HallsSessionMonsterRuntime {
         if (configured != null) {
             return configured;
         }
-        return new HallsMonsterType("warden", "Warden", EntityType.WARDEN, 500.0, false, 0, 1.0, 1.0, Material.AIR, Map.of());
+        return new HallsMonsterType("warden", "Warden", EntityType.WARDEN, 500.0, false, 0, 1.0, 1.0, -1.0, Material.AIR, Map.of());
     }
 
     private HallsExplorationGenerator.Cell spawnCellAwayFromPlayers(HallsMonsterType type) {

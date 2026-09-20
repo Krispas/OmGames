@@ -597,6 +597,9 @@ public final class HallsSession {
     }
 
     public boolean handleBreakableAttack(Player player, Entity entity) {
+        if (trapRuntime.handleTrapAttack(player, entity)) {
+            return true;
+        }
         BreakableProp prop = entity == null ? null : breakableProps.get(entity.getUniqueId());
         if (prop == null) {
             return false;
@@ -5961,6 +5964,10 @@ public final class HallsSession {
         drop.location().setX(next.getX());
         drop.location().setY(next.getY());
         drop.location().setZ(next.getZ());
+        if (trapRuntime.disarmProximityMineNear(next)) {
+            removePhysicsDrop(drop);
+            return;
+        }
         display.teleport(next);
         interaction.teleport(next.clone().add(0.0, -0.15, 0.0));
     }

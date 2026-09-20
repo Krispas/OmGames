@@ -3,7 +3,7 @@ kind: homing_mine
 weight: 5
 level-types:
   - bunker
-model-material: HEAVY_WEIGHTED_PRESSURE_PLATE
+model-material: LIGHT_WEIGHTED_PRESSURE_PLATE
 model-scale: 1.15
 damage: 7
 radius: 3.0

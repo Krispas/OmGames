@@ -30,6 +30,7 @@ import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.PufferFish;
@@ -143,6 +144,45 @@ final class HallsSessionTrapRuntime {
             }
             triggerArmyCoffin(trap, player);
             return true;
+        }
+        return false;
+    }
+
+    boolean handleTrapAttack(Player player, Entity entity) {
+        if (player == null || entity == null) {
+            return false;
+        }
+        for (HallsTrap trap : List.copyOf(traps)) {
+            if (!trap.displayIds().contains(entity.getUniqueId())) {
+                continue;
+            }
+            if (trap.kind() == TrapKind.ENCHANTED_BOOK) {
+                destroyEnchantedBookTrap(trap, player);
+                return true;
+            }
+            if (trap.kind() == TrapKind.ARMY_COFFIN) {
+                triggerArmyCoffin(trap, player);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    boolean disarmProximityMineNear(Location location) {
+        if (location == null || !world.equals(location.getWorld())) {
+            return false;
+        }
+        for (HallsTrap trap : List.copyOf(traps)) {
+            if (trap.kind() != TrapKind.PROXIMITY_MINE) {
+                continue;
+            }
+            Location mine = new Location(world, trap.x() + 0.5, origin.y() + 0.1, trap.z() + 0.5);
+            if (location.distanceSquared(mine) <= 1.35 * 1.35) {
+                world.spawnParticle(Particle.SMOKE, mine, 18, 0.35, 0.15, 0.35, 0.02);
+                world.playSound(mine, Sound.BLOCK_LEVER_CLICK, 0.75f, 0.55f);
+                removeTrap(trap);
+                return true;
+            }
         }
         return false;
     }
@@ -297,6 +337,7 @@ final class HallsSessionTrapRuntime {
         for (Set<HallsExplorationGenerator.Cell> pitCells : pitMasks(candidate, random, type)) {
             if (pitCells.isEmpty()
                     || !Collections.disjoint(pitCells, liquidCells)
+                    || !Collections.disjoint(borderCells(pitCells), liquidCells)
                     || !Collections.disjoint(pitCells, occupied)) {
                 continue;
             }
@@ -821,11 +862,25 @@ final class HallsSessionTrapRuntime {
             case BUBBLES -> buildSewerWaterFixture(cell, type);
             case GEYSER -> buildSewerWaterFixture(cell, type);
             case PUFFERFISH -> List.of(spawnPufferfish(cell));
-            case ARMY_COFFIN -> List.of(spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 90.0));
+            case ARMY_COFFIN -> withInteraction(cell,
+                    spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 90.0), 1.35f, 1.0f);
             case HOMING_MINE -> List.of(spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 0.0));
-            case ENCHANTED_BOOK -> List.of(spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 0.0));
+            case ENCHANTED_BOOK -> withInteraction(cell,
+                    spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 0.0), 0.8f, 0.9f);
             default -> List.of();
         };
+    }
+
+    private List<UUID> withInteraction(HallsExplorationGenerator.Cell cell, UUID displayId, float width, float height) {
+        Interaction interaction = world.spawn(new Location(world, cell.x() + 0.5, origin.y(), cell.z() + 0.5),
+                Interaction.class, entity -> {
+                    entity.setInteractionWidth(width);
+                    entity.setInteractionHeight(height);
+                    entity.setResponsive(true);
+                    entity.setPersistent(false);
+                    entity.addScoreboardTag("omgames_hoc_trap");
+                });
+        return List.of(displayId, interaction.getUniqueId());
     }
 
     private void buildPit(Set<HallsExplorationGenerator.Cell> pitCells,
@@ -1022,6 +1077,9 @@ final class HallsSessionTrapRuntime {
     }
 
     private UUID movingDisplayId(TrapKind kind, List<UUID> displayIds) {
+        if (kind == TrapKind.HOMING_MINE && !displayIds.isEmpty()) {
+            return displayIds.get(0);
+        }
         if ((kind != TrapKind.SWINGING_BLADE && kind != TrapKind.WALL_SPIKES) || displayIds.size() < 2) {
             return null;
         }
@@ -1188,8 +1246,12 @@ final class HallsSessionTrapRuntime {
         if (target != null && display != null) {
             Vector delta = target.getLocation().toVector().subtract(display.getLocation().toVector());
             delta.setY(0.0);
+            if (delta.lengthSquared() <= 1.15 * 1.15) {
+                triggerProximityMine(trap, target);
+                return;
+            }
             if (delta.lengthSquared() > 0.04) {
-                Location next = display.getLocation().add(delta.normalize().multiply(0.16));
+                Location next = display.getLocation().add(delta.normalize().multiply(0.22));
                 next.setY(origin.y() + 0.15);
                 display.teleport(next);
                 world.spawnParticle(Particle.SMOKE, next.clone().add(0.0, 0.2, 0.0), 2, 0.08, 0.04, 0.08, 0.01);
@@ -1280,13 +1342,21 @@ final class HallsSessionTrapRuntime {
     }
 
     private void triggerProximityMine(HallsTrap trap, LivingEntity trigger) {
-        Location location = new Location(world, trap.x() + 0.5, origin.y(), trap.z() + 0.5);
+        Location location = activeMineLocation(trap);
         world.playSound(location, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.2f);
         world.spawnParticle(Particle.EXPLOSION, location.clone().add(0.0, 0.45, 0.0), 1, 0.0, 0.0, 0.0, 0.0);
         world.spawnParticle(Particle.SMOKE, location.clone().add(0.0, 0.35, 0.0), 30, 0.9, 0.35, 0.9, 0.03);
         damagePlayersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage(), "A proximity mine detonates.");
         damageMonstersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage());
         removeTrap(trap);
+    }
+
+    private Location activeMineLocation(HallsTrap trap) {
+        Entity display = trap.movingDisplayId() == null ? null : Bukkit.getEntity(trap.movingDisplayId());
+        if (trap.kind() == TrapKind.HOMING_MINE && display != null && display.isValid()) {
+            return display.getLocation().clone();
+        }
+        return new Location(world, trap.x() + 0.5, origin.y(), trap.z() + 0.5);
     }
 
     private void triggerBearTrap(HallsTrap trap, LivingEntity trigger) {
@@ -1316,6 +1386,14 @@ final class HallsSessionTrapRuntime {
             lootDropSink.accept(location);
             player.sendActionBar(Component.text("The coffin breaks open with salvage dust inside.", NamedTextColor.GOLD));
         }
+        removeTrap(trap);
+    }
+
+    private void destroyEnchantedBookTrap(HallsTrap trap, Player player) {
+        Location location = new Location(world, trap.x() + 0.5, origin.y() + 0.6, trap.z() + 0.5);
+        world.spawnParticle(Particle.ENCHANT, location, 28, 0.35, 0.25, 0.35, 0.03);
+        world.playSound(location, Sound.ITEM_BOOK_PUT, 0.8f, 0.7f);
+        player.sendActionBar(Component.text("The enchanted book unravels.", NamedTextColor.LIGHT_PURPLE));
         removeTrap(trap);
     }
 
@@ -1569,12 +1647,18 @@ final class HallsSessionTrapRuntime {
 
     private void damagePlayersInLine(HallsTrap trap, double radius, double width, double damage, String message) {
         for (Player player : participantsInLine(trap, wallTrapReach(trap, radius), width)) {
+            if (trap.kind() == TrapKind.WALL_SPIKES && player.getLocation().getY() < origin.y() - 0.05) {
+                continue;
+            }
             damagePlayerFromTrap(player, damage, message);
         }
     }
 
     private void damageMonstersInLine(HallsTrap trap, double radius, double width, double damage) {
         for (LivingEntity monster : monstersInLine(trap, wallTrapReach(trap, radius), width)) {
+            if (trap.kind() == TrapKind.WALL_SPIKES && monster.getLocation().getY() < origin.y() - 0.05) {
+                continue;
+            }
             damageMonsterFromTrap(monster, damage);
         }
     }
@@ -1585,6 +1669,21 @@ final class HallsSessionTrapRuntime {
         double forward = -(dx * trap.face().getModX() + dz * trap.face().getModZ());
         double lateral = Math.abs(trap.face().getModX() == 0 ? dx : dz);
         return forward >= 0.0 && forward <= radius && lateral <= width;
+    }
+
+    private Set<HallsExplorationGenerator.Cell> borderCells(Set<HallsExplorationGenerator.Cell> cells) {
+        Set<HallsExplorationGenerator.Cell> border = new HashSet<>();
+        for (HallsExplorationGenerator.Cell cell : cells) {
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                HallsExplorationGenerator.Cell side = new HallsExplorationGenerator.Cell(
+                        cell.x() + face.getModX(),
+                        cell.z() + face.getModZ());
+                if (!cells.contains(side)) {
+                    border.add(side);
+                }
+            }
+        }
+        return border;
     }
 
     private double wallTrapReach(HallsTrap trap, double configuredReach) {

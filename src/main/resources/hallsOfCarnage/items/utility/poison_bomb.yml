@@ -2,7 +2,7 @@ id: poison_bomb
 name: "Poison Bomb"
 category: utility
 rarity: rare
-material: SPLASH_POTION
+material: SPIDER_EYE
 item-model: minecraft:spider_eye
 max-stack-size: 1
 lore:

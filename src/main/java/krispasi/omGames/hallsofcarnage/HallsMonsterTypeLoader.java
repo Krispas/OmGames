@@ -57,6 +57,7 @@ final class HallsMonsterTypeLoader {
                 Math.max(0, yaml.getInt("slime-size", 0)),
                 Math.max(0.1, yaml.getDouble("scale", 1.0)),
                 Math.max(0.0, yaml.getDouble("movement-speed-multiplier", 1.0)),
+                yaml.getDouble("attack-damage", -1.0),
                 material(yaml.getString("equipment.main-hand"), Material.AIR),
                 armor(yaml.getConfigurationSection("equipment.armor"))
         );
@@ -81,7 +82,7 @@ final class HallsMonsterTypeLoader {
             EntityType entityType = entityType(id);
             if (entityType != null) {
                 monsters.put(id, new HallsMonsterType(id, title(id), entityType, defaultHealth(entityType),
-                        false, 0, 1.0, 1.0, Material.AIR, Map.of()));
+                        false, 0, 1.0, 1.0, -1.0, Material.AIR, Map.of()));
             }
         }
     }
