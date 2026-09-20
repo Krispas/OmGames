@@ -13,6 +13,22 @@ levels:
       - material: PODZOL
         offset: [0, 0, 0]
         scale: [1, 0.25, 1]
+      - material: SPRUCE_SHELF
+        offset: [0, 0, -0.75]
+        block-data: "facing=north"
+        scale: [1, 0.5, 0.5]
+      - material: SPRUCE_SHELF
+        offset: [0, 0, 0.75]
+        block-data: "facing=south"
+        scale: [1, 0.5, 0.5]
+      - material: SPRUCE_SHELF
+        offset: [0.75, 0, 0]
+        block-data: "facing=east"
+        scale: [0.5, 0.5, 1]
+      - material: SPRUCE_SHELF
+        offset: [-0.75, 0, 0]
+        block-data: "facing=west"
+        scale: [0.5, 0.5, 1]
       - material: BROWN_MUSHROOM
         offset: [0.15, 0.25, 0.1]
         scale: [0.7, 0.7, 0.7]
@@ -21,21 +37,21 @@ levels:
         offset: [0, 0, 0]
         scale: [1, 0.25, 1]
       - material: SPRUCE_SHELF
-        offset: [0, 0, 0]
+        offset: [0, 0, -0.75]
         block-data: "facing=north"
-        scale: [1, 1, 1]
+        scale: [1, 0.5, 0.5]
       - material: SPRUCE_SHELF
-        offset: [0, 0, 0]
+        offset: [0, 0, 0.75]
         block-data: "facing=south"
-        scale: [1, 1, 1]
+        scale: [1, 0.5, 0.5]
       - material: SPRUCE_SHELF
-        offset: [0, 0, 0]
+        offset: [0.75, 0, 0]
         block-data: "facing=east"
-        scale: [1, 1, 1]
+        scale: [0.5, 0.5, 1]
       - material: SPRUCE_SHELF
-        offset: [0, 0, 0]
+        offset: [-0.75, 0, 0]
         block-data: "facing=west"
-        scale: [1, 1, 1]
+        scale: [0.5, 0.5, 1]
   2:
     upgrade-cost: {diamond: 2}
     harvest:
@@ -46,6 +62,22 @@ levels:
       - material: MYCELIUM
         offset: [0, 0, 0]
         scale: [1, 0.25, 1]
+      - material: SPRUCE_SHELF
+        offset: [0, 0, -0.75]
+        block-data: "facing=north"
+        scale: [1, 0.5, 0.5]
+      - material: SPRUCE_SHELF
+        offset: [0, 0, 0.75]
+        block-data: "facing=south"
+        scale: [1, 0.5, 0.5]
+      - material: SPRUCE_SHELF
+        offset: [0.75, 0, 0]
+        block-data: "facing=east"
+        scale: [0.5, 0.5, 1]
+      - material: SPRUCE_SHELF
+        offset: [-0.75, 0, 0]
+        block-data: "facing=west"
+        scale: [0.5, 0.5, 1]
       - material: BROWN_MUSHROOM
         offset: [0.15, 0.25, 0.1]
         scale: [0.8, 0.8, 0.8]
@@ -56,6 +88,22 @@ levels:
       - material: MYCELIUM
         offset: [0, 0, 0]
         scale: [1, 0.25, 1]
+      - material: SPRUCE_SHELF
+        offset: [0, 0, -0.75]
+        block-data: "facing=north"
+        scale: [1, 0.5, 0.5]
+      - material: SPRUCE_SHELF
+        offset: [0, 0, 0.75]
+        block-data: "facing=south"
+        scale: [1, 0.5, 0.5]
+      - material: SPRUCE_SHELF
+        offset: [0.75, 0, 0]
+        block-data: "facing=east"
+        scale: [0.5, 0.5, 1]
+      - material: SPRUCE_SHELF
+        offset: [-0.75, 0, 0]
+        block-data: "facing=west"
+        scale: [0.5, 0.5, 1]
       - material: DEAD_BUSH
         offset: [0.15, 0.2, 0.1]
         scale: [0.55, 0.55, 0.55]
@@ -69,14 +117,46 @@ levels:
     parts:
       - material: MYCELIUM
         offset: [0, 0, 0]
-        scale: [1.1, 0.25, 1.1]
+        scale: [1.0, 0.25, 1.0]
+      - material: SPRUCE_SHELF
+        offset: [0, 0, -0.75]
+        block-data: "facing=north"
+        scale: [1, 0.5, 0.5]
+      - material: SPRUCE_SHELF
+        offset: [0, 0, 0.75]
+        block-data: "facing=south"
+        scale: [1, 0.5, 0.5]
+      - material: SPRUCE_SHELF
+        offset: [0.75, 0, 0]
+        block-data: "facing=east"
+        scale: [0.5, 0.5, 1]
+      - material: SPRUCE_SHELF
+        offset: [-0.75, 0, 0]
+        block-data: "facing=west"
+        scale: [0.5, 0.5, 1]
       - material: BROWN_MUSHROOM_BLOCK
         offset: [0.1, 0.45, 0.1]
         scale: [0.45, 0.45, 0.45]
     empty-parts:
       - material: MYCELIUM
         offset: [0, 0, 0]
-        scale: [1.1, 0.25, 1.1]
+        scale: [1.0, 0.25, 1.0]
+      - material: SPRUCE_SHELF
+        offset: [0, 0, -0.75]
+        block-data: "facing=north"
+        scale: [1, 0.5, 0.5]
+      - material: SPRUCE_SHELF
+        offset: [0, 0, 0.75]
+        block-data: "facing=south"
+        scale: [1, 0.5, 0.5]
+      - material: SPRUCE_SHELF
+        offset: [0.75, 0, 0]
+        block-data: "facing=east"
+        scale: [0.5, 0.5, 1]
+      - material: SPRUCE_SHELF
+        offset: [-0.75, 0, 0]
+        block-data: "facing=west"
+        scale: [0.5, 0.5, 1]
       - material: DEAD_BUSH
         offset: [0.1, 0.2, 0.1]
         scale: [0.65, 0.65, 0.65]

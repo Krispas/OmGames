@@ -138,10 +138,13 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- Harvesting mycelia farm, doing /hoc leave and returning makes the stuff regrow... did some update break the saving of building charges? Can you look into it throughout the whole building system
+- When going through vents on the library level, rotate the player to face outwards.
+- Make jumping over overdrive spawner shockwaves easier, it is really hard not to get damage.
+- Overdrive spawner now cannot be hit with uncharged weapon, I want the weapon to be able to hit him any time just like any normal mob. I know datapck makers use invisible pigs as hitboxes to simulate this, we have plugin however, so we can do this more smoothly, can you look up how this is done proffesionally in the modern MC versions?
 
 Future slices (dont do yet):
 - Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too). Place it on the last fight floor. While working on it, merge behaviour of poison bomb poioson cloud, librarian poison cloud and the poison clouds from the boss, of course the poison bomb one effects monsters only and the other two ones players only.
-- When going through vents on the library level, rotate the player to face outwards.
 
 For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, mycelia_farm, research_table, scanner, sculk purifier, speed totem, storage locker.
