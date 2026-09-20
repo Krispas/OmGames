@@ -142,9 +142,9 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- Rework the floor structure for the whole scenario based on Extra Resources/halls_of_carnage/UntoldDepthsLevels.csv, there are two boss levels, Overdrive Spawner and Archaic Guards, for now just replace them with the fight floor that currently sits on floor 50.
 
 Future slices (dont do yet):
-- Rework the floor structure for the whole scenario based on Extra Resources/halls_of_carnage/UntoldDepthsLevels.csv, there are two boss levels, Overdrive Spawner and Archaic Guards, for now just replace them with the fight floor that currently sits on floor 50.
 - Boss 1 - Add first boss: Overdrive Spawner, documented in overdrive_spawner.md. Use boss_floor.md for design as they are replacements for fight floors. Place it on the first fight floor.
 - Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too). Place it on the last fight floor.
 
