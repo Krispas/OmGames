@@ -5851,7 +5851,8 @@ public final class HallsSession {
         if (node == null || unlockedResearch.contains(node.id()) || researchPoints < node.cost()) {
             return false;
         }
-        return unlockedResearch.containsAll(node.prerequisites());
+        return node.prerequisites().isEmpty()
+                || node.prerequisites().stream().anyMatch(unlockedResearch::contains);
     }
 
     private boolean unlockResearch(String nodeId) {

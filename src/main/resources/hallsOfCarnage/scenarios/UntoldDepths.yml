@@ -285,132 +285,253 @@ crafting-stations:
       - marathons
 research:
   nodes:
-    field_cooking:
-      name: "Field Cooking"
-      icon: COOKED_BEEF
+    basics:
+      name: "Basics"
+      icon: BOOK
       cost: 0
-      unlocks:
-        - cooked_mycelia
-        - potato
-        - carrot
-        - raw_pufferfish
-        - sculk_cleansing_hash
-        - hearty_mycelia_stew
-        - fleetfoot_ration
-        - stonehide_chowder
-    camp_tools:
-      name: "Camp Tools"
-      icon: STONE_AXE
-      cost: 0
+      row: 3
+      column: 1
       unlocks:
         - vagabonds_club
-        - rusty_sword
-        - poking_stick
-        - shortbow
-        - lodestone
-        - handheld_scanner
-        - smoke_bomb
-        - mending_salve
         - padded_cap
         - padded_armor
         - padded_leggings
         - padded_boots
-    better_meals:
-      name: "Better Meals"
-      icon: RABBIT_STEW
-      cost: 1
-      prerequisites:
-        - field_cooking
-      unlocks:
-        - ember_stew
-        - golden_jerky
-        - pufferfish_stew
-    mining_arms:
-      name: "Mining Arms"
-      icon: IRON_PICKAXE
-      cost: 1
-      prerequisites:
-        - camp_tools
-      unlocks:
         - miner_pick
-        - bone_cleaver
-        - conductpole
-        - poisoned_dagger
-        - crossbow
+        - poking_stick
+        - cooked_mycelia
+        - sculk_cleansing_hash
+    knights_feast:
+      name: "Knight's Feast"
+      icon: COOKED_BEEF
+      cost: 1
+      row: 2
+      column: 3
+      prerequisites:
+        - improved_gear
+      unlocks:
+        - shortbow
+        - rusty_sword
+        - stonehide_chowder
+        - fleetfoot_ration
+    improved_gear:
+      name: "Improved Gear"
+      icon: IRON_SWORD
+      cost: 1
+      row: 3
+      column: 3
+      prerequisites:
+        - basics
+      unlocks:
         - chainmail_coif
         - chainmail_hauberk
         - chainmail_leggings
         - chainmail_boots
-    frostcraft:
-      name: "Frostcraft"
-      icon: TRIDENT
-      cost: 2
+        - smoke_bomb
+        - lodestone
+        - bone_cleaver
+    soup_mastery:
+      name: "Soup Mastery"
+      icon: RABBIT_STEW
+      cost: 1
+      row: 4
+      column: 3
       prerequisites:
-        - mining_arms
+        - improved_gear
       unlocks:
-        - frost_lance
-        - smasher
-        - sightline
-        - replated
-        - sneakers
-        - sprinters_treasure
-        - ironbound_helmet
-        - ironbound_chestplate
-        - ironbound_leggings
-        - ironbound_boots
-        - adrenaline_shot
-    warding:
-      name: "Warding"
+        - crossbow
+        - bonker
+        - ember_stew
+        - hearty_mycelia_stew
+        - pufferfish_stew
+    magic_gear:
+      name: "Magic Gear"
       icon: TOTEM_OF_UNDYING
       cost: 2
+      row: 1
+      column: 5
       prerequisites:
-        - better_meals
-        - mining_arms
+        - knights_feast
       unlocks:
+        - poisoned_dagger
         - warding_totem
-        - ironhide_salve
+    advanced_combat:
+      name: "Advanced Combat"
+      icon: DIAMOND_SWORD
+      cost: 1
+      row: 2
+      column: 5
+      prerequisites:
+        - sturdy_armor
+        - magic_gear
+      unlocks:
+        - replated
+        - sightline
+    sturdy_armor:
+      name: "Sturdy Armor"
+      icon: IRON_CHESTPLATE
+      cost: 2
+      row: 3
+      column: 5
+      prerequisites:
+        - improved_gear
+      unlocks:
         - cinder_helmet
         - cinderplate
         - cinder_leggings
         - cinder_boots
-        - bonker
-        - bubblebow
-    stormcraft:
-      name: "Stormcraft"
+        - ironbound_helmet
+        - ironbound_chestplate
+        - ironbound_leggings
+        - ironbound_boots
+        - frost_lance
+        - adrenaline_shot
+    scouting:
+      name: "Scouting"
+      icon: LEATHER_LEGGINGS
+      cost: 1
+      row: 4
+      column: 5
+      prerequisites:
+        - sturdy_armor
+        - conduction
+      unlocks:
+        - sneakers
+        - sprinters_treasure
+    conduction:
+      name: "Conduction"
       icon: LIGHTNING_ROD
-      cost: 3
+      cost: 2
+      row: 5
+      column: 5
       prerequisites:
-        - frostcraft
+        - soup_mastery
       unlocks:
-        - storm_vial
-        - echo_blade
+        - conductpole
+        - ironhide_salve
+    heavy_ordnance:
+      name: "Heavy Ordnance"
+      icon: TNT
+      cost: 2
+      row: 1
+      column: 7
+      prerequisites:
+        - magic_gear
+      unlocks:
         - longbow
-        - reinforced_crossbow
-        - royal_halberd
-    sculk_studies:
-      name: "Sculk Studies"
-      icon: SCULK_CATALYST
-      cost: 3
-      prerequisites:
-        - warding
-      unlocks:
-        - poison_bomb
-        - sculk_maul
         - explodificator
-        - stormterrow
-        - deeproot_purge_stew
+    advanced_scouting:
+      name: "Advanced Scouting"
+      icon: COMPASS
+      cost: 2
+      row: 2
+      column: 7
+      prerequisites:
+        - sturdy_armor
+        - heavy_ordnance
+      unlocks:
+        - bubblebow
+        - handheld_scanner
+    reinforced_armor:
+      name: "Reinforced Armor"
+      icon: DIAMOND_CHESTPLATE
+      cost: 2
+      row: 3
+      column: 7
+      prerequisites:
+        - sturdy_armor
+        - acrobatics
+        - master_combat
+      unlocks:
         - reinforced_helmet
         - reinforced_chestplate
         - reinforced_leggings
         - reinforced_boots
+        - smasher
+    stormcraft:
+      name: "Stormcraft"
+      icon: TRIDENT
+      cost: 2
+      row: 4
+      column: 7
+      prerequisites:
+        - sturdy_armor
+        - royal_equipment
+      unlocks:
+        - stormterrow
+        - storm_vial
+    royal_equipment:
+      name: "Royal Equipment"
+      icon: GOLDEN_CHESTPLATE
+      cost: 2
+      row: 5
+      column: 7
+      prerequisites:
+        - conduction
+      unlocks:
+        - reinforced_crossbow
+        - royal_halberd
+    resonance:
+      name: "Resonance"
+      icon: ECHO_SHARD
+      cost: 3
+      row: 1
+      column: 9
+      prerequisites:
+        - heavy_ordnance
+      unlocks:
+        - echo_blade
+        - mending_salve
+        - golden_jerky
+    master_combat:
+      name: "Master Combat"
+      icon: NETHERITE_SWORD
+      cost: 2
+      row: 2
+      column: 9
+      prerequisites:
+        - advanced_scouting
+        - deepguard_armor
+      unlocks:
+        - superguard
+        - the_crosshair
+    deepguard_armor:
+      name: "Deepguard Armor"
+      icon: NETHERITE_CHESTPLATE
+      cost: 3
+      row: 3
+      column: 9
+      prerequisites:
+        - reinforced_armor
+      unlocks:
         - deepguard_helmet
         - deepguard_plate
         - deepguard_leggings
         - deepguard_boots
-        - the_crosshair
-        - superguard
-        - the_undetected
+    acrobatics:
+      name: "Acrobatics"
+      icon: FEATHER
+      cost: 2
+      row: 4
+      column: 9
+      prerequisites:
+        - stormcraft
+        - deepguard_armor
+      unlocks:
         - marathons
+        - the_undetected
+    sculk_studies:
+      name: "Sculk Studies"
+      icon: SCULK_CATALYST
+      cost: 3
+      row: 5
+      column: 9
+      prerequisites:
+        - royal_equipment
+      unlocks:
+        - sculk_maul
+        - poison_bomb
+        - deeproot_purge_stew
 floors:
   - number: 1
     kind: start

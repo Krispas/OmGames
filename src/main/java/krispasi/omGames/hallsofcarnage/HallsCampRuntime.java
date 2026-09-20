@@ -920,10 +920,12 @@ public final class HallsCampRuntime {
     private void openResearchMenu(Player player, Plot plot) {
         Inventory inventory = Bukkit.createInventory(new CampMenu(plot.id(), "research", "", 0), 54,
                 Component.text("Camp Station: Research", NamedTextColor.DARK_GREEN));
-        inventory.setItem(4, menuItem(Material.EXPERIENCE_BOTTLE, "Research Points", NamedTextColor.AQUA,
+        inventory.setItem(49, menuItem(Material.EXPERIENCE_BOTTLE, "Research Points", NamedTextColor.AQUA,
                 List.of("Available: " + researchPointsLabel()), null, null));
         List<HallsResearchNode> nodes = scenario == null ? List.of() : scenario.researchNodes().values().stream()
-                .sorted(java.util.Comparator.comparingInt((HallsResearchNode node) -> node.prerequisites().size())
+                .sorted(java.util.Comparator.comparingInt((HallsResearchNode node) -> node.column() <= 0 ? 99 : node.column())
+                        .thenComparingInt(node -> node.row() <= 0 ? 99 : node.row())
+                        .thenComparingInt(node -> node.prerequisites().size())
                         .thenComparing(HallsResearchNode::id))
                 .toList();
         if (nodes.isEmpty()) {
@@ -934,6 +936,21 @@ public final class HallsCampRuntime {
             player.openInventory(inventory);
             return;
         }
+        Set<Integer> usedSlots = new HashSet<>();
+        List<HallsResearchNode> unplacedNodes = new ArrayList<>();
+        for (HallsResearchNode node : nodes) {
+            if (!node.hasGridPosition()) {
+                unplacedNodes.add(node);
+                continue;
+            }
+            int slot = researchGridSlot(node);
+            if (slot < 0 || usedSlots.contains(slot)) {
+                unplacedNodes.add(node);
+                continue;
+            }
+            usedSlots.add(slot);
+            inventory.setItem(slot, researchNodeItem(node));
+        }
         int[][] slotsByDepth = {
                 {10, 19, 28, 37},
                 {12, 21, 30, 39},
@@ -943,16 +960,32 @@ public final class HallsCampRuntime {
         int[] usedByDepth = new int[slotsByDepth.length];
         int overflowIndex = 0;
         int[] overflowSlots = {46, 47, 48, 50, 51, 52};
-        for (HallsResearchNode node : nodes) {
+        for (HallsResearchNode node : unplacedNodes) {
             int depth = Math.min(slotsByDepth.length - 1, researchDepth(node, new HashSet<>()));
+            while (usedByDepth[depth] < slotsByDepth[depth].length
+                    && inventory.getItem(slotsByDepth[depth][usedByDepth[depth]]) != null) {
+                usedByDepth[depth]++;
+            }
             if (usedByDepth[depth] < slotsByDepth[depth].length) {
                 inventory.setItem(slotsByDepth[depth][usedByDepth[depth]++], researchNodeItem(node));
-            } else if (overflowIndex < overflowSlots.length) {
-                inventory.setItem(overflowSlots[overflowIndex++], researchNodeItem(node));
+            } else {
+                while (overflowIndex < overflowSlots.length && inventory.getItem(overflowSlots[overflowIndex]) != null) {
+                    overflowIndex++;
+                }
+                if (overflowIndex < overflowSlots.length) {
+                    inventory.setItem(overflowSlots[overflowIndex++], researchNodeItem(node));
+                }
             }
         }
         inventory.setItem(45, menuItem(Material.ARROW, "Back", NamedTextColor.GRAY, List.of("Return to station."), "station_home", null));
         player.openInventory(inventory);
+    }
+
+    private int researchGridSlot(HallsResearchNode node) {
+        if (node == null || !node.hasGridPosition()) {
+            return -1;
+        }
+        return (node.row() - 1) * 9 + (node.column() - 1);
     }
 
     private int researchDepth(HallsResearchNode node, Set<String> visiting) {
@@ -973,7 +1006,7 @@ public final class HallsCampRuntime {
         List<String> lore = new ArrayList<>();
         lore.add("Cost: " + node.cost() + " research");
         if (!node.prerequisites().isEmpty()) {
-            lore.add("Requires: " + node.prerequisites().stream().map(this::researchName).collect(java.util.stream.Collectors.joining(", ")));
+            lore.add("Requires one: " + node.prerequisites().stream().map(this::researchName).collect(java.util.stream.Collectors.joining(", ")));
         }
         if (!node.unlocks().isEmpty()) {
             lore.add("Unlocks:");

@@ -103,6 +103,8 @@ public final class HallsScenarioLoader {
                     nodeSection.getString("name", id.replace('_', ' ')),
                     icon,
                     Math.max(0, nodeSection.getInt("cost", 1)),
+                    nodeSection.getInt("row", 0),
+                    nodeSection.getInt("column", 0),
                     nodeSection.getStringList("prerequisites"),
                     nodeSection.getStringList("unlocks")
             ));
