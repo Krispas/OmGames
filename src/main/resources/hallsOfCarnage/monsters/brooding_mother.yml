@@ -4,3 +4,5 @@ entity-type: SPIDER
 health: 15
 scale: 0.48
 movement-speed-multiplier: 0.45
+death-children:
+  spiderling: 20

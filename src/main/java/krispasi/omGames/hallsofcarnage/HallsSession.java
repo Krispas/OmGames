@@ -212,15 +212,15 @@ public final class HallsSession {
         for (Player player : players) {
             participants.add(player.getUniqueId());
         }
-        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::isAliveParticipant,
-                this::setBlock, this.trapTypes,
-                () -> activeFloorModifiers.trapDamageMultiplier(),
-                location -> dropSessionItem(location, coinItem(1)));
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
                 this::isAliveParticipant);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
                 this::maxAliveSculkPercent, this::isAliveParticipant,
                 location -> dropSessionItem(location, coinItem(1)), this::debug);
+        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::isAliveParticipant,
+                this::setBlock, this.trapTypes,
+                () -> activeFloorModifiers.trapDamageMultiplier(),
+                location -> dropSessionItem(location, coinItem(1)), monsterRuntime::spawnConfiguredMonster);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
                 type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
             @Override
@@ -2138,7 +2138,7 @@ public final class HallsSession {
         }
         List<LibraryVentCandidate> candidates = libraryVentCandidates(build, reservedCells);
         java.util.Collections.shuffle(candidates, build.random());
-        int targetPairs = Math.min(3, Math.max(1, build.plan().rooms().size() / 5));
+        int targetPairs = Math.min(6, Math.max(2, build.plan().rooms().size() / 3));
         Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
         int pairs = 0;
         while (pairs < targetPairs && candidates.size() >= 2) {

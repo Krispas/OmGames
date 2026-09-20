@@ -3,6 +3,7 @@ package krispasi.omGames.hallsofcarnage;
 import java.io.File;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.bukkit.Material;
@@ -59,8 +60,24 @@ final class HallsMonsterTypeLoader {
                 Math.max(0.0, yaml.getDouble("movement-speed-multiplier", 1.0)),
                 yaml.getDouble("attack-damage", -1.0),
                 material(yaml.getString("equipment.main-hand"), Material.AIR),
-                armor(yaml.getConfigurationSection("equipment.armor"))
+                armor(yaml.getConfigurationSection("equipment.armor")),
+                deathChildren(yaml.getConfigurationSection("death-children"))
         );
+    }
+
+    private static List<HallsMonsterType.DeathChild> deathChildren(ConfigurationSection section) {
+        if (section == null) {
+            return List.of();
+        }
+        java.util.ArrayList<HallsMonsterType.DeathChild> children = new java.util.ArrayList<>();
+        for (String key : section.getKeys(false)) {
+            String id = normalizeId(key);
+            int count = Math.max(0, section.getInt(key, 0));
+            if (!id.isBlank() && count > 0) {
+                children.add(new HallsMonsterType.DeathChild(id, count));
+            }
+        }
+        return List.copyOf(children);
     }
 
     private static Map<String, Material> armor(ConfigurationSection section) {
@@ -82,7 +99,7 @@ final class HallsMonsterTypeLoader {
             EntityType entityType = entityType(id);
             if (entityType != null) {
                 monsters.put(id, new HallsMonsterType(id, title(id), entityType, defaultHealth(entityType),
-                        false, 0, 1.0, 1.0, -1.0, Material.AIR, Map.of()));
+                        false, 0, 1.0, 1.0, -1.0, Material.AIR, Map.of(), List.of()));
             }
         }
     }

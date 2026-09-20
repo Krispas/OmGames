@@ -8,3 +8,4 @@ model-scale: 1.0
 damage: 6
 radius: 2.0
 interval-ticks: 80
+hit-points: 10

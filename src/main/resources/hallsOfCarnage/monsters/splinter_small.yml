@@ -11,3 +11,5 @@ equipment:
     chestplate: LEATHER_CHESTPLATE
     leggings: LEATHER_LEGGINGS
     boots: LEATHER_BOOTS
+death-children:
+  splinter_baby: 2

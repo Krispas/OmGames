@@ -2,8 +2,8 @@ id: poison_bomb
 name: "Poison Bomb"
 category: utility
 rarity: rare
-material: SPIDER_EYE
-item-model: minecraft:spider_eye
+material: FIREWORK_STAR
+item-model: om:poison_bomb
 max-stack-size: 1
 lore:
   - "Deploys a toxic cloud that hurts monsters, not players."

@@ -3,6 +3,7 @@ package krispasi.omGames.hallsofcarnage;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -220,36 +221,52 @@ final class HallsSessionMonsterRuntime {
         }
     }
 
+    boolean spawnConfiguredMonster(String monsterId, Location location) {
+        if (monsterId == null || location == null || !world.equals(location.getWorld())) {
+            return false;
+        }
+        HallsMonsterType type = monsterTypes.get(normalizeId(monsterId));
+        if (type == null) {
+            return false;
+        }
+        Entity entity = world.spawnEntity(location, type.entityType());
+        if (!(entity instanceof LivingEntity living)) {
+            entity.remove();
+            return false;
+        }
+        configureLivingMonster(living, type);
+        spawnedMonsters.add(living.getUniqueId());
+        spawnedThisFloor++;
+        maxAlive++;
+        return true;
+    }
+
     private void spawnDeathChildren(LivingEntity entity) {
         String typeId = entity.getPersistentDataContainer().get(monsterTypeKey, PersistentDataType.STRING);
         if (typeId == null) {
             return;
         }
-        String childId = switch (typeId) {
-            case "splinter" -> "splinter_small";
-            case "splinter_small" -> "splinter_baby";
-            case "brooding_mother" -> "spiderling";
-            default -> "";
-        };
-        if (childId.isBlank()) {
+        HallsMonsterType type = monsterTypes.get(typeId);
+        if (type == null || type.deathChildren().isEmpty()) {
             return;
         }
-        HallsMonsterType childType = monsterTypes.get(childId);
-        if (childType == null) {
-            return;
-        }
-        int childCount = typeId.equals("brooding_mother") ? 20 : 2;
         int spawned = 0;
         Location base = entity.getLocation();
-        for (int i = 0; i < childCount; i++) {
-            Entity child = world.spawnEntity(base, childType.entityType());
-            if (child instanceof LivingEntity living) {
-                configureLivingMonster(living, childType);
-                spawnedMonsters.add(living.getUniqueId());
-                spawnedThisFloor++;
-                spawned++;
-            } else {
-                child.remove();
+        for (HallsMonsterType.DeathChild child : type.deathChildren()) {
+            HallsMonsterType childType = monsterTypes.get(child.monsterId());
+            if (childType == null) {
+                continue;
+            }
+            for (int i = 0; i < child.count(); i++) {
+                Entity childEntity = world.spawnEntity(base, childType.entityType());
+                if (childEntity instanceof LivingEntity living) {
+                    configureLivingMonster(living, childType);
+                    spawnedMonsters.add(living.getUniqueId());
+                    spawnedThisFloor++;
+                    spawned++;
+                } else {
+                    childEntity.remove();
+                }
             }
         }
         maxAlive += spawned;
@@ -293,10 +310,13 @@ final class HallsSessionMonsterRuntime {
                         return;
                     }
                     tnt.remove();
-                    world.spawnParticle(org.bukkit.Particle.EXPLOSION, location.clone().add(0.0, 0.4, 0.0), 1);
-                    world.spawnParticle(org.bukkit.Particle.SMOKE, location.clone().add(0.0, 0.5, 0.0), 55, 1.2, 0.45, 1.2, 0.05);
-                    world.playSound(location, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.05f);
                     double radius = 4.0;
+                    world.spawnParticle(org.bukkit.Particle.EXPLOSION, location.clone().add(0.0, 0.4, 0.0), 1);
+                    world.spawnParticle(org.bukkit.Particle.SMOKE, location.clone().add(0.0, 0.75, 0.0),
+                            130, radius * 0.45, 0.8, radius * 0.45, 0.07);
+                    world.spawnParticle(org.bukkit.Particle.FLAME, location.clone().add(0.0, 0.55, 0.0),
+                            45, radius * 0.35, 0.45, radius * 0.35, 0.04);
+                    world.playSound(location, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.05f);
                     for (Entity nearby : world.getNearbyEntities(location, radius, radius, radius)) {
                         if (nearby instanceof LivingEntity living && living.getLocation().distanceSquared(location) <= radius * radius) {
                             living.damage(13.0, entity);
@@ -573,7 +593,8 @@ final class HallsSessionMonsterRuntime {
         if (configured != null) {
             return configured;
         }
-        return new HallsMonsterType("warden", "Warden", EntityType.WARDEN, 500.0, false, 0, 1.0, 1.0, -1.0, Material.AIR, Map.of());
+        return new HallsMonsterType("warden", "Warden", EntityType.WARDEN, 500.0, false, 0,
+                1.0, 1.0, -1.0, Material.AIR, Map.of(), List.of());
     }
 
     private HallsExplorationGenerator.Cell spawnCellAwayFromPlayers(HallsMonsterType type) {
@@ -783,5 +804,9 @@ final class HallsSessionMonsterRuntime {
         } catch (NumberFormatException ex) {
             return fallback;
         }
+    }
+
+    private String normalizeId(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
     }
 }

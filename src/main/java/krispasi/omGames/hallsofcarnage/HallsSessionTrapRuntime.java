@@ -9,6 +9,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.IdentityHashMap;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.DoubleSupplier;
 import java.util.function.Predicate;
@@ -21,15 +22,12 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
-import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.LivingEntity;
@@ -61,6 +59,7 @@ final class HallsSessionTrapRuntime {
     private final Map<String, HallsTrapType> trapTypes;
     private final DoubleSupplier trapDamageMultiplier;
     private final Consumer<Location> lootDropSink;
+    private final BiPredicate<String, Location> trapMonsterSpawner;
     private final List<HallsTrap> traps = new ArrayList<>();
     private final Map<UUID, Long> trapDamageCooldowns = new java.util.HashMap<>();
     private final Map<HallsTrap, Long> trapNextTriggerTicks = new IdentityHashMap<>();
@@ -77,7 +76,8 @@ final class HallsSessionTrapRuntime {
                             BlockSetter blockSetter,
                             Map<String, HallsTrapType> trapTypes,
                             DoubleSupplier trapDamageMultiplier,
-                            Consumer<Location> lootDropSink) {
+                            Consumer<Location> lootDropSink,
+                            BiPredicate<String, Location> trapMonsterSpawner) {
         this.plugin = plugin;
         this.world = world;
         this.origin = origin;
@@ -87,6 +87,7 @@ final class HallsSessionTrapRuntime {
         this.trapTypes = trapTypes == null ? Map.of() : Map.copyOf(trapTypes);
         this.trapDamageMultiplier = trapDamageMultiplier == null ? () -> 1.0 : trapDamageMultiplier;
         this.lootDropSink = lootDropSink == null ? ignored -> { } : lootDropSink;
+        this.trapMonsterSpawner = trapMonsterSpawner;
     }
 
     void clear() {
@@ -1379,10 +1380,10 @@ final class HallsSessionTrapRuntime {
         world.spawnParticle(Particle.BLOCK, location, 28, 0.75, 0.35, 0.75, Material.OAK_PLANKS.createBlockData());
         world.playSound(location, Sound.BLOCK_BARREL_OPEN, 0.9f, 0.55f);
         if (roll < 25) {
-            spawnSimpleTrapMonster(location, EntityType.SKELETON, "old_bones", "Old Bones", 5.0, Material.NETHERITE_SWORD);
+            spawnTrapMonster("old_bones", location);
             player.sendActionBar(Component.text("Old bones climb out of the coffin.", NamedTextColor.RED));
         } else if (roll < 50) {
-            spawnSimpleTrapMonster(location, EntityType.SPIDER, "brooding_mother", "Brooding Mother", 30.0, Material.AIR);
+            spawnTrapMonster("brooding_mother", location);
             player.sendActionBar(Component.text("Something heavy crawls out of the coffin.", NamedTextColor.RED));
         } else {
             lootDropSink.accept(location);
@@ -1409,24 +1410,9 @@ final class HallsSessionTrapRuntime {
         removeTrap(trap);
     }
 
-    private void spawnSimpleTrapMonster(Location location, EntityType entityType, String typeId, String name, double health, Material weapon) {
-        Entity entity = world.spawnEntity(location, entityType);
-        if (!(entity instanceof LivingEntity living)) {
-            entity.remove();
-            return;
-        }
-        living.addScoreboardTag("omgames_hoc_monster");
-        living.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_monster_type"),
-                org.bukkit.persistence.PersistentDataType.STRING, typeId);
-        living.customName(Component.text(name, NamedTextColor.DARK_RED));
-        AttributeInstance maxHealth = living.getAttribute(Attribute.MAX_HEALTH);
-        if (maxHealth != null) {
-            maxHealth.setBaseValue(health);
-            living.setHealth(health);
-        }
-        if (living.getEquipment() != null && weapon != null && !weapon.isAir()) {
-            living.getEquipment().setItemInMainHand(new org.bukkit.inventory.ItemStack(weapon));
-            living.getEquipment().setItemInMainHandDropChance(0.0f);
+    private void spawnTrapMonster(String monsterId, Location location) {
+        if (trapMonsterSpawner == null || !trapMonsterSpawner.test(monsterId, location)) {
+            lootDropSink.accept(location);
         }
     }
 
@@ -1470,7 +1456,7 @@ final class HallsSessionTrapRuntime {
         double y = origin.y() + 0.08;
         double z = cell.z() + 0.5;
 
-        if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE) {
+        if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.HOMING_MINE) {
             y += 0.4;
         }
 
@@ -1539,7 +1525,7 @@ final class HallsSessionTrapRuntime {
             rotation.rotateZ((float) Math.toRadians(180.0));
         } else if (requiresWall(kind)) {
             rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
-        } else if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE) {
+        } else if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.HOMING_MINE) {
             rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
         } else {
             rotation.rotateX((float) Math.toRadians(90.0));
