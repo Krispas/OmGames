@@ -938,7 +938,7 @@ final class HallsSessionTrapRuntime {
     }
 
     private UUID spawnHomingMineAntenna(HallsExplorationGenerator.Cell cell) {
-        Location location = new Location(world, cell.x() + 0.5, origin.y() + 0.85, cell.z() + 0.5);
+        Location location = new Location(world, cell.x() + 0.5, origin.y() + 0.10, cell.z() + 0.5);
         BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
             entity.setBlock(connectedFenceData());
             entity.setBillboard(Display.Billboard.FIXED);

@@ -2278,23 +2278,22 @@ public final class HallsSession {
     }
 
     private void spawnLibraryVentPart(LibraryVent vent, HallsBuildingType.Part part) {
-        double yaw = wallFixtureYawDegrees(vent.face());
         double lateralX = vent.face().getModZ();
         double lateralZ = -vent.face().getModX();
-        double depth = Math.max(0.0, part.offsetZ());
+        double depth = Math.max(0.01, Math.abs(part.offsetZ()));
+        double width = Math.max(0.01, part.scaleX());
+        double height = Math.max(0.01, part.scaleY());
         Location location = new Location(world,
                 vent.x() + 0.5 + lateralX * part.offsetX() + vent.face().getModX() * (0.5 - depth),
-                vent.y() + part.offsetY(),
+                vent.y() + part.offsetY() + height * 0.5,
                 vent.z() + 0.5 + lateralZ * part.offsetX() + vent.face().getModZ() * (0.5 - depth));
         BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
-            entity.setBlock(displayBlockData(part.material(), part.blockData()));
+            entity.setBlock(wallVentBlockData(part, vent.face()));
             entity.setBillboard(Display.Billboard.FIXED);
             entity.setTransformation(new Transformation(
-                    wallVentDisplayTranslation(vent.face(), part),
-                    new Quaternionf().rotateXYZ((float) Math.toRadians(part.rotationX()),
-                            (float) Math.toRadians(part.rotationY() + yaw),
-                            (float) Math.toRadians(part.rotationZ())),
-                    new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
+                    wallVentDisplayTranslation(vent.face(), depth, width, height),
+                    new Quaternionf(),
+                    wallVentDisplayScale(vent.face(), depth, width, height),
                     new Quaternionf()));
             entity.setBrightness(FULL_BRIGHTNESS);
             entity.setPersistent(false);
@@ -2302,8 +2301,25 @@ public final class HallsSession {
         vent.displayIds().add(display.getUniqueId());
     }
 
-    private Vector3f wallVentDisplayTranslation(BlockFace face, HallsBuildingType.Part part) {
-        return new Vector3f((float) (-part.scaleX() / 2.0), 0.0f, (float) (-part.scaleZ() / 2.0));
+    private BlockData wallVentBlockData(HallsBuildingType.Part part, BlockFace wallFace) {
+        BlockData data = displayBlockData(part.material(), part.blockData());
+        if (data instanceof Directional directional) {
+            directional.setFacing(wallFace.getOppositeFace());
+        }
+        return data;
+    }
+
+    private Vector3f wallVentDisplayTranslation(BlockFace face, double depth, double width, double height) {
+        float x = face == BlockFace.EAST || face == BlockFace.WEST ? (float) (-depth / 2.0) : (float) (-width / 2.0);
+        float y = (float) (-height / 2.0);
+        float z = face == BlockFace.NORTH || face == BlockFace.SOUTH ? (float) (-depth / 2.0) : (float) (-width / 2.0);
+        return new Vector3f(x, y, z);
+    }
+
+    private Vector3f wallVentDisplayScale(BlockFace face, double depth, double width, double height) {
+        float x = face == BlockFace.EAST || face == BlockFace.WEST ? (float) depth : (float) width;
+        float z = face == BlockFace.NORTH || face == BlockFace.SOUTH ? (float) depth : (float) width;
+        return new Vector3f(x, (float) height, z);
     }
 
     private double yawDegrees(BlockFace face) {
@@ -4504,28 +4520,16 @@ public final class HallsSession {
     private void activatePoisonBomb(Player player, HallsItemType type) {
         double radius = Math.max(1.0, type.stats().getOrDefault("radius", 4.0));
         double damage = Math.max(0.0, type.stats().getOrDefault("monster_damage", 3.0));
-        int poisonTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("poison_seconds", 5.0) * 20.0));
+        int cloudTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("poison_seconds", 5.0) * 20.0));
+        int poisonTicks = Math.min(80, Math.max(40, cloudTicks / 2));
         int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("poison_amplifier", 1.0)) - 1);
         Location center = player.getLocation();
-        int affected = 0;
-        for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
-            if (nearby instanceof LivingEntity living
-                    && monsterRuntime.isSessionMonster(living)
-                    && living.getLocation().distanceSquared(center) <= radius * radius) {
-                living.addPotionEffect(new PotionEffect(PotionEffectType.POISON, poisonTicks, amplifier, true, true, true));
-                if (damage > 0.0) {
-                    living.damage(damage, player);
-                }
-                affected++;
-            }
-        }
-        spawnPoisonBombCloud(center, radius, Math.min(poisonTicks, 160));
+        spawnPoisonBombCloud(player, center, radius, Math.min(cloudTicks, 200), poisonTicks, amplifier, damage);
         world.playSound(center, Sound.ENTITY_SPLASH_POTION_BREAK, 0.8f, 0.75f);
-        player.sendActionBar(Component.text("Poison vapor eats into nearby monsters"
-                + (affected > 0 ? ": " + affected : "") + ".", NamedTextColor.DARK_GREEN));
+        player.sendActionBar(Component.text("Poison vapor blooms from the bomb.", NamedTextColor.DARK_GREEN));
     }
 
-    private void spawnPoisonBombCloud(Location center, double radius, int durationTicks) {
+    private void spawnPoisonBombCloud(Player source, Location center, double radius, int durationTicks, int poisonTicks, int amplifier, double damage) {
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
             private int ticks;
 
@@ -4541,10 +4545,26 @@ public final class HallsSession {
                         65, radius * 0.45, 0.35, radius * 0.45, 0.025);
                 world.spawnParticle(Particle.SMOKE, center.clone().add(0.0, 0.35, 0.0),
                         30, radius * 0.35, 0.2, radius * 0.35, 0.01);
+                if (ticks % 20 == 0) {
+                    applyPoisonBombCloud(source, center, radius, poisonTicks, amplifier, damage);
+                }
                 ticks += 10;
             }
         }, 1L, 10L);
         Bukkit.getScheduler().runTaskLater(plugin, task::cancel, durationTicks + 2L);
+    }
+
+    private void applyPoisonBombCloud(Player source, Location center, double radius, int poisonTicks, int amplifier, double damage) {
+        for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
+            if (nearby instanceof LivingEntity living
+                    && monsterRuntime.isSessionMonster(living)
+                    && living.getLocation().distanceSquared(center) <= radius * radius) {
+                living.addPotionEffect(new PotionEffect(PotionEffectType.POISON, poisonTicks, amplifier, true, true, true));
+                if (damage > 0.0) {
+                    living.damage(damage, source);
+                }
+            }
+        }
     }
 
     private void activateLodestone(Player player, HallsItemType type) {
