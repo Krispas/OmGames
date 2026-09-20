@@ -2284,9 +2284,9 @@ public final class HallsSession {
         double width = Math.max(0.01, part.scaleX());
         double height = Math.max(0.01, part.scaleY());
         Location location = new Location(world,
-                vent.x() + 0.5 + lateralX * part.offsetX() + vent.face().getModX() * (0.5 - depth),
+                vent.x() + 0.5 + lateralX * part.offsetX() + vent.face().getModX() * (0.75 - depth),
                 vent.y() + part.offsetY() + height * 0.5,
-                vent.z() + 0.5 + lateralZ * part.offsetX() + vent.face().getModZ() * (0.5 - depth));
+                vent.z() + 0.5 + lateralZ * part.offsetX() + vent.face().getModZ() * (0.75 - depth));
         BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
             entity.setBlock(wallVentBlockData(part, vent.face()));
             entity.setBillboard(Display.Billboard.FIXED);
@@ -4523,13 +4523,15 @@ public final class HallsSession {
         int cloudTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("poison_seconds", 5.0) * 20.0));
         int poisonTicks = Math.min(80, Math.max(40, cloudTicks / 2));
         int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("poison_amplifier", 1.0)) - 1);
-        Location center = player.getLocation();
+        Location center = player.getLocation().clone();
         spawnPoisonBombCloud(player, center, radius, Math.min(cloudTicks, 200), poisonTicks, amplifier, damage);
         world.playSound(center, Sound.ENTITY_SPLASH_POTION_BREAK, 0.8f, 0.75f);
         player.sendActionBar(Component.text("Poison vapor blooms from the bomb.", NamedTextColor.DARK_GREEN));
     }
 
     private void spawnPoisonBombCloud(Player source, Location center, double radius, int durationTicks, int poisonTicks, int amplifier, double damage) {
+        renderPoisonBombCloudPulse(center, radius, 0);
+        applyPoisonBombCloud(source, center, radius, poisonTicks, amplifier, damage);
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
             private int ticks;
 
@@ -4538,20 +4540,24 @@ public final class HallsSession {
                 if (!running || world == null || ticks > durationTicks) {
                     return;
                 }
-                double pulse = 0.55 + Math.sin(ticks / 8.0) * 0.15;
-                world.spawnParticle(Particle.ENTITY_EFFECT, center.clone().add(0.0, 0.9, 0.0),
-                        90, radius * pulse, 0.45, radius * pulse, 0.05);
-                world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, center.clone().add(0.0, 0.65, 0.0),
-                        65, radius * 0.45, 0.35, radius * 0.45, 0.025);
-                world.spawnParticle(Particle.SMOKE, center.clone().add(0.0, 0.35, 0.0),
-                        30, radius * 0.35, 0.2, radius * 0.35, 0.01);
+                renderPoisonBombCloudPulse(center, radius, ticks);
                 if (ticks % 20 == 0) {
                     applyPoisonBombCloud(source, center, radius, poisonTicks, amplifier, damage);
                 }
-                ticks += 10;
+                ticks += 5;
             }
-        }, 1L, 10L);
+        }, 1L, 5L);
         Bukkit.getScheduler().runTaskLater(plugin, task::cancel, durationTicks + 2L);
+    }
+
+    private void renderPoisonBombCloudPulse(Location center, double radius, int ticks) {
+        double pulse = 0.55 + Math.sin(ticks / 8.0) * 0.15;
+        Location waist = center.clone().add(0.0, 0.8, 0.0);
+        Location ground = center.clone().add(0.0, 0.2, 0.0);
+        world.spawnParticle(Particle.WITCH, waist, 85, radius * pulse, 0.45, radius * pulse, 0.02);
+        world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, waist, 70, radius * 0.5, 0.4, radius * 0.5, 0.025);
+        world.spawnParticle(Particle.SMOKE, ground, 45, radius * 0.45, 0.18, radius * 0.45, 0.01);
+        world.spawnParticle(Particle.CLOUD, ground, 25, radius * 0.35, 0.12, radius * 0.35, 0.01);
     }
 
     private void applyPoisonBombCloud(Player source, Location center, double radius, int poisonTicks, int amplifier, double damage) {
