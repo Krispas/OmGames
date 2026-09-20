@@ -23,7 +23,7 @@ monsters:
   common:
     - zombie
     - splinter
-    - silverfish
+    - brooding_mother
     - creaking
   special:
     - breeze

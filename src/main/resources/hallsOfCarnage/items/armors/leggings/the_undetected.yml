@@ -1,0 +1,15 @@
+id: the_undetected
+name: "The Undetected"
+category: armor
+rarity: rare
+material: NETHERITE_LEGGINGS
+max-stack-size: 1
+lore:
+  - "The corridor forgets you were there."
+stats:
+  armor: 5
+  armor-toughness: 2
+  swift-sneak: 2
+recipe:
+  iron_scrap: 14
+  diamond_scrap: 4

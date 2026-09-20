@@ -42,6 +42,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.player.PlayerItemDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -109,7 +110,7 @@ public final class HallsSession {
     private Set<HallsExplorationGenerator.Cell> activeVentGateCells = Set.of();
     private final Map<String, Long> utilityCooldowns = new HashMap<>();
     private final Map<String, Long> sculkMaulSplashCooldowns = new HashMap<>();
-    private final Set<UUID> sculkMaulSplashing = new HashSet<>();
+    private final Set<UUID> weaponSplashing = new HashSet<>();
     private final Map<UUID, CarriedResearchCrate> carriedResearchCrates = new HashMap<>();
     private final Map<UUID, BlueprintDistillery> blueprintDistilleries = new HashMap<>();
     private final Map<UUID, LibraryVent> libraryVents = new HashMap<>();
@@ -212,7 +213,8 @@ public final class HallsSession {
         }
         this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::isAliveParticipant,
                 this::setBlock, this.trapTypes,
-                () -> activeFloorModifiers.trapDamageMultiplier());
+                () -> activeFloorModifiers.trapDamageMultiplier(),
+                location -> dropSessionItem(location, coinItem(1)));
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
                 this::isAliveParticipant);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
@@ -824,41 +826,116 @@ public final class HallsSession {
         if (event != null && activeFloorModifiers.meleeDamageMultiplier() != 1.0) {
             event.setDamage(event.getDamage() * Math.max(0.0, activeFloorModifiers.meleeDamageMultiplier()));
         }
+        if (event != null && event.getDamager() instanceof org.bukkit.entity.Projectile projectile) {
+            Double projectileDamage = projectile.getPersistentDataContainer().get(
+                    new org.bukkit.NamespacedKey(plugin, "hoc_projectile_damage"),
+                    PersistentDataType.DOUBLE
+            );
+            if (projectileDamage != null && projectileDamage > 0.0) {
+                event.setDamage(projectileDamage);
+            }
+        }
         HallsItemType type = itemType(player.getInventory().getItemInMainHand());
-        if (type == null || !type.id().equals("sculk_maul")) {
+        if (type == null || !type.category().equals("weapon")) {
             return false;
         }
-        if (sculkMaulSplashing.contains(player.getUniqueId()) || !canTriggerSculkMaulSplash(player, living)) {
-            return false;
+        applyWeaponStatusEffects(type, living);
+        applyWeaponChainEffect(player, type, living, event == null ? type.stats().getOrDefault("melee_damage", 1.0) : event.getDamage());
+        applyWeaponSplashEffect(player, type, living);
+        applyWeaponKnockbackEffect(type, living.getLocation(), living, player);
+        return false;
+    }
+
+    private void applyWeaponStatusEffects(HallsItemType type, LivingEntity target) {
+        int poisonTicks = (int) Math.round(type.stats().getOrDefault("poison_seconds", 0.0) * 20.0);
+        if (poisonTicks > 0) {
+            int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("poison_amplifier", 1.0)) - 1);
+            target.addPotionEffect(new PotionEffect(PotionEffectType.POISON, poisonTicks, amplifier, true, true, true));
+        }
+        int stunTicks = (int) Math.round(type.stats().getOrDefault("stun_seconds", 0.0) * 20.0);
+        if (stunTicks > 0) {
+            target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, stunTicks, 9, true, true, true));
+        }
+        int slownessTicks = (int) Math.round(type.stats().getOrDefault("slowness_seconds", 0.0) * 20.0);
+        if (slownessTicks > 0) {
+            int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("slowness_amplifier", 1.0)) - 1);
+            target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, slownessTicks, amplifier, true, true, true));
+        }
+    }
+
+    private void applyWeaponChainEffect(Player player, HallsItemType type, LivingEntity primaryTarget, double sourceDamage) {
+        int targets = Math.max(0, (int) Math.round(type.stats().getOrDefault("chain_targets", 0.0)));
+        if (targets <= 0) {
+            return;
+        }
+        double radius = Math.max(2.0, type.stats().getOrDefault("chain_radius", 7.0));
+        double damage = Math.max(0.5, type.stats().getOrDefault("chain_damage", sourceDamage));
+        int hits = 0;
+        for (Entity nearby : world.getNearbyEntities(primaryTarget.getLocation(), radius, radius, radius)) {
+            if (!(nearby instanceof LivingEntity living)
+                    || living.getUniqueId().equals(primaryTarget.getUniqueId())
+                    || !monsterRuntime.isSessionMonster(living)
+                    || living.getLocation().distanceSquared(primaryTarget.getLocation()) > radius * radius) {
+                continue;
+            }
+            living.damage(Math.min(damage, Math.max(0.0, living.getHealth() - 0.5)), player);
+            world.spawnParticle(Particle.ELECTRIC_SPARK, living.getLocation().add(0.0, 1.0, 0.0), 12, 0.25, 0.35, 0.25, 0.05);
+            hits++;
+            if (hits >= targets) {
+                break;
+            }
+        }
+        if (hits > 0) {
+            world.playSound(primaryTarget.getLocation(), Sound.BLOCK_COPPER_BULB_TURN_ON, 0.55f, 1.55f);
+        }
+    }
+
+    private void applyWeaponSplashEffect(Player player, HallsItemType type, LivingEntity target) {
+        if (weaponSplashing.contains(player.getUniqueId()) || !canTriggerWeaponSplash(player, target)) {
+            return;
         }
         double radius = Math.max(0.0, type.stats().getOrDefault("aoe_radius", 0.0));
         double damage = Math.max(0.0, type.stats().getOrDefault("aoe_damage", 0.0));
         if (radius <= 0.0 || damage <= 0.0) {
-            return false;
+            return;
         }
-        Location center = living.getLocation();
+        Location center = target.getLocation();
         int hits = 0;
-        sculkMaulSplashing.add(player.getUniqueId());
+        weaponSplashing.add(player.getUniqueId());
         try {
             for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
                 if (!(nearby instanceof LivingEntity nearbyLiving)
-                        || nearbyLiving.getUniqueId().equals(living.getUniqueId())
+                        || nearbyLiving.getUniqueId().equals(target.getUniqueId())
                         || !monsterRuntime.isSessionMonster(nearbyLiving)
                         || nearbyLiving.getLocation().distanceSquared(center) > radius * radius) {
                     continue;
                 }
                 nearbyLiving.damage(Math.min(damage, Math.max(0.0, nearbyLiving.getHealth() - 0.5)), player);
+                applyWeaponKnockbackEffect(type, center, nearbyLiving, player);
                 hits++;
             }
         } finally {
-            sculkMaulSplashing.remove(player.getUniqueId());
+            weaponSplashing.remove(player.getUniqueId());
         }
         if (hits > 0) {
             world.spawnParticle(Particle.SCULK_SOUL, center.clone().add(0.0, 0.8, 0.0),
                     8, radius * 0.16, 0.25, radius * 0.16, 0.01);
             world.playSound(center, Sound.BLOCK_SCULK_SENSOR_CLICKING, 0.18f, 0.75f);
         }
-        return hits > 0;
+    }
+
+    private void applyWeaponKnockbackEffect(HallsItemType type, Location center, LivingEntity target, Player attacker) {
+        double strength = Math.max(0.0, type.stats().getOrDefault("pushback_strength", 0.0));
+        if (strength <= 0.0 || target == null || center == null) {
+            return;
+        }
+        Vector delta = target.getLocation().toVector().subtract(center.toVector());
+        if (delta.lengthSquared() < 0.01) {
+            delta = attacker == null ? new Vector(0.0, 0.0, 1.0) : attacker.getLocation().getDirection();
+        }
+        Vector velocity = delta.normalize().multiply(strength);
+        velocity.setY(Math.max(0.35, strength * 0.55));
+        target.setVelocity(velocity);
     }
 
     public boolean handleItemDamage(PlayerItemDamageEvent event) {
@@ -903,7 +980,7 @@ public final class HallsSession {
         return false;
     }
 
-    private boolean canTriggerSculkMaulSplash(Player player, LivingEntity target) {
+    private boolean canTriggerWeaponSplash(Player player, LivingEntity target) {
         String key = player.getUniqueId() + ":" + target.getUniqueId();
         long now = System.currentTimeMillis();
         long nextAllowed = sculkMaulSplashCooldowns.getOrDefault(key, 0L);
@@ -987,6 +1064,56 @@ public final class HallsSession {
         player.sendActionBar(Component.text(message.isBlank() ? "Consumed " + type.name() + "." : message,
                 NamedTextColor.GREEN));
         return true;
+    }
+
+    public void handleMonsterAttack(EntityDamageByEntityEvent event) {
+        if (event == null || !(event.getEntity() instanceof Player player) || !participants.contains(player.getUniqueId())) {
+            return;
+        }
+        monsterRuntime.handleMonsterAttack(event.getDamager(), player);
+    }
+
+    public void ensureRangedAmmo(Player player, ItemStack item) {
+        if (player == null || item == null || !running || !participants.contains(player.getUniqueId())
+                || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())) {
+            return;
+        }
+        HallsItemType type = itemType(item);
+        if (type == null || type.stats().getOrDefault("ranged", 0.0) <= 0.0) {
+            return;
+        }
+        ItemStack current = player.getInventory().getItem(9);
+        if (isSessionRangedAmmo(plugin, current) && current.getAmount() >= 32) {
+            return;
+        }
+        ItemStack arrows = new ItemStack(Material.ARROW, 64);
+        ItemMeta meta = arrows.getItemMeta();
+        if (meta != null) {
+            meta.displayName(Component.text("Halls Quiver", NamedTextColor.GRAY));
+            meta.getPersistentDataContainer().set(new org.bukkit.NamespacedKey(plugin, "hoc_ranged_ammo"), PersistentDataType.BYTE, (byte) 1);
+            arrows.setItemMeta(meta);
+        }
+        player.getInventory().setItem(9, arrows);
+    }
+
+    public void handleRangedShot(Player player, EntityShootBowEvent event) {
+        if (player == null || event == null || !running || !participants.contains(player.getUniqueId())) {
+            return;
+        }
+        HallsItemType type = itemType(event.getBow());
+        if (type == null || type.stats().getOrDefault("ranged", 0.0) <= 0.0) {
+            return;
+        }
+        event.setConsumeItem(false);
+        ensureRangedAmmo(player, event.getBow());
+        double damage = type.stats().getOrDefault("ranged_damage", 0.0);
+        if (damage > 0.0 && event.getProjectile() != null) {
+            event.getProjectile().getPersistentDataContainer().set(
+                    new org.bukkit.NamespacedKey(plugin, "hoc_projectile_damage"),
+                    PersistentDataType.DOUBLE,
+                    damage
+            );
+        }
     }
 
     private void applyFoodBuffs(Player player, HallsItemType type) {
@@ -1078,6 +1205,24 @@ public final class HallsSession {
                     yield true;
                 }
                 activatePoisonBomb(player, type);
+                applyUtilityCooldown(player, item, type);
+                damageUtilityItem(player, item, type);
+                yield true;
+            }
+            case "lodestone" -> {
+                if (isUtilityOnCooldown(player, type)) {
+                    yield true;
+                }
+                activateLodestone(player, type);
+                applyUtilityCooldown(player, item, type);
+                damageUtilityItem(player, item, type);
+                yield true;
+            }
+            case "handheld_scanner" -> {
+                if (isUtilityOnCooldown(player, type)) {
+                    yield true;
+                }
+                activateHandheldScanner(player, type);
                 applyUtilityCooldown(player, item, type);
                 damageUtilityItem(player, item, type);
                 yield true;
@@ -2193,6 +2338,10 @@ public final class HallsSession {
         player.setFallDistance(0.0f);
         world.playSound(destination, Sound.BLOCK_IRON_TRAPDOOR_OPEN, 0.7f, 1.45f);
         return true;
+    }
+
+    public boolean handleTrapInteract(Player player, Entity entity) {
+        return trapRuntime.handleTrapInteract(player, entity);
     }
 
     private boolean isMonsterNear(Location location, double radius) {
@@ -4360,6 +4509,69 @@ public final class HallsSession {
         player.sendActionBar(Component.text("Poison vapor eats into nearby monsters.", NamedTextColor.DARK_GREEN));
     }
 
+    private void activateLodestone(Player player, HallsItemType type) {
+        int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("duration_seconds", 20.0) * 20.0));
+        Location target = elevatorSpawnLocation();
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (!running || !player.isOnline() || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())) {
+                return;
+            }
+            renderPathParticles(player.getLocation().clone().add(0.0, 0.35, 0.0), target.clone().add(0.0, 0.35, 0.0), Particle.ELECTRIC_SPARK);
+        }, 1L, 10L);
+        Bukkit.getScheduler().runTaskLater(plugin, task::cancel, durationTicks);
+        world.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.2f);
+        player.sendActionBar(Component.text("The lodestone points toward the elevator.", NamedTextColor.AQUA));
+    }
+
+    private void renderPathParticles(Location from, Location to, Particle particle) {
+        Vector delta = to.toVector().subtract(from.toVector());
+        double length = delta.length();
+        if (length < 0.1) {
+            return;
+        }
+        Vector step = delta.normalize().multiply(0.75);
+        Location point = from.clone();
+        int count = Math.min(48, Math.max(4, (int) Math.round(length / 0.75)));
+        for (int i = 0; i < count; i++) {
+            world.spawnParticle(particle, point, 1, 0.03, 0.03, 0.03, 0.0);
+            point.add(step);
+        }
+    }
+
+    private void activateHandheldScanner(Player player, HallsItemType type) {
+        double radius = Math.max(1.0, type.stats().getOrDefault("radius", 20.0));
+        Location location = player.getLocation();
+        boolean nearbyResearchCrate = researchCrate != null && researchCrate.blocks().stream()
+                .anyMatch(block -> distanceSquared(location, block.x() + 0.5, block.y() + 0.5, block.z() + 0.5) <= radius * radius);
+        boolean nearbyDistillery = blueprintDistilleries.values().stream()
+                .anyMatch(distillery -> distanceSquared(location, distillery.x() + 0.5, distillery.y() + 0.5, distillery.z() + 0.5) <= radius * radius);
+        int witherAfterSeconds = activeFloorModifiers.witherAfterSeconds();
+        String fog = "none";
+        if (witherAfterSeconds > 0) {
+            long elapsed = Math.max(0L, (System.currentTimeMillis() - floorStartedAtMillis) / 1000L);
+            fog = Math.max(0L, witherAfterSeconds - elapsed) + "s";
+        }
+        player.sendMessage(Component.text("Scanner", NamedTextColor.AQUA)
+                .append(Component.text(" | Monsters: " + monsterRuntime.debugStatus(), NamedTextColor.GRAY)));
+        player.sendMessage(Component.text("Nearby research crate: " + yesNo(nearbyResearchCrate)
+                + " | Nearby distillery: " + yesNo(nearbyDistillery), NamedTextColor.GRAY));
+        player.sendMessage(Component.text("Death fog: " + fog + " | Unbroken breakables: "
+                + new HashSet<>(breakableProps.values()).size(), NamedTextColor.GRAY));
+        world.spawnParticle(Particle.ELECTRIC_SPARK, location.clone().add(0.0, 1.0, 0.0), 48, radius * 0.08, 0.55, radius * 0.08, 0.03);
+        world.playSound(location, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.75f, 1.7f);
+    }
+
+    private double distanceSquared(Location location, double x, double y, double z) {
+        double dx = location.getX() - x;
+        double dy = location.getY() - y;
+        double dz = location.getZ() - z;
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    private String yesNo(boolean value) {
+        return value ? "yes" : "no";
+    }
+
     private boolean isUtilityOnCooldown(Player player, HallsItemType type) {
         long remainingMillis = utilityCooldowns.getOrDefault(utilityCooldownKey(player, type), 0L) - System.currentTimeMillis();
         if (remainingMillis <= 0L) {
@@ -5077,7 +5289,6 @@ public final class HallsSession {
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
         sculkMaulSplashCooldowns.clear();
-        sculkMaulSplashing.clear();
         scannedFloorModifiers.clear();
         healthTotemLevels.clear();
         speedTotemLevels.clear();
@@ -5165,7 +5376,6 @@ public final class HallsSession {
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
         sculkMaulSplashCooldowns.clear();
-        sculkMaulSplashing.clear();
         scannedFloorModifiers.clear();
         healthTotemLevels.clear();
         speedTotemLevels.clear();
@@ -5436,7 +5646,6 @@ public final class HallsSession {
         compassTrailCountdown = 0;
         utilityCooldowns.clear();
         sculkMaulSplashCooldowns.clear();
-        sculkMaulSplashing.clear();
         scannedFloorModifiers.clear();
         healthTotemLevels.clear();
         speedTotemLevels.clear();
@@ -5941,7 +6150,7 @@ public final class HallsSession {
         ItemStack barrier = lockedSlotItem();
         for (int slot = 9; slot <= 35; slot++) {
             ItemStack current = player.getInventory().getItem(slot);
-            if (current == null || current.getType().isAir() || isLockedSlotItem(plugin, current)) {
+            if (current == null || current.getType().isAir() || isLockedSlotItem(plugin, current) || isSessionRangedAmmo(plugin, current)) {
                 player.getInventory().setItem(slot, barrier.clone());
             }
         }
@@ -5958,11 +6167,20 @@ public final class HallsSession {
         }
         for (int slot = 9; slot <= 35; slot++) {
             ItemStack item = player.getInventory().getItem(slot);
-            if (isLockedSlotItem(plugin, item)) {
+            if (isLockedSlotItem(plugin, item) || isSessionRangedAmmo(plugin, item)) {
                 player.getInventory().setItem(slot, null);
             }
         }
         player.updateInventory();
+    }
+
+    private static boolean isSessionRangedAmmo(JavaPlugin plugin, ItemStack item) {
+        if (plugin == null || item == null || item.getType() != Material.ARROW || !item.hasItemMeta()) {
+            return false;
+        }
+        Byte marker = item.getItemMeta().getPersistentDataContainer()
+                .get(new org.bukkit.NamespacedKey(plugin, "hoc_ranged_ammo"), PersistentDataType.BYTE);
+        return marker != null && marker == (byte) 1;
     }
 
     public static boolean isLockedSlotItem(JavaPlugin plugin, ItemStack item) {

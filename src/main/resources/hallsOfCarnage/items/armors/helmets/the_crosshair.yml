@@ -1,0 +1,16 @@
+id: the_crosshair
+name: "The Crosshair"
+category: armor
+rarity: rare
+material: NETHERITE_HELMET
+max-stack-size: 1
+lore:
+  - "The visor keeps finding the next weak point."
+stats:
+  armor: 2
+  armor-toughness: 2
+  attack-speed-percent: 10
+recipe:
+  iron_scrap: 10
+  diamond_scrap: 3
+  redstone_scrap: 4

@@ -1,0 +1,15 @@
+id: smasher
+name: "Smasher"
+category: weapon
+rarity: normal
+material: NETHERITE_AXE
+max-stack-size: 1
+lore:
+  - "A brutal axe that needs a long windup."
+stats:
+  melee-damage: 30
+  attack-speed: 0.05
+  durability: 45
+recipe:
+  iron_scrap: 18
+  diamond_scrap: 5

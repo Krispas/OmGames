@@ -131,3 +131,17 @@ modifiers:
     effects:
       weapon-durability-loss-multiplier: 2.0
       armor-damage-multiplier: 0.9
+  less_enemy_hp:
+    type: good
+    display-name: "Less Enemy HP"
+    icon: "-"
+    weight: 4
+    effects:
+      enemy-health-multiplier: 0.7
+  more_enemy_hp:
+    type: bad
+    display-name: "More Enemy HP"
+    icon: "+"
+    weight: 5
+    effects:
+      enemy-health-multiplier: 1.3

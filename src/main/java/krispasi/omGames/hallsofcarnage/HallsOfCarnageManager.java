@@ -94,6 +94,8 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/modifiers/deep_crypt.yml",
             "hallsOfCarnage/modifiers/factory.yml",
             "hallsOfCarnage/modifiers/sewer.yml",
+            "hallsOfCarnage/modifiers/bunker.yml",
+            "hallsOfCarnage/modifiers/library.yml",
             "hallsOfCarnage/breakables/barrel.yml",
             "hallsOfCarnage/breakables/chest.yml",
             "hallsOfCarnage/breakables/ender_chest.yml",
@@ -119,6 +121,9 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/traps/bubbles.yml",
             "hallsOfCarnage/traps/geyser.yml",
             "hallsOfCarnage/traps/pufferfish.yml",
+            "hallsOfCarnage/traps/army_coffin.yml",
+            "hallsOfCarnage/traps/homing_mine.yml",
+            "hallsOfCarnage/traps/enchanted_book.yml",
             "hallsOfCarnage/monsters/zombie.yml",
             "hallsOfCarnage/monsters/creeper.yml",
             "hallsOfCarnage/monsters/creaking.yml",
@@ -148,6 +153,12 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/monsters/splinter.yml",
             "hallsOfCarnage/monsters/splinter_small.yml",
             "hallsOfCarnage/monsters/splinter_baby.yml",
+            "hallsOfCarnage/monsters/old_bones.yml",
+            "hallsOfCarnage/monsters/brooding_mother.yml",
+            "hallsOfCarnage/monsters/spiderling.yml",
+            "hallsOfCarnage/monsters/dammed_librarian.yml",
+            "hallsOfCarnage/monsters/rotting_soldier.yml",
+            "hallsOfCarnage/monsters/bedrock_walker.yml",
             "hallsOfCarnage/items/weapons/vagabonds_club.yml",
             "hallsOfCarnage/items/weapons/rusty_sword.yml",
             "hallsOfCarnage/items/weapons/poking_stick.yml",
@@ -156,30 +167,50 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/weapons/bone_cleaver.yml",
             "hallsOfCarnage/items/weapons/frost_lance.yml",
             "hallsOfCarnage/items/weapons/sculk_maul.yml",
+            "hallsOfCarnage/items/weapons/conductpole.yml",
+            "hallsOfCarnage/items/weapons/smasher.yml",
+            "hallsOfCarnage/items/weapons/bonker.yml",
+            "hallsOfCarnage/items/weapons/royal_halberd.yml",
+            "hallsOfCarnage/items/weapons/poisoned_dagger.yml",
+            "hallsOfCarnage/items/weapons/explodificator.yml",
+            "hallsOfCarnage/items/weapons/shortbow.yml",
+            "hallsOfCarnage/items/weapons/crossbow.yml",
+            "hallsOfCarnage/items/weapons/longbow.yml",
+            "hallsOfCarnage/items/weapons/reinforced_crossbow.yml",
+            "hallsOfCarnage/items/weapons/bubblebow.yml",
+            "hallsOfCarnage/items/weapons/stormterrow.yml",
             "hallsOfCarnage/items/armors/helmets/padded_cap.yml",
             "hallsOfCarnage/items/armors/helmets/chainmail_coif.yml",
             "hallsOfCarnage/items/armors/helmets/ironbound_helmet.yml",
             "hallsOfCarnage/items/armors/helmets/cinder_helmet.yml",
             "hallsOfCarnage/items/armors/helmets/reinforced_helmet.yml",
             "hallsOfCarnage/items/armors/helmets/deepguard_helmet.yml",
+            "hallsOfCarnage/items/armors/helmets/sightline.yml",
+            "hallsOfCarnage/items/armors/helmets/the_crosshair.yml",
             "hallsOfCarnage/items/armors/chestplates/padded_armor.yml",
             "hallsOfCarnage/items/armors/chestplates/chainmail_hauberk.yml",
             "hallsOfCarnage/items/armors/chestplates/ironbound_chestplate.yml",
             "hallsOfCarnage/items/armors/chestplates/cinderplate.yml",
             "hallsOfCarnage/items/armors/chestplates/reinforced_chestplate.yml",
             "hallsOfCarnage/items/armors/chestplates/deepguard_plate.yml",
+            "hallsOfCarnage/items/armors/chestplates/replated.yml",
+            "hallsOfCarnage/items/armors/chestplates/superguard.yml",
             "hallsOfCarnage/items/armors/leggings/padded_leggings.yml",
             "hallsOfCarnage/items/armors/leggings/chainmail_leggings.yml",
             "hallsOfCarnage/items/armors/leggings/ironbound_leggings.yml",
             "hallsOfCarnage/items/armors/leggings/cinder_leggings.yml",
             "hallsOfCarnage/items/armors/leggings/reinforced_leggings.yml",
             "hallsOfCarnage/items/armors/leggings/deepguard_leggings.yml",
+            "hallsOfCarnage/items/armors/leggings/sneakers.yml",
+            "hallsOfCarnage/items/armors/leggings/the_undetected.yml",
             "hallsOfCarnage/items/armors/boots/padded_boots.yml",
             "hallsOfCarnage/items/armors/boots/chainmail_boots.yml",
             "hallsOfCarnage/items/armors/boots/ironbound_boots.yml",
             "hallsOfCarnage/items/armors/boots/cinder_boots.yml",
             "hallsOfCarnage/items/armors/boots/reinforced_boots.yml",
             "hallsOfCarnage/items/armors/boots/deepguard_boots.yml",
+            "hallsOfCarnage/items/armors/boots/sprinters_treasure.yml",
+            "hallsOfCarnage/items/armors/boots/marathons.yml",
             "hallsOfCarnage/items/food/stale_bread.yml",
             "hallsOfCarnage/items/food/raw_mycelia.yml",
             "hallsOfCarnage/items/food/potato.yml",
@@ -201,6 +232,8 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/utility/ironhide_salve.yml",
             "hallsOfCarnage/items/utility/storm_vial.yml",
             "hallsOfCarnage/items/utility/poison_bomb.yml",
+            "hallsOfCarnage/items/utility/lodestone.yml",
+            "hallsOfCarnage/items/utility/handheld_scanner.yml",
             "hallsOfCarnage/items/blueprints/forge_blueprint.yml",
             "hallsOfCarnage/items/blueprints/grindstone_blueprint.yml",
             "hallsOfCarnage/items/blueprints/storage_locker_blueprint.yml",
@@ -849,6 +882,36 @@ public final class HallsOfCarnageManager {
         }
     }
 
+    public Player sessionProjectileShooter(Entity damager) {
+        if (!(damager instanceof org.bukkit.entity.Projectile projectile)
+                || !(projectile.getShooter() instanceof Player player)) {
+            return null;
+        }
+        return isActiveSessionParticipant(player) ? player : null;
+    }
+
+    public void ensureSessionRangedAmmo(Player player, org.bukkit.inventory.ItemStack item) {
+        if (player == null || item == null) {
+            return;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (session != null) {
+            session.ensureRangedAmmo(player, item);
+        }
+    }
+
+    public void handleSessionRangedShot(Player player, org.bukkit.event.entity.EntityShootBowEvent event) {
+        if (player == null || event == null) {
+            return;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (session != null) {
+            session.handleRangedShot(player, event);
+        }
+    }
+
     public boolean handleSessionFriendlyFire(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
         if (event == null || !(event.getEntity() instanceof Player player)) {
             return false;
@@ -856,6 +919,17 @@ public final class HallsOfCarnageManager {
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         return session != null && session.handleFriendlyFire(event);
+    }
+
+    public void handleSessionMonsterAttack(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
+        if (event == null || !(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (session != null) {
+            session.handleMonsterAttack(event);
+        }
     }
 
     public boolean handleSessionItemDamage(org.bukkit.event.player.PlayerItemDamageEvent event) {
@@ -901,6 +975,15 @@ public final class HallsOfCarnageManager {
         Integer sessionId = playerSessions.get(player.getUniqueId());
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         return session != null && session.handleLibraryVentInteract(player, entity);
+    }
+
+    public boolean handleTrapInteract(Player player, Entity entity) {
+        if (player == null || entity == null) {
+            return false;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        return session != null && session.handleTrapInteract(player, entity);
     }
 
     public boolean handleVentGateInteract(Player player, org.bukkit.block.Block block) {

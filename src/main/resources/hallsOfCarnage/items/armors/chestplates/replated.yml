@@ -1,0 +1,14 @@
+id: replated
+name: "Replated"
+category: armor
+rarity: normal
+material: IRON_CHESTPLATE
+max-stack-size: 1
+lore:
+  - "Extra chest plating with room to breathe."
+stats:
+  armor: 5
+  max-health: 2
+recipe:
+  iron_scrap: 14
+  wood_scrap: 4

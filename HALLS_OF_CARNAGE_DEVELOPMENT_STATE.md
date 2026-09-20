@@ -127,6 +127,7 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
+- Next development slice applied: `content.md` was backed up to `content.md.bak` and reduced to a completion marker. Added data-driven Halls weapon hit effects for poison, slowness/stun, chain damage, AoE splash, and AoE pushback; added held movement-speed weapon attributes, armor max-health/attack-speed/speed/swift-sneak stats, ranged bow/crossbow support with marked replenishing blocked-slot arrows, and projectile damage metadata. Added Conductpole, Smasher, Bonker, Royal Halberd, Poisoned Dagger, Explodificator, Shortbow, Crossbow, Longbow, Reinforced Crossbow, Bubblebow, Stormterrow, Sightline, The Crosshair, Replated, Superguard, Sneakers, The Undetected, Sprinter's Treasure, Marathons, Lodestone, and Handheld Scanner resources, and wired them into Untold Depths allowlists, Camp Station crafting, and research unlocks. Added Old Bones, Brooding Mother, Spiderling, Dammed Librarian, Rotting Soldier, and Bedrock Walker monster resources without adding them to level-type pools. Added Brooding Mother and Splinter same-position splitting, Dammed Librarian poison clouds on attack/death, Rotting Soldier delayed non-block-breaking explosion, enemy-health modifier support, Army Coffin, Homing Mine, and Enchanted Book trap resources/runtime, plus Bunker/Library trap-boost modifiers. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available.
 - Next reviewer slice applied: Halls sidebar now uses gold for wood scrap and shows research/distillery progress with red `x` and green checkmark markers. Research crates no longer generate in the first generated exploration room immediately beyond the elevator. Library vent entrances now render as iron-bar gates at low-ceiling vent mouths; right-clicking those gates teleports players through while leaving a physical barrier for monsters. Bunker generation now keeps ordinary room connectors one block wide and adds a separate widened trunk corridor pass. Exploration floors now place up to five blueprint distilleries outside the first room; activating one changes its display, active distilleries emit a particle beam toward the next inactive distillery, and activating the last one grants the activator a scenario/level-type blueprint with a 33% rare roll. Maven verification could not be run in this environment because `mvn` is not installed on PATH.
 - Next reviewer slice applied: `/hoc leave` now closes camp and elevator transfer chest viewers, captures the elevator chest, and then saves so host-leave saves cannot miss recent transfer-chest edits. Grindstone blueprint was changed to normal rarity and moved into normal Untold Depths blueprint pools where it appeared as rare. Halls armor resources were split by equipped slot under `items/armors/<slot>/`, full helmet/chestplate/leggings/boots sets were added for padded, chainmail, ironbound, cinder, reinforced, and deepguard armor, and armor/toughness stats were rebalanced to match the vanilla armor pieces they inherit. Untold Depths allowed items, Camp Station crafting, and research unlocks now include the full armor sets.
 - Next reviewer slice applied: Library vents now replace some generated Library connector corridors instead of being added as separate branch generation, with low iron-bar gates placed at vent/wide-corridor transitions. Blueprint distilleries are larger and use brighter `HAPPY_VILLAGER` pointing particles. Bunker connectors now route through winding detours, the separate loop-prone trunk pass was removed, the existing corridor network is widened afterward, and bunker redstone-lamp corridor lights are placed unlit. Camp sidebars now show research points and show nonzero sculk pressure on camp floors. Deconstructing a used camp building now writes its run-use or Research Table point state onto the returned original blueprint; rebuilding from that blueprint starts at level 1 with the saved state clamped to level-1 behavior, while extra upgrade blueprints remain plain.
@@ -139,17 +140,23 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Add a ton of new content, I wrote about it in content.md. Implement EVERYTHING, you have the whole development slice dedicated just to this document. As you add stuff, progressively remove it from the doc. Before you start create backup version of the doc unless it already exists.
-
-Future slices (dont do yet):
-- Make it so dropping item into hitbox of a building, it will get teleported out, so it can be picked up
-- Rework the floor structure for the whole scenario based on Extra Resources/halls_of_carnage/UntoldDepthsLevels.csv
-- Boss 1 - Add first boss: Overdrive Spawner, documented in overdrive_spawner.md. Use boss_floor.md for design as they are replacements for fight floors. Put it on floor 50 for now.
-- Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too).  Replace it on floor 50 for now, later will get replaced with new scenario structure.
 - Make it so wall spikes cannot damage you if you are lower than the floor (underwater for example)
 - Make it possible for proximity mines to be disarmed by throwing items near them.
 - Make it so liquids cannot generate right next to the holes, so there is at least 1 block border of ground between them.
 - The ventilation shafts on library floors have their model still positioned badly. Rework it, start with the exact same logic wall spike traps use and then edit the visual.
+- Some buildings have blueprints of wrong rarity associated with them, fix the blueprint items
+- Poison bomb utility is not working, it is being thrown out of the inventory as potion, maybe you could mask another item type with potion bottle bodel, not sure how the implementation is supossed to work
+- Before rotting soldiers explode, there should be a tnt model at the place and a beeping sound, make the explosion larger.
+- Make it so spiderlings deal less damage
+- Enchanted trap should have a hitbox thanks to which it can be permanently destroyed
+- The homing mine model is wrong, make it exactly the same as mine model, but golden pressure plate. Also homing mines should ran after nearest player when activated
+- Coffins are missing their hitbox, thus cannot be broken/opened
+- Make it so dropping item into hitbox of a building, it will get teleported out, so it can be picked up
+
+Future slices (dont do yet):
+- Rework the floor structure for the whole scenario based on Extra Resources/halls_of_carnage/UntoldDepthsLevels.csv, there are two boss levels, Overdrive Spawner and Archaic Guards, for now just replace them with the fight floor that currently sits on floor 50.
+- Boss 1 - Add first boss: Overdrive Spawner, documented in overdrive_spawner.md. Use boss_floor.md for design as they are replacements for fight floors. Place it on the first fight floor.
+- Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too). Place it on the last fight floor.
 
 For reviewer to figure out:
 - New research tree - I have added research.csv, rework the research tree fully based on this file

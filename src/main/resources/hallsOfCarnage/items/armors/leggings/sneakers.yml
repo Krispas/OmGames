@@ -1,0 +1,14 @@
+id: sneakers
+name: "Sneakers"
+category: armor
+rarity: normal
+material: IRON_LEGGINGS
+max-stack-size: 1
+lore:
+  - "Quiet plates for crawling past trouble."
+stats:
+  armor: 4
+  swift-sneak: 1
+recipe:
+  iron_scrap: 10
+  wood_scrap: 3

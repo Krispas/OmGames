@@ -1,0 +1,6 @@
+id: brooding_mother
+name: "Brooding Mother"
+entity-type: SPIDER
+health: 15
+scale: 0.48
+movement-speed-multiplier: 0.45

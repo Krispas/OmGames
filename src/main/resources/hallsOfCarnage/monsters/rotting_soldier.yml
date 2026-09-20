@@ -1,0 +1,10 @@
+id: rotting_soldier
+name: "Rotting Soldier"
+entity-type: ZOMBIE
+health: 10
+equipment:
+  armor:
+    helmet: NETHERITE_HELMET
+    chestplate: NETHERITE_CHESTPLATE
+    leggings: NETHERITE_LEGGINGS
+    boots: NETHERITE_BOOTS

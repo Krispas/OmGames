@@ -25,12 +25,12 @@ pillar-palettes:
 monsters:
   common:
     - splinter
-    - silverfish
-    - creaking
+    - old_bones
+    - rotting_soldier
     - ravager
   special:
     - stray
-    - cave_spider
+    - bedrock_walker
     - zombie_vanguard
 vegetation:
   chance: 0.0

@@ -1,0 +1,15 @@
+id: longbow
+name: "Longbow"
+category: weapon
+rarity: rare
+material: BOW
+max-stack-size: 1
+lore:
+  - "A tall bow that rewards steady aim."
+stats:
+  ranged: 1
+  ranged-damage: 7
+  durability: 130
+recipe:
+  wood_scrap: 14
+  diamond_scrap: 2

@@ -1,0 +1,6 @@
+id: old_bones
+name: "Old Bones"
+entity-type: SKELETON
+health: 5
+equipment:
+  main-hand: NETHERITE_SWORD

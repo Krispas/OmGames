@@ -125,6 +125,15 @@ final class HallsItemFactory {
                     EquipmentSlotGroup.HAND
             ));
         }
+        Double movementSpeed = type.stats().get("movement_speed_percent");
+        if (movementSpeed != null && !type.category().equals("armor")) {
+            meta.addAttributeModifier(Attribute.MOVEMENT_SPEED, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_held_movement_speed_" + type.id()),
+                    movementSpeed / 100.0,
+                    AttributeModifier.Operation.ADD_SCALAR,
+                    EquipmentSlotGroup.HAND
+            ));
+        }
     }
 
     private static void applyArmorStats(JavaPlugin plugin, ItemMeta meta, HallsItemType type) {
@@ -154,14 +163,47 @@ final class HallsItemFactory {
                     group
             ));
         }
+        Double maxHealth = type.stats().get("max_health");
+        if (maxHealth != null) {
+            meta.addAttributeModifier(Attribute.MAX_HEALTH, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_max_health_" + type.id()),
+                    maxHealth,
+                    AttributeModifier.Operation.ADD_NUMBER,
+                    group
+            ));
+        }
+        Double movementSpeed = type.stats().get("movement_speed_percent");
+        if (movementSpeed != null) {
+            meta.addAttributeModifier(Attribute.MOVEMENT_SPEED, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_movement_speed_" + type.id()),
+                    movementSpeed / 100.0,
+                    AttributeModifier.Operation.ADD_SCALAR,
+                    group
+            ));
+        }
+        Double attackSpeedPercent = type.stats().get("attack_speed_percent");
+        if (attackSpeedPercent != null) {
+            meta.addAttributeModifier(Attribute.ATTACK_SPEED, new AttributeModifier(
+                    new NamespacedKey(plugin, "hoc_armor_attack_speed_" + type.id()),
+                    attackSpeedPercent / 100.0,
+                    AttributeModifier.Operation.ADD_SCALAR,
+                    group
+            ));
+        }
+        Double swiftSneak = type.stats().get("swift_sneak");
+        if (swiftSneak != null && swiftSneak > 0.0) {
+            meta.addEnchant(Enchantment.SWIFT_SNEAK, Math.max(1, swiftSneak.intValue()), true);
+        }
     }
 
     private static void applySpecialItemMetadata(ItemMeta meta, HallsItemType type) {
-        if (!type.id().equals("frost_lance")) {
-            return;
+        if (type.id().equals("frost_lance")) {
+            meta.addEnchant(Enchantment.LOYALTY, 3, true);
+            meta.setEnchantmentGlintOverride(false);
         }
-        meta.addEnchant(Enchantment.LOYALTY, 3, true);
-        meta.setEnchantmentGlintOverride(false);
+        if (type.stats().getOrDefault("ranged", 0.0) > 0.0 && type.material() == Material.BOW) {
+            meta.addEnchant(Enchantment.INFINITY, 1, true);
+        }
     }
 
     private static void applyArmorModel(ItemMeta meta, HallsItemType type) {

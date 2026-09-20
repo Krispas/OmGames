@@ -33,13 +33,13 @@ pillar-palettes:
 monsters:
   common:
     - zombie
-    - skeleton
-    - silverfish
-    - witch
-  special:
-    - vindicator
-    - breeze
+    - brooding_mother
     - creaking
+    - dammed_librarian
+  special:
+    - cave_spider
+    - skeleton
+    - witch
 vegetation:
   chance: 0.01
   types:

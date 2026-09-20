@@ -39,11 +39,11 @@ monsters:
     - husk
     - breeze
     - pillager
-    - silverfish
+    - dammed_librarian
   special:
     - skeleton
     - parched
-    - wither_skeleton
+    - bedrock_walker
 vegetation:
   chance: 0.035
   types:

@@ -33,13 +33,13 @@ pillar-palettes:
 monsters:
   common:
     - zombie
-    - pillager
-    - skeleton
-    - slime_medium
+    - brooding_mother
+    - old_bones
+    - rotting_soldier
   special:
-    - ravager
-    - breeze
-    - zombie_vanguard
+    - skeleton
+    - bedrock_walker
+    - cave_spider
 vegetation:
   chance: 0.0
   types: {}

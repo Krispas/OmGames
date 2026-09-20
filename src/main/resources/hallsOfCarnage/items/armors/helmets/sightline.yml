@@ -1,0 +1,14 @@
+id: sightline
+name: "Sightline"
+category: armor
+rarity: normal
+material: IRON_HELMET
+max-stack-size: 1
+lore:
+  - "A narrow-visor helmet tuned for quick strikes."
+stats:
+  armor: 2
+  attack-speed-percent: 5
+recipe:
+  iron_scrap: 8
+  redstone_scrap: 2

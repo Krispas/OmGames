@@ -1,0 +1,14 @@
+id: sprinters_treasure
+name: "Sprinter's Treasure"
+category: armor
+rarity: normal
+material: IRON_BOOTS
+max-stack-size: 1
+lore:
+  - "Light boots with a springy sole."
+stats:
+  armor: 2
+  movement-speed-percent: 10
+recipe:
+  iron_scrap: 7
+  redstone_scrap: 2

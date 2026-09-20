@@ -1,0 +1,5 @@
+id: dammed_librarian
+name: "Dammed Librarian"
+entity-type: ZOMBIE_VILLAGER
+health: 20
+movement-speed-multiplier: 0.95

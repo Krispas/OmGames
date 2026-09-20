@@ -1,0 +1,16 @@
+id: royal_halberd
+name: "Royal Halberd"
+category: weapon
+rarity: rare
+material: DIAMOND_SWORD
+max-stack-size: 1
+lore:
+  - "A ceremonial spear balanced for decisive lunges."
+stats:
+  melee-damage: 8
+  attack-speed: 1.0
+  movement-speed-percent: 20
+  durability: 110
+recipe:
+  iron_scrap: 15
+  diamond_scrap: 5

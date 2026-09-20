@@ -1,0 +1,16 @@
+id: marathons
+name: "Marathons"
+category: armor
+rarity: rare
+material: NETHERITE_BOOTS
+max-stack-size: 1
+lore:
+  - "Made for running until the dungeon gives up."
+stats:
+  armor: 2
+  armor-toughness: 2
+  movement-speed-percent: 20
+recipe:
+  iron_scrap: 9
+  diamond_scrap: 3
+  redstone_scrap: 5

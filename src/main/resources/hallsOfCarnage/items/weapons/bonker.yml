@@ -1,0 +1,16 @@
+id: bonker
+name: "Bonker"
+category: weapon
+rarity: rare
+material: WOODEN_AXE
+max-stack-size: 1
+lore:
+  - "A ridiculous club that leaves monsters seeing stars."
+stats:
+  melee-damage: 6
+  attack-speed: 0.9
+  stun-seconds: 2
+  durability: 80
+recipe:
+  wood_scrap: 14
+  redstone_scrap: 4

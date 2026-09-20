@@ -1,0 +1,15 @@
+id: crossbow
+name: "Crossbow"
+category: weapon
+rarity: normal
+material: CROSSBOW
+max-stack-size: 1
+lore:
+  - "A reliable crank bow with heavier bolts."
+stats:
+  ranged: 1
+  ranged-damage: 5
+  durability: 100
+recipe:
+  wood_scrap: 10
+  iron_scrap: 4

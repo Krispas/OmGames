@@ -1,0 +1,18 @@
+id: conductpole
+name: "Conductpole"
+category: weapon
+rarity: normal
+material: IRON_SWORD
+max-stack-size: 1
+lore:
+  - "A hooked iron spear that jumps pain between enemies."
+stats:
+  melee-damage: 4
+  attack-speed: 1.5
+  chain-targets: 5
+  chain-radius: 7
+  chain-damage: 3
+  durability: 90
+recipe:
+  iron_scrap: 10
+  redstone_scrap: 4

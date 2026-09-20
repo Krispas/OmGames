@@ -11,6 +11,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityTransformEvent;
+import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.entity.EntityType;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
@@ -161,6 +162,11 @@ public final class HallsOfCarnageListener implements Listener {
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player player)) {
             manager.handleSessionFriendlyFire(event);
+            manager.handleSessionMonsterAttack(event);
+            Player shooter = manager.sessionProjectileShooter(event.getDamager());
+            if (shooter != null) {
+                manager.handleSessionWeaponHit(shooter, event.getEntity(), event);
+            }
             return;
         }
         if (manager.handleSessionFriendlyFire(event)) {
@@ -171,6 +177,13 @@ public final class HallsOfCarnageListener implements Listener {
             return;
         }
         manager.handleSessionWeaponHit(player, event.getEntity(), event);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityShootBow(EntityShootBowEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            manager.handleSessionRangedShot(player, event);
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -192,6 +205,11 @@ public final class HallsOfCarnageListener implements Listener {
         }
         if (event.getHand() == EquipmentSlot.HAND
                 && manager.handleLibraryVentInteract(event.getPlayer(), event.getRightClicked())) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getHand() == EquipmentSlot.HAND
+                && manager.handleTrapInteract(event.getPlayer(), event.getRightClicked())) {
             event.setCancelled(true);
             return;
         }
@@ -247,6 +265,7 @@ public final class HallsOfCarnageListener implements Listener {
             event.getPlayer().sendActionBar(Component.text("Set the research crate down first.", NamedTextColor.LIGHT_PURPLE));
             return;
         }
+        manager.ensureSessionRangedAmmo(event.getPlayer(), event.getItem());
         if ((event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK)
                 && manager.handleUtilityUse(event.getPlayer(), event.getItem())) {
             event.setCancelled(true);

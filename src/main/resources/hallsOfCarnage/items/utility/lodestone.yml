@@ -1,0 +1,15 @@
+id: lodestone
+name: "Lodestone"
+category: utility
+rarity: normal
+material: LODESTONE
+max-stack-size: 1
+lore:
+  - "Projects a temporary path back to the elevator."
+stats:
+  durability: 5
+  cooldown-seconds: 45
+  duration-seconds: 20
+recipe:
+  iron_scrap: 8
+  redstone_scrap: 4

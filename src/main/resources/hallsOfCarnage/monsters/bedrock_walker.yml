@@ -1,0 +1,11 @@
+id: bedrock_walker
+name: "Bedrock Walker"
+entity-type: HUSK
+health: 60
+movement-speed-multiplier: 0.35
+equipment:
+  armor:
+    helmet: NETHERITE_HELMET
+    chestplate: NETHERITE_CHESTPLATE
+    leggings: NETHERITE_LEGGINGS
+    boots: NETHERITE_BOOTS

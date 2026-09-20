@@ -46,6 +46,18 @@ allowed-items:
     - frost_lance
     - echo_blade
     - sculk_maul
+    - conductpole
+    - smasher
+    - bonker
+    - royal_halberd
+    - poisoned_dagger
+    - explodificator
+    - shortbow
+    - crossbow
+    - longbow
+    - reinforced_crossbow
+    - bubblebow
+    - stormterrow
   armor:
     - padded_cap
     - padded_armor
@@ -71,6 +83,14 @@ allowed-items:
     - deepguard_plate
     - deepguard_leggings
     - deepguard_boots
+    - sightline
+    - the_crosshair
+    - replated
+    - superguard
+    - sneakers
+    - the_undetected
+    - sprinters_treasure
+    - marathons
   food:
     - raw_mycelia
     - potato
@@ -94,6 +114,8 @@ allowed-items:
     - ironhide_salve
     - storm_vial
     - poison_bomb
+    - lodestone
+    - handheld_scanner
   blueprint:
     - forge_blueprint
     - grindstone_blueprint
@@ -212,9 +234,23 @@ crafting-stations:
       - ironhide_salve
       - echo_blade
       - sculk_maul
+      - conductpole
+      - smasher
+      - bonker
+      - royal_halberd
+      - poisoned_dagger
+      - explodificator
+      - shortbow
+      - crossbow
+      - longbow
+      - reinforced_crossbow
+      - bubblebow
+      - stormterrow
       - warding_totem
       - storm_vial
       - poison_bomb
+      - lodestone
+      - handheld_scanner
       - padded_cap
       - padded_armor
       - padded_leggings
@@ -239,6 +275,14 @@ crafting-stations:
       - deepguard_plate
       - deepguard_leggings
       - deepguard_boots
+      - sightline
+      - the_crosshair
+      - replated
+      - superguard
+      - sneakers
+      - the_undetected
+      - sprinters_treasure
+      - marathons
 research:
   nodes:
     field_cooking:
@@ -262,6 +306,9 @@ research:
         - vagabonds_club
         - rusty_sword
         - poking_stick
+        - shortbow
+        - lodestone
+        - handheld_scanner
         - smoke_bomb
         - mending_salve
         - padded_cap
@@ -287,6 +334,9 @@ research:
       unlocks:
         - miner_pick
         - bone_cleaver
+        - conductpole
+        - poisoned_dagger
+        - crossbow
         - chainmail_coif
         - chainmail_hauberk
         - chainmail_leggings
@@ -299,6 +349,11 @@ research:
         - mining_arms
       unlocks:
         - frost_lance
+        - smasher
+        - sightline
+        - replated
+        - sneakers
+        - sprinters_treasure
         - ironbound_helmet
         - ironbound_chestplate
         - ironbound_leggings
@@ -318,6 +373,8 @@ research:
         - cinderplate
         - cinder_leggings
         - cinder_boots
+        - bonker
+        - bubblebow
     stormcraft:
       name: "Stormcraft"
       icon: LIGHTNING_ROD
@@ -327,6 +384,9 @@ research:
       unlocks:
         - storm_vial
         - echo_blade
+        - longbow
+        - reinforced_crossbow
+        - royal_halberd
     sculk_studies:
       name: "Sculk Studies"
       icon: SCULK_CATALYST
@@ -336,6 +396,8 @@ research:
       unlocks:
         - poison_bomb
         - sculk_maul
+        - explodificator
+        - stormterrow
         - deeproot_purge_stew
         - reinforced_helmet
         - reinforced_chestplate
@@ -345,6 +407,10 @@ research:
         - deepguard_plate
         - deepguard_leggings
         - deepguard_boots
+        - the_crosshair
+        - superguard
+        - the_undetected
+        - marathons
 floors:
   - number: 1
     kind: start

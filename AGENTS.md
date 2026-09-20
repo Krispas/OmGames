@@ -1335,7 +1335,7 @@ SQLite tables:
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, optional `recipe` cost map, and an optional `stats` map.
 - Bundled Halls armor item resources are organized by equipped slot under `items/armors/helmets/`, `items/armors/chestplates/`, `items/armors/leggings/`, and `items/armors/boots/`.
-- Halls player item defaults do not include ranged gear; do not add bows, crossbows, tridents, arrows, or fireworks as Halls player items unless the design changes again.
+- Halls player item defaults include first-pass ranged bows/crossbows; ranged Halls weapons use `stats.ranged` / `stats.ranged-damage`, keep a marked arrow stack in a blocked inventory row, and should not consume arrows on shot.
 - Armor `item-model` controls the item icon/model; armor `armor-model` is written to Paper's equippable component for the worn armor model.
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
 - Halls scenarios may define top-level `camp.layout`, `camp.team-lives`, and `camp.key-costs`; camp floors use the scenario's shared camp layout instead of separate per-floor camp layouts.
@@ -1382,6 +1382,8 @@ SQLite tables:
 - `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions. If `<item>` is `wood_scrap`, `iron_scrap`, `diamond_scrap`, or `redstone_scrap`, the amount is deposited directly into the caller's active session elevator storage and awards the matching test coins. If `<item>` is `research_points` (aliases: `research_point`, `research`, `rp`), the amount is added to the caller's active session research points.
 - Halls armor items equip into empty matching armor slots from `/hoc give`; right-click physics-drop pickup still inserts into the selected hotbar slot.
 - Halls armor item `stats.armor` maps to real Bukkit `ARMOR` item attributes on the matching armor slot; optional `stats.armor-toughness` / normalized `armor_toughness` maps to `ARMOR_TOUGHNESS`.
+- Halls weapon effects are data-driven through item stats where possible: `poison-seconds`, `slowness-seconds`, `stun-seconds`, `chain-targets`, `chain-radius`, `chain-damage`, `aoe-damage`, `aoe-radius`, and `pushback-strength`.
+- Halls armor supports data-driven bonus stats: `max-health`, `attack-speed-percent`, `movement-speed-percent`, and `swift-sneak`.
 - Halls coin drops use session-owned physics drops but bypass normal inventory pickup; right-clicking the coin adds it directly to the shared session coin counter even when the hotbar is full.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
@@ -1395,6 +1397,7 @@ SQLite tables:
 - Halls utility `smoke_bomb` clears nearby session monster targets, conceals the user from monster target selection for its duration, emits smoke, applies temporary invisibility, refreshes item use-cooldown metadata on use, and uses a per-player cooldown instead of being consumed on right-click.
 - Halls utility `warding_totem` gives nearby alive participants Resistance II for 10 seconds and uses a per-player cooldown instead of being consumed on right-click.
 - Halls utility `mending_salve` heals `4` health on right-click and uses a per-player cooldown instead of being consumed.
+- Halls utilities `lodestone` and `handheld_scanner` are data-driven catalog items using durability/cooldown stats; Lodestone renders a temporary elevator particle trail, and Handheld Scanner reports live monster/debug state, nearby research crate/distillery presence, death fog remaining, and unbroken breakables.
 - Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.
 - Elevator scrap deposit consumes only the currently selected hotbar stack, not every scrap item in the player hotbar/offhand.
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
@@ -1410,12 +1413,15 @@ SQLite tables:
 - Halls traps should damage session monsters as well as players when monsters enter their contact, radius, or lane checks, but only while a participant is within 20 blocks of the trap effect/contact area.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth. Bear traps and proximity mines render through item-display models instead of placed physical floor blocks.
+- Bunker trap kinds include `army_coffin` and `homing_mine`; Library trap kinds include `enchanted_book`.
 - Trap files may define `blacklisted-level-types`; blacklisted level type ids are rejected even when `level-types` is empty. Bundled bear traps and proximity mines are blacklisted from `sewer`.
 - Sewer trap kinds currently include `bubbles`, `geyser`, and `pufferfish`. Bubbles and geysers render squished magma/soul-sand display fixtures at the bottom of two-block-deep puddles without replacing the water blocks; bubbles damage contact, geysers use cooldown bursts, splash/cloud/bubble particles, and large knockback without damage, and pufferfish spawns a killable pufferfish trap entity.
 - Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults. Parched must resolve to the actual `PARCHED` entity type, not a Husk fallback. Ravagers are intentionally weaker than vanilla for Halls; bundled health is `10` and runtime attack damage is clamped to `4`. Drowned and 10-HP guardians are bundled for Sewer pools.
 - Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `scale`, optional `movement-speed-multiplier`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
+- Special Halls monster death/attack behavior currently includes Brooding Mother splitting into twenty `spiderling` monsters, Splinter splitting at the same position, Dammed Librarian poison clouds on attack/death, and Rotting Soldier delayed non-block-breaking explosion.
 - Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
 - Modifier files define `modifiers.<id>.type`, `display-name`, `icon`, `weight`, and `effects`.
+- Modifier effects include `enemy-health-multiplier`; duplicate modifiers stack multiplicatively.
 - Shared modifiers live in `modifiers/shared.yml`; level-specific modifier files such as `frozen_halls.yml` and `deep_crypt.yml` are restricted to that level type by filename.
 - Exploration floors roll three modifiers. Each slot has `max(0, min(100, 50 - difficulty))%` chance to roll from the good pool; otherwise it rolls from the bad pool.
 - Duplicate modifiers are allowed and their effects stack or multiply.

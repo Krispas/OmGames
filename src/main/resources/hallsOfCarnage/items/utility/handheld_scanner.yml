@@ -1,0 +1,15 @@
+id: handheld_scanner
+name: "Handheld Scanner"
+category: utility
+rarity: normal
+material: SPYGLASS
+max-stack-size: 1
+lore:
+  - "Pings the floor for threats and unusual salvage."
+stats:
+  durability: 8
+  cooldown-seconds: 25
+  radius: 20
+recipe:
+  iron_scrap: 8
+  redstone_scrap: 6

@@ -1,0 +1,10 @@
+id: enchanted_book
+kind: enchanted_book
+weight: 6
+level-types:
+  - library
+model-material: ENCHANTED_BOOK
+model-scale: 1.0
+damage: 6
+radius: 2.0
+interval-ticks: 80

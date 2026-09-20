@@ -1,0 +1,15 @@
+modifiers:
+  army_coffins:
+    type: bad
+    display-name: "Army Coffins"
+    icon: "C"
+    weight: 7
+    effects:
+      trap: army_coffin
+  homing_mines:
+    type: bad
+    display-name: "Homing Mines"
+    icon: "M"
+    weight: 7
+    effects:
+      trap: homing_mine
