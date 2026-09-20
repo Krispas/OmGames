@@ -137,7 +137,7 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Overdrive spawner animations are broken, use item models for it, not block models. Do this for buildings, breakables and other models too, dont forget they are placed and rotated differently, read the docs about it.
+- Overdrive spawner animations are broken, use item displays for it, not block displays. Do this for buildings, breakables and other models too, dont forget they are placed and rotated differently, read the docs about it.
 - When going through vents on the library level, rotate the player to face outwards.
 
 Future slices (dont do yet):
