@@ -137,11 +137,11 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- Overdrive spawner animations are broken, use item models for it, not block models. Do this for buildings, breakables and other models too, dont forget they are placed and rotated differently, read the docs about it.
+- When going through vents on the library level, rotate the player to face outwards.
 
 Future slices (dont do yet):
-- Overdrive spawner animations are broken, use item models for it, not block models. Do this for buildings, breakables and other models too, dont forget they are placed and rotated differently, read the docs about it.
 - Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too). Place it on the last fight floor. While working on it, merge behaviour of poison bomb poioson cloud, librarian poison cloud and the poison clouds from the boss, of course the poison bomb one effects monsters only and the other two ones players only.
-- When going through vents on the library level, rotate the player to face outwards.
 
 For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, mycelia_farm, research_table, scanner, sculk purifier, speed totem, storage locker.
