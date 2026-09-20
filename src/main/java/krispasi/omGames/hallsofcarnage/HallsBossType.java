@@ -57,6 +57,7 @@ record HallsBossType(
                      int minSpawnCount,
                      int maxSpawnCount,
                      double shockwaveDamage,
+                     double shockwaveSpeedBlocksPerSecond,
                      double xBlastDamage,
                      List<WeightedMonster> spawnPool) {
         Overdrive {
@@ -70,13 +71,14 @@ record HallsBossType(
             minSpawnCount = Math.max(1, minSpawnCount);
             maxSpawnCount = Math.max(minSpawnCount, maxSpawnCount);
             shockwaveDamage = Math.max(0.0, shockwaveDamage);
+            shockwaveSpeedBlocksPerSecond = Math.max(0.5, shockwaveSpeedBlocksPerSecond);
             xBlastDamage = Math.max(0.0, xBlastDamage);
             spawnPool = spawnPool == null ? List.of() : List.copyOf(spawnPool);
         }
 
         static Overdrive defaults() {
             return new Overdrive(60, 140, 10, 20, 20, 40, 40,
-                    3, 5, 6.0, 8.0,
+                    3, 5, 6.0, 4.0, 8.0,
                     List.of(
                             new WeightedMonster("splinter", 3),
                             new WeightedMonster("zombie", 3),

@@ -227,7 +227,7 @@ public final class HallsSession {
                 location -> dropSessionItem(location, coinItem(1)), monsterRuntime::spawnConfiguredMonster);
         this.bossRuntime = new HallsSessionBossRuntime(plugin, world, participants, this.bossTypes,
                 this::isAliveParticipant, monsterRuntime::spawnConfiguredMonster,
-                this::setBlock, this::unlockBossFloorExit);
+                this::setBlock, monsterRuntime::removeAllForBossDefeat, this::unlockBossFloorExit);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
                 type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
             @Override

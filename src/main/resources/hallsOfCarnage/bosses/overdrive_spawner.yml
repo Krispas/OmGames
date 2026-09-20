@@ -4,7 +4,7 @@ health: 150
 multiplayer-hp-boost: 1.3
 display:
   material: TRIAL_SPAWNER
-  item-model: om:overdrive_spawner
+  item-model: ""
   parts:
     core:
       material: TRIAL_SPAWNER
@@ -34,6 +34,7 @@ overdrive:
     ready-seconds: 0.5
     cooldown-seconds: 1.0
     shockwave-damage: 6.0
+    shockwave-speed-blocks-per-second: 4.0
   x-blast:
     move-seconds: 1.0
     charge-seconds: 2.0

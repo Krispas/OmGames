@@ -94,6 +94,7 @@ final class HallsBossTypeLoader {
                 Math.max(1, section.getInt("spawn.count.min", defaults.minSpawnCount())),
                 Math.max(1, section.getInt("spawn.count.max", defaults.maxSpawnCount())),
                 section.getDouble("jump.shockwave-damage", defaults.shockwaveDamage()),
+                section.getDouble("jump.shockwave-speed-blocks-per-second", defaults.shockwaveSpeedBlocksPerSecond()),
                 section.getDouble("x-blast.damage", defaults.xBlastDamage()),
                 spawnPool(section.getConfigurationSection("spawn.pool"))
         );

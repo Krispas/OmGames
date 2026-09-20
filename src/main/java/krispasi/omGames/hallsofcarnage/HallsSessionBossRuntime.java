@@ -40,6 +40,8 @@ import org.joml.Vector3f;
 final class HallsSessionBossRuntime {
     private static final String BOSS_TAG = "omgames_hoc_boss";
     private static final double HIT_FLASH_RADIUS = 1.8;
+    private static final float MIN_MELEE_ATTACK_COOLDOWN = 0.88f;
+    private static final long MELEE_COOLDOWN_MESSAGE_TICKS = 10L;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -48,9 +50,11 @@ final class HallsSessionBossRuntime {
     private final Predicate<UUID> aliveParticipantPredicate;
     private final BiFunction<String, Location, Boolean> monsterSpawner;
     private final BlockSetter blockSetter;
+    private final Runnable bossMinionClearCallback;
     private final Runnable defeatedCallback;
     private final NamespacedKey bossIdKey;
     private final Random random = new Random();
+    private final Map<UUID, Long> cooldownMessageTicks = new java.util.HashMap<>();
 
     private ActiveBoss activeBoss;
     private BossBar bossBar;
@@ -65,6 +69,7 @@ final class HallsSessionBossRuntime {
                             Predicate<UUID> aliveParticipantPredicate,
                             BiFunction<String, Location, Boolean> monsterSpawner,
                             BlockSetter blockSetter,
+                            Runnable bossMinionClearCallback,
                             Runnable defeatedCallback) {
         this.plugin = plugin;
         this.world = world;
@@ -73,6 +78,7 @@ final class HallsSessionBossRuntime {
         this.aliveParticipantPredicate = aliveParticipantPredicate == null ? id -> true : aliveParticipantPredicate;
         this.monsterSpawner = monsterSpawner == null ? (id, location) -> false : monsterSpawner;
         this.blockSetter = blockSetter == null ? (x, y, z, material, face) -> { } : blockSetter;
+        this.bossMinionClearCallback = bossMinionClearCallback == null ? () -> { } : bossMinionClearCallback;
         this.defeatedCallback = defeatedCallback == null ? () -> { } : defeatedCallback;
         this.bossIdKey = new NamespacedKey(plugin, "hoc_boss_id");
     }
@@ -119,6 +125,13 @@ final class HallsSessionBossRuntime {
         }
         if (!activeBoss.active()) {
             activate(player);
+            return true;
+        }
+        float attackCooldown = player.getAttackCooldown();
+        if (attackCooldown < MIN_MELEE_ATTACK_COOLDOWN) {
+            sendCooldownMessage(player);
+            world.spawnParticle(Particle.SMOKE, entity.getLocation().clone().add(0.0, 1.2, 0.0),
+                    6, 0.25, 0.25, 0.25, 0.01);
             return true;
         }
         damage(Math.max(1.0, damage), player.getLocation());
@@ -211,6 +224,7 @@ final class HallsSessionBossRuntime {
             return;
         }
         cancelTasks();
+        bossMinionClearCallback.run();
         Location center = activeBoss.location().clone().add(0.0, 2.2, 0.0);
         world.spawnParticle(Particle.EXPLOSION, center, 2, 0.4, 0.4, 0.4, 0.0);
         world.spawnParticle(Particle.ELECTRIC_SPARK, center, 100, 2.4, 1.8, 2.4, 0.08);
@@ -254,6 +268,11 @@ final class HallsSessionBossRuntime {
         activeBoss.setIdleTicks(activeBoss.idleTicks() + 1);
         double bob = Math.sin(activeBoss.idleTicks() / 8.0) * 0.04;
         animateDisplays(activeBoss.yaw(), bob, new Vector());
+        Location core = activeBoss.location().clone().add(0.0, 2.45 + bob, 0.0);
+        world.spawnParticle(Particle.TRIAL_SPAWNER_DETECTION, core, 2, 1.9, 1.5, 1.9, 0.0);
+        if (activeBoss.idleTicks() % 8 == 0) {
+            world.spawnParticle(Particle.ELECTRIC_SPARK, core, 8, 2.0, 1.4, 2.0, 0.04);
+        }
     }
 
     private void scheduleNextAttack(long delayTicks) {
@@ -622,7 +641,7 @@ final class HallsSessionBossRuntime {
                 return;
             }
             world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 0.55f);
-            new Shockwave(config.shockwaveDamage()).runTaskTimer(plugin, 1L, 2L);
+            new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond()).runTaskTimer(plugin, 1L, 2L);
             scheduleNextAttack(config.jumpCooldownTicks());
             cancel();
         }
@@ -630,11 +649,13 @@ final class HallsSessionBossRuntime {
 
     private final class Shockwave extends org.bukkit.scheduler.BukkitRunnable {
         private final double damage;
+        private final double radiusStep;
         private double radius = 1.0;
         private final Set<UUID> hit = new java.util.HashSet<>();
 
-        private Shockwave(double damage) {
+        private Shockwave(double damage, double speedBlocksPerSecond) {
             this.damage = damage;
+            this.radiusStep = Math.max(0.05, speedBlocksPerSecond * 2.0 / 20.0);
         }
 
         @Override
@@ -659,11 +680,21 @@ final class HallsSessionBossRuntime {
                     player.damage(damage);
                 }
             }
-            radius += 0.85;
+            radius += radiusStep;
             if (radius > 13.0) {
                 cancel();
             }
         }
+    }
+
+    private void sendCooldownMessage(Player player) {
+        long now = world.getFullTime();
+        Long previous = cooldownMessageTicks.get(player.getUniqueId());
+        if (previous != null && now - previous < MELEE_COOLDOWN_MESSAGE_TICKS) {
+            return;
+        }
+        cooldownMessageTicks.put(player.getUniqueId(), now);
+        player.sendActionBar(Component.text("Time your swings to damage the boss.", NamedTextColor.GRAY));
     }
 
     private final class RetractAnimation extends org.bukkit.scheduler.BukkitRunnable {

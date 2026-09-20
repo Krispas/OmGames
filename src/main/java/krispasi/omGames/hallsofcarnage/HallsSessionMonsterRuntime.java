@@ -163,6 +163,30 @@ final class HallsSessionMonsterRuntime {
         monsterHealthMultiplier = 1.0;
     }
 
+    void removeAllForBossDefeat() {
+        if (spawnTask != null) {
+            spawnTask.cancel();
+            spawnTask = null;
+        }
+        for (UUID entityId : Set.copyOf(spawnedMonsters)) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity == null) {
+                continue;
+            }
+            Location location = entity.getLocation().clone().add(0.0, 0.6, 0.0);
+            if (entity instanceof LivingEntity living) {
+                world.spawnParticle(org.bukkit.Particle.SOUL, location, 18, 0.35, 0.45, 0.35, 0.03);
+                world.playSound(location, org.bukkit.Sound.ENTITY_WITHER_HURT, 0.35f, 1.45f);
+                living.remove();
+            } else {
+                entity.remove();
+            }
+        }
+        spawnedMonsters.clear();
+        spawnedThisFloor = 0;
+        maxAlive = 0;
+    }
+
     String debugStatus() {
         pruneDeadMonsters();
         return spawnedMonsters.size() + " alive, cap " + baseMaxAlive + ", extended cap " + maxAlive
