@@ -614,13 +614,18 @@ public final class HallsSession {
 
     public boolean handleBreakableAttack(Player player, Entity entity) {
         if (bossRuntime.isBossEntity(entity)) {
-            boolean handled = bossRuntime.handleAttack(player, entity, meleeDamage(player));
-            if (handled) {
+            HallsSessionBossRuntime.AttackResult result = bossRuntime.handleAttack(player, entity, chargedMeleeDamage(player));
+            if (result.damaged()) {
+                player.resetCooldown();
                 applyBossDirectWeaponEffects(player);
             }
-            return handled;
+            return result.handled();
         }
-        if (bossRuntime.handleAttack(player, entity, meleeDamage(player))) {
+        HallsSessionBossRuntime.AttackResult bossAttack = bossRuntime.handleAttack(player, entity, chargedMeleeDamage(player));
+        if (bossAttack.damaged()) {
+            player.resetCooldown();
+        }
+        if (bossAttack.handled()) {
             return true;
         }
         if (trapRuntime.handleTrapAttack(player, entity)) {
@@ -907,6 +912,15 @@ public final class HallsSession {
             return Math.max(1.0, type.stats().getOrDefault("melee_damage", 1.0));
         }
         return 1.0;
+    }
+
+    private double chargedMeleeDamage(Player player) {
+        double damage = meleeDamage(player) * Math.max(0.0, activeFloorModifiers.meleeDamageMultiplier());
+        if (player == null) {
+            return damage;
+        }
+        double charge = Math.max(0.0, Math.min(1.0, player.getCooledAttackStrength(0.5f)));
+        return damage * (0.2 + charge * charge * 0.8);
     }
 
     private void applyWeaponStatusEffects(HallsItemType type, LivingEntity target) {

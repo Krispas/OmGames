@@ -111,20 +111,21 @@ final class HallsSessionBossRuntime {
         return activeBoss == null || activeBoss.defeated();
     }
 
-    boolean handleAttack(Player player, Entity entity, double damage) {
+    AttackResult handleAttack(Player player, Entity entity, double damage) {
         if (player == null || entity == null || activeBoss == null || !isBossEntity(entity)) {
-            return false;
+            return AttackResult.unhandledResult();
         }
         if (!participants.contains(player.getUniqueId()) || !aliveParticipantPredicate.test(player.getUniqueId())) {
             player.sendActionBar(Component.text("Ghosts cannot harm the boss.", NamedTextColor.GRAY));
-            return true;
+            return AttackResult.handledResult();
         }
         if (!activeBoss.active()) {
             activate(player);
-            return true;
+            return AttackResult.handledResult();
         }
-        damage(Math.max(1.0, damage), player.getLocation(), false);
-        return true;
+        return damage(Math.max(1.0, damage), player.getLocation(), false)
+                ? AttackResult.damagedResult()
+                : AttackResult.handledResult();
     }
 
     boolean handleProjectileHit(Player shooter, Entity entity, double damage) {
@@ -227,13 +228,13 @@ final class HallsSessionBossRuntime {
         startTicking();
     }
 
-    private void damage(double amount, Location source, boolean bypassInvulnerability) {
+    private boolean damage(double amount, Location source, boolean bypassInvulnerability) {
         if (activeBoss == null || !activeBoss.active()) {
-            return;
+            return false;
         }
         long now = System.currentTimeMillis();
         if (!bypassInvulnerability && now < activeBoss.invulnerableUntilMillis()) {
-            return;
+            return false;
         }
         if (!bypassInvulnerability) {
             activeBoss.setInvulnerableUntilMillis(now + DAMAGE_INVULNERABILITY_MILLIS);
@@ -251,6 +252,21 @@ final class HallsSessionBossRuntime {
         }
         if (activeBoss.health() <= 0.0) {
             defeat();
+        }
+        return true;
+    }
+
+    record AttackResult(boolean handled, boolean damaged) {
+        private static AttackResult unhandledResult() {
+            return new AttackResult(false, false);
+        }
+
+        private static AttackResult handledResult() {
+            return new AttackResult(true, false);
+        }
+
+        private static AttackResult damagedResult() {
+            return new AttackResult(true, true);
         }
     }
 
