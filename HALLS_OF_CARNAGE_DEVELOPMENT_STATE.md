@@ -143,7 +143,7 @@ This is the first implementation slice. It focuses on:
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
 - Overdrive spawner changes: make it so the boss is shielded when there are other mobs spawned by it alive. Make it so only up to 3 mobs can be alive at once (each mob also has individual cooldown, once a mob is defeated, it starts ticking down from 15 seconds, only after it counts down, the spawner can spawn another monster again) (make all of these numbers configurable)
-- Overdrive spawner change: change it so when at low health, the shockwave attack no longer tries to loop, instead when above half health, it chains 2-4 shockwaves and under half 3-5 shockwaves.
+- Overdrive spawner change: change it so when at low health, the shockwave attack no longer tries to loop, instead when above half health, it chains 2-4 shockwaves and under half 3-5 shockwaves. Each of those shockwaves will of course play the jump animation.
 - Overdrive spawner change: make overdrive spawner 20% smaller, instead when half the health is reached, an animation playes, particles and roar happens and the spawner sizes up to its original size.
 - Overdrive spawner change: when under half health, bundle the all individual mob caps together and spawn them in the full group, counter starts only when the entire group is killed, the cooldown is doubled
 - Overdrive spawner change: under half health, the spawner will chain 3 of those spinning attacks
