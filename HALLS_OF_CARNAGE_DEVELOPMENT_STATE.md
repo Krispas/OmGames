@@ -148,6 +148,7 @@ Do all following for the next slice (and keep this line):
 - Overdrive spawner change: when under half health, bundle the all individual mob caps together and spawn them in the full group, counter starts only when the entire group is killed, the cooldown is doubled
 - Overdrive spawner change: under half health, the spawner will chain 3 of those spinning attacks
 - Overdrive spawner: add audio to all of its actions, adding more immersion
+- Overdrive spawner: make hitting the boss drain durability
 
 Future slices (dont do yet):
 - Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too). Place it on the last fight floor. While working on it, merge behaviour of poison bomb poioson cloud, librarian poison cloud and the poison clouds from the boss, of course the poison bomb one effects monsters only and the other two ones players only.
