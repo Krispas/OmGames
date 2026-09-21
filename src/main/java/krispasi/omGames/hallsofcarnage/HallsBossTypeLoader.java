@@ -51,6 +51,7 @@ final class HallsBossTypeLoader {
                 material(config.getString("display.material"), Material.SPAWNER),
                 config.getString("display.item-model", ""),
                 displayParts(config.getConfigurationSection("display.parts")),
+                animations(config.getConfigurationSection("animations")),
                 overdrive(config.getConfigurationSection("overdrive"))
         );
     }
@@ -66,6 +67,7 @@ final class HallsBossTypeLoader {
                 continue;
             }
             parts.add(new HallsBossType.DisplayPart(
+                    normalizeId(key),
                     material(row.getString("material"), Material.SPAWNER),
                     row.getDouble("offset.x", row.getDouble("offset-x", 0.0)),
                     row.getDouble("offset.y", row.getDouble("offset-y", 0.0)),
@@ -76,6 +78,67 @@ final class HallsBossTypeLoader {
             ));
         }
         return List.copyOf(parts);
+    }
+
+    private static Map<String, HallsBossType.Animation> animations(ConfigurationSection section) {
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, HallsBossType.Animation> animations = new LinkedHashMap<>();
+        for (String key : section.getKeys(false)) {
+            ConfigurationSection row = section.getConfigurationSection(key);
+            if (row == null) {
+                continue;
+            }
+            Map<String, List<HallsBossType.Keyframe>> partFrames = new LinkedHashMap<>();
+            ConfigurationSection parts = row.getConfigurationSection("parts");
+            if (parts != null) {
+                for (String partKey : parts.getKeys(false)) {
+                    ConfigurationSection part = parts.getConfigurationSection(partKey);
+                    if (part != null) {
+                        partFrames.put(normalizeId(partKey), keyframes(part.getConfigurationSection("frames")));
+                    }
+                }
+            }
+            animations.put(normalizeId(key), new HallsBossType.Animation(
+                    row.getBoolean("loop", false),
+                    keyframes(row.getConfigurationSection("frames")),
+                    partFrames
+            ));
+        }
+        return Map.copyOf(animations);
+    }
+
+    private static List<HallsBossType.Keyframe> keyframes(ConfigurationSection section) {
+        if (section == null) {
+            return List.of();
+        }
+        List<HallsBossType.Keyframe> frames = new ArrayList<>();
+        for (String key : section.getKeys(false)) {
+            ConfigurationSection row = section.getConfigurationSection(key);
+            if (row == null) {
+                continue;
+            }
+            frames.add(new HallsBossType.Keyframe(
+                    row.getInt("tick", parseTickKey(key)),
+                    row.getDouble("offset.x", row.getDouble("offset-x", 0.0)),
+                    row.getDouble("offset.y", row.getDouble("offset-y", 0.0)),
+                    row.getDouble("offset.z", row.getDouble("offset-z", 0.0)),
+                    row.getDouble("yaw-offset", row.getDouble("yaw", 0.0)),
+                    row.getDouble("scale.x", row.getDouble("scale-x", 1.0)),
+                    row.getDouble("scale.y", row.getDouble("scale-y", 1.0)),
+                    row.getDouble("scale.z", row.getDouble("scale-z", 1.0))
+            ));
+        }
+        return List.copyOf(frames);
+    }
+
+    private static int parseTickKey(String key) {
+        try {
+            return Integer.parseInt(key);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
     }
 
     private static HallsBossType.Overdrive overdrive(ConfigurationSection section) {

@@ -920,6 +920,17 @@ public final class HallsOfCarnageManager {
         }
     }
 
+    public void handleSessionProjectileHit(Player player, org.bukkit.event.entity.ProjectileHitEvent event) {
+        if (player == null || event == null) {
+            return;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (session != null) {
+            session.handleProjectileHit(player, event);
+        }
+    }
+
     public boolean handleSessionFriendlyFire(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
         if (event == null || !(event.getEntity() instanceof Player player)) {
             return false;

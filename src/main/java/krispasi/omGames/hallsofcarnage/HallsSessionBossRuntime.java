@@ -38,6 +38,7 @@ import org.joml.Quaternionf;
 final class HallsSessionBossRuntime {
     private static final String BOSS_TAG = "omgames_hoc_boss";
     private static final double HIT_FLASH_RADIUS = 1.8;
+    private static final long DAMAGE_INVULNERABILITY_MILLIS = 500L;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -122,7 +123,7 @@ final class HallsSessionBossRuntime {
             activate(player);
             return true;
         }
-        damage(Math.max(1.0, damage), player.getLocation());
+        damage(Math.max(1.0, damage), player.getLocation(), false);
         return true;
     }
 
@@ -133,8 +134,47 @@ final class HallsSessionBossRuntime {
         if (!participants.contains(shooter.getUniqueId()) || !aliveParticipantPredicate.test(shooter.getUniqueId())) {
             return true;
         }
-        damage(Math.max(1.0, damage), entity.getLocation());
+        damage(Math.max(1.0, damage), entity.getLocation(), false);
         return true;
+    }
+
+    boolean handleAreaDamage(Player source, Location center, double radius, double damage) {
+        if (source == null || center == null || activeBoss == null || !activeBoss.active()
+                || !participants.contains(source.getUniqueId()) || !aliveParticipantPredicate.test(source.getUniqueId())
+                || radius <= 0.0 || damage <= 0.0) {
+            return false;
+        }
+        Location bossCenter = activeBoss.location().clone().add(0.0, 2.5, 0.0);
+        double effectiveRadius = radius + 2.5;
+        if (bossCenter.distanceSquared(center) > effectiveRadius * effectiveRadius) {
+            return false;
+        }
+        damage(damage, center, false);
+        return true;
+    }
+
+    void applyPoison(Player source, int durationTicks, int amplifier) {
+        if (source == null || activeBoss == null || !activeBoss.active()
+                || !participants.contains(source.getUniqueId()) || !aliveParticipantPredicate.test(source.getUniqueId())
+                || durationTicks <= 0) {
+            return;
+        }
+        int pulses = Math.max(1, durationTicks / 20);
+        double pulseDamage = Math.max(1.0, 1.0 + amplifier);
+        new org.bukkit.scheduler.BukkitRunnable() {
+            private int remaining = pulses;
+
+            @Override
+            public void run() {
+                if (activeBoss == null || !activeBoss.active() || remaining-- <= 0) {
+                    cancel();
+                    return;
+                }
+                Location center = activeBoss.location().clone().add(0.0, 2.4, 0.0);
+                world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, center, 35, 1.7, 1.1, 1.7, 0.03);
+                damage(pulseDamage, source.getLocation(), true);
+            }
+        }.runTaskTimer(plugin, 20L, 20L);
     }
 
     String debugStatus() {
@@ -187,9 +227,16 @@ final class HallsSessionBossRuntime {
         startTicking();
     }
 
-    private void damage(double amount, Location source) {
+    private void damage(double amount, Location source, boolean bypassInvulnerability) {
         if (activeBoss == null || !activeBoss.active()) {
             return;
+        }
+        long now = System.currentTimeMillis();
+        if (!bypassInvulnerability && now < activeBoss.invulnerableUntilMillis()) {
+            return;
+        }
+        if (!bypassInvulnerability) {
+            activeBoss.setInvulnerableUntilMillis(now + DAMAGE_INVULNERABILITY_MILLIS);
         }
         activeBoss.setHealth(activeBoss.health() - amount);
         updateBossBar();
@@ -255,7 +302,7 @@ final class HallsSessionBossRuntime {
         refreshBossBarPlayers();
         activeBoss.setIdleTicks(activeBoss.idleTicks() + 1);
         double bob = Math.sin(activeBoss.idleTicks() / 8.0) * 0.04;
-        animateDisplays(activeBoss.yaw(), bob, new Vector());
+        animateDisplays("idle", activeBoss.idleTicks(), activeBoss.yaw(), bob, new Vector());
         Location core = activeBoss.location().clone().add(0.0, 2.45 + bob, 0.0);
         world.spawnParticle(Particle.TRIAL_SPAWNER_DETECTION, core, 2, 1.9, 1.5, 1.9, 0.0);
         if (activeBoss.idleTicks() % 8 == 0) {
@@ -297,11 +344,12 @@ final class HallsSessionBossRuntime {
     private void runSpawnAttack() {
         HallsBossType.Overdrive config = activeBoss.type().overdrive();
         activeBoss.setLastAttack(Attack.SPAWN);
+        activeBoss.setAttackAnimationTicks(0);
         new TimedAttack(config.spawnChargeTicks(), () -> {
             activeBoss.setYaw(activeBoss.yaw() + 18.0f);
             Location center = activeBoss.location().clone().add(0.0, 2.7, 0.0);
             world.spawnParticle(Particle.ELECTRIC_SPARK, center, 5, 1.9, 1.4, 1.9, 0.04);
-            animateDisplays(activeBoss.yaw(), 0.1, new Vector());
+            animateDisplays("spawn_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.1, new Vector());
         }, () -> {
             int count = config.minSpawnCount() + random.nextInt(config.maxSpawnCount() - config.minSpawnCount() + 1);
             for (int i = 0; i < count; i++) {
@@ -318,19 +366,21 @@ final class HallsSessionBossRuntime {
     private void runJumpAttack() {
         HallsBossType.Overdrive config = activeBoss.type().overdrive();
         activeBoss.setLastAttack(Attack.JUMP);
+        activeBoss.setAttackAnimationTicks(0);
         new TimedAttack(config.jumpReadyTicks(), () -> {
             world.spawnParticle(Particle.DUST_PLUME, activeBoss.location().clone().add(0.0, 0.15, 0.0),
                     10, 1.7, 0.05, 1.7, 0.03);
-            animateDisplays(activeBoss.yaw(), -0.12, new Vector());
+            animateDisplays("jump_ready", activeBoss.attackAnimationTicks(), activeBoss.yaw(), -0.12, new Vector());
         }, () -> new JumpSlam(config).runTaskTimer(plugin, 1L, 1L));
     }
 
     private void runXBlastAttack() {
         HallsBossType.Overdrive config = activeBoss.type().overdrive();
         activeBoss.setLastAttack(Attack.X_BLAST);
+        activeBoss.setAttackAnimationTicks(0);
         new TimedAttack(config.xBlastMoveTicks(), () -> {
             activeBoss.setYaw(activeBoss.yaw() + 24.0f);
-            animateDisplays(activeBoss.yaw(), 0.08, new Vector());
+            animateDisplays("x_blast_move", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.08, new Vector());
         }, () -> new TimedAttack(config.xBlastChargeTicks(), () -> renderXBlastWarning(false), () -> {
             fireXBlast(config.xBlastDamage());
             scheduleNextAttack(config.xBlastCooldownTicks());
@@ -410,10 +460,10 @@ final class HallsSessionBossRuntime {
 
     private List<HallsBossType.DisplayPart> displayParts(HallsBossType type) {
         if (!type.itemModel().isBlank()) {
-            return List.of(new HallsBossType.DisplayPart(type.displayMaterial(), 0.0, 2.5, 0.0, 5.0, 5.0, 5.0));
+            return List.of(new HallsBossType.DisplayPart("core", type.displayMaterial(), 0.0, 2.5, 0.0, 5.0, 5.0, 5.0));
         }
         return type.displayParts().isEmpty()
-                ? List.of(new HallsBossType.DisplayPart(type.displayMaterial(), -2.5, 0.0, -2.5, 5.0, 5.0, 5.0))
+                ? List.of(new HallsBossType.DisplayPart("core", type.displayMaterial(), -2.5, 0.0, -2.5, 5.0, 5.0, 5.0))
                 : type.displayParts();
     }
 
@@ -465,10 +515,15 @@ final class HallsSessionBossRuntime {
     }
 
     private void animateDisplays(float yaw, double yOffset, Vector offset) {
+        animateDisplays("", 0, yaw, yOffset, offset);
+    }
+
+    private void animateDisplays(String animationId, int tick, float yaw, double yOffset, Vector offset) {
         if (activeBoss == null) {
             return;
         }
         List<HallsBossType.DisplayPart> parts = displayParts(activeBoss.type());
+        String normalizedAnimationId = normalizeId(animationId);
         int index = 0;
         for (UUID displayId : activeBoss.displayIds()) {
             Entity entity = Bukkit.getEntity(displayId);
@@ -477,17 +532,62 @@ final class HallsSessionBossRuntime {
                 continue;
             }
             HallsBossType.DisplayPart part = parts.get(Math.min(index, parts.size() - 1));
-            Location target = displayLocation(activeBoss.location(), part, yOffset, offset);
+            AnimationPose pose = animationPose(activeBoss.type(), normalizedAnimationId, part.id(), tick);
+            Vector combinedOffset = (offset == null ? new Vector() : offset.clone())
+                    .add(new Vector(pose.offsetX(), pose.offsetY(), pose.offsetZ()));
+            Location target = displayLocation(activeBoss.location(), part, yOffset, combinedOffset);
             entity.teleport(target);
             if (entity instanceof Display display) {
                 display.setInterpolationDelay(1);
                 display.setTeleportDuration(2);
                 display.setTransformation(HallsDisplayTransforms.centeredBlock(
-                        part.scaleX(), part.scaleY(), part.scaleZ(),
-                        new Quaternionf().rotateY((float) Math.toRadians(yaw))));
+                        part.scaleX() * pose.scaleX(),
+                        part.scaleY() * pose.scaleY(),
+                        part.scaleZ() * pose.scaleZ(),
+                        new Quaternionf().rotateY((float) Math.toRadians(yaw + pose.yawOffset()))));
             }
             index++;
         }
+    }
+
+    private AnimationPose animationPose(HallsBossType type, String animationId, String partId, int tick) {
+        HallsBossType.Animation animation = type.animations().get(animationId);
+        if (animation == null) {
+            return AnimationPose.IDENTITY;
+        }
+        AnimationPose global = interpolate(animation.frames(), animation.loop(), tick);
+        List<HallsBossType.Keyframe> partFrames = animation.partFrames().get(normalizeId(partId));
+        if (partFrames == null || partFrames.isEmpty()) {
+            return global;
+        }
+        return global.plus(interpolate(partFrames, animation.loop(), tick));
+    }
+
+    private AnimationPose interpolate(List<HallsBossType.Keyframe> frames, boolean loop, int tick) {
+        if (frames == null || frames.isEmpty()) {
+            return AnimationPose.IDENTITY;
+        }
+        int adjustedTick = Math.max(0, tick);
+        HallsBossType.Keyframe lastFrame = frames.getLast();
+        if (loop && lastFrame.tick() > 0) {
+            adjustedTick %= lastFrame.tick();
+        }
+        HallsBossType.Keyframe previous = frames.getFirst();
+        HallsBossType.Keyframe next = frames.getLast();
+        for (HallsBossType.Keyframe frame : frames) {
+            if (frame.tick() <= adjustedTick) {
+                previous = frame;
+            }
+            if (frame.tick() >= adjustedTick) {
+                next = frame;
+                break;
+            }
+        }
+        if (previous == next || next.tick() <= previous.tick()) {
+            return AnimationPose.from(previous);
+        }
+        double progress = (adjustedTick - previous.tick()) / (double) (next.tick() - previous.tick());
+        return AnimationPose.lerp(previous, next, progress);
     }
 
     private Location displayLocation(Location base, HallsBossType.DisplayPart part, double yOffset, Vector animationOffset) {
@@ -598,6 +698,7 @@ final class HallsSessionBossRuntime {
                 return;
             }
             if (ticks++ < durationTicks) {
+                activeBoss.setAttackAnimationTicks(activeBoss.attackAnimationTicks() + 1);
                 tickAction.run();
                 return;
             }
@@ -622,11 +723,11 @@ final class HallsSessionBossRuntime {
             }
             ticks++;
             if (ticks <= 10) {
-                animateDisplays(activeBoss.yaw(), ticks / 10.0 * 3.0, new Vector());
+                animateDisplays("jump_rise", ticks, activeBoss.yaw(), ticks / 10.0 * 3.0, new Vector());
                 return;
             }
             if (ticks <= 18) {
-                animateDisplays(activeBoss.yaw(), (18 - ticks) / 8.0 * 3.0, new Vector());
+                animateDisplays("jump_fall", ticks - 10, activeBoss.yaw(), (18 - ticks) / 8.0 * 3.0, new Vector());
                 return;
             }
             world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 0.55f);
@@ -686,9 +787,56 @@ final class HallsSessionBossRuntime {
                 cancel();
                 return;
             }
-            animateDisplays(activeBoss.yaw() + ticks * 8.0f, -ticks / 20.0, new Vector());
+            animateDisplays("retract", ticks, activeBoss.yaw() + ticks * 8.0f, -ticks / 20.0, new Vector());
             world.spawnParticle(Particle.SMOKE, activeBoss.location().clone().add(0.0, 0.5, 0.0),
                     8, 1.4, 0.2, 1.4, 0.03);
+        }
+    }
+
+    private record AnimationPose(double offsetX,
+                                 double offsetY,
+                                 double offsetZ,
+                                 double yawOffset,
+                                 double scaleX,
+                                 double scaleY,
+                                 double scaleZ) {
+        private static final AnimationPose IDENTITY = new AnimationPose(0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0);
+
+        private AnimationPose plus(AnimationPose other) {
+            if (other == null) {
+                return this;
+            }
+            return new AnimationPose(
+                    offsetX + other.offsetX,
+                    offsetY + other.offsetY,
+                    offsetZ + other.offsetZ,
+                    yawOffset + other.yawOffset,
+                    scaleX * other.scaleX,
+                    scaleY * other.scaleY,
+                    scaleZ * other.scaleZ
+            );
+        }
+
+        private static AnimationPose from(HallsBossType.Keyframe frame) {
+            return new AnimationPose(frame.offsetX(), frame.offsetY(), frame.offsetZ(), frame.yawOffset(),
+                    frame.scaleX(), frame.scaleY(), frame.scaleZ());
+        }
+
+        private static AnimationPose lerp(HallsBossType.Keyframe from, HallsBossType.Keyframe to, double progress) {
+            double clamped = Math.max(0.0, Math.min(1.0, progress));
+            return new AnimationPose(
+                    lerp(from.offsetX(), to.offsetX(), clamped),
+                    lerp(from.offsetY(), to.offsetY(), clamped),
+                    lerp(from.offsetZ(), to.offsetZ(), clamped),
+                    lerp(from.yawOffset(), to.yawOffset(), clamped),
+                    lerp(from.scaleX(), to.scaleX(), clamped),
+                    lerp(from.scaleY(), to.scaleY(), clamped),
+                    lerp(from.scaleZ(), to.scaleZ(), clamped)
+            );
+        }
+
+        private static double lerp(double from, double to, double progress) {
+            return from + (to - from) * progress;
         }
     }
 
@@ -704,6 +852,8 @@ final class HallsSessionBossRuntime {
         private boolean defeated;
         private float yaw;
         private int idleTicks;
+        private int attackAnimationTicks;
+        private long invulnerableUntilMillis;
         private Attack lastAttack;
 
         private ActiveBoss(HallsBossType type,
@@ -784,6 +934,22 @@ final class HallsSessionBossRuntime {
 
         private void setIdleTicks(int idleTicks) {
             this.idleTicks = idleTicks;
+        }
+
+        private int attackAnimationTicks() {
+            return attackAnimationTicks;
+        }
+
+        private void setAttackAnimationTicks(int attackAnimationTicks) {
+            this.attackAnimationTicks = attackAnimationTicks;
+        }
+
+        private long invulnerableUntilMillis() {
+            return invulnerableUntilMillis;
+        }
+
+        private void setInvulnerableUntilMillis(long invulnerableUntilMillis) {
+            this.invulnerableUntilMillis = invulnerableUntilMillis;
         }
 
         private Attack lastAttack() {

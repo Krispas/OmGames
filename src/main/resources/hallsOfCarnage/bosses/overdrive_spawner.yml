@@ -16,6 +16,113 @@ display:
         x: 5.0
         y: 5.0
         z: 5.0
+animations:
+  idle:
+    loop: true
+    frames:
+      0:
+        tick: 0
+        offset:
+          y: 0.00
+      8:
+        tick: 8
+        offset:
+          y: 0.04
+      16:
+        tick: 16
+        offset:
+          y: 0.00
+      24:
+        tick: 24
+        offset:
+          y: -0.04
+      32:
+        tick: 32
+        offset:
+          y: 0.00
+  spawn_charge:
+    loop: true
+    frames:
+      0:
+        tick: 0
+        offset:
+          y: 0.00
+      5:
+        tick: 5
+        offset:
+          y: 0.12
+        yaw-offset: 12
+      10:
+        tick: 10
+        offset:
+          y: 0.00
+        yaw-offset: 24
+  jump_ready:
+    loop: true
+    frames:
+      0:
+        tick: 0
+        offset:
+          y: 0.00
+      6:
+        tick: 6
+        offset:
+          y: -0.12
+      12:
+        tick: 12
+        offset:
+          y: 0.00
+  jump_rise:
+    loop: false
+    frames:
+      0:
+        tick: 0
+        offset:
+          y: 0.00
+      10:
+        tick: 10
+        offset:
+          y: 3.00
+  jump_fall:
+    loop: false
+    frames:
+      0:
+        tick: 0
+        offset:
+          y: 3.00
+      8:
+        tick: 8
+        offset:
+          y: 0.00
+  x_blast_move:
+    loop: true
+    frames:
+      0:
+        tick: 0
+        offset:
+          y: 0.00
+      5:
+        tick: 5
+        offset:
+          y: 0.10
+        yaw-offset: 18
+      10:
+        tick: 10
+        offset:
+          y: 0.00
+        yaw-offset: 36
+  retract:
+    loop: false
+    frames:
+      0:
+        tick: 0
+        offset:
+          y: 0.00
+      20:
+        tick: 20
+        offset:
+          y: -1.00
+        yaw-offset: 160
 overdrive:
   spawn:
     charge-seconds: 3.0

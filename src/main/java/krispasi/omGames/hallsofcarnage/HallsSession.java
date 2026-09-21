@@ -43,6 +43,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.player.PlayerItemDamageEvent;
 import org.bukkit.inventory.ItemStack;
@@ -81,6 +82,12 @@ public final class HallsSession {
     private static final long SCULK_MAUL_SPLASH_COOLDOWN_MILLIS = 350L;
     private static final String RESEARCH_CRATE_TAG = "omgames_hoc_research_crate";
     private static final String ELEVATOR_WAYPOINT_TAG = "omgames_hoc_elevator_waypoint";
+    private static final String PROJECTILE_DAMAGE_KEY = "hoc_projectile_damage";
+    private static final String PROJECTILE_AOE_DAMAGE_KEY = "hoc_projectile_aoe_damage";
+    private static final String PROJECTILE_AOE_RADIUS_KEY = "hoc_projectile_aoe_radius";
+    private static final String PROJECTILE_POISON_TICKS_KEY = "hoc_projectile_poison_ticks";
+    private static final String PROJECTILE_POISON_AMPLIFIER_KEY = "hoc_projectile_poison_amplifier";
+    private static final String PROJECTILE_IMPACT_PROCESSED_KEY = "hoc_projectile_impact_processed";
     private static final Display.Brightness FULL_BRIGHTNESS = new Display.Brightness(15, 15);
     private static final int BLUEPRINT_DISTILLERY_TARGET_COUNT = 5;
 
@@ -606,6 +613,13 @@ public final class HallsSession {
     }
 
     public boolean handleBreakableAttack(Player player, Entity entity) {
+        if (bossRuntime.isBossEntity(entity)) {
+            boolean handled = bossRuntime.handleAttack(player, entity, meleeDamage(player));
+            if (handled) {
+                applyBossDirectWeaponEffects(player);
+            }
+            return handled;
+        }
         if (bossRuntime.handleAttack(player, entity, meleeDamage(player))) {
             return true;
         }
@@ -838,6 +852,7 @@ public final class HallsSession {
 
     public boolean handleWeaponHit(Player player, Entity target, EntityDamageByEntityEvent event) {
         if (event != null && bossRuntime.handleProjectileHit(player, target, eventDamageWithProjectileMetadata(event))) {
+            applyBossProjectileEffects(player, event.getDamager());
             event.setCancelled(true);
             return true;
         }
@@ -851,7 +866,7 @@ public final class HallsSession {
         }
         if (event != null && event.getDamager() instanceof org.bukkit.entity.Projectile projectile) {
             Double projectileDamage = projectile.getPersistentDataContainer().get(
-                    new org.bukkit.NamespacedKey(plugin, "hoc_projectile_damage"),
+                    new org.bukkit.NamespacedKey(plugin, PROJECTILE_DAMAGE_KEY),
                     PersistentDataType.DOUBLE
             );
             if (projectileDamage != null && projectileDamage > 0.0) {
@@ -873,7 +888,7 @@ public final class HallsSession {
         double damage = event == null ? 1.0 : event.getDamage();
         if (event != null && event.getDamager() instanceof org.bukkit.entity.Projectile projectile) {
             Double projectileDamage = projectile.getPersistentDataContainer().get(
-                    new org.bukkit.NamespacedKey(plugin, "hoc_projectile_damage"),
+                    new org.bukkit.NamespacedKey(plugin, PROJECTILE_DAMAGE_KEY),
                     PersistentDataType.DOUBLE
             );
             if (projectileDamage != null && projectileDamage > 0.0) {
@@ -951,6 +966,9 @@ public final class HallsSession {
         int hits = 0;
         weaponSplashing.add(player.getUniqueId());
         try {
+            if (bossRuntime.handleAreaDamage(player, center, radius, damage)) {
+                hits++;
+            }
             for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
                 if (!(nearby instanceof LivingEntity nearbyLiving)
                         || nearbyLiving.getUniqueId().equals(target.getUniqueId())
@@ -1157,11 +1175,136 @@ public final class HallsSession {
         double damage = type.stats().getOrDefault("ranged_damage", 0.0);
         if (damage > 0.0 && event.getProjectile() != null) {
             event.getProjectile().getPersistentDataContainer().set(
-                    new org.bukkit.NamespacedKey(plugin, "hoc_projectile_damage"),
+                    new org.bukkit.NamespacedKey(plugin, PROJECTILE_DAMAGE_KEY),
                     PersistentDataType.DOUBLE,
                     damage
             );
         }
+        if (event.getProjectile() != null) {
+            setProjectileDouble(event.getProjectile(), PROJECTILE_AOE_DAMAGE_KEY, type.stats().getOrDefault("aoe_damage", 0.0));
+            setProjectileDouble(event.getProjectile(), PROJECTILE_AOE_RADIUS_KEY, type.stats().getOrDefault("aoe_radius", 0.0));
+            int poisonTicks = (int) Math.round(type.stats().getOrDefault("poison_seconds", 0.0) * 20.0);
+            if (poisonTicks > 0) {
+                event.getProjectile().getPersistentDataContainer().set(
+                        new org.bukkit.NamespacedKey(plugin, PROJECTILE_POISON_TICKS_KEY),
+                        PersistentDataType.INTEGER,
+                        poisonTicks
+                );
+                int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("poison_amplifier", 1.0)) - 1);
+                event.getProjectile().getPersistentDataContainer().set(
+                        new org.bukkit.NamespacedKey(plugin, PROJECTILE_POISON_AMPLIFIER_KEY),
+                        PersistentDataType.INTEGER,
+                        amplifier
+                );
+            }
+        }
+    }
+
+    private void applyBossDirectWeaponEffects(Player player) {
+        if (player == null) {
+            return;
+        }
+        HallsItemType type = itemType(player.getInventory().getItemInMainHand());
+        if (type == null || !type.category().equals("weapon")) {
+            return;
+        }
+        int poisonTicks = (int) Math.round(type.stats().getOrDefault("poison_seconds", 0.0) * 20.0);
+        if (poisonTicks > 0) {
+            int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("poison_amplifier", 1.0)) - 1);
+            bossRuntime.applyPoison(player, poisonTicks, amplifier);
+        }
+    }
+
+    public void handleProjectileHit(Player player, ProjectileHitEvent event) {
+        if (player == null || event == null || event.getEntity() == null || !running
+                || !participants.contains(player.getUniqueId()) || !player.getWorld().equals(world)
+                || ghostPlayers.contains(player.getUniqueId())) {
+            return;
+        }
+        org.bukkit.entity.Projectile projectile = event.getEntity();
+        if (markProjectileImpactProcessed(projectile)) {
+            return;
+        }
+        double damage = projectileDouble(projectile, PROJECTILE_DAMAGE_KEY, 0.0);
+        Entity hitEntity = event.getHitEntity();
+        if (damage > 0.0 && hitEntity != null && bossRuntime.handleProjectileHit(player, hitEntity, damage)) {
+            applyBossProjectileEffects(player, projectile);
+        }
+        applyProjectileAreaEffect(player, projectile.getLocation(), projectile);
+    }
+
+    private void applyBossProjectileEffects(Player player, Entity projectile) {
+        if (!(projectile instanceof org.bukkit.entity.Projectile)) {
+            return;
+        }
+        Integer poisonTicks = projectile.getPersistentDataContainer().get(
+                new org.bukkit.NamespacedKey(plugin, PROJECTILE_POISON_TICKS_KEY),
+                PersistentDataType.INTEGER
+        );
+        if (poisonTicks == null || poisonTicks <= 0) {
+            return;
+        }
+        Integer amplifier = projectile.getPersistentDataContainer().get(
+                new org.bukkit.NamespacedKey(plugin, PROJECTILE_POISON_AMPLIFIER_KEY),
+                PersistentDataType.INTEGER
+        );
+        bossRuntime.applyPoison(player, poisonTicks, amplifier == null ? 0 : amplifier);
+    }
+
+    private void applyProjectileAreaEffect(Player player, Location center, org.bukkit.entity.Projectile projectile) {
+        double radius = projectileDouble(projectile, PROJECTILE_AOE_RADIUS_KEY, 0.0);
+        double damage = projectileDouble(projectile, PROJECTILE_AOE_DAMAGE_KEY, 0.0);
+        if (center == null || radius <= 0.0 || damage <= 0.0) {
+            return;
+        }
+        renderProjectileExplosion(center, radius);
+        boolean hitBoss = bossRuntime.handleAreaDamage(player, center, radius, damage);
+        int hits = hitBoss ? 1 : 0;
+        for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
+            if (!(nearby instanceof LivingEntity living)
+                    || !monsterRuntime.isSessionMonster(living)
+                    || living.getLocation().distanceSquared(center) > radius * radius) {
+                continue;
+            }
+            living.damage(Math.min(damage, Math.max(0.0, living.getHealth() - 0.5)), player);
+            hits++;
+        }
+        if (hits > 0) {
+            world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 0.75f, 1.35f);
+        }
+    }
+
+    private void renderProjectileExplosion(Location center, double radius) {
+        world.spawnParticle(Particle.EXPLOSION, center, 1, 0.0, 0.0, 0.0, 0.0);
+        world.spawnParticle(Particle.ELECTRIC_SPARK, center, 45, radius * 0.35, radius * 0.20, radius * 0.35, 0.08);
+        world.spawnParticle(Particle.CLOUD, center, 28, radius * 0.25, radius * 0.12, radius * 0.25, 0.03);
+    }
+
+    private boolean markProjectileImpactProcessed(org.bukkit.entity.Projectile projectile) {
+        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, PROJECTILE_IMPACT_PROCESSED_KEY);
+        Byte processed = projectile.getPersistentDataContainer().get(key, PersistentDataType.BYTE);
+        if (processed != null && processed == (byte) 1) {
+            return true;
+        }
+        projectile.getPersistentDataContainer().set(key, PersistentDataType.BYTE, (byte) 1);
+        return false;
+    }
+
+    private void setProjectileDouble(Entity projectile, String key, double value) {
+        if (projectile == null || value <= 0.0) {
+            return;
+        }
+        projectile.getPersistentDataContainer().set(new org.bukkit.NamespacedKey(plugin, key),
+                PersistentDataType.DOUBLE, value);
+    }
+
+    private double projectileDouble(Entity projectile, String key, double fallback) {
+        if (projectile == null) {
+            return fallback;
+        }
+        Double value = projectile.getPersistentDataContainer().get(new org.bukkit.NamespacedKey(plugin, key),
+                PersistentDataType.DOUBLE);
+        return value == null ? fallback : value;
     }
 
     private void applyFoodBuffs(Player player, HallsItemType type) {
@@ -2287,13 +2430,18 @@ public final class HallsSession {
         java.util.Collections.shuffle(candidates, build.random());
         int targetPairs = Math.min(6, Math.max(2, build.plan().rooms().size() / 3));
         Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
+        Map<Integer, Integer> ventsByRoom = new HashMap<>();
         int pairs = 0;
         while (pairs < targetPairs && candidates.size() >= 2) {
-            LibraryVentCandidate first = candidates.removeFirst();
+            int firstIndex = bestDistributedLibraryVentIndex(candidates, reserved, ventsByRoom);
+            if (firstIndex < 0) {
+                break;
+            }
+            LibraryVentCandidate first = candidates.remove(firstIndex);
             if (reserved.contains(first.cell())) {
                 continue;
             }
-            int partnerIndex = bestLibraryVentPartnerIndex(first, candidates, reserved);
+            int partnerIndex = bestLibraryVentPartnerIndex(first, candidates, reserved, ventsByRoom);
             if (partnerIndex < 0) {
                 continue;
             }
@@ -2304,6 +2452,8 @@ public final class HallsSession {
             secondVent.setLinkedInteractionId(firstVent.interactionId());
             reserved.add(first.cell());
             reserved.add(second.cell());
+            ventsByRoom.merge(first.roomIndex(), 1, Integer::sum);
+            ventsByRoom.merge(second.roomIndex(), 1, Integer::sum);
             pairs++;
         }
         if (pairs < targetPairs) {
@@ -2366,14 +2516,40 @@ public final class HallsSession {
         return room.layout().at(x, z) != 'O';
     }
 
+    private int bestDistributedLibraryVentIndex(List<LibraryVentCandidate> candidates,
+                                                Set<HallsExplorationGenerator.Cell> reserved,
+                                                Map<Integer, Integer> ventsByRoom) {
+        int bestIndex = -1;
+        int bestScore = Integer.MIN_VALUE;
+        for (int i = 0; i < candidates.size(); i++) {
+            LibraryVentCandidate candidate = candidates.get(i);
+            if (reserved.contains(candidate.cell()) || ventsByRoom.getOrDefault(candidate.roomIndex(), 0) >= 2) {
+                continue;
+            }
+            int nearestExisting = reserved.stream()
+                    .mapToInt(cell -> Math.abs(cell.x() - candidate.cell().x()) + Math.abs(cell.z() - candidate.cell().z()))
+                    .min()
+                    .orElse(64);
+            int score = nearestExisting - ventsByRoom.getOrDefault(candidate.roomIndex(), 0) * 20;
+            if (score > bestScore) {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    }
+
     private int bestLibraryVentPartnerIndex(LibraryVentCandidate first,
                                             List<LibraryVentCandidate> candidates,
-                                            Set<HallsExplorationGenerator.Cell> reserved) {
+                                            Set<HallsExplorationGenerator.Cell> reserved,
+                                            Map<Integer, Integer> ventsByRoom) {
         int bestIndex = -1;
         int bestDistance = -1;
         for (int i = 0; i < candidates.size(); i++) {
             LibraryVentCandidate candidate = candidates.get(i);
-            if (reserved.contains(candidate.cell()) || candidate.roomIndex() == first.roomIndex()) {
+            if (reserved.contains(candidate.cell())
+                    || candidate.roomIndex() == first.roomIndex()
+                    || ventsByRoom.getOrDefault(candidate.roomIndex(), 0) >= 2) {
                 continue;
             }
             int distance = Math.abs(candidate.cell().x() - first.cell().x())
@@ -2442,7 +2618,6 @@ public final class HallsSession {
                     new Quaternionf(),
                     wallVentDisplayScale(vent.face(), depth, width, height),
                     new Quaternionf()));
-            entity.setBrightness(FULL_BRIGHTNESS);
             entity.setPersistent(false);
         });
         vent.displayIds().add(display.getUniqueId());

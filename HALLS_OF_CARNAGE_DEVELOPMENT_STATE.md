@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-20
+Last updated: 2026-09-21
 
 ## Implemented
 
@@ -136,18 +136,14 @@ This is the first implementation slice. It focuses on:
 - Next development slice applied: Camp Station research now uses fixed one-based `row`/`column` coordinates on a 9x5 research grid, moves the research-point bottle to the bottom row, and treats multiple prerequisites as OR gates. Untold Depths research defaults were rebuilt from `research.md`, including the new Basics root and the full column 3/5/7/9 item progression. Older scenario nodes without coordinates still fall back to the prior dynamic placement path. Maven verification could not be run because `mvn` is not installed on PATH; targeted Java 25 `javac` verification could not be run because only `javac 18` is available.
 - Next reviewer slice applied: Block-display model transforms now use a shared Halls helper that can center scaling and rotation on the rendered block display's visual center. Camp building displays, the blueprint distillery, breakable props, Overdrive Spawner boss displays, and simple trap block-display fixtures were converted to the centered helper. Overdrive Spawner's bundled display offset was normalized from the prior `-2.5` X/Z corner-origin workaround to `0.0`, so its 5x trial spawner model is centered on the boss anchor. Maven verification could not be run because `mvn` is not installed on PATH; targeted Java 25 `javac` verification could not be run because only `javac 18` is available.
 - Next reviewer slice applied: Camp building charge restore now preserves exact saved `harvest-remaining` / `harvest-used` counters instead of restocking zero-counter saved states during save/load; explicit new-run/game-over refresh paths still restock run-limited buildings. Library vent teleport now rotates the player to face outward from the linked destination vent. Overdrive Spawner melee hit handling no longer requires a mostly charged vanilla attack cooldown and listens to Paper's pre-attack event even when Paper marks a non-standard hitbox attack as not normally damaging, keeping the plugin-owned `Interaction` hitbox responsive. Overdrive Spawner shockwaves are easier to jump over by treating airborne/low-hop players as jumping and narrowing the damage band. Maven verification could not be run because `mvn` is not installed on PATH; targeted Java 25 `javac` verification could not be run because only `javac 18` is available.
+- Next reviewer slice applied: Library vent block displays no longer force full brightness, so they respect room lighting and do not glow in darkness. Library vent pair placement now chooses more distributed room candidates, links distant rooms, and caps each room at two vents. Overdrive Spawner boss damage now has a vanilla-style 500 ms invulnerability window for direct melee/projectile/AoE hits, while poison-style boss damage ticks bypass that direct-hit cooldown so status effects remain useful. Halls ranged projectiles now persist AoE and poison metadata, process `ProjectileHitEvent`, render non-block-breaking impact explosions for Stormterrow-style crossbows, damage nearby session monsters, and route direct/area projectile hits into the boss runtime. Maven verification could not be run because `mvn` is not installed on PATH; targeted Java 25 `javac` verification of the Halls package passed against the cached Paper `26.2.build.121-stable` API and required transitive jars.
+- Next development slice applied: Boss display animations are now data-driven from boss YAML resources. `bosses/*.yml` may define named `animations` with global keyframes plus optional per-display-part keyframes; keyframes support tick, offset, yaw offset, scale multipliers, and looping. Overdrive Spawner's idle bob, spawn charge, jump rise/fall, X-blast move, and retract motions are now declared in `overdrive_spawner.yml` while Java keeps fallback motion values for older boss files. Maven verification could not be run because `mvn` is not installed on PATH; targeted Java 25 `javac` verification of the Halls package passed against the cached Paper `26.2.build.121-stable` API and required transitive jars.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Library vent changes: make the model not glow in the dark, make it so each room can have up to 2 vents. Make it so vents are more distributed throughout the level
-- Give overdrive spawner invincibility frames like vanilla mobs have
-- The damage overdrive spawner recieves is doubled, invincibility frames may fix this, not sure.
-- Make sure (maybe already works that way) that AoE and other effects such as poison and stuff work on the overdrive spawner correctly
-- Projectiles dont work against overdrive spawner (I once again urge you to reconsider regular hitbox instead of interaction)
-- Stormterror crossbow doesnt have working explosions (at least visually)
+- Overdrive spawner can still be spawn click with uncharged weapon, which is a problem in case a hight damage weapon is used. I told you to make it so lower charge deals lower damage, like vanilla.
 
 Future slices (dont do yet):
-- Make boss animations data driven, adding the animations and keyframes for each part into the .yml file so it can be easily tweaked
 - Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too). Place it on the last fight floor. While working on it, merge behaviour of poison bomb poioson cloud, librarian poison cloud and the poison clouds from the boss, of course the poison bomb one effects monsters only and the other two ones players only.
 
 For reviewer to figure out:

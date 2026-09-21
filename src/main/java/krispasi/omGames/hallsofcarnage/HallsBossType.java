@@ -12,6 +12,7 @@ record HallsBossType(
         Material displayMaterial,
         String itemModel,
         List<DisplayPart> displayParts,
+        Map<String, Animation> animations,
         Overdrive overdrive
 ) {
     HallsBossType {
@@ -22,10 +23,12 @@ record HallsBossType(
         displayMaterial = displayMaterial == null ? Material.SPAWNER : displayMaterial;
         itemModel = itemModel == null ? "" : itemModel.trim();
         displayParts = displayParts == null ? List.of() : List.copyOf(displayParts);
+        animations = animations == null ? Map.of() : Map.copyOf(animations);
         overdrive = overdrive == null ? Overdrive.defaults() : overdrive;
     }
 
-    record DisplayPart(Material material,
+    record DisplayPart(String id,
+                       Material material,
                        double offsetX,
                        double offsetY,
                        double offsetZ,
@@ -33,10 +36,38 @@ record HallsBossType(
                        double scaleY,
                        double scaleZ) {
         DisplayPart {
+            id = normalize(id).isBlank() ? "core" : normalize(id);
             material = material == null ? Material.SPAWNER : material;
             scaleX = Math.max(0.05, scaleX);
             scaleY = Math.max(0.05, scaleY);
             scaleZ = Math.max(0.05, scaleZ);
+        }
+    }
+
+    record Animation(boolean loop,
+                     List<Keyframe> frames,
+                     Map<String, List<Keyframe>> partFrames) {
+        Animation {
+            frames = frames == null ? List.of() : frames.stream()
+                    .sorted(java.util.Comparator.comparingInt(Keyframe::tick))
+                    .toList();
+            partFrames = partFrames == null ? Map.of() : Map.copyOf(partFrames);
+        }
+    }
+
+    record Keyframe(int tick,
+                    double offsetX,
+                    double offsetY,
+                    double offsetZ,
+                    double yawOffset,
+                    double scaleX,
+                    double scaleY,
+                    double scaleZ) {
+        Keyframe {
+            tick = Math.max(0, tick);
+            scaleX = scaleX <= 0.0 ? 1.0 : scaleX;
+            scaleY = scaleY <= 0.0 ? 1.0 : scaleY;
+            scaleZ = scaleZ <= 0.0 ? 1.0 : scaleZ;
         }
     }
 
