@@ -1484,10 +1484,12 @@ public final class HallsSession {
             applyInventoryLimit(player);
             if (initialSave == null) {
                 giveStarterItem(player);
+                healPlayerToFull(player);
             } else {
                 HallsSaveData.PlayerState state = initialSave.players().get(playerId);
                 restoreSavedPlayer(player, state);
                 restoreSavedTotemBuffs(player, state);
+                restoreSavedHealth(player, state);
                 if (state != null && state.ghost()) {
                     ghostPlayers.add(playerId);
                     applyGhostState(player);
@@ -1523,6 +1525,7 @@ public final class HallsSession {
                 sidebar.restore(playerId);
                 player.teleport(fallback);
                 player.setFallDistance(0.0f);
+                healPlayerToFull(player);
                 player.sendTitle("Leaving the Halls", "", 0, 35, 10);
             } else if (player != null) {
                 restoreInventoryLimit(player);
@@ -1534,6 +1537,7 @@ public final class HallsSession {
                 player.removePotionEffect(PotionEffectType.GLOWING);
                 clearTotemBuffs(player);
                 sidebar.restore(playerId);
+                healPlayerToFull(player);
                 if (fallback != null) {
                     player.setRespawnLocation(fallback, true);
                 }
@@ -5735,7 +5739,7 @@ public final class HallsSession {
                 player.getInventory().setArmorContents(null);
                 player.getInventory().setItemInOffHand(null);
                 clearTotemBuffs(player);
-                player.setHealth(Math.min(player.getMaxHealth(), 20.0));
+                healPlayerToFull(player);
                 clearGhostState(player);
                 applyInventoryLimit(player);
                 giveStarterItem(player);
@@ -5785,8 +5789,8 @@ public final class HallsSession {
                 } else {
                     restoreSavedPlayer(player, state);
                     restoreSavedTotemBuffs(player, state);
+                    restoreSavedHealth(player, state);
                 }
-                player.setHealth(Math.min(player.getMaxHealth(), 20.0));
                 clearGhostState(player);
                 applyInventoryLimit(player);
                 teleportSessionPlayer(player, spawn);
@@ -5962,6 +5966,29 @@ public final class HallsSession {
         applyInventoryLimit(player);
     }
 
+    private void restoreSavedHealth(Player player, HallsSaveData.PlayerState state) {
+        if (player == null) {
+            return;
+        }
+        double savedHealth = state == null ? -1.0 : state.health();
+        if (savedHealth <= 0.0) {
+            healPlayerToFull(player);
+            return;
+        }
+        player.setHealth(Math.min(maxHealth(player), Math.max(1.0, savedHealth)));
+    }
+
+    private void healPlayerToFull(Player player) {
+        if (player != null) {
+            player.setHealth(maxHealth(player));
+        }
+    }
+
+    private double maxHealth(Player player) {
+        AttributeInstance maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
+        return Math.max(1.0, maxHealth == null ? player.getMaxHealth() : maxHealth.getValue());
+    }
+
     private ItemStack[] cloneArray(ItemStack[] source, int size) {
         ItemStack[] copy = new ItemStack[size];
         if (source == null) {
@@ -5998,6 +6025,7 @@ public final class HallsSession {
         return new HallsSaveData.PlayerState(
                 name,
                 ghostPlayers.contains(playerId),
+                player == null ? -1.0 : Math.max(0.0, player.getHealth()),
                 sculkRuntime.sculkPercent(playerId),
                 aggregateTotemLevel(healthTotemLevels, playerId),
                 aggregateTotemLevel(speedTotemLevels, playerId),
@@ -6012,6 +6040,7 @@ public final class HallsSession {
             Player player = Bukkit.getPlayer(playerId);
             String path = "players." + playerId;
             yaml.set(path + ".ghost", ghostPlayers.contains(playerId));
+            yaml.set(path + ".health", player == null ? -1.0 : Math.max(0.0, player.getHealth()));
             yaml.set(path + ".sculk", sculkRuntime.sculkPercent(playerId));
             yaml.set(path + ".health-totem-level", aggregateTotemLevel(healthTotemLevels, playerId));
             yaml.set(path + ".speed-totem-level", aggregateTotemLevel(speedTotemLevels, playerId));

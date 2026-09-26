@@ -334,6 +334,7 @@ final class HallsSessionBossRuntime {
         }
         pruneBossMinions();
         tickBossMinionCooldowns();
+        tickSummonReadiness();
         refreshBossBarPlayers();
         updateBossBar();
         updateInvulnerabilityFeedback(System.currentTimeMillis());
@@ -389,6 +390,12 @@ final class HallsSessionBossRuntime {
         if (activeBoss.lastAttack() != null && attacks.size() > 1) {
             attacks.remove(activeBoss.lastAttack());
         }
+        if (attacks.contains(Attack.SPAWN)
+                && activeBoss.summonReadyTicks() >= 100
+                && canSpawnMinions(activeBoss.type().overdrive())) {
+            attacks.add(Attack.SPAWN);
+            attacks.add(Attack.SPAWN);
+        }
         return attacks.get(random.nextInt(attacks.size()));
     }
 
@@ -400,6 +407,7 @@ final class HallsSessionBossRuntime {
             return;
         }
         activeBoss.setLastAttack(Attack.SPAWN);
+        activeBoss.setSummonReadyTicks(0);
         activeBoss.setAttackAnimationTicks(0);
         new TimedAttack(config.spawnChargeTicks(), () -> {
             activeBoss.setYaw(activeBoss.yaw() + 18.0f);
@@ -561,6 +569,17 @@ final class HallsSessionBossRuntime {
         }
         activeBoss.tickMinionCooldowns();
         activeBoss.setGroupCooldownTicks(Math.max(0, activeBoss.groupCooldownTicks() - 1));
+    }
+
+    private void tickSummonReadiness() {
+        if (activeBoss == null) {
+            return;
+        }
+        if (canSpawnMinions(activeBoss.type().overdrive())) {
+            activeBoss.setSummonReadyTicks(activeBoss.summonReadyTicks() + 1);
+        } else {
+            activeBoss.setSummonReadyTicks(0);
+        }
     }
 
     private boolean canSpawnMinions(HallsBossType.Overdrive config) {
@@ -1173,6 +1192,7 @@ final class HallsSessionBossRuntime {
         private boolean enraged;
         private boolean awaitingGroupClear;
         private int groupCooldownTicks;
+        private int summonReadyTicks;
         private double scaleMultiplier = 1.0;
         private float xBlastYaw;
 
@@ -1342,6 +1362,14 @@ final class HallsSessionBossRuntime {
 
         private void setGroupCooldownTicks(int groupCooldownTicks) {
             this.groupCooldownTicks = Math.max(0, groupCooldownTicks);
+        }
+
+        private int summonReadyTicks() {
+            return summonReadyTicks;
+        }
+
+        private void setSummonReadyTicks(int summonReadyTicks) {
+            this.summonReadyTicks = Math.max(0, summonReadyTicks);
         }
 
         private double scaleMultiplier() {

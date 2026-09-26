@@ -1195,10 +1195,19 @@ public final class HallsOfCarnageManager {
         player.setGameMode(GameMode.ADVENTURE);
         player.setFoodLevel(20);
         player.setSaturation(20.0f);
+        if (!isActiveSessionParticipant(player)) {
+            healPlayerToFull(player);
+        }
         Location spawn = getLobbySpawn();
         if (spawn != null) {
             player.setRespawnLocation(spawn, true);
         }
+    }
+
+    private void healPlayerToFull(Player player) {
+        org.bukkit.attribute.AttributeInstance maxHealth = player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+        double targetHealth = maxHealth == null ? player.getMaxHealth() : maxHealth.getValue();
+        player.setHealth(Math.max(1.0, targetHealth));
     }
 
     public int getShame(UUID playerId) {
