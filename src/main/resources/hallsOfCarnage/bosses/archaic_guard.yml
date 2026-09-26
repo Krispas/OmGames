@@ -207,12 +207,12 @@ archaic-guard:
   missile:
     aim-seconds: 3.0
     lock-seconds: 1.0
-    cooldown-seconds: 2.0
+    cooldown-seconds: 1.0
     damage: 10.0
     radius: 2.8
   shockwave:
-    charge-seconds: 3.0
-    cooldown-seconds: 2.0
+    charge-seconds: 2.0
+    cooldown-seconds: 1.0
     chain:
       normal:
         min: 1
@@ -223,9 +223,9 @@ archaic-guard:
     damage: 6.0
     speed-blocks-per-second: 4.0
   walls:
-    charge-seconds: 3.0
-    gap-seconds: 3.0
-    cooldown-seconds: 5.0
+    charge-seconds: 2.0
+    gap-seconds: 1.5
+    cooldown-seconds: 1.0
     chain:
       normal:
         min: 1
@@ -246,17 +246,17 @@ archaic-guard:
       max: 2
     pool:
       normal:
-        bedrock_walker: 1
+        husk: 1
       enraged:
         rotting_soldier: 1
   reposition:
     move-seconds: 2.0
-    cooldown-seconds: 3.0
+    cooldown-seconds: 1.0
     radius: 8.0
     cloud-radius: 2.4
     cloud-duration-seconds: 5.0
     cloud-effect-seconds: 4.0
   phase:
-    threshold: 0.33
+    threshold: 0.4
 drops:
   random-scrap: 40

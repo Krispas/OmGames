@@ -1055,9 +1055,9 @@ floors:
     level-type: howling_corridors
   - number: 52
     kind: combat
-    level-type: howling_corridors
-    difficulty: 80
-    layout: special/final_floor_1.txt
+    level-type: factory
+    difficulty: 40
+    layout: special/untold_depths_overdrive_spawner.txt
     boss: archaic_guard
     enemy-pool:
       - zombie

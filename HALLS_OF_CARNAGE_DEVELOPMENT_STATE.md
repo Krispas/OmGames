@@ -149,6 +149,12 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- Archaic guard model is currently completely broken. Instead of just properlers, all parts of it rotate
+- Hitbox doesnt move with bosses
+- Archaic guard hitbox it too big
+- Archaic guard spawn attack cooldown is wrongly implemented. It should take only few seconds for next attack to be executed, BUT it cannot use another spawn attack for 30 seconds (lower it to 25 while at it).
+- Make it so when archaic guard spawns enemies, its HP is not shielded, unlike overdrive spawner.
+- Archaic guard, rework the spawn attack animations, make it so instead it quickly crashes into ceiling. (could spawn particles or something, thats also when monsters spawn) and then flies back to the ground.
 
 Future slices (dont do yet):
 - TBD
