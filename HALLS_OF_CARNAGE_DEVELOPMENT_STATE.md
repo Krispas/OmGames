@@ -152,6 +152,7 @@ This is the first implementation slice. It focuses on:
 Do all following for the next slice (and keep this line):
 - Ghosts are not teleported when falling down into the void/holes
 - Reduce damage of all mobs (by editing their files) to half. (except warden)
+- Reduce crafting costs of all armors to approx 33% of current costs. (endgame armors only to 50%)
 
 Future slices (dont do yet):
 - TBD
