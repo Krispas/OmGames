@@ -10,6 +10,7 @@ record HallsBossType(
         String name,
         double health,
         double multiplayerHpBoost,
+        long directHitInvulnerabilityMillis,
         Material displayMaterial,
         String itemModel,
         List<DisplayPart> displayParts,
@@ -22,6 +23,7 @@ record HallsBossType(
         name = name == null || name.isBlank() ? id : name;
         health = Math.max(1.0, health);
         multiplayerHpBoost = Math.max(1.0, multiplayerHpBoost);
+        directHitInvulnerabilityMillis = Math.max(0L, directHitInvulnerabilityMillis);
         displayMaterial = displayMaterial == null ? Material.SPAWNER : displayMaterial;
         itemModel = itemModel == null ? "" : itemModel.trim();
         displayParts = displayParts == null ? List.of() : List.copyOf(displayParts);

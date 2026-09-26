@@ -38,7 +38,6 @@ import org.joml.Quaternionf;
 final class HallsSessionBossRuntime {
     private static final String BOSS_TAG = "omgames_hoc_boss";
     private static final double HIT_FLASH_RADIUS = 1.8;
-    private static final long DAMAGE_INVULNERABILITY_MILLIS = 500L;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -58,6 +57,7 @@ final class HallsSessionBossRuntime {
     private BukkitTask tickTask;
     private BukkitTask attackTask;
     private BukkitTask defeatedOpenTask;
+    private int activeFloorDifficulty = 40;
 
     HallsSessionBossRuntime(JavaPlugin plugin,
                             World world,
@@ -82,12 +82,13 @@ final class HallsSessionBossRuntime {
         this.bossIdKey = new NamespacedKey(plugin, "hoc_boss_id");
     }
 
-    void prepare(String bossId, Location location, DoorSeal seal) {
+    void prepare(String bossId, Location location, DoorSeal seal, int floorDifficulty) {
         clear();
         HallsBossType type = bossTypes.get(normalizeId(bossId));
         if (type == null || location == null || !world.equals(location.getWorld())) {
             return;
         }
+        activeFloorDifficulty = Math.max(0, floorDifficulty);
         List<UUID> displayIds = spawnDisplays(type, location, 0.0f, 0.0);
         Interaction hitbox = world.spawn(location.clone().add(0.0, 0.1, 0.0), Interaction.class, entity -> {
             setHitboxSize(entity, type.overdrive().initialScaleMultiplier());
@@ -250,7 +251,7 @@ final class HallsSessionBossRuntime {
             return false;
         }
         if (!bypassInvulnerability) {
-            activeBoss.setInvulnerableUntilMillis(now + DAMAGE_INVULNERABILITY_MILLIS);
+            activeBoss.setInvulnerableUntilMillis(now + activeBoss.type().directHitInvulnerabilityMillis());
             updateInvulnerabilityFeedback(now);
         }
         activeBoss.setHealth(activeBoss.health() - amount);
@@ -324,7 +325,7 @@ final class HallsSessionBossRuntime {
         if (tickTask == null) {
             tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
         }
-        scheduleNextAttack(30L);
+        scheduleNextAttackUnscaled(30L);
     }
 
     private void tick() {
@@ -347,10 +348,28 @@ final class HallsSessionBossRuntime {
     }
 
     private void scheduleNextAttack(long delayTicks) {
+        scheduleNextAttackUnscaled(scaledAttackCooldownTicks(delayTicks));
+    }
+
+    private void scheduleNextAttackUnscaled(long delayTicks) {
         if (attackTask != null) {
             attackTask.cancel();
         }
         attackTask = Bukkit.getScheduler().runTaskLater(plugin, this::runNextAttack, Math.max(1L, delayTicks));
+    }
+
+    private long scaledAttackCooldownTicks(long baseTicks) {
+        return Math.max(1L, Math.round(baseTicks * attackCooldownMultiplier(activeFloorDifficulty)));
+    }
+
+    static double attackCooldownMultiplier(int difficulty) {
+        if (difficulty <= 20) {
+            return Math.max(0.1, 0.7 + (difficulty - 20) * 0.015);
+        }
+        if (difficulty <= 40) {
+            return 0.7 + (difficulty - 20) * 0.015;
+        }
+        return 1.0 + (difficulty - 40) * 0.0075;
     }
 
     private void runNextAttack() {

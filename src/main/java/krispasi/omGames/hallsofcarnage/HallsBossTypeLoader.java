@@ -49,6 +49,7 @@ final class HallsBossTypeLoader {
                 config.getString("name", fallbackId),
                 config.getDouble("health", 150.0),
                 config.getDouble("multiplayer-hp-boost", 1.3),
+                directHitInvulnerabilityMillis(config),
                 material(config.getString("display.material"), Material.SPAWNER),
                 config.getString("display.item-model", ""),
                 displayParts(config.getConfigurationSection("display.parts")),
@@ -236,6 +237,16 @@ final class HallsBossTypeLoader {
             return defaults;
         }
         return new HallsBossType.Drops(section.getInt("random-scrap", defaults.randomScrap()));
+    }
+
+    private static long directHitInvulnerabilityMillis(YamlConfiguration config) {
+        if (config.contains("direct-hit-invulnerability-millis")) {
+            return Math.max(0L, config.getLong("direct-hit-invulnerability-millis"));
+        }
+        if (config.contains("direct-hit-invulnerability-seconds")) {
+            return Math.max(0L, Math.round(config.getDouble("direct-hit-invulnerability-seconds") * 1000.0));
+        }
+        return 500L;
     }
 
     private static List<HallsBossType.WeightedMonster> spawnPool(ConfigurationSection section) {

@@ -1,7 +1,8 @@
 id: overdrive_spawner
 name: "Overdrive Spawner"
-health: 250
+health: 500
 multiplayer-hp-boost: 1.3
+direct-hit-invulnerability-millis: 700
 display:
   material: TRIAL_SPAWNER
   item-model: ""

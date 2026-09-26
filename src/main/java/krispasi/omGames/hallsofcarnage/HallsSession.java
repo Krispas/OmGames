@@ -1670,7 +1670,7 @@ public final class HallsSession {
         captureCurrentCampState();
         captureElevatorChestContents();
         removeSessionEntities();
-        HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
+        HallsScenario.FloorDefinition floorDefinition = adjustedDifficulty(scenario.floor(floor));
         HallsLevelType levelType = levelTypeFor(floorDefinition);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = 1;
@@ -1696,8 +1696,7 @@ public final class HallsSession {
         restoreElevatorChestContents();
         closeElevatorDoors();
         openElevatorDoors();
-        Location bossLocation = new Location(world, roomStartX + layout.width() / 2.0 + 0.5,
-                origin.y(), roomStartZ + layout.depth() / 2.0 + 0.5, 0.0f, 0.0f);
+        Location bossLocation = bossCenterLocation(layout, roomStartX, roomStartZ);
         HallsSessionBossRuntime.DoorSeal seal = new HallsSessionBossRuntime.DoorSeal(
                 roomStartX + openingX - 1,
                 roomStartX + openingX + 1,
@@ -1706,8 +1705,33 @@ public final class HallsSession {
                 roomStartZ + layout.depth(),
                 wallMaterial(levelType, roomStartX + openingX, origin.y(), roomStartZ + layout.depth(), false, 0xB055)
         );
-        bossRuntime.prepare(floorDefinition.boss(), bossLocation, seal);
+        bossRuntime.prepare(floorDefinition.boss(), bossLocation, seal,
+                parseDifficulty(floorDefinition.difficulty(), floorDefinition.firstFloor()));
         teleportParticipantsToElevator("Floor " + floor, "Boss: " + bossName(floorDefinition.boss()));
+    }
+
+    private Location bossCenterLocation(HallsLayout layout, int roomStartX, int roomStartZ) {
+        int minX = layout.width();
+        int maxX = -1;
+        int minZ = layout.depth();
+        int maxZ = -1;
+        for (int z = 0; z < layout.depth(); z++) {
+            for (int x = 0; x < layout.width(); x++) {
+                if (layout.at(x, z) == 'X') {
+                    continue;
+                }
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x);
+                minZ = Math.min(minZ, z);
+                maxZ = Math.max(maxZ, z);
+            }
+        }
+        if (maxX < minX || maxZ < minZ) {
+            return new Location(world, roomStartX + layout.width() / 2.0 + 0.5,
+                    origin.y(), roomStartZ + layout.depth() / 2.0 + 0.5, 0.0f, 0.0f);
+        }
+        return new Location(world, roomStartX + (minX + maxX) / 2.0 + 0.5,
+                origin.y(), roomStartZ + (minZ + maxZ) / 2.0 + 0.5, 0.0f, 0.0f);
     }
 
     private HallsLayout loadBossLayout(HallsScenario.FloorDefinition floorDefinition) {
@@ -4794,16 +4818,19 @@ public final class HallsSession {
             return;
         }
         PropReward[] scraps = {PropReward.WOOD_SCRAP, PropReward.IRON_SCRAP, PropReward.DIAMOND_SCRAP, PropReward.REDSTONE_SCRAP};
-        PropReward selected = scraps[new Random().nextInt(scraps.length)];
-        switch (selected) {
-            case WOOD_SCRAP -> dropSessionItem(dropLocation,
-                    scrapItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD, PropReward.WOOD_SCRAP, amount));
-            case IRON_SCRAP -> dropSessionItem(dropLocation,
-                    scrapItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY, PropReward.IRON_SCRAP, amount));
-            case DIAMOND_SCRAP -> dropSessionItem(dropLocation,
-                    scrapItem(Material.DIAMOND, "Diamond Scrap", NamedTextColor.AQUA, PropReward.DIAMOND_SCRAP, amount));
-            case REDSTONE_SCRAP -> dropSessionItem(dropLocation,
-                    scrapItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED, PropReward.REDSTONE_SCRAP, amount));
+        Random random = new Random();
+        for (int i = 0; i < amount; i++) {
+            PropReward selected = scraps[random.nextInt(scraps.length)];
+            switch (selected) {
+                case WOOD_SCRAP -> dropSessionItem(dropLocation,
+                        scrapItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD, PropReward.WOOD_SCRAP, 1));
+                case IRON_SCRAP -> dropSessionItem(dropLocation,
+                        scrapItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY, PropReward.IRON_SCRAP, 1));
+                case DIAMOND_SCRAP -> dropSessionItem(dropLocation,
+                        scrapItem(Material.DIAMOND, "Diamond Scrap", NamedTextColor.AQUA, PropReward.DIAMOND_SCRAP, 1));
+                case REDSTONE_SCRAP -> dropSessionItem(dropLocation,
+                        scrapItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED, PropReward.REDSTONE_SCRAP, 1));
+            }
         }
     }
 
