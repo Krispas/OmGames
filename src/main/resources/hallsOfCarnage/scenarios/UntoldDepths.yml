@@ -793,14 +793,11 @@ floors:
   - number: 26
     kind: combat
     level-type: howling_corridors
-    difficulty: 80
-    layout: special/final_floor_1.txt
+    difficulty: 40
+    layout: special/untold_depths_overdrive_spawner.txt
     boss: overdrive_spawner
     enemy-pool:
       - zombie
-      - skeleton
-      - husk
-      - stray
   - number: 27
     kind: camp
     level-type: howling_corridors
