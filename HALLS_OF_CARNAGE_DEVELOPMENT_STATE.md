@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-21
+Last updated: 2026-09-26
 
 ## Implemented
 
@@ -147,12 +147,13 @@ This is the first implementation slice. It focuses on:
 - Next development slice applied: Added the second data-driven boss, Archaic Guard, under `bosses/archaic_guard.yml`, seeded it through `HallsOfCarnageManager`, and placed it on Untold Depths floor 52. Boss types now support an `ai` selector and `archaic-guard` config for missile, shockwave, radial-wall, spawn, reposition/cloud, phase threshold, and phase-specific spawn pools. Archaic Guard uses the existing boss floor activation/sealing/boss-bar flow, interrupts the current timed attack when it enters phase 2 at 33% health, fires a second missile while enraged, spawns half-health Bedrock Walkers before enrage and Rotting Soldiers after enrage, and leaves poison/wither player clouds during reposition. Poison Bomb, Dammed Librarian poison clouds, and Archaic Guard clouds now share `HallsPoisonClouds`; Poison Bomb targets session monsters, while Librarian/Guard clouds target alive participants. Maven verification could not be run because `mvn` is not installed and no Maven wrapper is present; targeted Java verification could not be run because only `javac 18.0.2-beta` is available while the project targets Java 25 and the cached Paper 26.2 API requires a newer class-file version.
 - Next reviewer slice applied: Scenario completion now triggers when the elevator is used after the final configured floor. The party stays in the elevator, receives completion/final-shame messaging, the run completion is recorded in SQLite with scenario and difficulty, the active save file is deleted, and the manager returns players to the Halls lobby shortly after. Halls run shame is tracked and saved as `shame.current`; deaths add 5, party wipes add 50, and coins, research points, building builds/upgrades, and blueprint distillery chain completion add 1 per event/point/coin. Final shame is reduced by difficulty (`hard` 30% less, `extreme` 50% less). Scenario menu icons now show prior completion state by best completed difficulty. `OmVeinsAPI` has an optional Halls scenario completion consumer receiving the player and a scenario/difficulty pair, called only if present. Maven verification could not be run because `mvn` is not installed and no Maven wrapper is present; targeted Java verification could not be run because only Java 18 is installed while the project targets Java 25.
 - Next reviewer slice applied: Archaic Guard display animation now keeps body bobbing separate from propeller yaw offsets, and boss resources support optional `display.hitbox.width`, `display.hitbox.height`, and `display.hitbox.y-offset`. Boss interaction hitboxes now move with display animation/repositioning and Archaic Guard uses a smaller configured hitbox. Archaic Guard adds no longer shield boss health, and its spawn attack now uses a quick ceiling crash that spawns monsters at impact, returns to ground, schedules the next attack after a few seconds, and gates the next spawn attack behind a 25-second lockout. Maven verification could not be run because `mvn` is not installed and no Maven wrapper is present; targeted Java verification could not be run because only Java 18 is installed while the project targets Java 25.
+- Next reviewer slice applied: Ghost participants now recover to the elevator when they fall below active Halls floors or pits instead of remaining stuck below the dungeon. Bundled monster resources now define explicit reduced `attack-damage` values for every monster except Warden, and the old ravager Java-side damage clamp was removed so ravager damage is config-owned. Bundled armor recipe scrap costs were reduced: most armor costs are roughly one third of prior values, while Deepguard, Superguard, The Crosshair, Marathons, and The Undetected use roughly half-cost endgame tuning. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `18.0.2-beta` while the project targets Java 25.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Ghosts are not teleported when falling down into the void/holes
-- Reduce damage of all mobs (by editing their files) to half. (except warden)
-- Reduce crafting costs of all armors to approx 33% of current costs. (endgame armors only to 50%)
+- Archaic guard: all model parts of the boss still rotate, fix that, I want only the properler planks to rotate around
+- Archaic guard: when casting multiple shockwaves, halve the duration between the waves
+- Archaic guard, add a new attack "circle dash", attack has 1 second telegraph moment, simillarly to reposition, target location will be picked and all things about repositiona attack apply, however the boss will move in curve and the path will be telegraphed beforehand
 
 Future slices (dont do yet):
 - TBD

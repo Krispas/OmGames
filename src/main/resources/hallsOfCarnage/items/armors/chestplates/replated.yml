@@ -10,5 +10,5 @@ stats:
   armor: 5
   max-health: 2
 recipe:
-  iron_scrap: 14
-  wood_scrap: 4
+  iron_scrap: 5
+  wood_scrap: 1

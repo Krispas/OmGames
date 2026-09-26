@@ -12,6 +12,6 @@ stats:
   durability: 80
   resistance-seconds: 4
 recipe:
-  iron_scrap: 10
-  redstone_scrap: 4
+  iron_scrap: 3
+  redstone_scrap: 1
 

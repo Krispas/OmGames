@@ -2,3 +2,5 @@ id: creaking
 name: "Creaking"
 entity-type: CREAKING
 health: 20
+
+attack-damage: 1.5

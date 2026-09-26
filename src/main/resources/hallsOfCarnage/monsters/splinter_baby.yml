@@ -2,6 +2,7 @@ id: splinter_baby
 name: "Baby Splinter"
 entity-type: ZOMBIE
 health: 2
+attack-damage: 1.5
 baby: true
 movement-speed-multiplier: 0.75
 equipment:

@@ -2,3 +2,5 @@ id: vindicator
 name: "Vindicator"
 entity-type: VINDICATOR
 health: 10
+
+attack-damage: 6.5

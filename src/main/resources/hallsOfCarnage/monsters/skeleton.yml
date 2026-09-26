@@ -2,5 +2,6 @@ id: skeleton
 name: "Skeleton"
 entity-type: SKELETON
 health: 8
+attack-damage: 1.0
 equipment:
   main-hand: BOW

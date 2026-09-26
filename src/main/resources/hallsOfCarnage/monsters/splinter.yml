@@ -2,6 +2,7 @@ id: splinter
 name: "Splinter"
 entity-type: ZOMBIE
 health: 12
+attack-damage: 1.5
 baby: false
 equipment:
   armor:

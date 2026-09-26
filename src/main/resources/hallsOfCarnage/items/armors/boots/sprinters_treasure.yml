@@ -10,5 +10,5 @@ stats:
   armor: 2
   movement-speed-percent: 10
 recipe:
-  iron_scrap: 7
-  redstone_scrap: 2
+  iron_scrap: 2
+  redstone_scrap: 1

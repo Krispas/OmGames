@@ -11,6 +11,6 @@ stats:
   armor: 6
   durability: 90
 recipe:
-  iron_scrap: 12
-  redstone_scrap: 2
+  iron_scrap: 4
+  redstone_scrap: 1
 

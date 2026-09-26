@@ -10,5 +10,5 @@ stats:
   armor: 4
   swift-sneak: 1
 recipe:
-  iron_scrap: 10
-  wood_scrap: 3
+  iron_scrap: 3
+  wood_scrap: 1

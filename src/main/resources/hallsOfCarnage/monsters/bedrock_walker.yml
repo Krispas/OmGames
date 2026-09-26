@@ -2,6 +2,7 @@ id: bedrock_walker
 name: "Bedrock Walker"
 entity-type: HUSK
 health: 60
+attack-damage: 1.5
 movement-speed-multiplier: 0.35
 equipment:
   armor:

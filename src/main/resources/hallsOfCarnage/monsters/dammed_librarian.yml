@@ -2,4 +2,5 @@ id: dammed_librarian
 name: "Dammed Librarian"
 entity-type: ZOMBIE_VILLAGER
 health: 20
+attack-damage: 1.5
 movement-speed-multiplier: 0.95

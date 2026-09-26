@@ -2,3 +2,5 @@ id: silverfish
 name: "Silverfish"
 entity-type: SILVERFISH
 health: 8
+
+attack-damage: 0.5

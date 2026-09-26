@@ -2,5 +2,6 @@ id: piglin
 name: "Piglin"
 entity-type: PIGLIN
 health: 18
+attack-damage: 2.0
 equipment:
   main-hand: GOLDEN_SWORD

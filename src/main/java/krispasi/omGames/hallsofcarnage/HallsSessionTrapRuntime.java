@@ -123,6 +123,12 @@ final class HallsSessionTrapRuntime {
             return false;
         }
         if (!isAliveParticipant(player)) {
+            if (player.getLocation().getY() <= origin.y() - 8) {
+                teleportPlayerToElevator(player);
+                player.setFallDistance(0.0f);
+                player.sendActionBar(Component.text("You drift back to the elevator.", NamedTextColor.GRAY));
+                return true;
+            }
             return false;
         }
         checkPlayerTrapContact(player);

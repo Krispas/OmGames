@@ -518,12 +518,7 @@ final class HallsSessionMonsterRuntime {
         if (speed != null && type.movementSpeedMultiplier() != 1.0) {
             speed.setBaseValue(speed.getBaseValue() * type.movementSpeedMultiplier());
         }
-        if (type.id().equals("ravager")) {
-            AttributeInstance attackDamage = living.getAttribute(Attribute.ATTACK_DAMAGE);
-            if (attackDamage != null) {
-                attackDamage.setBaseValue(4.0);
-            }
-        } else if (type.attackDamage() >= 0.0) {
+        if (type.attackDamage() >= 0.0) {
             AttributeInstance attackDamage = living.getAttribute(Attribute.ATTACK_DAMAGE);
             if (attackDamage != null) {
                 attackDamage.setBaseValue(type.attackDamage());

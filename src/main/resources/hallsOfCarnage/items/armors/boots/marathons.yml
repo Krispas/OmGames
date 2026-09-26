@@ -11,6 +11,6 @@ stats:
   armor-toughness: 2
   movement-speed-percent: 20
 recipe:
-  iron_scrap: 9
-  diamond_scrap: 3
-  redstone_scrap: 5
+  iron_scrap: 5
+  diamond_scrap: 2
+  redstone_scrap: 3

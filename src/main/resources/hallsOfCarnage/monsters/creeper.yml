@@ -2,3 +2,5 @@ id: creeper
 name: "Creeper"
 entity-type: CREEPER
 health: 20
+
+attack-damage: 0.0
