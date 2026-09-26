@@ -7,6 +7,10 @@ direct-hit-invulnerability-millis: 700
 display:
   material: POLISHED_BASALT
   item-model: ""
+  hitbox:
+    width: 2.4
+    height: 3.2
+    y-offset: 0.9
   parts:
     lower_lid:
       material: REINFORCED_DEEPSLATE
@@ -96,27 +100,57 @@ animations:
         tick: 0
         offset:
           y: 0.00
-        yaw-offset: 0
       8:
         tick: 8
         offset:
           y: 0.05
-        yaw-offset: 48
       16:
         tick: 16
         offset:
           y: 0.00
-        yaw-offset: 96
       24:
         tick: 24
         offset:
           y: -0.04
-        yaw-offset: 144
       32:
         tick: 32
         offset:
           y: 0.00
-        yaw-offset: 192
+    parts:
+      propeller_x:
+        frames:
+          0:
+            tick: 0
+            yaw-offset: 0
+          8:
+            tick: 8
+            yaw-offset: 48
+          16:
+            tick: 16
+            yaw-offset: 96
+          24:
+            tick: 24
+            yaw-offset: 144
+          32:
+            tick: 32
+            yaw-offset: 192
+      propeller_z:
+        frames:
+          0:
+            tick: 0
+            yaw-offset: 0
+          8:
+            tick: 8
+            yaw-offset: 48
+          16:
+            tick: 16
+            yaw-offset: 96
+          24:
+            tick: 24
+            yaw-offset: 144
+          32:
+            tick: 32
+            yaw-offset: 192
   missile_aim:
     loop: true
     frames:
@@ -129,7 +163,6 @@ animations:
         tick: 10
         offset:
           y: 0.06
-        yaw-offset: 12
   missile_lock:
     loop: true
     frames:
@@ -142,7 +175,6 @@ animations:
         tick: 8
         offset:
           y: 0.08
-        yaw-offset: 18
   shockwave_charge:
     loop: true
     frames:
@@ -167,7 +199,6 @@ animations:
         tick: 10
         offset:
           y: 0.10
-        yaw-offset: 32
   spawn_slam:
     loop: false
     frames:
@@ -175,17 +206,17 @@ animations:
         tick: 0
         offset:
           y: 0.0
-      20:
-        tick: 20
+      6:
+        tick: 6
         offset:
-          y: 2.0
-      40:
-        tick: 40
-        offset:
-          y: 0.0
+          y: 5.0
         sound: ENTITY_IRON_GOLEM_ATTACK
         volume: 1.0
         pitch: 0.55
+      12:
+        tick: 12
+        offset:
+          y: 0.0
   reposition:
     loop: true
     frames:
@@ -198,7 +229,6 @@ animations:
         tick: 8
         offset:
           y: 0.18
-        yaw-offset: 22
 overdrive:
   phase:
     initial-scale-multiplier: 1.0
@@ -239,8 +269,9 @@ archaic-guard:
       normal: 30.0
       enraged: 24.0
   spawn:
-    rise-seconds: 2.0
-    cooldown-seconds: 30.0
+    rise-seconds: 0.6
+    cooldown-seconds: 3.0
+    lockout-seconds: 25.0
     count:
       min: 1
       max: 2

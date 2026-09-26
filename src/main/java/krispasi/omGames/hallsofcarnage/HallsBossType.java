@@ -14,6 +14,9 @@ record HallsBossType(
         long directHitInvulnerabilityMillis,
         Material displayMaterial,
         String itemModel,
+        double hitboxWidth,
+        double hitboxHeight,
+        double hitboxYOffset,
         List<DisplayPart> displayParts,
         Map<String, Animation> animations,
         Drops drops,
@@ -29,6 +32,8 @@ record HallsBossType(
         directHitInvulnerabilityMillis = Math.max(0L, directHitInvulnerabilityMillis);
         displayMaterial = displayMaterial == null ? Material.SPAWNER : displayMaterial;
         itemModel = itemModel == null ? "" : itemModel.trim();
+        hitboxWidth = Math.max(0.5, hitboxWidth);
+        hitboxHeight = Math.max(0.5, hitboxHeight);
         displayParts = displayParts == null ? List.of() : List.copyOf(displayParts);
         animations = animations == null ? Map.of() : Map.copyOf(animations);
         drops = drops == null ? Drops.defaults() : drops;
@@ -199,6 +204,7 @@ record HallsBossType(
                         double enragedWallSafeDegrees,
                         int spawnRiseTicks,
                         int spawnCooldownTicks,
+                        int spawnLockoutTicks,
                         int minSpawnCount,
                         int maxSpawnCount,
                         int repositionTicks,
@@ -237,6 +243,7 @@ record HallsBossType(
             enragedWallSafeDegrees = Math.max(1.0, enragedWallSafeDegrees);
             spawnRiseTicks = Math.max(1, spawnRiseTicks);
             spawnCooldownTicks = Math.max(1, spawnCooldownTicks);
+            spawnLockoutTicks = Math.max(1, spawnLockoutTicks);
             minSpawnCount = Math.max(1, minSpawnCount);
             maxSpawnCount = Math.max(minSpawnCount, maxSpawnCount);
             repositionTicks = Math.max(1, repositionTicks);
@@ -254,7 +261,7 @@ record HallsBossType(
             return new ArchaicGuard(60, 20, 40, 10.0, 2.8,
                     60, 40, 1, 3, 3, 5, 6.0, 4.0,
                     60, 60, 100, 1, 3, 1, 3, 9.0, 4.0, 30.0, 24.0,
-                    40, 600, 1, 2,
+                    12, 60, 500, 1, 2,
                     40, 60, 9.0, 2.4, 100, 80, 0.33,
                     List.of(new WeightedMonster("bedrock_walker", 1)),
                     List.of(new WeightedMonster("rotting_soldier", 1)));

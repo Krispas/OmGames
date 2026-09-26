@@ -92,7 +92,7 @@ final class HallsSessionBossRuntime {
         activeFloorDifficulty = Math.max(0, floorDifficulty);
         List<UUID> displayIds = spawnDisplays(type, location, 0.0f, 0.0);
         Interaction hitbox = world.spawn(location.clone().add(0.0, 0.1, 0.0), Interaction.class, entity -> {
-            setHitboxSize(entity, type.overdrive().initialScaleMultiplier());
+            setHitboxSize(entity, type, type.overdrive().initialScaleMultiplier());
             entity.setResponsive(true);
             entity.setPersistent(false);
             entity.addScoreboardTag(BOSS_TAG);
@@ -245,7 +245,7 @@ final class HallsSessionBossRuntime {
             return false;
         }
         pruneBossMinions();
-        if (activeBoss.hasLivingMinions()) {
+        if (bossIsShielded()) {
             Location center = activeBoss.location().clone().add(0.0, 2.5, 0.0);
             world.spawnParticle(Particle.ENCHANT, center, 35, 2.1, 1.5, 2.1, 0.05);
             world.playSound(center, Sound.BLOCK_BEACON_POWER_SELECT, 0.55f, 0.45f);
@@ -336,6 +336,7 @@ final class HallsSessionBossRuntime {
         pruneBossMinions();
         tickBossMinionCooldowns();
         tickSummonReadiness();
+        tickArchaicSpawnLockout();
         refreshBossBarPlayers();
         updateBossBar();
         updateInvulnerabilityFeedback(System.currentTimeMillis());
@@ -404,6 +405,9 @@ final class HallsSessionBossRuntime {
     private Attack chooseAttack() {
         if (isArchaicGuard()) {
             List<Attack> attacks = new ArrayList<>(List.of(Attack.MISSILE, Attack.JUMP, Attack.WALLS, Attack.SPAWN, Attack.REPOSITION));
+            if (activeBoss.archaicSpawnLockoutTicks() > 0) {
+                attacks.remove(Attack.SPAWN);
+            }
             if (activeBoss.lastAttack() != null && attacks.size() > 1) {
                 attacks.remove(activeBoss.lastAttack());
             }
@@ -647,28 +651,9 @@ final class HallsSessionBossRuntime {
     private void runArchaicSpawnAttack() {
         HallsBossType.ArchaicGuard config = activeBoss.type().archaicGuard();
         activeBoss.setLastAttack(Attack.SPAWN);
+        activeBoss.setArchaicSpawnLockoutTicks(config.spawnLockoutTicks());
         activeBoss.setAttackAnimationTicks(0);
-        new TimedAttack(config.spawnRiseTicks(), () -> {
-            double progress = activeBoss.attackAnimationTicks() / (double) config.spawnRiseTicks();
-            animateDisplays("spawn_slam", activeBoss.attackAnimationTicks(), activeBoss.yaw(), Math.sin(progress * Math.PI) * 2.0, new Vector());
-            world.spawnParticle(Particle.CLOUD, activeBoss.location().clone().add(0.0, 0.15, 0.0), 6, 1.5, 0.08, 1.5, 0.02);
-        }, () -> {
-            int count = config.minSpawnCount() + random.nextInt(config.maxSpawnCount() - config.minSpawnCount() + 1);
-            for (int i = 0; i < count; i++) {
-                String monsterId = weightedMonster(activeBoss.type().archaicSpawnPool(activeBoss.enraged()));
-                Location spawn = activeBoss.location().clone().add(randomOffset(4.0), 5.0, randomOffset(4.0));
-                world.spawnParticle(Particle.EXPLOSION, spawn, 1, 0.35, 0.35, 0.35, 0.0);
-                UUID minionId = monsterSpawner.spawn(monsterId, spawn);
-                if (minionId != null) {
-                    activeBoss.registerMinion(minionId, monsterId);
-                    if (!activeBoss.enraged() && normalizeId(monsterId).equals("bedrock_walker")) {
-                        halveMonsterHealth(minionId);
-                    }
-                }
-            }
-            world.playSound(activeBoss.location(), Sound.ENTITY_IRON_GOLEM_ATTACK, 1.1f, 0.6f);
-            scheduleNextAttack(config.spawnCooldownTicks());
-        });
+        new ArchaicSpawnSlam(config).runTaskTimer(plugin, 1L, 1L);
     }
 
     private void runRepositionAttack() {
@@ -792,6 +777,12 @@ final class HallsSessionBossRuntime {
         activeBoss.setGroupCooldownTicks(Math.max(0, activeBoss.groupCooldownTicks() - 1));
     }
 
+    private void tickArchaicSpawnLockout() {
+        if (activeBoss != null) {
+            activeBoss.setArchaicSpawnLockoutTicks(Math.max(0, activeBoss.archaicSpawnLockoutTicks() - 1));
+        }
+    }
+
     private void tickSummonReadiness() {
         if (activeBoss == null) {
             return;
@@ -821,6 +812,10 @@ final class HallsSessionBossRuntime {
             return false;
         }
         return activeBoss.enraged() || activeBoss.minionCooldownTicks(normalizeId(monsterId)) <= 0;
+    }
+
+    private boolean bossIsShielded() {
+        return activeBoss != null && !isArchaicGuard() && activeBoss.hasLivingMinions();
     }
 
     private int spawnCount(HallsBossType.Overdrive config) {
@@ -1013,6 +1008,7 @@ final class HallsSessionBossRuntime {
         if (activeBoss == null) {
             return;
         }
+        updateHitboxPosition(yOffset, offset);
         List<HallsBossType.DisplayPart> parts = displayParts(activeBoss.type());
         String normalizedAnimationId = normalizeId(animationId);
         playAnimationSounds(activeBoss.type(), normalizedAnimationId, tick);
@@ -1137,7 +1133,7 @@ final class HallsSessionBossRuntime {
         if (activeBoss == null || bossBar == null) {
             return;
         }
-        boolean shielded = activeBoss.hasLivingMinions();
+        boolean shielded = bossIsShielded();
         bossBar.setProgress(Math.max(0.0, Math.min(1.0, activeBoss.health() / activeBoss.maxHealth())));
         bossBar.setColor(shielded ? BarColor.WHITE : BarColor.RED);
         String shield = shielded ? " - Shielded" : "";
@@ -1150,14 +1146,29 @@ final class HallsSessionBossRuntime {
         }
         Entity hitbox = Bukkit.getEntity(activeBoss.hitboxId());
         if (hitbox instanceof Interaction interaction) {
-            setHitboxSize(interaction, activeBoss.scaleMultiplier());
+            setHitboxSize(interaction, activeBoss.type(), activeBoss.scaleMultiplier());
         }
     }
 
-    private void setHitboxSize(Interaction entity, double scaleMultiplier) {
-        float size = (float) Math.max(1.0, 5.0 * scaleMultiplier);
-        entity.setInteractionWidth(size);
-        entity.setInteractionHeight(size);
+    private void updateHitboxPosition(double yOffset, Vector offset) {
+        if (activeBoss == null) {
+            return;
+        }
+        Entity hitbox = Bukkit.getEntity(activeBoss.hitboxId());
+        if (hitbox == null) {
+            return;
+        }
+        Vector safeOffset = offset == null ? new Vector() : offset;
+        Location location = activeBoss.location().clone().add(
+                safeOffset.getX(),
+                activeBoss.type().hitboxYOffset() + yOffset + safeOffset.getY(),
+                safeOffset.getZ());
+        hitbox.teleport(location);
+    }
+
+    private void setHitboxSize(Interaction entity, HallsBossType type, double scaleMultiplier) {
+        entity.setInteractionWidth((float) Math.max(0.5, type.hitboxWidth() * scaleMultiplier));
+        entity.setInteractionHeight((float) Math.max(0.5, type.hitboxHeight() * scaleMultiplier));
     }
 
     private void updateInvulnerabilityFeedback(long nowMillis) {
@@ -1456,6 +1467,69 @@ final class HallsSessionBossRuntime {
         }
     }
 
+    private final class ArchaicSpawnSlam extends org.bukkit.scheduler.BukkitRunnable {
+        private final HallsBossType.ArchaicGuard config;
+        private final int generation;
+        private boolean spawned;
+        private int ticks;
+
+        private ArchaicSpawnSlam(HallsBossType.ArchaicGuard config) {
+            this.config = config;
+            this.generation = activeBoss == null ? 0 : activeBoss.attackGeneration();
+        }
+
+        @Override
+        public void run() {
+            if (activeBoss == null || !activeBoss.active() || activeBoss.attackGeneration() != generation) {
+                cancel();
+                return;
+            }
+            ticks++;
+            int riseTicks = config.spawnRiseTicks();
+            int totalTicks = riseTicks * 2;
+            double yOffset;
+            if (ticks <= riseTicks) {
+                double progress = ticks / (double) riseTicks;
+                yOffset = 5.0 * (1.0 - Math.pow(1.0 - progress, 3.0));
+                world.spawnParticle(Particle.CLOUD, activeBoss.location().clone().add(0.0, 0.2, 0.0),
+                        8, 1.3, 0.08, 1.3, 0.03);
+            } else {
+                if (!spawned) {
+                    spawnArchaicGuardAdds();
+                    spawned = true;
+                }
+                double progress = (ticks - riseTicks) / (double) riseTicks;
+                yOffset = 5.0 * Math.pow(1.0 - progress, 2.0);
+            }
+            animateDisplays("spawn_slam", ticks, activeBoss.yaw(), Math.max(0.0, yOffset), new Vector());
+            if (ticks >= totalTicks) {
+                animateDisplays(activeBoss.yaw(), 0.0, new Vector());
+                scheduleNextAttack(config.spawnCooldownTicks());
+                cancel();
+            }
+        }
+
+        private void spawnArchaicGuardAdds() {
+            Location crash = activeBoss.location().clone().add(0.0, 5.0, 0.0);
+            world.spawnParticle(Particle.EXPLOSION, crash, 3, 1.7, 0.35, 1.7, 0.0);
+            world.spawnParticle(Particle.BLOCK, crash, 80, 2.0, 0.25, 2.0, Material.DEEPSLATE_BRICKS.createBlockData());
+            world.playSound(crash, Sound.ENTITY_IRON_GOLEM_ATTACK, 1.25f, 0.5f);
+            int count = config.minSpawnCount() + random.nextInt(config.maxSpawnCount() - config.minSpawnCount() + 1);
+            for (int i = 0; i < count; i++) {
+                String monsterId = weightedMonster(activeBoss.type().archaicSpawnPool(activeBoss.enraged()));
+                Location spawn = activeBoss.location().clone().add(randomOffset(4.0), 5.0, randomOffset(4.0));
+                world.spawnParticle(Particle.SCULK_SOUL, spawn, 20, 0.35, 0.35, 0.35, 0.03);
+                UUID minionId = monsterSpawner.spawn(monsterId, spawn);
+                if (minionId != null) {
+                    activeBoss.registerMinion(minionId, monsterId);
+                    if (!activeBoss.enraged() && normalizeId(monsterId).equals("bedrock_walker")) {
+                        halveMonsterHealth(minionId);
+                    }
+                }
+            }
+        }
+    }
+
     private final class RetractAnimation extends org.bukkit.scheduler.BukkitRunnable {
         private int ticks;
 
@@ -1576,6 +1650,7 @@ final class HallsSessionBossRuntime {
         private boolean awaitingGroupClear;
         private int groupCooldownTicks;
         private int summonReadyTicks;
+        private int archaicSpawnLockoutTicks;
         private double scaleMultiplier = 1.0;
         private float xBlastYaw;
         private int attackGeneration;
@@ -1754,6 +1829,14 @@ final class HallsSessionBossRuntime {
 
         private void setSummonReadyTicks(int summonReadyTicks) {
             this.summonReadyTicks = Math.max(0, summonReadyTicks);
+        }
+
+        private int archaicSpawnLockoutTicks() {
+            return archaicSpawnLockoutTicks;
+        }
+
+        private void setArchaicSpawnLockoutTicks(int archaicSpawnLockoutTicks) {
+            this.archaicSpawnLockoutTicks = Math.max(0, archaicSpawnLockoutTicks);
         }
 
         private double scaleMultiplier() {
