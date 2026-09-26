@@ -134,6 +134,7 @@ public final class HallsSession {
     private final HallsCampRuntime campRuntime;
     private final HallsSidebar sidebar = new HallsSidebar();
     private final java.util.function.Predicate<UUID> debugEnabled;
+    private final java.util.function.Consumer<CompletedRun> completionHandler;
     private final String elevatorLocatorIconItemModel;
     private final Set<UUID> ghostPlayers = new HashSet<>();
     private final Map<UUID, Map<Integer, Integer>> healthTotemLevels = new HashMap<>();
@@ -157,6 +158,7 @@ public final class HallsSession {
     private int researchPoints;
     private int explorationFloorsSinceCamp;
     private int remainingLives;
+    private int runShame;
     private int lastCampFloor;
     private HallsCampCheckpoint lastCampCheckpoint;
     private ItemStack[] elevatorChestContents = new ItemStack[27];
@@ -167,6 +169,7 @@ public final class HallsSession {
     private boolean transitioning;
     private boolean running;
     private boolean elevatorChestSnapshotLocked;
+    private boolean completingScenario;
     private Location startRoomSpawn;
     private long floorStartedAtMillis;
     private HallsFloorModifiers activeFloorModifiers = HallsFloorModifiers.none();
@@ -198,6 +201,7 @@ public final class HallsSession {
                         String elevatorLocatorIconItemModel,
                         HallsSaveData initialSave,
                         List<Player> players,
+                        java.util.function.Consumer<CompletedRun> completionHandler,
                         java.util.function.Predicate<UUID> debugEnabled) {
         this.plugin = plugin;
         this.id = id;
@@ -219,6 +223,7 @@ public final class HallsSession {
         this.difficultyMultiplier = Math.max(1.0, difficultyMultiplier);
         this.elevatorLocatorIconItemModel = elevatorLocatorIconItemModel == null ? "" : elevatorLocatorIconItemModel.trim();
         this.initialSave = initialSave;
+        this.completionHandler = completionHandler;
         this.participants = new HashSet<>();
         for (Player player : players) {
             participants.add(player.getUniqueId());
@@ -306,7 +311,7 @@ public final class HallsSession {
                 campKeys--;
                 return true;
             }
-        });
+        }, this::addRunShame);
         this.debugEnabled = debugEnabled == null ? ignored -> false : debugEnabled;
         this.remainingLives = scenario.camp().teamLives();
         unlockRootResearch();
@@ -462,7 +467,9 @@ public final class HallsSession {
             return false;
         }
         if (isCoinItem(drop.stack())) {
-            coins += multipliedCoins(Math.max(1, drop.stack().getAmount()));
+            int gained = multipliedCoins(Math.max(1, drop.stack().getAmount()));
+            coins += gained;
+            addRunShame(gained);
             removePhysicsDrop(drop);
             world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.8f);
             return true;
@@ -520,6 +527,7 @@ public final class HallsSession {
         }
         removeCarriedResearchCrate(player.getUniqueId());
         researchPoints++;
+        addRunShame(1);
         researchCrateDepositedThisFloor = true;
         save("research-crate");
         world.playSound(block.getLocation(), Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.9f, 1.35f);
@@ -568,6 +576,7 @@ public final class HallsSession {
             return true;
         }
         blueprintDistilleryRewardClaimedThisFloor = true;
+        addRunShame(1);
         giveBlueprintDistilleryReward(player);
         return true;
     }
@@ -697,9 +706,51 @@ public final class HallsSession {
             player.sendMessage(Component.text("The elevator begins its descent.", NamedTextColor.DARK_RED));
             startElevatorTransition(currentFloor + 1, leftBehind);
         } else {
-            player.sendMessage(Component.text("No deeper placeholder floor is available.", NamedTextColor.YELLOW));
+            completeScenarioFromElevator(player, block);
         }
         return true;
+    }
+
+    private void completeScenarioFromElevator(Player player, Block block) {
+        if (completingScenario) {
+            player.sendMessage(Component.text("Scenario completion is already being recorded.", NamedTextColor.YELLOW));
+            return;
+        }
+        int quota = currentCoinQuota();
+        if (player.getGameMode() != GameMode.CREATIVE) {
+            if (coins < quota) {
+                player.sendMessage(Component.text("The elevator needs " + quota + " coins. Current: " + coins + ".",
+                        NamedTextColor.YELLOW));
+                return;
+            }
+            coins = Math.max(0, coins - quota);
+        }
+        completingScenario = true;
+        if (isCurrentFloorCamp()) {
+            campRuntime.closeOpenViewers();
+        }
+        closeOpenElevatorChestViewers();
+        captureElevatorChestContents();
+        removeElevatorCompasses();
+        elevatorChestSnapshotLocked = true;
+        save("scenario-complete");
+        openElevatorDoors();
+        world.playSound(block.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 0.9f);
+        int finalShame = adjustedCompletionShame();
+        for (UUID playerId : participants) {
+            Player participant = Bukkit.getPlayer(playerId);
+            if (participant != null && participant.getWorld().equals(world)) {
+                participant.sendTitle("Scenario Complete", scenario.name(), 10, 80, 20);
+                participant.sendMessage(Component.text("Completed " + scenario.name() + " on " + displayDifficulty(difficultyId) + ".",
+                        NamedTextColor.GOLD));
+                participant.sendMessage(Component.text("Final shame: " + finalShame + " (raw " + Math.max(0, runShame) + ").",
+                        NamedTextColor.LIGHT_PURPLE));
+            }
+        }
+        if (completionHandler != null) {
+            completionHandler.accept(new CompletedRun(id, scenario.id(), difficultyId, Math.max(0, runShame),
+                    Set.copyOf(participants), saveFile()));
+        }
     }
 
     public boolean handleElevatorChestInteract(Player player, Block block) {
@@ -759,7 +810,9 @@ public final class HallsSession {
             player.sendActionBar(Component.text("No scrap to deposit.", NamedTextColor.GRAY));
             return true;
         }
-        coins += multipliedCoins(deposited);
+        int gained = multipliedCoins(deposited);
+        coins += gained;
+        addRunShame(gained);
         world.playSound(block.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8f, 0.7f);
         monsterRuntime.alert(block.getLocation());
         player.sendActionBar(Component.text("Deposited " + deposited + " scrap.", NamedTextColor.GOLD));
@@ -4303,6 +4356,30 @@ public final class HallsSession {
         return Math.max(1, (int) Math.round(amount * activeFloorModifiers.coinMultiplier()));
     }
 
+    private void addRunShame(int amount) {
+        if (amount <= 0) {
+            return;
+        }
+        runShame = Math.max(0, runShame + amount);
+    }
+
+    private int adjustedCompletionShame() {
+        double factor = switch (difficultyId) {
+            case "hard" -> 0.7;
+            case "extreme" -> 0.5;
+            default -> 1.0;
+        };
+        return Math.max(0, (int) Math.round(Math.max(0, runShame) * factor));
+    }
+
+    private String displayDifficulty(String difficultyId) {
+        return switch (difficultyId) {
+            case "hard" -> "Hard";
+            case "extreme" -> "Extreme";
+            default -> "Normal";
+        };
+    }
+
     private void applyCompassModifier() {
         if (activeFloorModifiers.compassLevel() <= 0 || currentFloor <= 1) {
             return;
@@ -5253,7 +5330,9 @@ public final class HallsSession {
                 return false;
             }
         }
-        coins += multipliedCoins(amount);
+        int gained = multipliedCoins(amount);
+        coins += gained;
+        addRunShame(gained);
         return true;
     }
 
@@ -5293,6 +5372,7 @@ public final class HallsSession {
             return researchPoints;
         }
         researchPoints += amount;
+        addRunShame(amount);
         save("test-research-points");
         return researchPoints;
     }
@@ -5560,6 +5640,7 @@ public final class HallsSession {
 
     private void makeGhost(Player player) {
         ghostPlayers.add(player.getUniqueId());
+        addRunShame(5);
         removeCarriedResearchCrate(player.getUniqueId());
         dropPlayerSessionInventory(player);
         dropFirstGhostCoinCache(player);
@@ -5649,6 +5730,7 @@ public final class HallsSession {
         if (gameOverTask != null) {
             return;
         }
+        addRunShame(50);
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
@@ -5852,6 +5934,7 @@ public final class HallsSession {
             yaml.set("camp-bank.coins", campBankCoins);
             yaml.set("camp-bank.keys", campKeys);
             yaml.set("camp-bank.keys-earned", campKeysEarned);
+            yaml.set("shame.current", runShame);
             yaml.set("research.points", researchPoints);
             yaml.set("research.unlocked", unlockedResearch.stream().sorted().toList());
             yaml.set("research.exploration-floors-since-camp", explorationFloorsSinceCamp);
@@ -5885,6 +5968,7 @@ public final class HallsSession {
         campBankCoins = Math.max(0, save.campBankCoins());
         campKeys = Math.max(0, save.campKeys());
         campKeysEarned = Math.max(0, save.campKeysEarned());
+        runShame = Math.max(0, save.runShame());
         researchPoints = Math.max(0, save.researchPoints());
         unlockedResearch.clear();
         unlockedResearch.addAll(save.unlockedResearch());
@@ -6106,6 +6190,7 @@ public final class HallsSession {
         }
         int awarded = explorationFloorsSinceCamp;
         researchPoints += awarded;
+        addRunShame(awarded);
         explorationFloorsSinceCamp = 0;
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
@@ -6181,6 +6266,7 @@ public final class HallsSession {
             campBankCoins = 0;
             campKeys = 0;
             campKeysEarned = 0;
+            runShame = 0;
             researchPoints = 0;
             unlockedResearch.clear();
             unlockRootResearch();
@@ -7124,6 +7210,17 @@ public final class HallsSession {
                         boolean researchCrateDeposited,
                         boolean blueprintDistillerCollected,
                         String modifiers) {
+    }
+
+    public record CompletedRun(int sessionId,
+                               String scenarioId,
+                               String difficultyId,
+                               int rawShame,
+                               Set<UUID> participants,
+                               File saveFile) {
+        public CompletedRun {
+            participants = participants == null ? Set.of() : Set.copyOf(participants);
+        }
     }
 
     private static final class PhysicsDrop {

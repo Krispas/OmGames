@@ -70,6 +70,18 @@ public class OmVeinsAPI {
     private static BiFunction<String, ItemStack, Boolean> addItemFunction;
 
     /**
+     * Optional consumer called when a player completes a Halls of Carnage scenario.
+     *
+     * <p>Arguments:
+     * <ul>
+     *     <li>{@link Player} - the completing player</li>
+     *     <li>{@link Pair} - scenario id and difficulty id</li>
+     * </ul>
+     * </p>
+     */
+    private static BiConsumer<Player, Pair<String, String>> hallsScenarioCompletionConsumer;
+
+    /**
      * Checks whether all required consumers are set.
      * If so, marks the API as initialized and logs the state.
      */
@@ -170,6 +182,36 @@ public class OmVeinsAPI {
         getPlayerSkinsFunction = consumer;
         OmGames.getInstance().getLogger().info("OmVeins API: GetPlayerSkinsConsumer consumer set!");
         checkIfDone();
+    }
+
+    /**
+     * Registers an optional Halls of Carnage scenario-completion consumer.
+     *
+     * <p>This callback is not required for base API initialization. OmGames will
+     * invoke it only when it is present and the API is otherwise initialized.</p>
+     *
+     * @param consumer consumer receiving the player and a pair of scenario id / difficulty id
+     */
+    public static void setHallsScenarioCompletionConsumer(BiConsumer<Player, Pair<String, String>> consumer) {
+        hallsScenarioCompletionConsumer = consumer;
+        OmGames.getInstance().getLogger().info("OmVeins API: HallsScenarioCompletion consumer set!");
+    }
+
+    public static boolean hasHallsScenarioCompletionConsumer() {
+        return hallsScenarioCompletionConsumer != null;
+    }
+
+    public static void completeHallsScenario(Player player, Pair<String, String> scenarioAndDifficulty) {
+        if (!initialized || hallsScenarioCompletionConsumer == null) {
+            return;
+        }
+        try {
+            hallsScenarioCompletionConsumer.accept(player, scenarioAndDifficulty);
+        } catch (Exception e) {
+            OmGames.getInstance().getLogger()
+                    .log(Level.SEVERE,
+                            "OmVeins API: error while executing HallsScenarioCompletion!", e);
+        }
     }
 
     /**

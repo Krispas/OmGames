@@ -27,6 +27,7 @@ public final class HallsShameService {
               scenario_id TEXT NOT NULL,
               player_uuid TEXT NOT NULL,
               completed_at INTEGER NOT NULL,
+              difficulty_id TEXT NOT NULL DEFAULT 'normal',
               final_shame INTEGER NOT NULL,
               PRIMARY KEY (scenario_id, player_uuid, completed_at)
             )
@@ -47,6 +48,7 @@ public final class HallsShameService {
             try (Statement statement = connection.createStatement()) {
                 statement.execute(SHAME_TABLE_SQL);
                 statement.execute(HISTORY_TABLE_SQL);
+                ensureCompletionDifficultyColumn(statement);
             }
         } catch (SQLException ex) {
             logger.log(Level.SEVERE, "Failed to load Halls of Carnage shame database.", ex);
@@ -124,6 +126,72 @@ public final class HallsShameService {
             logger.log(Level.WARNING, "Failed to load Halls shame leaderboard.", ex);
         }
         return entries;
+    }
+
+    public void recordCompletion(String scenarioId, String difficultyId, UUID playerId, int finalShame, long completedAt) {
+        if (connection == null || scenarioId == null || scenarioId.isBlank() || playerId == null) {
+            return;
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO hoc_completed_scenarios (scenario_id, player_uuid, completed_at, difficulty_id, final_shame)
+                VALUES (?, ?, ?, ?, ?)
+                """)) {
+            statement.setString(1, scenarioId);
+            statement.setString(2, playerId.toString());
+            statement.setLong(3, completedAt);
+            statement.setString(4, difficultyId == null || difficultyId.isBlank() ? "normal" : difficultyId);
+            statement.setInt(5, Math.max(0, finalShame));
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to record Halls completion for " + playerId + ".", ex);
+        }
+    }
+
+    public String bestCompletedDifficulty(UUID playerId, String scenarioId) {
+        if (connection == null || playerId == null || scenarioId == null || scenarioId.isBlank()) {
+            return "";
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT difficulty_id
+                FROM hoc_completed_scenarios
+                WHERE player_uuid = ? AND scenario_id = ?
+                """)) {
+            statement.setString(1, playerId.toString());
+            statement.setString(2, scenarioId);
+            String best = "";
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    String difficulty = rs.getString("difficulty_id");
+                    if (difficultyRank(difficulty) > difficultyRank(best)) {
+                        best = difficulty;
+                    }
+                }
+            }
+            return best == null ? "" : best;
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load Halls completion state for " + playerId + ".", ex);
+            return "";
+        }
+    }
+
+    private void ensureCompletionDifficultyColumn(Statement statement) throws SQLException {
+        try (ResultSet rs = statement.executeQuery("PRAGMA table_info(hoc_completed_scenarios)")) {
+            while (rs.next()) {
+                if ("difficulty_id".equalsIgnoreCase(rs.getString("name"))) {
+                    return;
+                }
+            }
+        }
+        statement.execute("ALTER TABLE hoc_completed_scenarios ADD COLUMN difficulty_id TEXT NOT NULL DEFAULT 'normal'");
+    }
+
+    private int difficultyRank(String difficultyId) {
+        return switch (difficultyId == null ? "" : difficultyId.toLowerCase(java.util.Locale.ROOT)) {
+            case "extreme" -> 3;
+            case "hard" -> 2;
+            case "normal" -> 1;
+            default -> 0;
+        };
     }
 
     private void openConnection() throws SQLException {

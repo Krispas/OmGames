@@ -1,5 +1,6 @@
 package krispasi.omGames.hallsofcarnage;
 
+import krispasi.omGames.OmVeinsAPI;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.commons.lang3.tuple.Pair;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
@@ -585,7 +587,7 @@ public final class HallsOfCarnageManager {
             return true;
         }
         switch (action) {
-            case HallsMainMenu.ACTION_NEW -> HallsMainMenu.openScenarios(plugin, player, scenarios);
+            case HallsMainMenu.ACTION_NEW -> openScenariosMenu(player);
             case HallsMainMenu.ACTION_LOAD -> HallsMainMenu.openSaves(plugin, player, savesFor(player));
             case HallsMainMenu.ACTION_BACK -> openBack(player, holder);
             case HallsMainMenu.ACTION_SCENARIO -> HallsMainMenu.openDifficulty(plugin, player, value);
@@ -646,7 +648,7 @@ public final class HallsOfCarnageManager {
     private void openBack(Player player, HallsMainMenu.MenuHolder holder) {
         switch (holder.type()) {
             case SCENARIOS, SAVES -> openMainMenu(player);
-            case DIFFICULTY -> HallsMainMenu.openScenarios(plugin, player, scenarios);
+            case DIFFICULTY -> openScenariosMenu(player);
             case SETTINGS -> {
                 PendingSession pending = pendingSessions.get(player.getUniqueId());
                 if (pending != null && pending.loading()) {
@@ -657,6 +659,17 @@ public final class HallsOfCarnageManager {
             }
             default -> openMainMenu(player);
         }
+    }
+
+    private void openScenariosMenu(Player player) {
+        Map<String, String> completed = new HashMap<>();
+        for (HallsScenario scenario : scenarios) {
+            String difficulty = shameService.bestCompletedDifficulty(player.getUniqueId(), scenario.id());
+            if (!difficulty.isBlank()) {
+                completed.put(scenario.id(), difficulty);
+            }
+        }
+        HallsMainMenu.openScenarios(plugin, player, scenarios, completed);
     }
 
     private void openSessionSettings(Player host, PendingSession pending) {
@@ -1284,7 +1297,7 @@ public final class HallsOfCarnageManager {
         HallsSession session = new HallsSession(plugin, sessionId, scenario, world, config.sessionOrigin(slot),
                 getDataFolder(), levelTypes, breakableTypes, vegetationTypes, itemTypes, trapTypes, bossTypes, monsterTypes, modifierTypes,
                 buildingTypes, hostId, selectedDifficulty.id(), selectedDifficulty.multiplier(),
-                config.elevatorLocatorIconItemModel(), saveData, players,
+                config.elevatorLocatorIconItemModel(), saveData, players, this::completeSession,
                 debugPlayers::contains);
         try {
             closeOpenHallsMenus(players);
@@ -1496,6 +1509,55 @@ public final class HallsOfCarnageManager {
         session.stop(fallback);
         for (UUID playerId : session.participants()) {
             playerSessions.remove(playerId);
+        }
+    }
+
+    private void completeSession(HallsSession.CompletedRun completion) {
+        if (completion == null) {
+            return;
+        }
+        HallsSession session = activeSessions.get(completion.sessionId());
+        if (session == null) {
+            return;
+        }
+        long completedAt = System.currentTimeMillis();
+        int finalShame = adjustedCompletionShame(completion.rawShame(), completion.difficultyId());
+        for (UUID playerId : completion.participants()) {
+            shameService.recordCompletion(completion.scenarioId(), completion.difficultyId(), playerId, finalShame, completedAt);
+            int current = shameService.getShame(playerId);
+            shameService.setShame(playerId, current <= 0 ? finalShame : Math.min(current, finalShame));
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && OmVeinsAPI.isInitialized() && OmVeinsAPI.hasHallsScenarioCompletionConsumer()) {
+                OmVeinsAPI.completeHallsScenario(player, Pair.of(completion.scenarioId(), completion.difficultyId()));
+            }
+        }
+        deleteCompletedSave(completion.saveFile());
+        Bukkit.getScheduler().runTaskLater(plugin, () -> stopSession(completion.sessionId(), true), 100L);
+    }
+
+    private int adjustedCompletionShame(int rawShame, String difficultyId) {
+        double factor = switch (normalizeId(difficultyId)) {
+            case "hard" -> 0.7;
+            case "extreme" -> 0.5;
+            default -> 1.0;
+        };
+        return Math.max(0, (int) Math.round(Math.max(0, rawShame) * factor));
+    }
+
+    private void deleteCompletedSave(File saveFile) {
+        if (saveFile == null || !saveFile.exists()) {
+            return;
+        }
+        try {
+            Path savesRoot = getSavesFolder().getCanonicalFile().toPath();
+            Path savePath = saveFile.getCanonicalFile().toPath();
+            if (!savePath.startsWith(savesRoot) || savePath.equals(savesRoot)) {
+                plugin.getLogger().warning("Refusing to delete completed Halls save outside the saves folder: " + saveFile);
+                return;
+            }
+            Files.deleteIfExists(savePath);
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Failed to delete completed Halls save " + saveFile + ": " + ex.getMessage());
         }
     }
 

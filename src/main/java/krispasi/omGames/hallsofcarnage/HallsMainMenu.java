@@ -4,6 +4,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -46,7 +47,8 @@ public final class HallsMainMenu {
         player.openInventory(inventory);
     }
 
-    public static void openScenarios(JavaPlugin plugin, Player player, List<HallsScenario> scenarios) {
+    public static void openScenarios(JavaPlugin plugin, Player player, List<HallsScenario> scenarios,
+                                     Map<String, String> completedDifficulties) {
         Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.SCENARIOS, null), 54,
                 Component.text("Choose Scenario", NamedTextColor.DARK_RED));
         int slot = 10;
@@ -54,7 +56,8 @@ public final class HallsMainMenu {
             if (slot >= 44) {
                 break;
             }
-            inventory.setItem(slot, scenarioItem(plugin, scenario));
+            String completedDifficulty = completedDifficulties == null ? "" : completedDifficulties.getOrDefault(scenario.id(), "");
+            inventory.setItem(slot, scenarioItem(plugin, scenario, completedDifficulty));
             slot = nextContentSlot(slot);
         }
         inventory.setItem(49, item(plugin, Material.ARROW, "Back", NamedTextColor.GRAY, List.of(), ACTION_BACK, null));
@@ -144,13 +147,35 @@ public final class HallsMainMenu {
                 .get(new org.bukkit.NamespacedKey(plugin, "hoc_menu_value"), PersistentDataType.STRING);
     }
 
-    private static ItemStack scenarioItem(JavaPlugin plugin, HallsScenario scenario) {
+    private static ItemStack scenarioItem(JavaPlugin plugin, HallsScenario scenario, String completedDifficulty) {
         List<String> lore = new ArrayList<>();
         lore.add("Scenario difficulty: " + scenario.difficulty());
         lore.add("Players: " + scenario.minPlayers() + "-" + scenario.maxPlayers());
         lore.add("Floors: " + scenario.floorCount());
+        if (completedDifficulty != null && !completedDifficulty.isBlank()) {
+            lore.add("Completed: " + displayDifficulty(completedDifficulty));
+        }
         lore.addAll(scenario.description());
-        return item(plugin, Material.MAP, scenario.name(), NamedTextColor.GOLD, lore, ACTION_SCENARIO, scenario.id());
+        return item(plugin, scenarioMaterial(completedDifficulty), scenario.name(), NamedTextColor.GOLD, lore,
+                ACTION_SCENARIO, scenario.id());
+    }
+
+    private static Material scenarioMaterial(String completedDifficulty) {
+        return switch (completedDifficulty == null ? "" : completedDifficulty.toLowerCase(java.util.Locale.ROOT)) {
+            case "extreme" -> Material.NETHER_STAR;
+            case "hard" -> Material.DIAMOND;
+            case "normal" -> Material.EMERALD;
+            default -> Material.MAP;
+        };
+    }
+
+    private static String displayDifficulty(String completedDifficulty) {
+        return switch (completedDifficulty == null ? "" : completedDifficulty.toLowerCase(java.util.Locale.ROOT)) {
+            case "extreme" -> "Extreme";
+            case "hard" -> "Hard";
+            case "normal" -> "Normal";
+            default -> completedDifficulty;
+        };
     }
 
     private static ItemStack difficultyItem(JavaPlugin plugin, String id, String name, Material material, double multiplier) {

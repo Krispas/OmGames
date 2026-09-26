@@ -1278,6 +1278,7 @@ Files:
 SQLite tables:
 - `hoc_shame`
 - `hoc_completed_scenarios`
+  - stores `scenario_id`, `player_uuid`, `completed_at`, `difficulty_id`, and `final_shame`
 
 ### 7.4 Runtime Notes
 
@@ -1285,6 +1286,8 @@ SQLite tables:
 - The human-built lobby is centered near `0 70 0`; automated session/dungeon placement must stay at least 1000 blocks away.
 - Players in the Halls world are kept in Adventure mode, with full hunger and natural regeneration disabled.
 - Shame leaderboards are ascending because lower shame is better.
+- When a party descends after the final configured scenario floor, the session displays completion/shame, records completion, deletes the Halls save file, optionally notifies OmVeins through its Halls completion consumer, and then returns players to the Halls lobby.
+- Halls run shame is saved in active save files as `shame.current`; final completion shame applies difficulty reduction (`normal` unchanged, `hard` 30% less, `extreme` 50% less) before persistence.
 - `/hoc start <scenario> [player...]` allocates a session origin, builds the first start floor/elevator shell, teleports players into it, and tracks changed blocks for cleanup.
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.

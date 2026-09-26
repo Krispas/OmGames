@@ -77,6 +77,10 @@ public final class HallsCampRuntime {
         boolean unlock(String nodeId);
     }
 
+    public interface ShameAccount {
+        void addShame(int amount);
+    }
+
     private final JavaPlugin plugin;
     private final World world;
     private final HallsScenario scenario;
@@ -88,6 +92,7 @@ public final class HallsCampRuntime {
     private final TotemAccount totemAccount;
     private final Function<Integer, List<String>> scanner;
     private final ResearchAccount researchAccount;
+    private final ShameAccount shameAccount;
     private final HallsCampSpecialBuildingSupport specialBuildings;
     private final Map<UUID, Plot> plotsByEntity = new HashMap<>();
     private final Map<Integer, Plot> plotsById = new HashMap<>();
@@ -111,6 +116,23 @@ public final class HallsCampRuntime {
                             Function<Integer, List<String>> scanner,
                             ResearchAccount researchAccount,
                             KeyAccount keyAccount) {
+        this(plugin, world, scenario, buildingTypes, itemTypes, itemFactory, scrapAccount, sculkAccount,
+                totemAccount, scanner, researchAccount, keyAccount, null);
+    }
+
+    public HallsCampRuntime(JavaPlugin plugin,
+                            World world,
+                            HallsScenario scenario,
+                            Map<String, HallsBuildingType> buildingTypes,
+                            Map<String, HallsItemType> itemTypes,
+                            Function<HallsItemType, ItemStack> itemFactory,
+                            ScrapAccount scrapAccount,
+                            SculkAccount sculkAccount,
+                            TotemAccount totemAccount,
+                            Function<Integer, List<String>> scanner,
+                            ResearchAccount researchAccount,
+                            KeyAccount keyAccount,
+                            ShameAccount shameAccount) {
         this.plugin = plugin;
         this.world = world;
         this.scenario = scenario;
@@ -123,6 +145,7 @@ public final class HallsCampRuntime {
         this.scanner = scanner;
         this.researchAccount = researchAccount;
         this.keyAccount = keyAccount;
+        this.shameAccount = shameAccount;
         this.specialBuildings = new HallsCampSpecialBuildingSupport(plugin, scenario, this.itemTypes,
                 this.buildingTypes, itemFactory, scrapAccount);
     }
@@ -677,6 +700,7 @@ public final class HallsCampRuntime {
         refreshDisplayForCurrentState(plot, building);
         player.sendMessage(Component.text("Built " + building.name() + ".", NamedTextColor.GREEN));
         playBuildingSound(player, building, BuildingSound.BUILD);
+        addShame(1);
         return true;
     }
 
@@ -720,7 +744,14 @@ public final class HallsCampRuntime {
         }
         player.sendMessage(Component.text("Upgraded " + building.name() + " to level " + plot.level() + ".", NamedTextColor.GREEN));
         playBuildingSound(player, building, BuildingSound.UPGRADE);
+        addShame(1);
         return true;
+    }
+
+    private void addShame(int amount) {
+        if (shameAccount != null && amount > 0) {
+            shameAccount.addShame(amount);
+        }
     }
 
     private void openBuildingMenu(Player player, Plot plot) {
