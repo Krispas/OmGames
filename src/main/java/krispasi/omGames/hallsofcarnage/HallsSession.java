@@ -1710,6 +1710,60 @@ public final class HallsSession {
         teleportParticipantsToElevator("Floor " + floor, "Boss: " + bossName(floorDefinition.boss()));
     }
 
+    private void placeBossArenaLights(HallsLayout layout,
+                                      int startX,
+                                      int y,
+                                      int startZ,
+                                      HallsLevelType levelType,
+                                      Location bossLocation,
+                                      int height) {
+        List<Cell> cells = openInteriorCells(layout);
+        if (cells.isEmpty()) {
+            return;
+        }
+        Material light = levelType.light();
+        int centerX = bossLocation.getBlockX();
+        int centerZ = bossLocation.getBlockZ();
+        setBlock(centerX, y - 1, centerZ, light);
+
+        int minX = cells.stream().mapToInt(Cell::x).min().orElse(layout.width() / 2);
+        int maxX = cells.stream().mapToInt(Cell::x).max().orElse(layout.width() / 2);
+        int minZ = cells.stream().mapToInt(Cell::z).min().orElse(layout.depth() / 2);
+        int maxZ = cells.stream().mapToInt(Cell::z).max().orElse(layout.depth() / 2);
+        int[][] positions = {
+                {minX + 2, minZ + 2},
+                {maxX - 2, minZ + 2},
+                {minX + 2, maxZ - 2},
+                {maxX - 2, maxZ - 2},
+                {(minX + maxX) / 2, minZ + 1},
+                {(minX + maxX) / 2, maxZ - 1},
+                {minX + 1, (minZ + maxZ) / 2},
+                {maxX - 1, (minZ + maxZ) / 2}
+        };
+        for (int[] position : positions) {
+            Cell cell = nearestOpenCell(layout, position[0], position[1], cells);
+            if (cell != null) {
+                setBlock(startX + cell.x(), y + height, startZ + cell.z(), light);
+            }
+        }
+    }
+
+    private Cell nearestOpenCell(HallsLayout layout, int targetX, int targetZ, List<Cell> cells) {
+        Cell best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (Cell cell : cells) {
+            if (layout.at(cell.x(), cell.z()) != 'O') {
+                continue;
+            }
+            int distance = Math.abs(cell.x() - targetX) + Math.abs(cell.z() - targetZ);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = cell;
+            }
+        }
+        return best;
+    }
+
     private Location bossCenterLocation(HallsLayout layout, int roomStartX, int roomStartZ) {
         int minX = layout.width();
         int maxX = -1;
@@ -1736,10 +1790,19 @@ public final class HallsSession {
 
     private HallsLayout loadBossLayout(HallsScenario.FloorDefinition floorDefinition) {
         String layoutPath = floorDefinition.layout().isBlank() ? "special/final_floor_1.txt" : floorDefinition.layout();
+        File dataLayout = new File(dataFolder, "level/" + layoutPath);
         try {
-            return HallsLayoutLoader.load(new File(dataFolder, "level/" + layoutPath));
+            return HallsLayoutLoader.load(dataLayout);
         } catch (IOException ex) {
-            plugin.getLogger().warning("Failed to load Halls boss layout " + layoutPath
+            try (java.io.InputStream bundled = plugin.getResource("hallsOfCarnage/level/" + layoutPath)) {
+                if (bundled != null) {
+                    return HallsLayoutLoader.load(bundled);
+                }
+            } catch (IOException bundledEx) {
+                plugin.getLogger().warning("Failed to load bundled Halls boss layout " + layoutPath
+                        + " for session " + id + ": " + bundledEx.getMessage());
+            }
+            plugin.getLogger().warning("Failed to load Halls boss layout " + dataLayout
                     + " for session " + id + ": " + ex.getMessage());
             return new HallsLayout(List.of(
                     "OOOOOOOOOOO",
@@ -3535,13 +3598,8 @@ public final class HallsSession {
                 }
             }
         }
-        for (int z = 2; z < layout.depth(); z += 5) {
-            for (int x = 2; x < layout.width(); x += 5) {
-                if (layout.at(x, z) == 'O') {
-                    setBlock(startX + x, y + height, startZ + z, levelType.light());
-                }
-            }
-        }
+        placeBossArenaLights(layout, startX, y, startZ, levelType,
+                bossCenterLocation(layout, startX, startZ), height);
         if (random != null) {
             world.spawnParticle(Particle.DUST_PLUME,
                     new Location(world, startX + layout.width() / 2.0 + 0.5, y + 0.2, startZ + layout.depth() / 2.0 + 0.5),

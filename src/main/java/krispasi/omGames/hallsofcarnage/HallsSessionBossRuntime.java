@@ -446,6 +446,7 @@ final class HallsSessionBossRuntime {
     private void runXBlastAttack() {
         HallsBossType.Overdrive config = activeBoss.type().overdrive();
         activeBoss.setLastAttack(Attack.X_BLAST);
+        activeBoss.setXBlastYaw(random.nextFloat() * 360.0f);
         runXBlastChain(config, activeBoss.enraged() ? config.enragedXBlastChains() : 1);
     }
 
@@ -472,12 +473,40 @@ final class HallsSessionBossRuntime {
             return;
         }
         Location center = activeBoss.location().clone().add(0.0, 1.0, 0.0);
-        for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST)) {
+        for (Vector axis : xBlastAxes()) {
             for (double distance = 1.0; distance <= 12.0; distance += 0.75) {
-                Location point = center.clone().add(face.getModX() * distance, 0.0, face.getModZ() * distance);
-                world.spawnParticle(damaging ? Particle.FLAME : Particle.DUST_PLUME, point, 1, 0.08, 0.08, 0.08, 0.0);
+                Location positive = center.clone().add(axis.clone().multiply(distance));
+                Location negative = center.clone().add(axis.clone().multiply(-distance));
+                world.spawnParticle(damaging ? Particle.FLAME : Particle.DUST_PLUME, positive, 1, 0.08, 0.08, 0.08, 0.0);
+                world.spawnParticle(damaging ? Particle.FLAME : Particle.DUST_PLUME, negative, 1, 0.08, 0.08, 0.08, 0.0);
             }
         }
+    }
+
+    private List<Vector> xBlastAxes() {
+        if (activeBoss == null) {
+            return List.of(new Vector(1.0, 0.0, 0.0), new Vector(0.0, 0.0, 1.0));
+        }
+        double radians = Math.toRadians(activeBoss.xBlastYaw());
+        Vector first = new Vector(Math.cos(radians), 0.0, Math.sin(radians));
+        Vector second = new Vector(-first.getZ(), 0.0, first.getX());
+        return List.of(first, second);
+    }
+
+    private boolean isInsideXBlastBeam(Location playerLocation, Location center) {
+        Vector relative = playerLocation.toVector().subtract(center.toVector());
+        for (Vector axis : xBlastAxes()) {
+            double along = relative.dot(axis);
+            if (Math.abs(along) > 12.5) {
+                continue;
+            }
+            Vector closest = axis.clone().multiply(along);
+            Vector perpendicular = relative.clone().subtract(closest);
+            if (perpendicular.length() <= 1.25) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void fireXBlast(double damage) {
@@ -486,11 +515,7 @@ final class HallsSessionBossRuntime {
         Location center = activeBoss.location().clone().add(0.0, 1.0, 0.0);
         for (Player player : alivePlayers()) {
             Location playerLocation = player.getLocation();
-            double dx = Math.abs(playerLocation.getX() - center.getX());
-            double dz = Math.abs(playerLocation.getZ() - center.getZ());
-            boolean inNorthSouthBeam = dx <= 1.25 && dz <= 12.5;
-            boolean inEastWestBeam = dz <= 1.25 && dx <= 12.5;
-            if (Math.abs(playerLocation.getY() - center.getY()) <= 2.8 && (inNorthSouthBeam || inEastWestBeam)) {
+            if (Math.abs(playerLocation.getY() - center.getY()) <= 2.8 && isInsideXBlastBeam(playerLocation, center)) {
                 player.damage(damage);
             }
         }
@@ -1149,6 +1174,7 @@ final class HallsSessionBossRuntime {
         private boolean awaitingGroupClear;
         private int groupCooldownTicks;
         private double scaleMultiplier = 1.0;
+        private float xBlastYaw;
 
         private ActiveBoss(HallsBossType type,
                            Location location,
@@ -1324,6 +1350,14 @@ final class HallsSessionBossRuntime {
 
         private void setScaleMultiplier(double scaleMultiplier) {
             this.scaleMultiplier = Math.max(0.05, scaleMultiplier);
+        }
+
+        private float xBlastYaw() {
+            return xBlastYaw;
+        }
+
+        private void setXBlastYaw(float xBlastYaw) {
+            this.xBlastYaw = xBlastYaw;
         }
     }
 }
