@@ -130,8 +130,11 @@ overdrive:
     count:
       min: 1
       max: 3
+    max-alive: 3
+    minion-respawn-cooldown-seconds: 15.0
+    low-health-cooldown-multiplier: 2.0
     pool:
-      splinter: 3
+      old_bones: 3
       zombie: 3
       vindicator: 2
       husk: 2
@@ -140,10 +143,21 @@ overdrive:
   jump:
     ready-seconds: 0.5
     cooldown-seconds: 1.0
+    chain:
+      normal:
+        min: 2
+        max: 4
+      enraged:
+        min: 3
+        max: 5
     shockwave-damage: 6.0
     shockwave-speed-blocks-per-second: 4.0
   x-blast:
     move-seconds: 1.0
     charge-seconds: 2.0
     cooldown-seconds: 2.0
+    enraged-chains: 3
     damage: 8.0
+  phase:
+    initial-scale-multiplier: 0.8
+    enraged-scale-multiplier: 1.0

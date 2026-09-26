@@ -89,6 +89,16 @@ record HallsBossType(
                      int maxSpawnCount,
                      double shockwaveDamage,
                      double shockwaveSpeedBlocksPerSecond,
+                     int maxAliveMinions,
+                     int minionRespawnCooldownTicks,
+                     double lowHealthMinionCooldownMultiplier,
+                     double initialScaleMultiplier,
+                     double enragedScaleMultiplier,
+                     int normalShockwaveChainMin,
+                     int normalShockwaveChainMax,
+                     int enragedShockwaveChainMin,
+                     int enragedShockwaveChainMax,
+                     int enragedXBlastChains,
                      double xBlastDamage,
                      List<WeightedMonster> spawnPool) {
         Overdrive {
@@ -103,13 +113,26 @@ record HallsBossType(
             maxSpawnCount = Math.max(minSpawnCount, maxSpawnCount);
             shockwaveDamage = Math.max(0.0, shockwaveDamage);
             shockwaveSpeedBlocksPerSecond = Math.max(0.5, shockwaveSpeedBlocksPerSecond);
+            maxAliveMinions = Math.max(0, maxAliveMinions);
+            minionRespawnCooldownTicks = Math.max(1, minionRespawnCooldownTicks);
+            lowHealthMinionCooldownMultiplier = Math.max(1.0, lowHealthMinionCooldownMultiplier);
+            initialScaleMultiplier = Math.max(0.05, initialScaleMultiplier);
+            enragedScaleMultiplier = Math.max(0.05, enragedScaleMultiplier);
+            normalShockwaveChainMin = Math.max(1, normalShockwaveChainMin);
+            normalShockwaveChainMax = Math.max(normalShockwaveChainMin, normalShockwaveChainMax);
+            enragedShockwaveChainMin = Math.max(1, enragedShockwaveChainMin);
+            enragedShockwaveChainMax = Math.max(enragedShockwaveChainMin, enragedShockwaveChainMax);
+            enragedXBlastChains = Math.max(1, enragedXBlastChains);
             xBlastDamage = Math.max(0.0, xBlastDamage);
             spawnPool = spawnPool == null ? List.of() : List.copyOf(spawnPool);
         }
 
         static Overdrive defaults() {
             return new Overdrive(60, 140, 10, 20, 20, 40, 40,
-                    3, 5, 6.0, 4.0, 8.0,
+                    3, 5, 6.0, 4.0,
+                    3, 300, 2.0, 0.8, 1.0,
+                    2, 4, 3, 5, 3,
+                    8.0,
                     List.of(
                             new WeightedMonster("splinter", 3),
                             new WeightedMonster("zombie", 3),

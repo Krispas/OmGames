@@ -246,23 +246,32 @@ final class HallsSessionMonsterRuntime {
     }
 
     boolean spawnConfiguredMonster(String monsterId, Location location) {
+        return spawnConfiguredMonsterEntity(monsterId, location) != null;
+    }
+
+    UUID spawnBossMinion(String monsterId, Location location) {
+        LivingEntity living = spawnConfiguredMonsterEntity(monsterId, location);
+        return living == null ? null : living.getUniqueId();
+    }
+
+    private LivingEntity spawnConfiguredMonsterEntity(String monsterId, Location location) {
         if (monsterId == null || location == null || !world.equals(location.getWorld())) {
-            return false;
+            return null;
         }
         HallsMonsterType type = monsterTypes.get(normalizeId(monsterId));
         if (type == null) {
-            return false;
+            return null;
         }
         Entity entity = world.spawnEntity(location, type.entityType());
         if (!(entity instanceof LivingEntity living)) {
             entity.remove();
-            return false;
+            return null;
         }
         configureLivingMonster(living, type);
         spawnedMonsters.add(living.getUniqueId());
         spawnedThisFloor++;
         maxAlive++;
-        return true;
+        return living;
     }
 
     private void spawnDeathChildren(LivingEntity entity) {

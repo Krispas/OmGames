@@ -233,7 +233,7 @@ public final class HallsSession {
                 () -> activeFloorModifiers.trapDamageMultiplier(),
                 location -> dropSessionItem(location, coinItem(1)), monsterRuntime::spawnConfiguredMonster);
         this.bossRuntime = new HallsSessionBossRuntime(plugin, world, participants, this.bossTypes,
-                this::isAliveParticipant, monsterRuntime::spawnConfiguredMonster,
+                this::isAliveParticipant, monsterRuntime::spawnBossMinion,
                 this::setBlock, monsterRuntime::removeAllForBossDefeat, this::unlockBossFloorExit);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
                 type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
@@ -856,10 +856,16 @@ public final class HallsSession {
     }
 
     public boolean handleWeaponHit(Player player, Entity target, EntityDamageByEntityEvent event) {
-        if (event != null && bossRuntime.handleProjectileHit(player, target, eventDamageWithProjectileMetadata(event))) {
-            applyBossProjectileEffects(player, event.getDamager());
-            event.setCancelled(true);
-            return true;
+        if (event != null) {
+            HallsSessionBossRuntime.AttackResult bossProjectileAttack =
+                    bossRuntime.handleProjectileHit(player, target, eventDamageWithProjectileMetadata(event));
+            if (bossProjectileAttack.damaged()) {
+                applyBossProjectileEffects(player, event.getDamager());
+            }
+            if (bossProjectileAttack.handled()) {
+                event.setCancelled(true);
+                return true;
+            }
         }
         if (player == null || target == null || !running || !participants.contains(player.getUniqueId())
                 || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())
@@ -1227,6 +1233,7 @@ public final class HallsSession {
             int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("poison_amplifier", 1.0)) - 1);
             bossRuntime.applyPoison(player, poisonTicks, amplifier);
         }
+        damageUtilityItem(player, player.getInventory().getItemInMainHand(), type);
     }
 
     public void handleProjectileHit(Player player, ProjectileHitEvent event) {
@@ -1241,8 +1248,12 @@ public final class HallsSession {
         }
         double damage = projectileDouble(projectile, PROJECTILE_DAMAGE_KEY, 0.0);
         Entity hitEntity = event.getHitEntity();
-        if (damage > 0.0 && hitEntity != null && bossRuntime.handleProjectileHit(player, hitEntity, damage)) {
-            applyBossProjectileEffects(player, projectile);
+        if (damage > 0.0 && hitEntity != null) {
+            HallsSessionBossRuntime.AttackResult bossProjectileAttack =
+                    bossRuntime.handleProjectileHit(player, hitEntity, damage);
+            if (bossProjectileAttack.damaged()) {
+                applyBossProjectileEffects(player, projectile);
+            }
         }
         applyProjectileAreaEffect(player, projectile.getLocation(), projectile);
     }

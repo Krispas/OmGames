@@ -158,6 +158,16 @@ final class HallsBossTypeLoader {
                 Math.max(1, section.getInt("spawn.count.max", defaults.maxSpawnCount())),
                 section.getDouble("jump.shockwave-damage", defaults.shockwaveDamage()),
                 section.getDouble("jump.shockwave-speed-blocks-per-second", defaults.shockwaveSpeedBlocksPerSecond()),
+                Math.max(0, section.getInt("spawn.max-alive", defaults.maxAliveMinions())),
+                seconds(section, "spawn.minion-respawn-cooldown-seconds", defaults.minionRespawnCooldownTicks()),
+                section.getDouble("spawn.low-health-cooldown-multiplier", defaults.lowHealthMinionCooldownMultiplier()),
+                section.getDouble("phase.initial-scale-multiplier", defaults.initialScaleMultiplier()),
+                section.getDouble("phase.enraged-scale-multiplier", defaults.enragedScaleMultiplier()),
+                Math.max(1, section.getInt("jump.chain.normal.min", defaults.normalShockwaveChainMin())),
+                Math.max(1, section.getInt("jump.chain.normal.max", defaults.normalShockwaveChainMax())),
+                Math.max(1, section.getInt("jump.chain.enraged.min", defaults.enragedShockwaveChainMin())),
+                Math.max(1, section.getInt("jump.chain.enraged.max", defaults.enragedShockwaveChainMax())),
+                Math.max(1, section.getInt("x-blast.enraged-chains", defaults.enragedXBlastChains())),
                 section.getDouble("x-blast.damage", defaults.xBlastDamage()),
                 spawnPool(section.getConfigurationSection("spawn.pool"))
         );

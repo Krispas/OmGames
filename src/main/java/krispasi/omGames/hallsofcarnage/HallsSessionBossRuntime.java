@@ -1,12 +1,12 @@
 package krispasi.omGames.hallsofcarnage;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -45,7 +45,7 @@ final class HallsSessionBossRuntime {
     private final Set<UUID> participants;
     private final Map<String, HallsBossType> bossTypes;
     private final Predicate<UUID> aliveParticipantPredicate;
-    private final BiFunction<String, Location, Boolean> monsterSpawner;
+    private final MinionSpawner monsterSpawner;
     private final BlockSetter blockSetter;
     private final Runnable bossMinionClearCallback;
     private final Runnable defeatedCallback;
@@ -63,7 +63,7 @@ final class HallsSessionBossRuntime {
                             Set<UUID> participants,
                             Map<String, HallsBossType> bossTypes,
                             Predicate<UUID> aliveParticipantPredicate,
-                            BiFunction<String, Location, Boolean> monsterSpawner,
+                            MinionSpawner monsterSpawner,
                             BlockSetter blockSetter,
                             Runnable bossMinionClearCallback,
                             Runnable defeatedCallback) {
@@ -72,7 +72,7 @@ final class HallsSessionBossRuntime {
         this.participants = participants;
         this.bossTypes = bossTypes == null ? Map.of() : Map.copyOf(bossTypes);
         this.aliveParticipantPredicate = aliveParticipantPredicate == null ? id -> true : aliveParticipantPredicate;
-        this.monsterSpawner = monsterSpawner == null ? (id, location) -> false : monsterSpawner;
+        this.monsterSpawner = monsterSpawner == null ? (id, location) -> null : monsterSpawner;
         this.blockSetter = blockSetter == null ? (x, y, z, material, face) -> { } : blockSetter;
         this.bossMinionClearCallback = bossMinionClearCallback == null ? () -> { } : bossMinionClearCallback;
         this.defeatedCallback = defeatedCallback == null ? () -> { } : defeatedCallback;
@@ -96,6 +96,8 @@ final class HallsSessionBossRuntime {
         });
         activeBoss = new ActiveBoss(type, location.clone(), displayIds, hitbox.getUniqueId(), seal,
                 scaledHealth(type), scaledHealth(type));
+        activeBoss.setScaleMultiplier(type.overdrive().initialScaleMultiplier());
+        animateDisplays(activeBoss.yaw(), 0.0, new Vector());
         bossBar = Bukkit.createBossBar(type.name(), BarColor.RED, BarStyle.SEGMENTED_10);
         bossBar.setProgress(1.0);
         bossBar.setVisible(false);
@@ -128,15 +130,16 @@ final class HallsSessionBossRuntime {
                 : AttackResult.handledResult();
     }
 
-    boolean handleProjectileHit(Player shooter, Entity entity, double damage) {
+    AttackResult handleProjectileHit(Player shooter, Entity entity, double damage) {
         if (shooter == null || entity == null || activeBoss == null || !isBossEntity(entity) || !activeBoss.active()) {
-            return false;
+            return AttackResult.unhandledResult();
         }
         if (!participants.contains(shooter.getUniqueId()) || !aliveParticipantPredicate.test(shooter.getUniqueId())) {
-            return true;
+            return AttackResult.handledResult();
         }
-        damage(Math.max(1.0, damage), entity.getLocation(), false);
-        return true;
+        return damage(Math.max(1.0, damage), entity.getLocation(), false)
+                ? AttackResult.damagedResult()
+                : AttackResult.handledResult();
     }
 
     boolean handleAreaDamage(Player source, Location center, double radius, double damage) {
@@ -236,10 +239,18 @@ final class HallsSessionBossRuntime {
         if (!bypassInvulnerability && now < activeBoss.invulnerableUntilMillis()) {
             return false;
         }
+        pruneBossMinions();
+        if (activeBoss.hasLivingMinions()) {
+            Location center = activeBoss.location().clone().add(0.0, 2.5, 0.0);
+            world.spawnParticle(Particle.ENCHANT, center, 35, 2.1, 1.5, 2.1, 0.05);
+            world.playSound(center, Sound.BLOCK_BEACON_POWER_SELECT, 0.55f, 0.45f);
+            return false;
+        }
         if (!bypassInvulnerability) {
             activeBoss.setInvulnerableUntilMillis(now + DAMAGE_INVULNERABILITY_MILLIS);
         }
         activeBoss.setHealth(activeBoss.health() - amount);
+        checkEnrage();
         updateBossBar();
         Location center = activeBoss.location().clone().add(0.0, 2.5, 0.0);
         world.spawnParticle(Particle.CRIT, center, 18, HIT_FLASH_RADIUS, 1.4, HIT_FLASH_RADIUS, 0.05);
@@ -315,7 +326,10 @@ final class HallsSessionBossRuntime {
         if (activeBoss == null || !activeBoss.active()) {
             return;
         }
+        pruneBossMinions();
+        tickBossMinionCooldowns();
         refreshBossBarPlayers();
+        updateBossBar();
         activeBoss.setIdleTicks(activeBoss.idleTicks() + 1);
         double bob = Math.sin(activeBoss.idleTicks() / 8.0) * 0.04;
         animateDisplays("idle", activeBoss.idleTicks(), activeBoss.yaw(), bob, new Vector());
@@ -346,10 +360,6 @@ final class HallsSessionBossRuntime {
     }
 
     private Attack chooseAttack() {
-        if (activeBoss.lastAttack() == Attack.JUMP && activeBoss.health() <= activeBoss.maxHealth() * 0.5
-                && random.nextDouble() < 0.70) {
-            return Attack.JUMP;
-        }
         List<Attack> attacks = new ArrayList<>(List.of(Attack.SPAWN, Attack.JUMP, Attack.X_BLAST));
         if (activeBoss.lastAttack() != null && attacks.size() > 1) {
             attacks.remove(activeBoss.lastAttack());
@@ -359,22 +369,34 @@ final class HallsSessionBossRuntime {
 
     private void runSpawnAttack() {
         HallsBossType.Overdrive config = activeBoss.type().overdrive();
+        pruneBossMinions();
+        if (!canSpawnMinions(config)) {
+            scheduleNextAttack(config.spawnCooldownTicks());
+            return;
+        }
         activeBoss.setLastAttack(Attack.SPAWN);
         activeBoss.setAttackAnimationTicks(0);
+        world.playSound(activeBoss.location(), Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 1.0f, 0.65f);
         new TimedAttack(config.spawnChargeTicks(), () -> {
             activeBoss.setYaw(activeBoss.yaw() + 18.0f);
             Location center = activeBoss.location().clone().add(0.0, 2.7, 0.0);
             world.spawnParticle(Particle.ELECTRIC_SPARK, center, 5, 1.9, 1.4, 1.9, 0.04);
             animateDisplays("spawn_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.1, new Vector());
         }, () -> {
-            int count = config.minSpawnCount() + random.nextInt(config.maxSpawnCount() - config.minSpawnCount() + 1);
+            int count = spawnCount(config);
             for (int i = 0; i < count; i++) {
                 String monsterId = weightedMonster(activeBoss.type().weightedSpawnPool());
+                if (!canSpawnMonsterType(config, monsterId)) {
+                    continue;
+                }
                 Location spawn = activeBoss.location().clone().add(randomOffset(3.5), 0.2, randomOffset(3.5));
-                monsterSpawner.apply(monsterId, spawn);
-                world.spawnParticle(Particle.ELECTRIC_SPARK, spawn.clone().add(0.0, 0.8, 0.0), 16, 0.4, 0.5, 0.4, 0.02);
+                UUID minionId = monsterSpawner.spawn(monsterId, spawn);
+                if (minionId != null) {
+                    activeBoss.registerMinion(minionId, monsterId);
+                    world.spawnParticle(Particle.ELECTRIC_SPARK, spawn.clone().add(0.0, 0.8, 0.0), 16, 0.4, 0.5, 0.4, 0.02);
+                }
             }
-            world.playSound(activeBoss.location(), Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 1.3f, 1.25f);
+            world.playSound(activeBoss.location(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.3f, activeBoss.enraged() ? 0.75f : 1.05f);
             scheduleNextAttack(config.spawnCooldownTicks());
         });
     }
@@ -382,24 +404,44 @@ final class HallsSessionBossRuntime {
     private void runJumpAttack() {
         HallsBossType.Overdrive config = activeBoss.type().overdrive();
         activeBoss.setLastAttack(Attack.JUMP);
+        runJumpChain(config, jumpChainCount(config));
+    }
+
+    private void runJumpChain(HallsBossType.Overdrive config, int remaining) {
+        if (activeBoss == null || !activeBoss.active()) {
+            return;
+        }
         activeBoss.setAttackAnimationTicks(0);
+        world.playSound(activeBoss.location(), Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0f, 0.55f);
         new TimedAttack(config.jumpReadyTicks(), () -> {
             world.spawnParticle(Particle.DUST_PLUME, activeBoss.location().clone().add(0.0, 0.15, 0.0),
                     10, 1.7, 0.05, 1.7, 0.03);
             animateDisplays("jump_ready", activeBoss.attackAnimationTicks(), activeBoss.yaw(), -0.12, new Vector());
-        }, () -> new JumpSlam(config).runTaskTimer(plugin, 1L, 1L));
+        }, () -> new JumpSlam(config, remaining).runTaskTimer(plugin, 1L, 1L));
     }
 
     private void runXBlastAttack() {
         HallsBossType.Overdrive config = activeBoss.type().overdrive();
         activeBoss.setLastAttack(Attack.X_BLAST);
+        runXBlastChain(config, activeBoss.enraged() ? config.enragedXBlastChains() : 1);
+    }
+
+    private void runXBlastChain(HallsBossType.Overdrive config, int remaining) {
+        if (activeBoss == null || !activeBoss.active()) {
+            return;
+        }
         activeBoss.setAttackAnimationTicks(0);
+        world.playSound(activeBoss.location(), Sound.BLOCK_BEACON_POWER_SELECT, 1.1f, activeBoss.enraged() ? 0.55f : 0.75f);
         new TimedAttack(config.xBlastMoveTicks(), () -> {
             activeBoss.setYaw(activeBoss.yaw() + 24.0f);
             animateDisplays("x_blast_move", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.08, new Vector());
         }, () -> new TimedAttack(config.xBlastChargeTicks(), () -> renderXBlastWarning(false), () -> {
             fireXBlast(config.xBlastDamage());
-            scheduleNextAttack(config.xBlastCooldownTicks());
+            if (remaining > 1) {
+                runXBlastChain(config, remaining - 1);
+            } else {
+                scheduleNextAttack(config.xBlastCooldownTicks());
+            }
         }));
     }
 
@@ -430,6 +472,94 @@ final class HallsSessionBossRuntime {
                 player.damage(damage);
             }
         }
+    }
+
+    private void checkEnrage() {
+        if (activeBoss == null || activeBoss.enraged() || activeBoss.health() > activeBoss.maxHealth() * 0.5) {
+            return;
+        }
+        activeBoss.setEnraged(true);
+        world.playSound(activeBoss.location(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1.3f, 0.7f);
+        for (UUID playerId : participants) {
+            Player participant = Bukkit.getPlayer(playerId);
+            if (participant != null && participant.getWorld().equals(world)) {
+                participant.sendTitle("Overdrive", "The spawner overclocks.", 5, 45, 10);
+            }
+        }
+        new EnrageAnimation(activeBoss.type().overdrive()).runTaskTimer(plugin, 1L, 1L);
+    }
+
+    private void pruneBossMinions() {
+        if (activeBoss == null) {
+            return;
+        }
+        for (Map.Entry<UUID, String> entry : Map.copyOf(activeBoss.minions()).entrySet()) {
+            Entity entity = Bukkit.getEntity(entry.getKey());
+            if (entity != null && entity.isValid() && !entity.isDead()) {
+                continue;
+            }
+            activeBoss.removeMinion(entry.getKey());
+            activeBoss.startMinionCooldown(entry.getValue(), minionCooldownTicks(activeBoss.type().overdrive()));
+        }
+        if (activeBoss.enraged() && activeBoss.awaitingGroupClear() && !activeBoss.hasLivingMinions()) {
+            activeBoss.setAwaitingGroupClear(false);
+            activeBoss.setGroupCooldownTicks(minionCooldownTicks(activeBoss.type().overdrive()));
+        }
+    }
+
+    private void tickBossMinionCooldowns() {
+        if (activeBoss == null) {
+            return;
+        }
+        activeBoss.tickMinionCooldowns();
+        activeBoss.setGroupCooldownTicks(Math.max(0, activeBoss.groupCooldownTicks() - 1));
+    }
+
+    private boolean canSpawnMinions(HallsBossType.Overdrive config) {
+        if (activeBoss == null || config.maxAliveMinions() <= 0) {
+            return false;
+        }
+        if (activeBoss.hasLivingMinions() && activeBoss.minions().size() >= config.maxAliveMinions()) {
+            return false;
+        }
+        if (activeBoss.enraged()) {
+            return !activeBoss.awaitingGroupClear() && activeBoss.groupCooldownTicks() <= 0 && !activeBoss.hasLivingMinions();
+        }
+        return true;
+    }
+
+    private boolean canSpawnMonsterType(HallsBossType.Overdrive config, String monsterId) {
+        if (activeBoss == null || activeBoss.minions().size() >= config.maxAliveMinions()) {
+            return false;
+        }
+        return activeBoss.enraged() || activeBoss.minionCooldownTicks(normalizeId(monsterId)) <= 0;
+    }
+
+    private int spawnCount(HallsBossType.Overdrive config) {
+        int room = Math.max(0, config.maxAliveMinions() - activeBoss.minions().size());
+        if (room <= 0) {
+            return 0;
+        }
+        if (activeBoss.enraged()) {
+            activeBoss.setAwaitingGroupClear(true);
+            return room;
+        }
+        int rolled = config.minSpawnCount() + random.nextInt(config.maxSpawnCount() - config.minSpawnCount() + 1);
+        return Math.min(room, rolled);
+    }
+
+    private int minionCooldownTicks(HallsBossType.Overdrive config) {
+        int cooldown = config.minionRespawnCooldownTicks();
+        if (activeBoss != null && activeBoss.enraged()) {
+            cooldown = (int) Math.round(cooldown * config.lowHealthMinionCooldownMultiplier());
+        }
+        return Math.max(1, cooldown);
+    }
+
+    private int jumpChainCount(HallsBossType.Overdrive config) {
+        int min = activeBoss != null && activeBoss.enraged() ? config.enragedShockwaveChainMin() : config.normalShockwaveChainMin();
+        int max = activeBoss != null && activeBoss.enraged() ? config.enragedShockwaveChainMax() : config.normalShockwaveChainMax();
+        return min + random.nextInt(max - min + 1);
     }
 
     private List<Player> alivePlayers() {
@@ -557,9 +687,9 @@ final class HallsSessionBossRuntime {
                 display.setInterpolationDelay(1);
                 display.setTeleportDuration(2);
                 display.setTransformation(HallsDisplayTransforms.centeredBlock(
-                        part.scaleX() * pose.scaleX(),
-                        part.scaleY() * pose.scaleY(),
-                        part.scaleZ() * pose.scaleZ(),
+                        part.scaleX() * pose.scaleX() * activeBoss.scaleMultiplier(),
+                        part.scaleY() * pose.scaleY() * activeBoss.scaleMultiplier(),
+                        part.scaleZ() * pose.scaleZ() * activeBoss.scaleMultiplier(),
                         new Quaternionf().rotateY((float) Math.toRadians(yaw + pose.yawOffset()))));
             }
             index++;
@@ -631,7 +761,8 @@ final class HallsSessionBossRuntime {
             return;
         }
         bossBar.setProgress(Math.max(0.0, Math.min(1.0, activeBoss.health() / activeBoss.maxHealth())));
-        bossBar.setTitle(activeBoss.type().name() + " " + Math.max(0, (int) Math.ceil(activeBoss.health())) + " HP");
+        String shield = activeBoss.hasLivingMinions() ? " - Shielded" : "";
+        bossBar.setTitle(activeBoss.type().name() + " " + Math.max(0, (int) Math.ceil(activeBoss.health())) + " HP" + shield);
     }
 
     private double scaledHealth(HallsBossType type) {
@@ -681,6 +812,10 @@ final class HallsSessionBossRuntime {
         void setBlock(int x, int y, int z, Material material, BlockFace facing);
     }
 
+    interface MinionSpawner {
+        UUID spawn(String monsterId, Location location);
+    }
+
     record DoorSeal(int minX, int maxX, int y, int minZ, int maxZ, Material material) {
         Location center(World world) {
             return new Location(world, (minX + maxX) / 2.0 + 0.5, y + 1.5, (minZ + maxZ) / 2.0 + 0.5);
@@ -725,10 +860,12 @@ final class HallsSessionBossRuntime {
 
     private final class JumpSlam extends org.bukkit.scheduler.BukkitRunnable {
         private final HallsBossType.Overdrive config;
+        private final int remaining;
         private int ticks;
 
-        private JumpSlam(HallsBossType.Overdrive config) {
+        private JumpSlam(HallsBossType.Overdrive config, int remaining) {
             this.config = config;
+            this.remaining = remaining;
         }
 
         @Override
@@ -746,9 +883,13 @@ final class HallsSessionBossRuntime {
                 animateDisplays("jump_fall", ticks - 10, activeBoss.yaw(), (18 - ticks) / 8.0 * 3.0, new Vector());
                 return;
             }
-            world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 0.55f);
+            world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, activeBoss.enraged() ? 0.45f : 0.55f);
             new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond()).runTaskTimer(plugin, 1L, 2L);
-            scheduleNextAttack(config.jumpCooldownTicks());
+            if (remaining > 1) {
+                Bukkit.getScheduler().runTaskLater(plugin, () -> runJumpChain(config, remaining - 1), 12L);
+            } else {
+                scheduleNextAttack(config.jumpCooldownTicks());
+            }
             cancel();
         }
     }
@@ -806,6 +947,41 @@ final class HallsSessionBossRuntime {
             animateDisplays("retract", ticks, activeBoss.yaw() + ticks * 8.0f, -ticks / 20.0, new Vector());
             world.spawnParticle(Particle.SMOKE, activeBoss.location().clone().add(0.0, 0.5, 0.0),
                     8, 1.4, 0.2, 1.4, 0.03);
+        }
+    }
+
+    private final class EnrageAnimation extends org.bukkit.scheduler.BukkitRunnable {
+        private final HallsBossType.Overdrive config;
+        private int ticks;
+
+        private EnrageAnimation(HallsBossType.Overdrive config) {
+            this.config = config;
+        }
+
+        @Override
+        public void run() {
+            if (activeBoss == null || !activeBoss.active()) {
+                cancel();
+                return;
+            }
+            ticks++;
+            double progress = Math.min(1.0, ticks / 40.0);
+            double scale = config.initialScaleMultiplier()
+                    + (config.enragedScaleMultiplier() - config.initialScaleMultiplier()) * progress;
+            activeBoss.setScaleMultiplier(scale);
+            activeBoss.setYaw(activeBoss.yaw() + 16.0f);
+            animateDisplays("idle", activeBoss.idleTicks(), activeBoss.yaw(), Math.sin(ticks / 3.0) * 0.08, new Vector());
+            Location center = activeBoss.location().clone().add(0.0, 2.5, 0.0);
+            world.spawnParticle(Particle.ELECTRIC_SPARK, center, 16, 2.2, 1.8, 2.2, 0.08);
+            world.spawnParticle(Particle.TRIAL_SPAWNER_DETECTION, center, 5, 2.3, 1.8, 2.3, 0.0);
+            if (ticks % 10 == 0) {
+                world.playSound(center, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 1.0f, 0.55f + ticks / 100.0f);
+            }
+            if (ticks >= 40) {
+                activeBoss.setScaleMultiplier(config.enragedScaleMultiplier());
+                world.playSound(center, Sound.ENTITY_WITHER_SPAWN, 0.8f, 1.25f);
+                cancel();
+            }
         }
     }
 
@@ -871,6 +1047,12 @@ final class HallsSessionBossRuntime {
         private int attackAnimationTicks;
         private long invulnerableUntilMillis;
         private Attack lastAttack;
+        private final Map<UUID, String> minions = new HashMap<>();
+        private final Map<String, Integer> minionCooldownTicks = new HashMap<>();
+        private boolean enraged;
+        private boolean awaitingGroupClear;
+        private int groupCooldownTicks;
+        private double scaleMultiplier = 1.0;
 
         private ActiveBoss(HallsBossType type,
                            Location location,
@@ -974,6 +1156,78 @@ final class HallsSessionBossRuntime {
 
         private void setLastAttack(Attack lastAttack) {
             this.lastAttack = lastAttack;
+        }
+
+        private Map<UUID, String> minions() {
+            return minions;
+        }
+
+        private void registerMinion(UUID entityId, String monsterId) {
+            if (entityId != null) {
+                minions.put(entityId, normalizeId(monsterId));
+            }
+        }
+
+        private void removeMinion(UUID entityId) {
+            minions.remove(entityId);
+        }
+
+        private boolean hasLivingMinions() {
+            return !minions.isEmpty();
+        }
+
+        private void startMinionCooldown(String monsterId, int ticks) {
+            String normalized = normalizeId(monsterId);
+            if (!normalized.isBlank()) {
+                minionCooldownTicks.put(normalized, Math.max(1, ticks));
+            }
+        }
+
+        private int minionCooldownTicks(String monsterId) {
+            return minionCooldownTicks.getOrDefault(normalizeId(monsterId), 0);
+        }
+
+        private void tickMinionCooldowns() {
+            for (Map.Entry<String, Integer> entry : Map.copyOf(minionCooldownTicks).entrySet()) {
+                int next = entry.getValue() - 1;
+                if (next <= 0) {
+                    minionCooldownTicks.remove(entry.getKey());
+                } else {
+                    minionCooldownTicks.put(entry.getKey(), next);
+                }
+            }
+        }
+
+        private boolean enraged() {
+            return enraged;
+        }
+
+        private void setEnraged(boolean enraged) {
+            this.enraged = enraged;
+        }
+
+        private boolean awaitingGroupClear() {
+            return awaitingGroupClear;
+        }
+
+        private void setAwaitingGroupClear(boolean awaitingGroupClear) {
+            this.awaitingGroupClear = awaitingGroupClear;
+        }
+
+        private int groupCooldownTicks() {
+            return groupCooldownTicks;
+        }
+
+        private void setGroupCooldownTicks(int groupCooldownTicks) {
+            this.groupCooldownTicks = Math.max(0, groupCooldownTicks);
+        }
+
+        private double scaleMultiplier() {
+            return scaleMultiplier;
+        }
+
+        private void setScaleMultiplier(double scaleMultiplier) {
+            this.scaleMultiplier = Math.max(0.05, scaleMultiplier);
         }
     }
 }
