@@ -31,6 +31,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 import org.joml.Quaternionf;
@@ -379,13 +380,35 @@ final class HallsSessionBossRuntime {
         }
         Attack attack = chooseAttack();
         switch (attack) {
-            case SPAWN -> runSpawnAttack();
-            case JUMP -> runJumpAttack();
+            case SPAWN -> {
+                if (isArchaicGuard()) {
+                    runArchaicSpawnAttack();
+                } else {
+                    runSpawnAttack();
+                }
+            }
+            case JUMP -> {
+                if (isArchaicGuard()) {
+                    runArchaicShockwaveAttack();
+                } else {
+                    runJumpAttack();
+                }
+            }
             case X_BLAST -> runXBlastAttack();
+            case MISSILE -> runMissileAttack();
+            case WALLS -> runWallAttack();
+            case REPOSITION -> runRepositionAttack();
         }
     }
 
     private Attack chooseAttack() {
+        if (isArchaicGuard()) {
+            List<Attack> attacks = new ArrayList<>(List.of(Attack.MISSILE, Attack.JUMP, Attack.WALLS, Attack.SPAWN, Attack.REPOSITION));
+            if (activeBoss.lastAttack() != null && attacks.size() > 1) {
+                attacks.remove(activeBoss.lastAttack());
+            }
+            return attacks.get(random.nextInt(attacks.size()));
+        }
         List<Attack> attacks = new ArrayList<>(List.of(Attack.SPAWN, Attack.JUMP, Attack.X_BLAST));
         if (activeBoss.lastAttack() != null && attacks.size() > 1) {
             attacks.remove(activeBoss.lastAttack());
@@ -397,6 +420,10 @@ final class HallsSessionBossRuntime {
             attacks.add(Attack.SPAWN);
         }
         return attacks.get(random.nextInt(attacks.size()));
+    }
+
+    private boolean isArchaicGuard() {
+        return activeBoss != null && normalizeId(activeBoss.type().ai()).equals("archaic_guard");
     }
 
     private void runSpawnAttack() {
@@ -476,6 +503,183 @@ final class HallsSessionBossRuntime {
         }));
     }
 
+    private void runMissileAttack() {
+        HallsBossType.ArchaicGuard config = activeBoss.type().archaicGuard();
+        activeBoss.setLastAttack(Attack.MISSILE);
+        runMissileChain(config, activeBoss.enraged() ? 2 : 1);
+    }
+
+    private void runMissileChain(HallsBossType.ArchaicGuard config, int remaining) {
+        if (activeBoss == null || !activeBoss.active()) {
+            return;
+        }
+        activeBoss.setAttackAnimationTicks(0);
+        final Location[] target = {nearestAlivePlayerLocation()};
+        new TimedAttack(config.missileAimTicks(), () -> {
+            activeBoss.setYaw(activeBoss.yaw() + 6.0f);
+            Location next = nearestAlivePlayerLocation();
+            if (next != null) {
+                target[0] = next;
+            }
+            renderMissileTelegraph(target[0], false);
+            animateDisplays("missile_aim", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.05, new Vector());
+        }, () -> {
+            Location locked = target[0] == null ? activeBoss.location().clone() : target[0].clone();
+            new TimedAttack(config.missileLockTicks(), () -> {
+                renderMissileTelegraph(locked, true);
+                animateDisplays("missile_lock", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.08, new Vector());
+            }, () -> {
+                fireMissile(locked, config.missileRadius(), config.missileDamage());
+                if (remaining > 1) {
+                    runMissileChain(config, remaining - 1);
+                } else {
+                    scheduleNextAttack(config.missileCooldownTicks());
+                }
+            });
+        });
+    }
+
+    private void renderMissileTelegraph(Location target, boolean locked) {
+        if (target == null) {
+            return;
+        }
+        Particle particle = locked ? Particle.FLAME : Particle.CRIT;
+        world.spawnParticle(particle, target.clone().add(0.0, 0.15, 0.0), locked ? 18 : 9,
+                locked ? 0.55 : 0.25, 0.04, locked ? 0.55 : 0.25, 0.01);
+        if (activeBoss != null) {
+            Location face = activeBoss.location().clone().add(0.0, 2.8, 0.0);
+            Vector delta = target.toVector().subtract(face.toVector());
+            if (delta.lengthSquared() > 0.01) {
+                Vector step = delta.normalize().multiply(0.55);
+                Location point = face.clone();
+                for (int i = 0; i < 10; i++) {
+                    point.add(step);
+                    world.spawnParticle(Particle.ELECTRIC_SPARK, point, 1, 0.03, 0.03, 0.03, 0.0);
+                }
+            }
+        }
+    }
+
+    private void fireMissile(Location target, double radius, double damage) {
+        world.spawnParticle(Particle.EXPLOSION, target, 2, 0.2, 0.2, 0.2, 0.0);
+        world.spawnParticle(Particle.FLAME, target, 70, radius * 0.35, 0.25, radius * 0.35, 0.04);
+        world.playSound(target, Sound.ENTITY_GENERIC_EXPLODE, 1.1f, 1.0f);
+        double radiusSquared = radius * radius;
+        for (Player player : alivePlayers()) {
+            if (player.getLocation().distanceSquared(target) <= radiusSquared) {
+                player.damage(damage);
+            }
+        }
+    }
+
+    private void runArchaicShockwaveAttack() {
+        HallsBossType.ArchaicGuard config = activeBoss.type().archaicGuard();
+        activeBoss.setLastAttack(Attack.JUMP);
+        runArchaicShockwaveChain(config, archaicShockwaveCount(config));
+    }
+
+    private void runArchaicShockwaveChain(HallsBossType.ArchaicGuard config, int remaining) {
+        if (activeBoss == null || !activeBoss.active()) {
+            return;
+        }
+        activeBoss.setAttackAnimationTicks(0);
+        new TimedAttack(config.shockwaveChargeTicks(), () -> {
+            Location ground = activeBoss.location().clone().add(0.0, 0.15, 0.0);
+            world.spawnParticle(Particle.ELECTRIC_SPARK, ground, 12, 0.6, 0.08, 0.6, 0.05);
+            animateDisplays("shockwave_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw(), -0.05, new Vector());
+        }, () -> {
+            world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 0.65f);
+            new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond()).runTaskTimer(plugin, 1L, 2L);
+            if (remaining > 1) {
+                Bukkit.getScheduler().runTaskLater(plugin, () -> runArchaicShockwaveChain(config, remaining - 1), 20L);
+            } else {
+                scheduleNextAttack(config.shockwaveCooldownTicks());
+            }
+        });
+    }
+
+    private void runWallAttack() {
+        HallsBossType.ArchaicGuard config = activeBoss.type().archaicGuard();
+        activeBoss.setLastAttack(Attack.WALLS);
+        runWallChain(config, archaicWallCount(config));
+    }
+
+    private void runWallChain(HallsBossType.ArchaicGuard config, int remaining) {
+        if (activeBoss == null || !activeBoss.active()) {
+            return;
+        }
+        activeBoss.setAttackAnimationTicks(0);
+        double rotation = random.nextDouble() * 360.0;
+        double safeDegrees = activeBoss.enraged() ? config.enragedWallSafeDegrees() : config.normalWallSafeDegrees();
+        new TimedAttack(config.wallChargeTicks(), () -> {
+            world.spawnParticle(Particle.EXPLOSION, activeBoss.location().clone().add(0.0, 2.2, 0.0),
+                    1, 1.8, 1.1, 1.8, 0.0);
+            renderWallWarning(rotation, safeDegrees, false);
+            animateDisplays("wall_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw() + activeBoss.attackAnimationTicks() * 5.0f,
+                    0.04, new Vector());
+        }, () -> {
+            new WallWave(config.wallDamage(), config.wallSpeedBlocksPerSecond(), rotation, safeDegrees).runTaskTimer(plugin, 1L, 2L);
+            if (remaining > 1) {
+                Bukkit.getScheduler().runTaskLater(plugin, () -> runWallChain(config, remaining - 1), config.wallGapTicks());
+            } else {
+                scheduleNextAttack(config.wallCooldownTicks());
+            }
+        });
+    }
+
+    private void renderWallWarning(double rotationDegrees, double safeDegrees, boolean damaging) {
+        if (activeBoss == null) {
+            return;
+        }
+        Location center = activeBoss.location().clone().add(0.0, 0.12, 0.0);
+        for (double radius = 2.0; radius <= 11.5; radius += 1.5) {
+            for (double degrees = 0.0; degrees < 360.0; degrees += 8.0) {
+                if (isSafeWallAngle(degrees, rotationDegrees, safeDegrees)) {
+                    continue;
+                }
+                double radians = Math.toRadians(degrees);
+                Location point = center.clone().add(Math.cos(radians) * radius, 0.0, Math.sin(radians) * radius);
+                world.spawnParticle(damaging ? Particle.FLAME : Particle.DUST_PLUME, point, 1, 0.02, 0.02, 0.02, 0.0);
+            }
+        }
+    }
+
+    private void runArchaicSpawnAttack() {
+        HallsBossType.ArchaicGuard config = activeBoss.type().archaicGuard();
+        activeBoss.setLastAttack(Attack.SPAWN);
+        activeBoss.setAttackAnimationTicks(0);
+        new TimedAttack(config.spawnRiseTicks(), () -> {
+            double progress = activeBoss.attackAnimationTicks() / (double) config.spawnRiseTicks();
+            animateDisplays("spawn_slam", activeBoss.attackAnimationTicks(), activeBoss.yaw(), Math.sin(progress * Math.PI) * 2.0, new Vector());
+            world.spawnParticle(Particle.CLOUD, activeBoss.location().clone().add(0.0, 0.15, 0.0), 6, 1.5, 0.08, 1.5, 0.02);
+        }, () -> {
+            int count = config.minSpawnCount() + random.nextInt(config.maxSpawnCount() - config.minSpawnCount() + 1);
+            for (int i = 0; i < count; i++) {
+                String monsterId = weightedMonster(activeBoss.type().archaicSpawnPool(activeBoss.enraged()));
+                Location spawn = activeBoss.location().clone().add(randomOffset(4.0), 5.0, randomOffset(4.0));
+                world.spawnParticle(Particle.EXPLOSION, spawn, 1, 0.35, 0.35, 0.35, 0.0);
+                UUID minionId = monsterSpawner.spawn(monsterId, spawn);
+                if (minionId != null) {
+                    activeBoss.registerMinion(minionId, monsterId);
+                    if (!activeBoss.enraged() && normalizeId(monsterId).equals("bedrock_walker")) {
+                        halveMonsterHealth(minionId);
+                    }
+                }
+            }
+            world.playSound(activeBoss.location(), Sound.ENTITY_IRON_GOLEM_ATTACK, 1.1f, 0.6f);
+            scheduleNextAttack(config.spawnCooldownTicks());
+        });
+    }
+
+    private void runRepositionAttack() {
+        HallsBossType.ArchaicGuard config = activeBoss.type().archaicGuard();
+        activeBoss.setLastAttack(Attack.REPOSITION);
+        Location from = activeBoss.location().clone();
+        Location target = randomBossArenaLocation(config.repositionRadius());
+        PotionEffectType effect = activeBoss.enraged() ? PotionEffectType.WITHER : PotionEffectType.POISON;
+        new RepositionMove(from, target, config, effect).runTaskTimer(plugin, 1L, 1L);
+    }
+
     private void renderXBlastWarning(boolean damaging) {
         if (activeBoss == null) {
             return;
@@ -530,19 +734,36 @@ final class HallsSessionBossRuntime {
     }
 
     private void checkEnrage() {
-        if (activeBoss == null || activeBoss.enraged() || activeBoss.health() > activeBoss.maxHealth() * 0.5) {
+        if (activeBoss == null || activeBoss.enraged() || activeBoss.health() > activeBoss.maxHealth() * enrageThreshold()) {
             return;
         }
         activeBoss.setEnraged(true);
+        activeBoss.setAttackGeneration(activeBoss.attackGeneration() + 1);
+        if (attackTask != null) {
+            attackTask.cancel();
+            attackTask = null;
+        }
         updateHitboxSize();
-        world.playSound(activeBoss.location(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1.3f, 0.7f);
+        world.playSound(activeBoss.location(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1.3f, isArchaicGuard() ? 0.45f : 0.7f);
         for (UUID playerId : participants) {
             Player participant = Bukkit.getPlayer(playerId);
             if (participant != null && participant.getWorld().equals(world)) {
-                participant.sendTitle("Overdrive", "The spawner overclocks.", 5, 45, 10);
+                participant.sendTitle(isArchaicGuard() ? "Ancient Protocol" : "Overdrive",
+                        isArchaicGuard() ? "The guard vents corrupted fumes." : "The spawner overclocks.",
+                        5, 45, 10);
             }
         }
+        world.spawnParticle(isArchaicGuard() ? Particle.SCULK_SOUL : Particle.ELECTRIC_SPARK,
+                activeBoss.location().clone().add(0.0, 2.3, 0.0), 100, 2.3, 1.7, 2.3, 0.08);
         new EnrageAnimation(activeBoss.type().overdrive()).runTaskTimer(plugin, 1L, 1L);
+        scheduleNextAttackUnscaled(50L);
+    }
+
+    private double enrageThreshold() {
+        if (isArchaicGuard()) {
+            return activeBoss.type().archaicGuard().phaseThreshold();
+        }
+        return 0.5;
     }
 
     private void pruneBossMinions() {
@@ -627,6 +848,63 @@ final class HallsSessionBossRuntime {
         int min = activeBoss != null && activeBoss.enraged() ? config.enragedShockwaveChainMin() : config.normalShockwaveChainMin();
         int max = activeBoss != null && activeBoss.enraged() ? config.enragedShockwaveChainMax() : config.normalShockwaveChainMax();
         return min + random.nextInt(max - min + 1);
+    }
+
+    private int archaicShockwaveCount(HallsBossType.ArchaicGuard config) {
+        int min = activeBoss != null && activeBoss.enraged() ? config.enragedShockwaveMin() : config.normalShockwaveMin();
+        int max = activeBoss != null && activeBoss.enraged() ? config.enragedShockwaveMax() : config.normalShockwaveMax();
+        return min + random.nextInt(max - min + 1);
+    }
+
+    private int archaicWallCount(HallsBossType.ArchaicGuard config) {
+        int min = activeBoss != null && activeBoss.enraged() ? config.enragedWallMin() : config.normalWallMin();
+        int max = activeBoss != null && activeBoss.enraged() ? config.enragedWallMax() : config.normalWallMax();
+        return min + random.nextInt(max - min + 1);
+    }
+
+    private Location nearestAlivePlayerLocation() {
+        if (activeBoss == null) {
+            return null;
+        }
+        Player nearest = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (Player player : alivePlayers()) {
+            double distance = player.getLocation().distanceSquared(activeBoss.location());
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                nearest = player;
+            }
+        }
+        return nearest == null ? null : nearest.getLocation().clone();
+    }
+
+    private Location randomBossArenaLocation(double radius) {
+        if (activeBoss == null) {
+            return null;
+        }
+        Location origin = activeBoss.location();
+        double angle = random.nextDouble() * Math.PI * 2.0;
+        double distance = Math.max(2.0, radius * (0.35 + random.nextDouble() * 0.65));
+        return origin.clone().add(Math.cos(angle) * distance, 0.0, Math.sin(angle) * distance);
+    }
+
+    private void halveMonsterHealth(UUID minionId) {
+        Entity entity = Bukkit.getEntity(minionId);
+        if (entity instanceof org.bukkit.entity.LivingEntity living) {
+            org.bukkit.attribute.AttributeInstance maxHealth = living.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH);
+            if (maxHealth != null) {
+                double next = Math.max(1.0, maxHealth.getBaseValue() * 0.5);
+                maxHealth.setBaseValue(next);
+                living.setHealth(Math.min(living.getHealth(), next));
+            }
+        }
+    }
+
+    private boolean isSafeWallAngle(double angleDegrees, double rotationDegrees, double safeDegrees) {
+        double normalized = Math.floorMod((int) Math.round(angleDegrees - rotationDegrees), 360);
+        double segment = normalized % 60.0;
+        double distance = Math.min(segment, 60.0 - segment);
+        return distance <= safeDegrees * 0.5;
     }
 
     private List<Player> alivePlayers() {
@@ -963,13 +1241,17 @@ final class HallsSessionBossRuntime {
     private enum Attack {
         SPAWN,
         JUMP,
-        X_BLAST
+        X_BLAST,
+        MISSILE,
+        WALLS,
+        REPOSITION
     }
 
     private final class TimedAttack implements Runnable {
         private final int durationTicks;
         private final Runnable tickAction;
         private final Runnable finishedAction;
+        private final int generation;
         private int ticks;
         private BukkitTask task;
 
@@ -977,12 +1259,13 @@ final class HallsSessionBossRuntime {
             this.durationTicks = Math.max(1, durationTicks);
             this.tickAction = tickAction;
             this.finishedAction = finishedAction;
+            this.generation = activeBoss == null ? 0 : activeBoss.attackGeneration();
             this.task = Bukkit.getScheduler().runTaskTimer(plugin, this, 1L, 1L);
         }
 
         @Override
         public void run() {
-            if (activeBoss == null || !activeBoss.active()) {
+            if (activeBoss == null || !activeBoss.active() || activeBoss.attackGeneration() != generation) {
                 task.cancel();
                 return;
             }
@@ -1068,6 +1351,106 @@ final class HallsSessionBossRuntime {
             }
             radius += radiusStep;
             if (radius > 13.0) {
+                cancel();
+            }
+        }
+    }
+
+    private final class WallWave extends org.bukkit.scheduler.BukkitRunnable {
+        private final double damage;
+        private final double radiusStep;
+        private final double rotationDegrees;
+        private final double safeDegrees;
+        private final Set<UUID> hit = new java.util.HashSet<>();
+        private double radius = 1.0;
+
+        private WallWave(double damage, double speedBlocksPerSecond, double rotationDegrees, double safeDegrees) {
+            this.damage = damage;
+            this.radiusStep = Math.max(0.05, speedBlocksPerSecond * 2.0 / 20.0);
+            this.rotationDegrees = rotationDegrees;
+            this.safeDegrees = safeDegrees;
+        }
+
+        @Override
+        public void run() {
+            if (activeBoss == null) {
+                cancel();
+                return;
+            }
+            Location center = activeBoss.location().clone().add(0.0, 0.12, 0.0);
+            for (double degrees = 0.0; degrees < 360.0; degrees += 5.0) {
+                if (isSafeWallAngle(degrees, rotationDegrees, safeDegrees)) {
+                    continue;
+                }
+                double radians = Math.toRadians(degrees);
+                Location point = center.clone().add(Math.cos(radians) * radius, 0.0, Math.sin(radians) * radius);
+                world.spawnParticle(Particle.FLAME, point, 1, 0.03, 0.05, 0.03, 0.0);
+                world.spawnParticle(Particle.DUST_PLUME, point, 1, 0.03, 0.02, 0.03, 0.0);
+            }
+            for (Player player : alivePlayers()) {
+                if (hit.contains(player.getUniqueId())) {
+                    continue;
+                }
+                Vector relative = player.getLocation().toVector().subtract(center.toVector());
+                double horizontal = Math.hypot(relative.getX(), relative.getZ());
+                if (Math.abs(horizontal - radius) > 0.65) {
+                    continue;
+                }
+                double angle = Math.toDegrees(Math.atan2(relative.getZ(), relative.getX()));
+                if (isSafeWallAngle(angle, rotationDegrees, safeDegrees)) {
+                    continue;
+                }
+                hit.add(player.getUniqueId());
+                player.damage(damage);
+            }
+            radius += radiusStep;
+            if (radius > 13.0) {
+                cancel();
+            }
+        }
+    }
+
+    private final class RepositionMove extends org.bukkit.scheduler.BukkitRunnable {
+        private final Location from;
+        private final Location target;
+        private final HallsBossType.ArchaicGuard config;
+        private final PotionEffectType effect;
+        private final int generation;
+        private int ticks;
+
+        private RepositionMove(Location from, Location target, HallsBossType.ArchaicGuard config, PotionEffectType effect) {
+            this.from = from == null ? activeBoss.location().clone() : from;
+            this.target = target == null ? activeBoss.location().clone() : target;
+            this.config = config;
+            this.effect = effect;
+            this.generation = activeBoss == null ? 0 : activeBoss.attackGeneration();
+        }
+
+        @Override
+        public void run() {
+            if (activeBoss == null || !activeBoss.active() || activeBoss.attackGeneration() != generation) {
+                cancel();
+                return;
+            }
+            ticks++;
+            double progress = Math.min(1.0, ticks / (double) config.repositionTicks());
+            double eased = 1.0 - Math.pow(1.0 - progress, 2.0);
+            activeBoss.location().setX(from.getX() + (target.getX() - from.getX()) * eased);
+            activeBoss.location().setY(from.getY() + (target.getY() - from.getY()) * eased);
+            activeBoss.location().setZ(from.getZ() + (target.getZ() - from.getZ()) * eased);
+            activeBoss.setYaw(activeBoss.yaw() + 10.0f);
+            animateDisplays("reposition", ticks, activeBoss.yaw(), 0.18, new Vector());
+            Location cloud = activeBoss.location().clone().add(0.0, 0.1, 0.0);
+            if (ticks == 1 || ticks % 10 == 0) {
+                HallsPoisonClouds.spawn(plugin, world, null, cloud, config.cloudRadius(), config.cloudDurationTicks(), 10,
+                        effect, config.cloudEffectTicks(), 0, 0.0,
+                        living -> living instanceof Player player
+                                && participants.contains(player.getUniqueId())
+                                && aliveParticipantPredicate.test(player.getUniqueId()));
+            }
+            if (ticks >= config.repositionTicks()) {
+                world.playSound(activeBoss.location(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 0.75f);
+                scheduleNextAttack(config.repositionCooldownTicks());
                 cancel();
             }
         }
@@ -1195,6 +1578,7 @@ final class HallsSessionBossRuntime {
         private int summonReadyTicks;
         private double scaleMultiplier = 1.0;
         private float xBlastYaw;
+        private int attackGeneration;
 
         private ActiveBoss(HallsBossType type,
                            Location location,
@@ -1386,6 +1770,14 @@ final class HallsSessionBossRuntime {
 
         private void setXBlastYaw(float xBlastYaw) {
             this.xBlastYaw = xBlastYaw;
+        }
+
+        private int attackGeneration() {
+            return attackGeneration;
+        }
+
+        private void setAttackGeneration(int attackGeneration) {
+            this.attackGeneration = Math.max(0, attackGeneration);
         }
     }
 }

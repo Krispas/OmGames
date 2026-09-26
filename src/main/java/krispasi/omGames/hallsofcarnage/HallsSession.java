@@ -5026,53 +5026,9 @@ public final class HallsSession {
         int poisonTicks = Math.min(80, Math.max(40, cloudTicks / 2));
         int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("poison_amplifier", 1.0)) - 1);
         Location center = player.getLocation().clone();
-        spawnPoisonBombCloud(player, center, radius, Math.min(cloudTicks, 200), poisonTicks, amplifier, damage);
-        world.playSound(center, Sound.ENTITY_SPLASH_POTION_BREAK, 0.8f, 0.75f);
+        HallsPoisonClouds.spawn(plugin, world, player, center, radius, Math.min(cloudTicks, 200), 5,
+                PotionEffectType.POISON, poisonTicks, amplifier, damage, monsterRuntime::isSessionMonster);
         player.sendActionBar(Component.text("Poison vapor blooms from the bomb.", NamedTextColor.DARK_GREEN));
-    }
-
-    private void spawnPoisonBombCloud(Player source, Location center, double radius, int durationTicks, int poisonTicks, int amplifier, double damage) {
-        renderPoisonBombCloudPulse(center, radius, 0);
-        applyPoisonBombCloud(source, center, radius, poisonTicks, amplifier, damage);
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
-            private int ticks;
-
-            @Override
-            public void run() {
-                if (!running || world == null || ticks > durationTicks) {
-                    return;
-                }
-                renderPoisonBombCloudPulse(center, radius, ticks);
-                if (ticks % 20 == 0) {
-                    applyPoisonBombCloud(source, center, radius, poisonTicks, amplifier, damage);
-                }
-                ticks += 5;
-            }
-        }, 1L, 5L);
-        Bukkit.getScheduler().runTaskLater(plugin, task::cancel, durationTicks + 2L);
-    }
-
-    private void renderPoisonBombCloudPulse(Location center, double radius, int ticks) {
-        double pulse = 0.55 + Math.sin(ticks / 8.0) * 0.15;
-        Location waist = center.clone().add(0.0, 0.8, 0.0);
-        Location ground = center.clone().add(0.0, 0.2, 0.0);
-        world.spawnParticle(Particle.WITCH, waist, 85, radius * pulse, 0.45, radius * pulse, 0.02);
-        world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, waist, 70, radius * 0.5, 0.4, radius * 0.5, 0.025);
-        world.spawnParticle(Particle.SMOKE, ground, 45, radius * 0.45, 0.18, radius * 0.45, 0.01);
-        world.spawnParticle(Particle.CLOUD, ground, 25, radius * 0.35, 0.12, radius * 0.35, 0.01);
-    }
-
-    private void applyPoisonBombCloud(Player source, Location center, double radius, int poisonTicks, int amplifier, double damage) {
-        for (Entity nearby : world.getNearbyEntities(center, radius, radius, radius)) {
-            if (nearby instanceof LivingEntity living
-                    && monsterRuntime.isSessionMonster(living)
-                    && living.getLocation().distanceSquared(center) <= radius * radius) {
-                living.addPotionEffect(new PotionEffect(PotionEffectType.POISON, poisonTicks, amplifier, true, true, true));
-                if (damage > 0.0) {
-                    living.damage(damage, source);
-                }
-            }
-        }
     }
 
     private void activateLodestone(Player player, HallsItemType type) {

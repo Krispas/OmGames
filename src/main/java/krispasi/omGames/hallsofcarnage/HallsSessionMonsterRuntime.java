@@ -377,13 +377,11 @@ final class HallsSessionMonsterRuntime {
         if (location == null || !world.equals(location.getWorld())) {
             return;
         }
-        world.spawnParticle(org.bukkit.Particle.SPORE_BLOSSOM_AIR, location.clone().add(0.0, 0.8, 0.0), 65, 1.15, 0.45, 1.15, 0.04);
-        world.playSound(location, org.bukkit.Sound.ENTITY_SPLASH_POTION_BREAK, 0.55f, 0.8f);
-        for (Entity nearby : world.getNearbyEntities(location, 2.5, 2.0, 2.5)) {
-            if (nearby instanceof LivingEntity living && living.getLocation().distanceSquared(location) <= 2.5 * 2.5) {
-                living.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.POISON, 100, 0, true, true, true));
-            }
-        }
+        HallsPoisonClouds.spawn(plugin, world, null, location, 2.5, 100, 10,
+                org.bukkit.potion.PotionEffectType.POISON, 100, 0, 0.0,
+                living -> living instanceof Player player
+                        && participants.contains(player.getUniqueId())
+                        && aliveParticipantPredicate.test(player.getUniqueId()));
     }
 
     void alert(Location location) {

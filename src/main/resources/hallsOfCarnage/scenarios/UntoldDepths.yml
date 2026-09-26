@@ -1058,6 +1058,7 @@ floors:
     level-type: howling_corridors
     difficulty: 80
     layout: special/final_floor_1.txt
+    boss: archaic_guard
     enemy-pool:
       - zombie
       - skeleton

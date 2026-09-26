@@ -8,6 +8,7 @@ import org.bukkit.Sound;
 record HallsBossType(
         String id,
         String name,
+        String ai,
         double health,
         double multiplayerHpBoost,
         long directHitInvulnerabilityMillis,
@@ -16,11 +17,13 @@ record HallsBossType(
         List<DisplayPart> displayParts,
         Map<String, Animation> animations,
         Drops drops,
-        Overdrive overdrive
+        Overdrive overdrive,
+        ArchaicGuard archaicGuard
 ) {
     HallsBossType {
         id = normalize(id);
         name = name == null || name.isBlank() ? id : name;
+        ai = normalize(ai).isBlank() ? id : normalize(ai);
         health = Math.max(1.0, health);
         multiplayerHpBoost = Math.max(1.0, multiplayerHpBoost);
         directHitInvulnerabilityMillis = Math.max(0L, directHitInvulnerabilityMillis);
@@ -30,6 +33,7 @@ record HallsBossType(
         animations = animations == null ? Map.of() : Map.copyOf(animations);
         drops = drops == null ? Drops.defaults() : drops;
         overdrive = overdrive == null ? Overdrive.defaults() : overdrive;
+        archaicGuard = archaicGuard == null ? ArchaicGuard.defaults() : archaicGuard;
     }
 
     record DisplayPart(String id,
@@ -169,9 +173,105 @@ record HallsBossType(
         }
     }
 
+    record ArchaicGuard(int missileAimTicks,
+                        int missileLockTicks,
+                        int missileCooldownTicks,
+                        double missileDamage,
+                        double missileRadius,
+                        int shockwaveChargeTicks,
+                        int shockwaveCooldownTicks,
+                        int normalShockwaveMin,
+                        int normalShockwaveMax,
+                        int enragedShockwaveMin,
+                        int enragedShockwaveMax,
+                        double shockwaveDamage,
+                        double shockwaveSpeedBlocksPerSecond,
+                        int wallChargeTicks,
+                        int wallGapTicks,
+                        int wallCooldownTicks,
+                        int normalWallMin,
+                        int normalWallMax,
+                        int enragedWallMin,
+                        int enragedWallMax,
+                        double wallDamage,
+                        double wallSpeedBlocksPerSecond,
+                        double normalWallSafeDegrees,
+                        double enragedWallSafeDegrees,
+                        int spawnRiseTicks,
+                        int spawnCooldownTicks,
+                        int minSpawnCount,
+                        int maxSpawnCount,
+                        int repositionTicks,
+                        int repositionCooldownTicks,
+                        double repositionRadius,
+                        double cloudRadius,
+                        int cloudDurationTicks,
+                        int cloudEffectTicks,
+                        double phaseThreshold,
+                        List<WeightedMonster> normalSpawnPool,
+                        List<WeightedMonster> enragedSpawnPool) {
+        ArchaicGuard {
+            missileAimTicks = Math.max(1, missileAimTicks);
+            missileLockTicks = Math.max(1, missileLockTicks);
+            missileCooldownTicks = Math.max(1, missileCooldownTicks);
+            missileDamage = Math.max(0.0, missileDamage);
+            missileRadius = Math.max(0.5, missileRadius);
+            shockwaveChargeTicks = Math.max(1, shockwaveChargeTicks);
+            shockwaveCooldownTicks = Math.max(1, shockwaveCooldownTicks);
+            normalShockwaveMin = Math.max(1, normalShockwaveMin);
+            normalShockwaveMax = Math.max(normalShockwaveMin, normalShockwaveMax);
+            enragedShockwaveMin = Math.max(1, enragedShockwaveMin);
+            enragedShockwaveMax = Math.max(enragedShockwaveMin, enragedShockwaveMax);
+            shockwaveDamage = Math.max(0.0, shockwaveDamage);
+            shockwaveSpeedBlocksPerSecond = Math.max(0.5, shockwaveSpeedBlocksPerSecond);
+            wallChargeTicks = Math.max(1, wallChargeTicks);
+            wallGapTicks = Math.max(1, wallGapTicks);
+            wallCooldownTicks = Math.max(1, wallCooldownTicks);
+            normalWallMin = Math.max(1, normalWallMin);
+            normalWallMax = Math.max(normalWallMin, normalWallMax);
+            enragedWallMin = Math.max(1, enragedWallMin);
+            enragedWallMax = Math.max(enragedWallMin, enragedWallMax);
+            wallDamage = Math.max(0.0, wallDamage);
+            wallSpeedBlocksPerSecond = Math.max(0.5, wallSpeedBlocksPerSecond);
+            normalWallSafeDegrees = Math.max(1.0, normalWallSafeDegrees);
+            enragedWallSafeDegrees = Math.max(1.0, enragedWallSafeDegrees);
+            spawnRiseTicks = Math.max(1, spawnRiseTicks);
+            spawnCooldownTicks = Math.max(1, spawnCooldownTicks);
+            minSpawnCount = Math.max(1, minSpawnCount);
+            maxSpawnCount = Math.max(minSpawnCount, maxSpawnCount);
+            repositionTicks = Math.max(1, repositionTicks);
+            repositionCooldownTicks = Math.max(1, repositionCooldownTicks);
+            repositionRadius = Math.max(1.0, repositionRadius);
+            cloudRadius = Math.max(0.5, cloudRadius);
+            cloudDurationTicks = Math.max(5, cloudDurationTicks);
+            cloudEffectTicks = Math.max(20, cloudEffectTicks);
+            phaseThreshold = Math.max(0.05, Math.min(0.95, phaseThreshold));
+            normalSpawnPool = normalSpawnPool == null ? List.of() : List.copyOf(normalSpawnPool);
+            enragedSpawnPool = enragedSpawnPool == null ? List.of() : List.copyOf(enragedSpawnPool);
+        }
+
+        static ArchaicGuard defaults() {
+            return new ArchaicGuard(60, 20, 40, 10.0, 2.8,
+                    60, 40, 1, 3, 3, 5, 6.0, 4.0,
+                    60, 60, 100, 1, 3, 1, 3, 9.0, 4.0, 30.0, 24.0,
+                    40, 600, 1, 2,
+                    40, 60, 9.0, 2.4, 100, 80, 0.33,
+                    List.of(new WeightedMonster("bedrock_walker", 1)),
+                    List.of(new WeightedMonster("rotting_soldier", 1)));
+        }
+    }
+
     Map<String, Integer> weightedSpawnPool() {
+        return weightedPool(overdrive.spawnPool());
+    }
+
+    Map<String, Integer> archaicSpawnPool(boolean enraged) {
+        return weightedPool(enraged ? archaicGuard.enragedSpawnPool() : archaicGuard.normalSpawnPool());
+    }
+
+    private static Map<String, Integer> weightedPool(List<WeightedMonster> monsters) {
         java.util.LinkedHashMap<String, Integer> pool = new java.util.LinkedHashMap<>();
-        for (WeightedMonster monster : overdrive.spawnPool()) {
+        for (WeightedMonster monster : monsters) {
             if (!monster.monsterId().isBlank() && monster.weight() > 0) {
                 pool.put(monster.monsterId(), monster.weight());
             }

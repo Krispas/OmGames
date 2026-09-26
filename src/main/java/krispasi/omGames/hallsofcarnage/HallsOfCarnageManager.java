@@ -126,6 +126,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/traps/homing_mine.yml",
             "hallsOfCarnage/traps/enchanted_book.yml",
             "hallsOfCarnage/bosses/overdrive_spawner.yml",
+            "hallsOfCarnage/bosses/archaic_guard.yml",
             "hallsOfCarnage/monsters/zombie.yml",
             "hallsOfCarnage/monsters/creeper.yml",
             "hallsOfCarnage/monsters/creaking.yml",

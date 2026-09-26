@@ -47,6 +47,7 @@ final class HallsBossTypeLoader {
         return new HallsBossType(
                 normalizeId(config.getString("id", fallbackId)),
                 config.getString("name", fallbackId),
+                config.getString("ai", fallbackId),
                 config.getDouble("health", 150.0),
                 config.getDouble("multiplayer-hp-boost", 1.3),
                 directHitInvulnerabilityMillis(config),
@@ -55,7 +56,8 @@ final class HallsBossTypeLoader {
                 displayParts(config.getConfigurationSection("display.parts")),
                 animations(config.getConfigurationSection("animations")),
                 drops(config.getConfigurationSection("drops")),
-                overdrive(config.getConfigurationSection("overdrive"))
+                overdrive(config.getConfigurationSection("overdrive")),
+                archaicGuard(config.getConfigurationSection("archaic-guard"))
         );
     }
 
@@ -227,7 +229,7 @@ final class HallsBossTypeLoader {
                 Math.max(1, section.getInt("jump.chain.enraged.max", defaults.enragedShockwaveChainMax())),
                 Math.max(1, section.getInt("x-blast.enraged-chains", defaults.enragedXBlastChains())),
                 section.getDouble("x-blast.damage", defaults.xBlastDamage()),
-                spawnPool(section.getConfigurationSection("spawn.pool"))
+                spawnPool(section.getConfigurationSection("spawn.pool"), HallsBossType.Overdrive.defaults().spawnPool())
         );
     }
 
@@ -237,6 +239,52 @@ final class HallsBossTypeLoader {
             return defaults;
         }
         return new HallsBossType.Drops(section.getInt("random-scrap", defaults.randomScrap()));
+    }
+
+    private static HallsBossType.ArchaicGuard archaicGuard(ConfigurationSection section) {
+        HallsBossType.ArchaicGuard defaults = HallsBossType.ArchaicGuard.defaults();
+        if (section == null) {
+            return defaults;
+        }
+        return new HallsBossType.ArchaicGuard(
+                seconds(section, "missile.aim-seconds", defaults.missileAimTicks()),
+                seconds(section, "missile.lock-seconds", defaults.missileLockTicks()),
+                seconds(section, "missile.cooldown-seconds", defaults.missileCooldownTicks()),
+                section.getDouble("missile.damage", defaults.missileDamage()),
+                section.getDouble("missile.radius", defaults.missileRadius()),
+                seconds(section, "shockwave.charge-seconds", defaults.shockwaveChargeTicks()),
+                seconds(section, "shockwave.cooldown-seconds", defaults.shockwaveCooldownTicks()),
+                Math.max(1, section.getInt("shockwave.chain.normal.min", defaults.normalShockwaveMin())),
+                Math.max(1, section.getInt("shockwave.chain.normal.max", defaults.normalShockwaveMax())),
+                Math.max(1, section.getInt("shockwave.chain.enraged.min", defaults.enragedShockwaveMin())),
+                Math.max(1, section.getInt("shockwave.chain.enraged.max", defaults.enragedShockwaveMax())),
+                section.getDouble("shockwave.damage", defaults.shockwaveDamage()),
+                section.getDouble("shockwave.speed-blocks-per-second", defaults.shockwaveSpeedBlocksPerSecond()),
+                seconds(section, "walls.charge-seconds", defaults.wallChargeTicks()),
+                seconds(section, "walls.gap-seconds", defaults.wallGapTicks()),
+                seconds(section, "walls.cooldown-seconds", defaults.wallCooldownTicks()),
+                Math.max(1, section.getInt("walls.chain.normal.min", defaults.normalWallMin())),
+                Math.max(1, section.getInt("walls.chain.normal.max", defaults.normalWallMax())),
+                Math.max(1, section.getInt("walls.chain.enraged.min", defaults.enragedWallMin())),
+                Math.max(1, section.getInt("walls.chain.enraged.max", defaults.enragedWallMax())),
+                section.getDouble("walls.damage", defaults.wallDamage()),
+                section.getDouble("walls.speed-blocks-per-second", defaults.wallSpeedBlocksPerSecond()),
+                section.getDouble("walls.safe-degrees.normal", defaults.normalWallSafeDegrees()),
+                section.getDouble("walls.safe-degrees.enraged", defaults.enragedWallSafeDegrees()),
+                seconds(section, "spawn.rise-seconds", defaults.spawnRiseTicks()),
+                seconds(section, "spawn.cooldown-seconds", defaults.spawnCooldownTicks()),
+                Math.max(1, section.getInt("spawn.count.min", defaults.minSpawnCount())),
+                Math.max(1, section.getInt("spawn.count.max", defaults.maxSpawnCount())),
+                seconds(section, "reposition.move-seconds", defaults.repositionTicks()),
+                seconds(section, "reposition.cooldown-seconds", defaults.repositionCooldownTicks()),
+                section.getDouble("reposition.radius", defaults.repositionRadius()),
+                section.getDouble("reposition.cloud-radius", defaults.cloudRadius()),
+                seconds(section, "reposition.cloud-duration-seconds", defaults.cloudDurationTicks()),
+                seconds(section, "reposition.cloud-effect-seconds", defaults.cloudEffectTicks()),
+                section.getDouble("phase.threshold", defaults.phaseThreshold()),
+                spawnPool(section.getConfigurationSection("spawn.pool.normal"), defaults.normalSpawnPool()),
+                spawnPool(section.getConfigurationSection("spawn.pool.enraged"), defaults.enragedSpawnPool())
+        );
     }
 
     private static long directHitInvulnerabilityMillis(YamlConfiguration config) {
@@ -249,9 +297,10 @@ final class HallsBossTypeLoader {
         return 500L;
     }
 
-    private static List<HallsBossType.WeightedMonster> spawnPool(ConfigurationSection section) {
+    private static List<HallsBossType.WeightedMonster> spawnPool(ConfigurationSection section,
+                                                                 List<HallsBossType.WeightedMonster> fallback) {
         if (section == null) {
-            return HallsBossType.Overdrive.defaults().spawnPool();
+            return fallback == null ? List.of() : fallback;
         }
         List<HallsBossType.WeightedMonster> pool = new ArrayList<>();
         for (String key : section.getKeys(false)) {
