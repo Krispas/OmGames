@@ -147,9 +147,10 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too, all mechanics between bosses should behave consistently). Place it on the last fight floor. While working on it, merge behaviour of poison bomb poioson cloud, librarian poison cloud and the poison clouds from the boss, of course the poison bomb one effects monsters only and the other two ones players only.
 
 Future slices (dont do yet):
-- Boss 2 - Add second boss: Archaic Guard, documented in archaic_guard.md. Use boss_floor.md for design principles (and existing boss design too). Place it on the last fight floor. While working on it, merge behaviour of poison bomb poioson cloud, librarian poison cloud and the poison clouds from the boss, of course the poison bomb one effects monsters only and the other two ones players only.
+- TBD
 
 For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
