@@ -3,6 +3,7 @@ package krispasi.omGames.hallsofcarnage;
 import java.util.List;
 import java.util.Map;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 
 record HallsBossType(
         String id,
@@ -13,6 +14,7 @@ record HallsBossType(
         String itemModel,
         List<DisplayPart> displayParts,
         Map<String, Animation> animations,
+        Drops drops,
         Overdrive overdrive
 ) {
     HallsBossType {
@@ -24,6 +26,7 @@ record HallsBossType(
         itemModel = itemModel == null ? "" : itemModel.trim();
         displayParts = displayParts == null ? List.of() : List.copyOf(displayParts);
         animations = animations == null ? Map.of() : Map.copyOf(animations);
+        drops = drops == null ? Drops.defaults() : drops;
         overdrive = overdrive == null ? Overdrive.defaults() : overdrive;
     }
 
@@ -62,12 +65,32 @@ record HallsBossType(
                     double yawOffset,
                     double scaleX,
                     double scaleY,
-                    double scaleZ) {
+                    double scaleZ,
+                    List<SoundCue> sounds) {
         Keyframe {
             tick = Math.max(0, tick);
             scaleX = scaleX <= 0.0 ? 1.0 : scaleX;
             scaleY = scaleY <= 0.0 ? 1.0 : scaleY;
             scaleZ = scaleZ <= 0.0 ? 1.0 : scaleZ;
+            sounds = sounds == null ? List.of() : List.copyOf(sounds);
+        }
+    }
+
+    record SoundCue(Sound sound, float volume, float pitch) {
+        SoundCue {
+            sound = sound == null ? Sound.BLOCK_NOTE_BLOCK_HAT : sound;
+            volume = Math.max(0.0f, volume);
+            pitch = Math.max(0.01f, pitch);
+        }
+    }
+
+    record Drops(int randomScrap) {
+        Drops {
+            randomScrap = Math.max(0, randomScrap);
+        }
+
+        static Drops defaults() {
+            return new Drops(0);
         }
     }
 

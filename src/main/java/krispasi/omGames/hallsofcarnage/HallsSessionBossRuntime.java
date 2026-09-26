@@ -46,6 +46,7 @@ final class HallsSessionBossRuntime {
     private final Map<String, HallsBossType> bossTypes;
     private final Predicate<UUID> aliveParticipantPredicate;
     private final MinionSpawner monsterSpawner;
+    private final BossDropper bossDropper;
     private final BlockSetter blockSetter;
     private final Runnable bossMinionClearCallback;
     private final Runnable defeatedCallback;
@@ -64,6 +65,7 @@ final class HallsSessionBossRuntime {
                             Map<String, HallsBossType> bossTypes,
                             Predicate<UUID> aliveParticipantPredicate,
                             MinionSpawner monsterSpawner,
+                            BossDropper bossDropper,
                             BlockSetter blockSetter,
                             Runnable bossMinionClearCallback,
                             Runnable defeatedCallback) {
@@ -73,6 +75,7 @@ final class HallsSessionBossRuntime {
         this.bossTypes = bossTypes == null ? Map.of() : Map.copyOf(bossTypes);
         this.aliveParticipantPredicate = aliveParticipantPredicate == null ? id -> true : aliveParticipantPredicate;
         this.monsterSpawner = monsterSpawner == null ? (id, location) -> null : monsterSpawner;
+        this.bossDropper = bossDropper == null ? (location, randomScrap) -> { } : bossDropper;
         this.blockSetter = blockSetter == null ? (x, y, z, material, face) -> { } : blockSetter;
         this.bossMinionClearCallback = bossMinionClearCallback == null ? () -> { } : bossMinionClearCallback;
         this.defeatedCallback = defeatedCallback == null ? () -> { } : defeatedCallback;
@@ -87,8 +90,7 @@ final class HallsSessionBossRuntime {
         }
         List<UUID> displayIds = spawnDisplays(type, location, 0.0f, 0.0);
         Interaction hitbox = world.spawn(location.clone().add(0.0, 0.1, 0.0), Interaction.class, entity -> {
-            entity.setInteractionWidth(5.0f);
-            entity.setInteractionHeight(5.0f);
+            setHitboxSize(entity, type.overdrive().initialScaleMultiplier());
             entity.setResponsive(true);
             entity.setPersistent(false);
             entity.addScoreboardTag(BOSS_TAG);
@@ -237,6 +239,7 @@ final class HallsSessionBossRuntime {
         }
         long now = System.currentTimeMillis();
         if (!bypassInvulnerability && now < activeBoss.invulnerableUntilMillis()) {
+            updateInvulnerabilityFeedback(now);
             return false;
         }
         pruneBossMinions();
@@ -248,6 +251,7 @@ final class HallsSessionBossRuntime {
         }
         if (!bypassInvulnerability) {
             activeBoss.setInvulnerableUntilMillis(now + DAMAGE_INVULNERABILITY_MILLIS);
+            updateInvulnerabilityFeedback(now);
         }
         activeBoss.setHealth(activeBoss.health() - amount);
         checkEnrage();
@@ -288,6 +292,7 @@ final class HallsSessionBossRuntime {
         cancelTasks();
         bossMinionClearCallback.run();
         Location center = activeBoss.location().clone().add(0.0, 2.2, 0.0);
+        bossDropper.drop(center, activeBoss.type().drops().randomScrap());
         world.spawnParticle(Particle.EXPLOSION, center, 2, 0.4, 0.4, 0.4, 0.0);
         world.spawnParticle(Particle.ELECTRIC_SPARK, center, 100, 2.4, 1.8, 2.4, 0.08);
         world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 1.2f, 0.75f);
@@ -330,6 +335,7 @@ final class HallsSessionBossRuntime {
         tickBossMinionCooldowns();
         refreshBossBarPlayers();
         updateBossBar();
+        updateInvulnerabilityFeedback(System.currentTimeMillis());
         activeBoss.setIdleTicks(activeBoss.idleTicks() + 1);
         double bob = Math.sin(activeBoss.idleTicks() / 8.0) * 0.04;
         animateDisplays("idle", activeBoss.idleTicks(), activeBoss.yaw(), bob, new Vector());
@@ -376,7 +382,6 @@ final class HallsSessionBossRuntime {
         }
         activeBoss.setLastAttack(Attack.SPAWN);
         activeBoss.setAttackAnimationTicks(0);
-        world.playSound(activeBoss.location(), Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 1.0f, 0.65f);
         new TimedAttack(config.spawnChargeTicks(), () -> {
             activeBoss.setYaw(activeBoss.yaw() + 18.0f);
             Location center = activeBoss.location().clone().add(0.0, 2.7, 0.0);
@@ -412,7 +417,6 @@ final class HallsSessionBossRuntime {
             return;
         }
         activeBoss.setAttackAnimationTicks(0);
-        world.playSound(activeBoss.location(), Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0f, 0.55f);
         new TimedAttack(config.jumpReadyTicks(), () -> {
             world.spawnParticle(Particle.DUST_PLUME, activeBoss.location().clone().add(0.0, 0.15, 0.0),
                     10, 1.7, 0.05, 1.7, 0.03);
@@ -431,7 +435,6 @@ final class HallsSessionBossRuntime {
             return;
         }
         activeBoss.setAttackAnimationTicks(0);
-        world.playSound(activeBoss.location(), Sound.BLOCK_BEACON_POWER_SELECT, 1.1f, activeBoss.enraged() ? 0.55f : 0.75f);
         new TimedAttack(config.xBlastMoveTicks(), () -> {
             activeBoss.setYaw(activeBoss.yaw() + 24.0f);
             animateDisplays("x_blast_move", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.08, new Vector());
@@ -479,6 +482,7 @@ final class HallsSessionBossRuntime {
             return;
         }
         activeBoss.setEnraged(true);
+        updateHitboxSize();
         world.playSound(activeBoss.location(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1.3f, 0.7f);
         for (UUID playerId : participants) {
             Player participant = Bukkit.getPlayer(playerId);
@@ -670,6 +674,7 @@ final class HallsSessionBossRuntime {
         }
         List<HallsBossType.DisplayPart> parts = displayParts(activeBoss.type());
         String normalizedAnimationId = normalizeId(animationId);
+        playAnimationSounds(activeBoss.type(), normalizedAnimationId, tick);
         int index = 0;
         for (UUID displayId : activeBoss.displayIds()) {
             Entity entity = Bukkit.getEntity(displayId);
@@ -736,6 +741,37 @@ final class HallsSessionBossRuntime {
         return AnimationPose.lerp(previous, next, progress);
     }
 
+    private void playAnimationSounds(HallsBossType type, String animationId, int tick) {
+        if (type == null || activeBoss == null || animationId.isBlank()) {
+            return;
+        }
+        HallsBossType.Animation animation = type.animations().get(animationId);
+        if (animation == null) {
+            return;
+        }
+        playFrameSounds(animation.frames(), animation.loop(), tick);
+    }
+
+    private void playFrameSounds(List<HallsBossType.Keyframe> frames, boolean loop, int tick) {
+        if (frames == null || frames.isEmpty()) {
+            return;
+        }
+        int adjustedTick = tick <= 1 ? 0 : tick;
+        HallsBossType.Keyframe lastFrame = frames.getLast();
+        if (loop && lastFrame.tick() > 0) {
+            adjustedTick %= lastFrame.tick();
+        }
+        for (HallsBossType.Keyframe frame : frames) {
+            if (frame.tick() == adjustedTick && !frame.sounds().isEmpty()) {
+                Location location = activeBoss.location().clone().add(0.0, 2.5, 0.0);
+                for (HallsBossType.SoundCue sound : frame.sounds()) {
+                    world.playSound(location, sound.sound(), sound.volume(), sound.pitch());
+                }
+                return;
+            }
+        }
+    }
+
     private Location displayLocation(Location base, HallsBossType.DisplayPart part, double yOffset, Vector animationOffset) {
         Vector offset = animationOffset == null ? new Vector() : animationOffset;
         return base.clone().add(
@@ -760,9 +796,44 @@ final class HallsSessionBossRuntime {
         if (activeBoss == null || bossBar == null) {
             return;
         }
+        boolean shielded = activeBoss.hasLivingMinions();
         bossBar.setProgress(Math.max(0.0, Math.min(1.0, activeBoss.health() / activeBoss.maxHealth())));
-        String shield = activeBoss.hasLivingMinions() ? " - Shielded" : "";
+        bossBar.setColor(shielded ? BarColor.WHITE : BarColor.RED);
+        String shield = shielded ? " - Shielded" : "";
         bossBar.setTitle(activeBoss.type().name() + " " + Math.max(0, (int) Math.ceil(activeBoss.health())) + " HP" + shield);
+    }
+
+    private void updateHitboxSize() {
+        if (activeBoss == null) {
+            return;
+        }
+        Entity hitbox = Bukkit.getEntity(activeBoss.hitboxId());
+        if (hitbox instanceof Interaction interaction) {
+            setHitboxSize(interaction, activeBoss.scaleMultiplier());
+        }
+    }
+
+    private void setHitboxSize(Interaction entity, double scaleMultiplier) {
+        float size = (float) Math.max(1.0, 5.0 * scaleMultiplier);
+        entity.setInteractionWidth(size);
+        entity.setInteractionHeight(size);
+    }
+
+    private void updateInvulnerabilityFeedback(long nowMillis) {
+        if (activeBoss == null) {
+            return;
+        }
+        boolean invulnerable = nowMillis < activeBoss.invulnerableUntilMillis();
+        Entity hitbox = Bukkit.getEntity(activeBoss.hitboxId());
+        if (hitbox != null) {
+            hitbox.setGlowing(invulnerable);
+        }
+        for (UUID displayId : activeBoss.displayIds()) {
+            Entity display = Bukkit.getEntity(displayId);
+            if (display != null) {
+                display.setGlowing(invulnerable);
+            }
+        }
     }
 
     private double scaledHealth(HallsBossType type) {
@@ -814,6 +885,10 @@ final class HallsSessionBossRuntime {
 
     interface MinionSpawner {
         UUID spawn(String monsterId, Location location);
+    }
+
+    interface BossDropper {
+        void drop(Location location, int randomScrap);
     }
 
     record DoorSeal(int minX, int maxX, int y, int minZ, int maxZ, Material material) {
@@ -969,6 +1044,7 @@ final class HallsSessionBossRuntime {
             double scale = config.initialScaleMultiplier()
                     + (config.enragedScaleMultiplier() - config.initialScaleMultiplier()) * progress;
             activeBoss.setScaleMultiplier(scale);
+            updateHitboxSize();
             activeBoss.setYaw(activeBoss.yaw() + 16.0f);
             animateDisplays("idle", activeBoss.idleTicks(), activeBoss.yaw(), Math.sin(ticks / 3.0) * 0.08, new Vector());
             Location center = activeBoss.location().clone().add(0.0, 2.5, 0.0);
@@ -979,6 +1055,7 @@ final class HallsSessionBossRuntime {
             }
             if (ticks >= 40) {
                 activeBoss.setScaleMultiplier(config.enragedScaleMultiplier());
+                updateHitboxSize();
                 world.playSound(center, Sound.ENTITY_WITHER_SPAWN, 0.8f, 1.25f);
                 cancel();
             }

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -52,6 +53,7 @@ final class HallsBossTypeLoader {
                 config.getString("display.item-model", ""),
                 displayParts(config.getConfigurationSection("display.parts")),
                 animations(config.getConfigurationSection("animations")),
+                drops(config.getConfigurationSection("drops")),
                 overdrive(config.getConfigurationSection("overdrive"))
         );
     }
@@ -127,10 +129,65 @@ final class HallsBossTypeLoader {
                     row.getDouble("yaw-offset", row.getDouble("yaw", 0.0)),
                     row.getDouble("scale.x", row.getDouble("scale-x", 1.0)),
                     row.getDouble("scale.y", row.getDouble("scale-y", 1.0)),
-                    row.getDouble("scale.z", row.getDouble("scale-z", 1.0))
+                    row.getDouble("scale.z", row.getDouble("scale-z", 1.0)),
+                    sounds(row)
             ));
         }
         return List.copyOf(frames);
+    }
+
+    private static List<HallsBossType.SoundCue> sounds(ConfigurationSection frame) {
+        if (frame == null) {
+            return List.of();
+        }
+        List<HallsBossType.SoundCue> sounds = new ArrayList<>();
+        HallsBossType.SoundCue direct = soundCue(frame, "sound", "volume", "pitch");
+        if (direct != null) {
+            sounds.add(direct);
+        }
+        if (frame.isList("sounds")) {
+            for (Map<?, ?> raw : frame.getMapList("sounds")) {
+                Sound sound = sound(raw.get("sound"));
+                if (sound == null) {
+                    continue;
+                }
+                sounds.add(new HallsBossType.SoundCue(
+                        sound,
+                        floatValue(raw.get("volume"), 1.0f),
+                        floatValue(raw.get("pitch"), 1.0f)
+                ));
+            }
+        } else {
+            ConfigurationSection section = frame.getConfigurationSection("sounds");
+            if (section != null) {
+                for (String key : section.getKeys(false)) {
+                    ConfigurationSection row = section.getConfigurationSection(key);
+                    if (row == null) {
+                        continue;
+                    }
+                    HallsBossType.SoundCue cue = soundCue(row, "sound", "volume", "pitch");
+                    if (cue != null) {
+                        sounds.add(cue);
+                    }
+                }
+            }
+        }
+        return List.copyOf(sounds);
+    }
+
+    private static HallsBossType.SoundCue soundCue(ConfigurationSection section,
+                                                   String soundPath,
+                                                   String volumePath,
+                                                   String pitchPath) {
+        Sound sound = sound(section.getString(soundPath));
+        if (sound == null) {
+            return null;
+        }
+        return new HallsBossType.SoundCue(
+                sound,
+                (float) section.getDouble(volumePath, 1.0),
+                (float) section.getDouble(pitchPath, 1.0)
+        );
     }
 
     private static int parseTickKey(String key) {
@@ -173,6 +230,14 @@ final class HallsBossTypeLoader {
         );
     }
 
+    private static HallsBossType.Drops drops(ConfigurationSection section) {
+        HallsBossType.Drops defaults = HallsBossType.Drops.defaults();
+        if (section == null) {
+            return defaults;
+        }
+        return new HallsBossType.Drops(section.getInt("random-scrap", defaults.randomScrap()));
+    }
+
     private static List<HallsBossType.WeightedMonster> spawnPool(ConfigurationSection section) {
         if (section == null) {
             return HallsBossType.Overdrive.defaults().spawnPool();
@@ -197,6 +262,31 @@ final class HallsBossTypeLoader {
         }
         Material material = Material.matchMaterial(raw.trim().toUpperCase(Locale.ROOT));
         return material == null ? fallback : material;
+    }
+
+    private static Sound sound(Object raw) {
+        if (raw == null || raw.toString().isBlank()) {
+            return null;
+        }
+        try {
+            return Sound.valueOf(raw.toString().trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
+    private static float floatValue(Object raw, float fallback) {
+        if (raw instanceof Number number) {
+            return number.floatValue();
+        }
+        if (raw == null) {
+            return fallback;
+        }
+        try {
+            return Float.parseFloat(raw.toString());
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
     }
 
     private static String normalizeId(String value) {

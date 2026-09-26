@@ -234,6 +234,7 @@ public final class HallsSession {
                 location -> dropSessionItem(location, coinItem(1)), monsterRuntime::spawnConfiguredMonster);
         this.bossRuntime = new HallsSessionBossRuntime(plugin, world, participants, this.bossTypes,
                 this::isAliveParticipant, monsterRuntime::spawnBossMinion,
+                this::dropBossRandomScrap,
                 this::setBlock, monsterRuntime::removeAllForBossDefeat, this::unlockBossFloorExit);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
                 type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
@@ -4786,6 +4787,24 @@ public final class HallsSession {
 
     private int multipliedScrap(int amount) {
         return Math.max(1, (int) Math.round(amount * activeFloorModifiers.scrapDropMultiplier()));
+    }
+
+    private void dropBossRandomScrap(Location dropLocation, int amount) {
+        if (dropLocation == null || amount <= 0) {
+            return;
+        }
+        PropReward[] scraps = {PropReward.WOOD_SCRAP, PropReward.IRON_SCRAP, PropReward.DIAMOND_SCRAP, PropReward.REDSTONE_SCRAP};
+        PropReward selected = scraps[new Random().nextInt(scraps.length)];
+        switch (selected) {
+            case WOOD_SCRAP -> dropSessionItem(dropLocation,
+                    scrapItem(Material.STICK, "Wood Scrap", NamedTextColor.GOLD, PropReward.WOOD_SCRAP, amount));
+            case IRON_SCRAP -> dropSessionItem(dropLocation,
+                    scrapItem(Material.RAW_IRON, "Iron Scrap", NamedTextColor.GRAY, PropReward.IRON_SCRAP, amount));
+            case DIAMOND_SCRAP -> dropSessionItem(dropLocation,
+                    scrapItem(Material.DIAMOND, "Diamond Scrap", NamedTextColor.AQUA, PropReward.DIAMOND_SCRAP, amount));
+            case REDSTONE_SCRAP -> dropSessionItem(dropLocation,
+                    scrapItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED, PropReward.REDSTONE_SCRAP, amount));
+        }
     }
 
     private ItemStack randomAllowedItem(String category, String rarity, int amount) {
