@@ -59,6 +59,7 @@ record HallsBossType(
     }
 
     record Animation(boolean loop,
+                     boolean applyBaseYaw,
                      List<Keyframe> frames,
                      Map<String, List<Keyframe>> partFrames) {
         Animation {
@@ -213,6 +214,10 @@ record HallsBossType(
                         double cloudRadius,
                         int cloudDurationTicks,
                         int cloudEffectTicks,
+                        int circleDashTelegraphTicks,
+                        int circleDashTicks,
+                        int circleDashCooldownTicks,
+                        double circleDashRadius,
                         double phaseThreshold,
                         List<WeightedMonster> normalSpawnPool,
                         List<WeightedMonster> enragedSpawnPool) {
@@ -252,6 +257,10 @@ record HallsBossType(
             cloudRadius = Math.max(0.5, cloudRadius);
             cloudDurationTicks = Math.max(5, cloudDurationTicks);
             cloudEffectTicks = Math.max(20, cloudEffectTicks);
+            circleDashTelegraphTicks = Math.max(1, circleDashTelegraphTicks);
+            circleDashTicks = Math.max(1, circleDashTicks);
+            circleDashCooldownTicks = Math.max(1, circleDashCooldownTicks);
+            circleDashRadius = Math.max(1.0, circleDashRadius);
             phaseThreshold = Math.max(0.05, Math.min(0.95, phaseThreshold));
             normalSpawnPool = normalSpawnPool == null ? List.of() : List.copyOf(normalSpawnPool);
             enragedSpawnPool = enragedSpawnPool == null ? List.of() : List.copyOf(enragedSpawnPool);
@@ -262,7 +271,9 @@ record HallsBossType(
                     60, 40, 1, 3, 3, 5, 6.0, 4.0,
                     60, 60, 100, 1, 3, 1, 3, 9.0, 4.0, 30.0, 24.0,
                     12, 60, 500, 1, 2,
-                    40, 60, 9.0, 2.4, 100, 80, 0.33,
+                    40, 60, 9.0, 2.4, 100, 80,
+                    20, 26, 60, 9.0,
+                    0.33,
                     List.of(new WeightedMonster("bedrock_walker", 1)),
                     List.of(new WeightedMonster("rotting_soldier", 1)));
         }

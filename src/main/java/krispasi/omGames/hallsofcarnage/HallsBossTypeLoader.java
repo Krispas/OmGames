@@ -110,6 +110,7 @@ final class HallsBossTypeLoader {
             }
             animations.put(normalizeId(key), new HallsBossType.Animation(
                     row.getBoolean("loop", false),
+                    row.getBoolean("apply-base-yaw", true),
                     keyframes(row.getConfigurationSection("frames")),
                     partFrames
             ));
@@ -285,6 +286,10 @@ final class HallsBossTypeLoader {
                 section.getDouble("reposition.cloud-radius", defaults.cloudRadius()),
                 seconds(section, "reposition.cloud-duration-seconds", defaults.cloudDurationTicks()),
                 seconds(section, "reposition.cloud-effect-seconds", defaults.cloudEffectTicks()),
+                seconds(section, "circle-dash.telegraph-seconds", defaults.circleDashTelegraphTicks()),
+                seconds(section, "circle-dash.move-seconds", defaults.circleDashTicks()),
+                seconds(section, "circle-dash.cooldown-seconds", defaults.circleDashCooldownTicks()),
+                section.getDouble("circle-dash.radius", defaults.circleDashRadius()),
                 section.getDouble("phase.threshold", defaults.phaseThreshold()),
                 spawnPool(section.getConfigurationSection("spawn.pool.normal"), defaults.normalSpawnPool()),
                 spawnPool(section.getConfigurationSection("spawn.pool.enraged"), defaults.enragedSpawnPool())

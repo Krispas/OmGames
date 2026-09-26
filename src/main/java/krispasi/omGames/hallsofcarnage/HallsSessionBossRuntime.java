@@ -399,12 +399,14 @@ final class HallsSessionBossRuntime {
             case MISSILE -> runMissileAttack();
             case WALLS -> runWallAttack();
             case REPOSITION -> runRepositionAttack();
+            case CIRCLE_DASH -> runCircleDashAttack();
         }
     }
 
     private Attack chooseAttack() {
         if (isArchaicGuard()) {
-            List<Attack> attacks = new ArrayList<>(List.of(Attack.MISSILE, Attack.JUMP, Attack.WALLS, Attack.SPAWN, Attack.REPOSITION));
+            List<Attack> attacks = new ArrayList<>(List.of(Attack.MISSILE, Attack.JUMP, Attack.WALLS, Attack.SPAWN,
+                    Attack.REPOSITION, Attack.CIRCLE_DASH));
             if (activeBoss.archaicSpawnLockoutTicks() > 0) {
                 attacks.remove(Attack.SPAWN);
             }
@@ -579,15 +581,15 @@ final class HallsSessionBossRuntime {
     private void runArchaicShockwaveAttack() {
         HallsBossType.ArchaicGuard config = activeBoss.type().archaicGuard();
         activeBoss.setLastAttack(Attack.JUMP);
-        runArchaicShockwaveChain(config, archaicShockwaveCount(config));
+        runArchaicShockwaveChain(config, archaicShockwaveCount(config), config.shockwaveChargeTicks());
     }
 
-    private void runArchaicShockwaveChain(HallsBossType.ArchaicGuard config, int remaining) {
+    private void runArchaicShockwaveChain(HallsBossType.ArchaicGuard config, int remaining, int chargeTicks) {
         if (activeBoss == null || !activeBoss.active()) {
             return;
         }
         activeBoss.setAttackAnimationTicks(0);
-        new TimedAttack(config.shockwaveChargeTicks(), () -> {
+        new TimedAttack(chargeTicks, () -> {
             Location ground = activeBoss.location().clone().add(0.0, 0.15, 0.0);
             world.spawnParticle(Particle.ELECTRIC_SPARK, ground, 12, 0.6, 0.08, 0.6, 0.05);
             animateDisplays("shockwave_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw(), -0.05, new Vector());
@@ -595,7 +597,8 @@ final class HallsSessionBossRuntime {
             world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 0.65f);
             new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond()).runTaskTimer(plugin, 1L, 2L);
             if (remaining > 1) {
-                Bukkit.getScheduler().runTaskLater(plugin, () -> runArchaicShockwaveChain(config, remaining - 1), 20L);
+                Bukkit.getScheduler().runTaskLater(plugin, () -> runArchaicShockwaveChain(config, remaining - 1,
+                        Math.max(1, config.shockwaveChargeTicks() / 2)), 1L);
             } else {
                 scheduleNextAttack(config.shockwaveCooldownTicks());
             }
@@ -663,6 +666,24 @@ final class HallsSessionBossRuntime {
         Location target = randomBossArenaLocation(config.repositionRadius());
         PotionEffectType effect = activeBoss.enraged() ? PotionEffectType.WITHER : PotionEffectType.POISON;
         new RepositionMove(from, target, config, effect).runTaskTimer(plugin, 1L, 1L);
+    }
+
+    private void runCircleDashAttack() {
+        HallsBossType.ArchaicGuard config = activeBoss.type().archaicGuard();
+        activeBoss.setLastAttack(Attack.CIRCLE_DASH);
+        Location from = activeBoss.location().clone();
+        Location target = randomBossArenaLocation(config.circleDashRadius());
+        if (target == null) {
+            scheduleNextAttack(config.circleDashCooldownTicks());
+            return;
+        }
+        Location control = circleDashControlPoint(from, target, config.circleDashRadius());
+        PotionEffectType effect = activeBoss.enraged() ? PotionEffectType.WITHER : PotionEffectType.POISON;
+        activeBoss.setAttackAnimationTicks(0);
+        new TimedAttack(config.circleDashTelegraphTicks(), () -> {
+            renderCircleDashPath(from, control, target, false);
+            animateDisplays("circle_dash", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.16, new Vector());
+        }, () -> new CircleDashMove(from, control, target, config, effect).runTaskTimer(plugin, 1L, 1L));
     }
 
     private void renderXBlastWarning(boolean damaging) {
@@ -883,6 +904,35 @@ final class HallsSessionBossRuntime {
         return origin.clone().add(Math.cos(angle) * distance, 0.0, Math.sin(angle) * distance);
     }
 
+    private Location circleDashControlPoint(Location from, Location target, double radius) {
+        Vector chord = target.toVector().subtract(from.toVector());
+        if (chord.lengthSquared() < 0.01) {
+            return from.clone().add(radius, 0.0, 0.0);
+        }
+        Vector perpendicular = new Vector(-chord.getZ(), 0.0, chord.getX()).normalize();
+        if (random.nextBoolean()) {
+            perpendicular.multiply(-1.0);
+        }
+        double arc = Math.max(2.0, Math.min(radius, chord.length() * 0.65));
+        return from.clone().add(chord.multiply(0.5)).add(perpendicular.multiply(arc));
+    }
+
+    private Location bezier(Location from, Location control, Location target, double progress) {
+        double inverse = 1.0 - progress;
+        double x = inverse * inverse * from.getX() + 2.0 * inverse * progress * control.getX() + progress * progress * target.getX();
+        double y = inverse * inverse * from.getY() + 2.0 * inverse * progress * control.getY() + progress * progress * target.getY();
+        double z = inverse * inverse * from.getZ() + 2.0 * inverse * progress * control.getZ() + progress * progress * target.getZ();
+        return new Location(world, x, y, z);
+    }
+
+    private void renderCircleDashPath(Location from, Location control, Location target, boolean moving) {
+        Particle particle = moving ? Particle.FLAME : Particle.DUST_PLUME;
+        for (double progress = 0.0; progress <= 1.0; progress += 0.055) {
+            Location point = bezier(from, control, target, progress).add(0.0, 0.16, 0.0);
+            world.spawnParticle(particle, point, moving ? 2 : 1, 0.05, 0.04, 0.05, 0.0);
+        }
+    }
+
     private void halveMonsterHealth(UUID minionId) {
         Entity entity = Bukkit.getEntity(minionId);
         if (entity instanceof org.bukkit.entity.LivingEntity living) {
@@ -1012,6 +1062,7 @@ final class HallsSessionBossRuntime {
         List<HallsBossType.DisplayPart> parts = displayParts(activeBoss.type());
         String normalizedAnimationId = normalizeId(animationId);
         playAnimationSounds(activeBoss.type(), normalizedAnimationId, tick);
+        HallsBossType.Animation animation = activeBoss.type().animations().get(normalizedAnimationId);
         int index = 0;
         for (UUID displayId : activeBoss.displayIds()) {
             Entity entity = Bukkit.getEntity(displayId);
@@ -1028,11 +1079,12 @@ final class HallsSessionBossRuntime {
             if (entity instanceof Display display) {
                 display.setInterpolationDelay(1);
                 display.setTeleportDuration(2);
+                boolean applyBaseYaw = animation == null ? !isArchaicGuard() : animation.applyBaseYaw();
                 display.setTransformation(HallsDisplayTransforms.centeredBlock(
                         part.scaleX() * pose.scaleX() * activeBoss.scaleMultiplier(),
                         part.scaleY() * pose.scaleY() * activeBoss.scaleMultiplier(),
                         part.scaleZ() * pose.scaleZ() * activeBoss.scaleMultiplier(),
-                        new Quaternionf().rotateY((float) Math.toRadians(yaw + pose.yawOffset()))));
+                        new Quaternionf().rotateY((float) Math.toRadians((applyBaseYaw ? yaw : 0.0f) + pose.yawOffset()))));
             }
             index++;
         }
@@ -1255,7 +1307,8 @@ final class HallsSessionBossRuntime {
         X_BLAST,
         MISSILE,
         WALLS,
-        REPOSITION
+        REPOSITION,
+        CIRCLE_DASH
     }
 
     private final class TimedAttack implements Runnable {
@@ -1462,6 +1515,59 @@ final class HallsSessionBossRuntime {
             if (ticks >= config.repositionTicks()) {
                 world.playSound(activeBoss.location(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.8f, 0.75f);
                 scheduleNextAttack(config.repositionCooldownTicks());
+                cancel();
+            }
+        }
+    }
+
+    private final class CircleDashMove extends org.bukkit.scheduler.BukkitRunnable {
+        private final Location from;
+        private final Location control;
+        private final Location target;
+        private final HallsBossType.ArchaicGuard config;
+        private final PotionEffectType effect;
+        private final int generation;
+        private int ticks;
+
+        private CircleDashMove(Location from,
+                               Location control,
+                               Location target,
+                               HallsBossType.ArchaicGuard config,
+                               PotionEffectType effect) {
+            this.from = from == null ? activeBoss.location().clone() : from;
+            this.control = control == null ? this.from.clone() : control;
+            this.target = target == null ? this.from.clone() : target;
+            this.config = config;
+            this.effect = effect;
+            this.generation = activeBoss == null ? 0 : activeBoss.attackGeneration();
+        }
+
+        @Override
+        public void run() {
+            if (activeBoss == null || !activeBoss.active() || activeBoss.attackGeneration() != generation) {
+                cancel();
+                return;
+            }
+            ticks++;
+            double progress = Math.min(1.0, ticks / (double) config.circleDashTicks());
+            Location next = bezier(from, control, target, progress);
+            activeBoss.location().setX(next.getX());
+            activeBoss.location().setY(next.getY());
+            activeBoss.location().setZ(next.getZ());
+            activeBoss.setYaw(activeBoss.yaw() + 18.0f);
+            renderCircleDashPath(from, control, target, true);
+            animateDisplays("circle_dash", ticks, activeBoss.yaw(), 0.2, new Vector());
+            if (ticks == 1 || ticks % 8 == 0) {
+                HallsPoisonClouds.spawn(plugin, world, null, activeBoss.location().clone().add(0.0, 0.1, 0.0),
+                        config.cloudRadius(), config.cloudDurationTicks(), 10,
+                        effect, config.cloudEffectTicks(), 0, 0.0,
+                        living -> living instanceof Player player
+                                && participants.contains(player.getUniqueId())
+                                && aliveParticipantPredicate.test(player.getUniqueId()));
+            }
+            if (ticks >= config.circleDashTicks()) {
+                world.playSound(activeBoss.location(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.95f, 0.65f);
+                scheduleNextAttack(config.circleDashCooldownTicks());
                 cancel();
             }
         }
