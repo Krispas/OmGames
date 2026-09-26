@@ -148,6 +148,12 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- Add ending to the scenarios, if descended via elevator and no floor is present, party will just stay in the elevator as completion is displayed on their screen. Then their shame, after that, the session ends, score is recorded, save file is deleted. When starting a scenario it should have different icon depending if it was previously completed and on which difficulty. You have rights to edit OmVeinsAPI for once, add a new consumer which inputs player and a pair which contains id of the scenario and difficulty which is triggered (if present) when completing scenario.
+Shame is gained for:
+- 5 for dying and becoming ghost
+- 50 for party wipe
+- 1 per research point got, building built/upgraded, coin gotten, blueprint distellery chain finished
+- Difficulties multiply the final shame. Normal doesnt change anything, 30% less on hard and 50% less on extreme.
 
 Future slices (dont do yet):
 - TBD
@@ -156,4 +162,3 @@ For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
 - New breakables
 - Texture all items
-- Fix skins from OmVeins side
