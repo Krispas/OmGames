@@ -157,6 +157,12 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: Archaic Guard missile aim and lock windups now set the boss yaw toward the selected target location, using yaw only. Archaic Guard display parts now keep base yaw applied across its attack animations so eyes, body, and propeller anchors face together while propeller spin remains layered as a part yaw offset. Spawn-slam adds now choose validated 3x3-clear arena cells near the boss instead of random offsets, preventing the spawn attack from creating mobs outside the boss arena or in walls. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available.
 
 ## Reviewer note (Delete entries once done, but keep the header)
+Do all following for the next slice (and keep this line):
+- Archaic guard - during the fire wall attack, remove the animation of it spinning
+- Boss change, make armor affect boss attack damage
+- Increase damage for overdrive spawner attacks to 150%, increase damage for archaic guard to 250% (by editting their attack values)
+- Make trap damage also affected by armor
+
 Future slices (dont do yet):
 - TBD
 
