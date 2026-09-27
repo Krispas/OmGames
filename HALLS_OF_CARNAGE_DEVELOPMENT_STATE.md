@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-26
+Last updated: 2026-09-27
 
 ## Implemented
 
@@ -151,12 +151,14 @@ This is the first implementation slice. It focuses on:
 - Next reviewer slice applied: Ghost participants now recover to the elevator when they fall below active Halls floors or pits instead of remaining stuck below the dungeon. Bundled monster resources now define explicit reduced `attack-damage` values for every monster except Warden, and the old ravager Java-side damage clamp was removed so ravager damage is config-owned. Bundled armor recipe scrap costs were reduced: most armor costs are roughly one third of prior values, while Deepguard, Superguard, The Crosshair, Marathons, and The Undetected use roughly half-cost endgame tuning. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `18.0.2-beta` while the project targets Java 25.
 - Next reviewer slice applied: Archaic Guard boss animations now support `apply-base-yaw`; the bundled Archaic Guard animations disable base yaw so the body no longer rotates during idle/attack motion while the propeller planks still rotate through part-specific yaw offsets. Chained Archaic Guard shockwaves now use half charge time after the first blast. Added a data-driven Circle Dash attack with a 1-second curved-path telegraph, curved movement, and the same poison/wither cloud behavior as reposition. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `18.0.2-beta` while the project targets Java 25.
 - Next reviewer slice applied: Archaic Guard reposition and circle-dash destinations now come from the boss arena's open-cell whitelist and require a 3x3 open footprint, preventing movement endpoints from landing outside the room or inside walls. Circle-dash control points are clamped back to safe arena cells. Boss display base yaw now rotates display-part offsets around the boss origin when an animation enables `apply-base-yaw`, so Archaic Guard movement-facing yaw keeps eyes/body coherent while animation keyframes layer on top. Archaic Guard has a new data-driven trap attack: it charges briefly, skips the attack when already standing on a boss-placeable trap, places a bear trap before phase 2, and places a proximity mine after phase 2. Boss-placed traps are created through `HallsSessionTrapRuntime`, so normal trap cleanup, trigger rules, and monster/player damage behavior apply. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available.
+- Next reviewer slice applied: Archaic Guard missile aim and lock windups now set the boss yaw toward the selected target location, using yaw only. Archaic Guard display parts now keep base yaw applied across its attack animations so eyes, body, and propeller anchors face together while propeller spin remains layered as a part yaw offset. Spawn-slam adds now choose validated 3x3-clear arena cells near the boss instead of random offsets, preventing the spawn attack from creating mobs outside the boss arena or in walls. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available.
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- The rotation for the archaic guard are kinda weird as its eyes dont always rotate gotether with the body
-- Archaic guard: make the spawn attack not be able to spawn mobs out of bounds.
-- Archaic guard: when targetting the missle attack, make it face towards the player (only on yaw, not pitch)
+Archaic guard changes:
+- Make the particles for the shockwave attack flames
+- Extend reach of shockwave and flame wall attacks by double
+- Rework all animations so the eyes move together with the rest of the base, right now they just move independently and it looks weird.
 
 Future slices (dont do yet):
 - TBD

@@ -154,7 +154,7 @@ animations:
             yaw-offset: 192
   missile_aim:
     loop: true
-    apply-base-yaw: false
+    apply-base-yaw: true
     frames:
       0:
         tick: 0
@@ -167,7 +167,7 @@ animations:
           y: 0.06
   missile_lock:
     loop: true
-    apply-base-yaw: false
+    apply-base-yaw: true
     frames:
       0:
         tick: 0
@@ -180,7 +180,7 @@ animations:
           y: 0.08
   shockwave_charge:
     loop: true
-    apply-base-yaw: false
+    apply-base-yaw: true
     frames:
       0:
         tick: 0
@@ -193,7 +193,7 @@ animations:
           y: -0.06
   wall_charge:
     loop: true
-    apply-base-yaw: false
+    apply-base-yaw: true
     frames:
       0:
         tick: 0
@@ -206,7 +206,7 @@ animations:
           y: 0.10
   spawn_slam:
     loop: false
-    apply-base-yaw: false
+    apply-base-yaw: true
     frames:
       0:
         tick: 0

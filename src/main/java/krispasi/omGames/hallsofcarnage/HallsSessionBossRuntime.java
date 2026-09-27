@@ -537,16 +537,19 @@ final class HallsSessionBossRuntime {
         activeBoss.setAttackAnimationTicks(0);
         final Location[] target = {missileTargetLocation()};
         new TimedAttack(config.missileAimTicks(), () -> {
-            activeBoss.setYaw(activeBoss.yaw() + 6.0f);
             Location next = missileTargetLocation();
             if (next != null) {
                 target[0] = next;
+            }
+            if (target[0] != null) {
+                activeBoss.setYaw(yawToward(activeBoss.location(), target[0]));
             }
             renderMissileTelegraph(target[0], false);
             animateDisplays("missile_aim", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.05, new Vector());
         }, () -> {
             Location locked = target[0] == null ? activeBoss.location().clone() : target[0].clone();
             new TimedAttack(config.missileLockTicks(), () -> {
+                activeBoss.setYaw(yawToward(activeBoss.location(), locked));
                 renderMissileTelegraph(locked, true);
                 animateDisplays("missile_lock", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.08, new Vector());
             }, () -> {
@@ -987,6 +990,27 @@ final class HallsSessionBossRuntime {
         return best == null ? activeBoss.location().clone() : arenaCellLocation(best);
     }
 
+    private Location randomSafeArenaLocationNear(Location around, double radius) {
+        if (activeBoss == null || around == null) {
+            return null;
+        }
+        List<HallsExplorationGenerator.Cell> candidates = new ArrayList<>();
+        double maxDistanceSquared = radius * radius;
+        for (HallsExplorationGenerator.Cell cell : activeBoss.arenaCells()) {
+            if (!isBossArenaCellClear(cell)) {
+                continue;
+            }
+            Location center = arenaCellLocation(cell);
+            if (horizontalDistanceSquared(center, around) <= maxDistanceSquared) {
+                candidates.add(cell);
+            }
+        }
+        if (!candidates.isEmpty()) {
+            return arenaCellLocation(candidates.get(random.nextInt(candidates.size())));
+        }
+        return nearestSafeArenaLocation(around, radius);
+    }
+
     private boolean isBossArenaCellClear(HallsExplorationGenerator.Cell cell) {
         if (activeBoss == null || activeBoss.arenaCells().isEmpty()) {
             return true;
@@ -1203,6 +1227,9 @@ final class HallsSessionBossRuntime {
                 display.setInterpolationDelay(1);
                 display.setTeleportDuration(2);
                 boolean applyBaseYaw = animation == null ? !isArchaicGuard() : animation.applyBaseYaw();
+                if (isArchaicGuard()) {
+                    applyBaseYaw = true;
+                }
                 Location target = displayLocation(activeBoss.location(), part, visualYOffset, combinedOffset, yaw, applyBaseYaw);
                 entity.teleport(target);
                 display.setTransformation(HallsDisplayTransforms.centeredBlock(
@@ -1785,8 +1812,13 @@ final class HallsSessionBossRuntime {
             int count = config.minSpawnCount() + random.nextInt(config.maxSpawnCount() - config.minSpawnCount() + 1);
             for (int i = 0; i < count; i++) {
                 String monsterId = weightedMonster(activeBoss.type().archaicSpawnPool(activeBoss.enraged()));
-                Location spawn = activeBoss.location().clone().add(randomOffset(4.0), 5.0, randomOffset(4.0));
-                world.spawnParticle(Particle.SCULK_SOUL, spawn, 20, 0.35, 0.35, 0.35, 0.03);
+                Location spawn = randomSafeArenaLocationNear(activeBoss.location(), 4.0);
+                if (spawn == null) {
+                    continue;
+                }
+                spawn.add(0.0, 0.2, 0.0);
+                world.spawnParticle(Particle.SCULK_SOUL, spawn.clone().add(0.0, 0.8, 0.0),
+                        20, 0.35, 0.35, 0.35, 0.03);
                 UUID minionId = monsterSpawner.spawn(monsterId, spawn);
                 if (minionId != null) {
                     activeBoss.registerMinion(minionId, monsterId);
