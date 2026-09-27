@@ -2198,6 +2198,7 @@ public final class HallsSession {
             player.setFallDistance(0.0f);
             player.sendTitle("Left Behind", "The elevator descended without you.", 10, 70, 20);
             player.sendMessage(Component.text("You were left behind and became a ghost.", NamedTextColor.DARK_RED));
+            announceGhost(player);
             world.playSound(player.getLocation(), Sound.ENTITY_WITHER_HURT, 0.7f, 0.6f);
             leftBehind = true;
         }
@@ -5968,9 +5969,23 @@ public final class HallsSession {
         applyGhostState(player);
         player.setHealth(1.0);
         player.sendTitle("You are a ghost", "Wait for the next floor.", 10, 50, 20);
+        announceGhost(player);
         world.playSound(player.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.65f, 1.4f);
         if (allParticipantsGhosts()) {
             scheduleGameOver();
+        }
+    }
+
+    private void announceGhost(Player ghost) {
+        if (ghost == null) {
+            return;
+        }
+        Component message = Component.text(ghost.getName() + " became a ghost.", NamedTextColor.DARK_RED);
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.sendMessage(message);
+            }
         }
     }
 
