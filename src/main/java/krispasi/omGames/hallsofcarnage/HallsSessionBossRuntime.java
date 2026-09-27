@@ -149,13 +149,33 @@ final class HallsSessionBossRuntime {
     }
 
     AttackResult handleProjectileHit(Player shooter, Entity entity, double damage) {
-        if (shooter == null || entity == null || activeBoss == null || !isBossEntity(entity) || !activeBoss.active()) {
+        if (shooter == null || entity == null || activeBoss == null || !isBossEntity(entity)) {
             return AttackResult.unhandledResult();
         }
         if (!participants.contains(shooter.getUniqueId()) || !aliveParticipantPredicate.test(shooter.getUniqueId())) {
             return AttackResult.handledResult();
         }
+        if (!activeBoss.active()) {
+            activate(shooter);
+            return AttackResult.handledResult();
+        }
         return damage(Math.max(1.0, damage), entity.getLocation(), false)
+                ? AttackResult.damagedResult()
+                : AttackResult.handledResult();
+    }
+
+    AttackResult handleProjectileImpact(Player shooter, Location impactLocation, Vector velocity, double damage) {
+        if (shooter == null || impactLocation == null || activeBoss == null || !projectileIntersectsBoss(impactLocation, velocity)) {
+            return AttackResult.unhandledResult();
+        }
+        if (!participants.contains(shooter.getUniqueId()) || !aliveParticipantPredicate.test(shooter.getUniqueId())) {
+            return AttackResult.handledResult();
+        }
+        if (!activeBoss.active()) {
+            activate(shooter);
+            return AttackResult.handledResult();
+        }
+        return damage(Math.max(1.0, damage), impactLocation, false)
                 ? AttackResult.damagedResult()
                 : AttackResult.handledResult();
     }
@@ -285,6 +305,40 @@ final class HallsSessionBossRuntime {
             defeat();
         }
         return true;
+    }
+
+    private boolean projectileIntersectsBoss(Location impactLocation, Vector velocity) {
+        Entity hitbox = Bukkit.getEntity(activeBoss.hitboxId());
+        if (!(hitbox instanceof Interaction interaction) || !hitbox.getWorld().equals(impactLocation.getWorld())) {
+            return false;
+        }
+        double halfWidth = Math.max(0.25, interaction.getInteractionWidth() * 0.5) + 0.45;
+        double minY = hitbox.getLocation().getY() - 0.45;
+        double maxY = hitbox.getLocation().getY() + interaction.getInteractionHeight() + 0.45;
+        if (pointInsideBossHitbox(impactLocation, hitbox.getLocation(), halfWidth, minY, maxY)) {
+            return true;
+        }
+        if (velocity == null || velocity.lengthSquared() < 0.0001) {
+            return false;
+        }
+        Vector backwards = velocity.clone().normalize().multiply(-0.35);
+        Location sample = impactLocation.clone();
+        for (int i = 0; i < 12; i++) {
+            sample.add(backwards);
+            if (pointInsideBossHitbox(sample, hitbox.getLocation(), halfWidth, minY, maxY)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean pointInsideBossHitbox(Location point, Location hitboxLocation, double halfWidth, double minY, double maxY) {
+        if (point.getY() < minY || point.getY() > maxY) {
+            return false;
+        }
+        double dx = point.getX() - hitboxLocation.getX();
+        double dz = point.getZ() - hitboxLocation.getZ();
+        return dx * dx + dz * dz <= halfWidth * halfWidth;
     }
 
     record AttackResult(boolean handled, boolean damaged) {

@@ -896,7 +896,11 @@ final class HallsExplorationGenerator {
     }
 
     private void addRoomToRoomLoops() {
-        int target = corridorMode == CorridorMode.MAZE ? Math.max(rooms.size() / 4, 3) : Math.max(rooms.size() / 2, 5);
+        int target = switch (corridorMode) {
+            case MAZE -> Math.max(rooms.size() / 4, 3);
+            case LIBRARY -> Math.max(rooms.size() / 3, 3);
+            default -> Math.max(rooms.size() / 2, 5);
+        };
         int added = 0;
         int attempts = 0;
         while (added < target && attempts++ < roomLoopAttemptLimit()) {
@@ -1424,12 +1428,15 @@ final class HallsExplorationGenerator {
         if (corridorMode == CorridorMode.BACKROOMS) {
             return targetRooms * 420;
         }
+        if (corridorMode == CorridorMode.LIBRARY) {
+            return targetRooms * 260;
+        }
         return targetRooms * (corridorMode == CorridorMode.MAZE ? 260 : 1000);
     }
 
     private int roomLoopAttemptLimit() {
         int roomCount = Math.max(1, rooms.size());
-        return (corridorMode == CorridorMode.MAZE || corridorMode == CorridorMode.BACKROOMS)
+        return (corridorMode == CorridorMode.MAZE || corridorMode == CorridorMode.BACKROOMS || corridorMode == CorridorMode.LIBRARY)
                 ? roomCount * 18
                 : roomCount * roomCount * 5;
     }

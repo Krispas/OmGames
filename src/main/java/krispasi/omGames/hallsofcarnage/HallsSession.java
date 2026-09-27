@@ -1360,11 +1360,12 @@ public final class HallsSession {
         if (markProjectileImpactProcessed(projectile)) {
             return;
         }
-        double damage = projectileDouble(projectile, PROJECTILE_DAMAGE_KEY, 0.0);
+        double damage = projectileDirectDamage(projectile);
         Entity hitEntity = event.getHitEntity();
-        if (damage > 0.0 && hitEntity != null) {
-            HallsSessionBossRuntime.AttackResult bossProjectileAttack =
-                    bossRuntime.handleProjectileHit(player, hitEntity, damage);
+        if (damage > 0.0) {
+            HallsSessionBossRuntime.AttackResult bossProjectileAttack = hitEntity == null
+                    ? bossRuntime.handleProjectileImpact(player, projectile.getLocation(), projectile.getVelocity(), damage)
+                    : bossRuntime.handleProjectileHit(player, hitEntity, damage);
             if (bossProjectileAttack.damaged()) {
                 applyBossProjectileEffects(player, projectile);
             }
@@ -1444,6 +1445,20 @@ public final class HallsSession {
         Double value = projectile.getPersistentDataContainer().get(new org.bukkit.NamespacedKey(plugin, key),
                 PersistentDataType.DOUBLE);
         return value == null ? fallback : value;
+    }
+
+    private double projectileDirectDamage(org.bukkit.entity.Projectile projectile) {
+        double configured = projectileDouble(projectile, PROJECTILE_DAMAGE_KEY, 0.0);
+        if (configured > 0.0) {
+            return configured;
+        }
+        if (projectile instanceof org.bukkit.entity.Trident) {
+            return 8.0;
+        }
+        if (projectile instanceof org.bukkit.entity.AbstractArrow) {
+            return 6.0;
+        }
+        return 0.0;
     }
 
     private void applyFoodBuffs(Player player, HallsItemType type) {
@@ -2669,7 +2684,7 @@ public final class HallsSession {
         List<LibraryVentCandidate> candidates = new ArrayList<>();
         for (int roomIndex = 1; roomIndex < build.plan().rooms().size(); roomIndex++) {
             HallsExplorationGenerator.Room room = build.plan().rooms().get(roomIndex);
-            for (Cell local : openInteriorCells(room)) {
+            for (Cell local : libraryVentCandidateCells(room)) {
                 HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(
                         room.startX() + local.x(), room.startZ() + local.z());
                 if ((reservedCells != null && reservedCells.contains(absolute))
@@ -3253,7 +3268,7 @@ public final class HallsSession {
         for (int i = 0; i < plan.rooms().size(); i++) {
             HallsExplorationGenerator.Room room = plan.rooms().get(i);
             Set<HallsExplorationGenerator.Cell> usedCells = new HashSet<>();
-            if (randomFreeContentCell(openInteriorCells(room), room, random, reservedCells, usedCells) != null) {
+            if (randomFreeContentCell(openContentCells(room), room, random, reservedCells, usedCells) != null) {
                 candidates.add(i);
             }
         }
@@ -4027,7 +4042,7 @@ public final class HallsSession {
                                             HallsLevelType levelType,
                                             Set<HallsExplorationGenerator.Cell> reservedCells,
                                             boolean forceRareBreakable) {
-        List<Cell> cells = openInteriorCells(room);
+        List<Cell> cells = openContentCells(room);
         if (cells.isEmpty()) {
             return;
         }
@@ -4121,6 +4136,33 @@ public final class HallsSession {
         for (int z = 1; z < room.layout().depth() - 1; z++) {
             for (int x = 1; x < room.layout().width() - 1; x++) {
                 if (room.layout().at(x, z) == 'O' && !isNearRoomExit(room, x, z)) {
+                    cells.add(new Cell(x, z));
+                }
+            }
+        }
+        return cells;
+    }
+
+    private List<Cell> openContentCells(HallsExplorationGenerator.Room room) {
+        if (!room.ventOnly()) {
+            return openInteriorCells(room);
+        }
+        List<Cell> cells = new ArrayList<>();
+        for (int z = 1; z < room.layout().depth() - 1; z++) {
+            for (int x = 1; x < room.layout().width() - 1; x++) {
+                if (room.layout().at(x, z) == 'O') {
+                    cells.add(new Cell(x, z));
+                }
+            }
+        }
+        return cells;
+    }
+
+    private List<Cell> libraryVentCandidateCells(HallsExplorationGenerator.Room room) {
+        List<Cell> cells = new ArrayList<>();
+        for (int z = 0; z < room.layout().depth(); z++) {
+            for (int x = 0; x < room.layout().width(); x++) {
+                if (room.layout().at(x, z) == 'O') {
                     cells.add(new Cell(x, z));
                 }
             }
