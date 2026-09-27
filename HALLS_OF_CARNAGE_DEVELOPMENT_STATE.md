@@ -163,13 +163,13 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- Make it so instead of villager being the interaction check in the lobby, its just an interaction entity, which I will put in front of a door once I build the lobby
 
 Future slices (dont do yet):
 - TBD
 
 For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
-- New breakables
 - Texture all items
 - Bunker and library palletes
 - Bunker and library rooms
