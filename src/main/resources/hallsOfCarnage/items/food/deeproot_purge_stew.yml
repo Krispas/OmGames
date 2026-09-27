@@ -3,6 +3,7 @@ name: "Deeproot Purge Stew"
 category: food
 rarity: rare
 material: SUSPICIOUS_STEW
+item-model: om:deeproot_purge_stew
 max-stack-size: 1
 lore:
   - "A bitter stew that quiets sculk pressure fast."

@@ -101,6 +101,7 @@ final class HallsSidebar {
         if (state.lives() > 0) {
             lines.add(ChatColor.RED + "Lives " + ChatColor.WHITE + state.lives());
         }
+        lines.add(ChatColor.DARK_RED + "Shame " + ChatColor.WHITE + state.shame());
         if (state.sculkPercent() > 0) {
             lines.add(ChatColor.DARK_AQUA + "Sculk " + ChatColor.WHITE + state.sculkPercent() + "%");
         }
@@ -108,7 +109,7 @@ final class HallsSidebar {
             lines.add(ChatColor.LIGHT_PURPLE + "Research " + ChatColor.WHITE
                     + (state.researchCrateDeposited() ? ChatColor.GREEN + "✓" : ChatColor.RED + "x"));
         }
-        if (!state.campFloor() && state.floor() > 1) {
+        if (!state.campFloor() && state.floor() > 1 && state.blueprintDistillerPresent()) {
             lines.add(ChatColor.BLUE + "Distillery " + ChatColor.WHITE
                     + (state.blueprintDistillerCollected() ? ChatColor.GREEN + "✓" : ChatColor.RED + "x"));
         }

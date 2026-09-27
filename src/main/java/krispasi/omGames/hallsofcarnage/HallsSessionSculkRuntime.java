@@ -169,7 +169,8 @@ final class HallsSessionSculkRuntime {
                 }
                 patchCells.add(cell);
                 if (random.nextDouble() < 0.80) {
-                    blockSetter.setBlock(x, origin.y() - 1, z, Material.SCULK, null);
+                    int floorY = sculkFloorY(x, z);
+                    blockSetter.setBlock(x, floorY, z, Material.SCULK, null);
                 }
                 maybePlaceVein(x, origin.y(), z, BlockFace.DOWN, random);
                 for (int y = origin.y(); y <= origin.y() + ROOM_HEIGHT; y++) {
@@ -192,6 +193,14 @@ final class HallsSessionSculkRuntime {
             return;
         }
         blockSetter.setBlock(x, y, z, Material.SCULK_VEIN, face);
+    }
+
+    private int sculkFloorY(int x, int z) {
+        Material topFloor = world.getBlockAt(x, origin.y() - 1, z).getType();
+        if (topFloor == Material.WATER || topFloor == Material.LAVA) {
+            return origin.y() - 3;
+        }
+        return origin.y() - 1;
     }
 
     private void clearPatchesOnly() {

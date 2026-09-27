@@ -62,13 +62,6 @@ modifiers:
     weight: 5
     effects:
       loot-multiplier: 0.75
-  more_sculk:
-    type: bad
-    display-name: "More Sculk"
-    icon: "☻"
-    weight: 2
-    effects:
-      sculk-multiplier: 3.0
   special_enemy:
     type: bad
     display-name: "Special Enemy"

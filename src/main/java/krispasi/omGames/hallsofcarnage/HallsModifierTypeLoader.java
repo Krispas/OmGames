@@ -42,6 +42,9 @@ public final class HallsModifierTypeLoader {
                 continue;
             }
             String id = normalizeId(key);
+            if (id.equals("more_sculk")) {
+                continue;
+            }
             HallsModifierType.Kind kind = modifierKind(row.getString("type", "bad"));
             Map<String, Object> effects = new LinkedHashMap<>();
             ConfigurationSection effectsSection = row.getConfigurationSection("effects");

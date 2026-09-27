@@ -3,6 +3,7 @@ name: "Sculk-Cleansing Hash"
 category: food
 rarity: normal
 material: BAKED_POTATO
+item-model: om:sculk_cleansing_hash
 max-stack-size: 1
 lore:
   - "Hot enough to push the whispering back."
@@ -11,5 +12,5 @@ stats:
   sculk-reduction-percent: 5
 recipe:
   potato: 1
-  cooked_mycelia: 1
+  baked_potato: 1
   wood_scrap: 1

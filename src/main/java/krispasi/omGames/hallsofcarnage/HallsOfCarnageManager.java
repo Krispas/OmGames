@@ -222,6 +222,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/food/carrot.yml",
             "hallsOfCarnage/items/food/raw_pufferfish.yml",
             "hallsOfCarnage/items/food/cooked_mycelia.yml",
+            "hallsOfCarnage/items/food/baked_potato.yml",
             "hallsOfCarnage/items/food/pufferfish_stew.yml",
             "hallsOfCarnage/items/food/sculk_cleansing_hash.yml",
             "hallsOfCarnage/items/food/deeproot_purge_stew.yml",
@@ -947,6 +948,17 @@ public final class HallsOfCarnageManager {
         HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
         if (session != null) {
             session.handleProjectileHit(player, event);
+        }
+    }
+
+    public void handleSessionProjectileLaunch(Player player, org.bukkit.entity.Projectile projectile) {
+        if (player == null || projectile == null) {
+            return;
+        }
+        Integer sessionId = playerSessions.get(player.getUniqueId());
+        HallsSession session = sessionId == null ? null : activeSessions.get(sessionId);
+        if (session != null) {
+            session.handleProjectileLaunch(player, projectile);
         }
     }
 

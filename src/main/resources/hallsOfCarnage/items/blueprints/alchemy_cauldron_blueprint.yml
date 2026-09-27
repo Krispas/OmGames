@@ -5,4 +5,5 @@ rarity: normal
 material: PAPER
 max-stack-size: 1
 lore:
+  - "Building size: Medium"
   - "Converts stored scrap into other stored scrap."

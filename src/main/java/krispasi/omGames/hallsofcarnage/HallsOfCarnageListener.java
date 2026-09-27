@@ -10,6 +10,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityTransformEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
@@ -192,6 +193,14 @@ public final class HallsOfCarnageListener implements Listener {
         Player shooter = manager.sessionProjectileShooter(event.getEntity());
         if (shooter != null) {
             manager.handleSessionProjectileHit(shooter, event);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onProjectileLaunch(ProjectileLaunchEvent event) {
+        Player shooter = manager.sessionProjectileShooter(event.getEntity());
+        if (shooter != null) {
+            manager.handleSessionProjectileLaunch(shooter, event.getEntity());
         }
     }
 

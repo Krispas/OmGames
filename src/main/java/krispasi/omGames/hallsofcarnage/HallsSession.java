@@ -91,7 +91,6 @@ public final class HallsSession {
     private static final String PROJECTILE_IMPACT_PROCESSED_KEY = "hoc_projectile_impact_processed";
     private static final String ITEM_USES_REMAINING_KEY = "hoc_uses_remaining";
     private static final Display.Brightness FULL_BRIGHTNESS = new Display.Brightness(15, 15);
-    private static final int BLUEPRINT_DISTILLERY_TARGET_COUNT = 5;
 
     private final JavaPlugin plugin;
     private final int id;
@@ -1295,6 +1294,46 @@ public final class HallsSession {
         }
     }
 
+    public void handleProjectileLaunch(Player player, org.bukkit.entity.Projectile projectile) {
+        if (player == null || projectile == null || !running || !participants.contains(player.getUniqueId())
+                || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())) {
+            return;
+        }
+        ItemStack weapon = player.getInventory().getItemInMainHand();
+        HallsItemType type = itemType(weapon);
+        if (type == null || !type.category().equals("weapon") || type.stats().getOrDefault("ranged", 0.0) <= 0.0) {
+            return;
+        }
+        applyProjectileWeaponMetadata(projectile, type);
+    }
+
+    private void applyProjectileWeaponMetadata(org.bukkit.entity.Projectile projectile, HallsItemType type) {
+        double damage = type.stats().getOrDefault("ranged_damage", 0.0);
+        if (damage > 0.0) {
+            projectile.getPersistentDataContainer().set(
+                    new org.bukkit.NamespacedKey(plugin, PROJECTILE_DAMAGE_KEY),
+                    PersistentDataType.DOUBLE,
+                    damage
+            );
+        }
+        setProjectileDouble(projectile, PROJECTILE_AOE_DAMAGE_KEY, type.stats().getOrDefault("aoe_damage", 0.0));
+        setProjectileDouble(projectile, PROJECTILE_AOE_RADIUS_KEY, type.stats().getOrDefault("aoe_radius", 0.0));
+        int poisonTicks = (int) Math.round(type.stats().getOrDefault("poison_seconds", 0.0) * 20.0);
+        if (poisonTicks > 0) {
+            projectile.getPersistentDataContainer().set(
+                    new org.bukkit.NamespacedKey(plugin, PROJECTILE_POISON_TICKS_KEY),
+                    PersistentDataType.INTEGER,
+                    poisonTicks
+            );
+            int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault("poison_amplifier", 1.0)) - 1);
+            projectile.getPersistentDataContainer().set(
+                    new org.bukkit.NamespacedKey(plugin, PROJECTILE_POISON_AMPLIFIER_KEY),
+                    PersistentDataType.INTEGER,
+                    amplifier
+            );
+        }
+    }
+
     private void applyBossDirectWeaponEffects(Player player) {
         if (player == null) {
             return;
@@ -1658,7 +1697,7 @@ public final class HallsSession {
         activeLiquidCells = renderExplorationLiquids(build, reservedCells);
         Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
         Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
-        renderExplorationSculk(build, liquidReservedCells);
+        renderExplorationSculk(build, reservedCells);
         Set<HallsExplorationGenerator.Cell> contentReservedCells = withReserved(reservedCells, vegetationCells);
         Set<HallsExplorationGenerator.Cell> researchCrateCells = placeResearchCrate(build, contentReservedCells);
         Set<HallsExplorationGenerator.Cell> distilleryCells = placeBlueprintDistilleries(build,
@@ -2411,9 +2450,11 @@ public final class HallsSession {
                                                                            Set<HallsExplorationGenerator.Cell> reservedCells) {
         removeBlueprintDistilleries();
         if (build == null || build.plan().rooms().size() <= 1
-                || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())) {
+                || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())
+                || build.floorDefinition().blueprintDistilleries() <= 0) {
             return Set.of();
         }
+        int targetCount = build.floorDefinition().blueprintDistilleries();
         Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
         Set<HallsExplorationGenerator.Cell> occupied = reservedCells == null ? Set.of() : reservedCells;
         List<HallsExplorationGenerator.Room> rooms = new ArrayList<>(build.plan().rooms());
@@ -2442,12 +2483,12 @@ public final class HallsSession {
                 placed++;
                 break;
             }
-            if (placed >= BLUEPRINT_DISTILLERY_TARGET_COUNT) {
+            if (placed >= targetCount) {
                 break;
             }
         }
-        if (placed < BLUEPRINT_DISTILLERY_TARGET_COUNT) {
-            debug("Placed " + placed + "/" + BLUEPRINT_DISTILLERY_TARGET_COUNT
+        if (placed < targetCount) {
+            debug("Placed " + placed + "/" + targetCount
                     + " blueprint distilleries on floor " + build.floor() + ".");
         }
         return Set.copyOf(reserved);
@@ -2528,27 +2569,49 @@ public final class HallsSession {
 
     private boolean allBlueprintDistilleriesActive() {
         return !blueprintDistilleries.isEmpty()
-                && blueprintDistilleries.size() >= BLUEPRINT_DISTILLERY_TARGET_COUNT
                 && blueprintDistilleries.values().stream().allMatch(BlueprintDistillery::active);
     }
 
     private void giveBlueprintDistilleryReward(Player player) {
-        ItemStack reward = blueprintFromScenario("normal", 33);
-        int slot = firstAvailableHotbarSlot(player.getInventory());
-        if (slot >= 0) {
-            player.getInventory().setItem(slot, reward);
-        } else {
-            dropSessionItem(player.getLocation(), reward);
-            player.sendActionBar(Component.text("Your hotbar is full. The blueprint dropped at your feet.", NamedTextColor.AQUA));
+        List<ItemStack> rewards = currentLevelBlueprintSet();
+        if (rewards.isEmpty()) {
+            rewards = List.of(blueprintPlaceholder());
+        }
+        int dropped = 0;
+        for (ItemStack reward : rewards) {
+            int slot = firstAvailableHotbarSlot(player.getInventory());
+            if (slot >= 0) {
+                player.getInventory().setItem(slot, reward);
+            } else {
+                dropSessionItem(player.getLocation(), reward);
+                dropped++;
+            }
+        }
+        if (dropped > 0) {
+            player.sendActionBar(Component.text(dropped + " blueprint reward"
+                    + (dropped == 1 ? " dropped" : "s dropped") + " at your feet.", NamedTextColor.AQUA));
         }
         world.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.9f, 1.2f);
         for (UUID playerId : participants) {
             Player participant = Bukkit.getPlayer(playerId);
             if (participant != null && participant.getWorld().equals(world)) {
-                participant.sendMessage(Component.text(player.getName() + " completed the blueprint distillery chain.",
+                participant.sendMessage(Component.text(player.getName() + " completed the blueprint distillery chain for "
+                                + rewards.size() + " blueprint" + (rewards.size() == 1 ? "." : "s."),
                         NamedTextColor.BLUE));
             }
         }
+    }
+
+    private List<ItemStack> currentLevelBlueprintSet() {
+        Set<String> ids = new java.util.LinkedHashSet<>();
+        ids.addAll(scenario.blueprintPool("normal", activeLevelTypeId));
+        ids.addAll(scenario.blueprintPool("rare", activeLevelTypeId));
+        return ids.stream()
+                .map(itemTypes::get)
+                .filter(item -> item != null && item.category().equals("blueprint"))
+                .sorted(Comparator.comparing(HallsItemType::id))
+                .map(item -> definedItem(item, 1))
+                .toList();
     }
 
     private Set<HallsExplorationGenerator.Cell> placeLibraryVents(ExplorationBuild build,
@@ -2560,25 +2623,31 @@ public final class HallsSession {
             return Set.of();
         }
         List<LibraryVentCandidate> candidates = libraryVentCandidates(build, reservedCells);
-        java.util.Collections.shuffle(candidates, build.random());
-        int targetPairs = Math.min(6, Math.max(2, build.plan().rooms().size() / 3));
+        List<LibraryVentCandidate> isolatedCandidates = candidates.stream()
+                .filter(candidate -> build.plan().rooms().get(candidate.roomIndex()).ventOnly())
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        List<LibraryVentCandidate> connectedCandidates = candidates.stream()
+                .filter(candidate -> !build.plan().rooms().get(candidate.roomIndex()).ventOnly())
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        java.util.Collections.shuffle(isolatedCandidates, build.random());
+        java.util.Collections.shuffle(connectedCandidates, build.random());
+        int targetPairs = isolatedCandidates.stream()
+                .map(LibraryVentCandidate::roomIndex)
+                .collect(java.util.stream.Collectors.toSet())
+                .size();
         Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
         Map<Integer, Integer> ventsByRoom = new HashMap<>();
         int pairs = 0;
-        while (pairs < targetPairs && candidates.size() >= 2) {
-            int firstIndex = bestDistributedLibraryVentIndex(candidates, reserved, ventsByRoom);
-            if (firstIndex < 0) {
-                break;
-            }
-            LibraryVentCandidate first = candidates.remove(firstIndex);
+        while (pairs < targetPairs && !isolatedCandidates.isEmpty() && !connectedCandidates.isEmpty()) {
+            LibraryVentCandidate first = isolatedCandidates.removeFirst();
             if (reserved.contains(first.cell())) {
                 continue;
             }
-            int partnerIndex = bestLibraryVentPartnerIndex(first, candidates, reserved, ventsByRoom);
+            int partnerIndex = bestLibraryVentPartnerIndex(first, connectedCandidates, reserved, ventsByRoom);
             if (partnerIndex < 0) {
                 continue;
             }
-            LibraryVentCandidate second = candidates.remove(partnerIndex);
+            LibraryVentCandidate second = connectedCandidates.remove(partnerIndex);
             LibraryVent firstVent = spawnLibraryVent(first);
             LibraryVent secondVent = spawnLibraryVent(second);
             firstVent.setLinkedInteractionId(secondVent.interactionId());
@@ -2814,11 +2883,6 @@ public final class HallsSession {
                 (float) wallFixtureYawDegrees(linked.face().getOppositeFace()), player.getLocation().getPitch());
         if (!isVentDestinationClear(new HallsExplorationGenerator.Cell(linked.x(), linked.z()))) {
             player.sendActionBar(Component.text("The vent is blocked.", NamedTextColor.GRAY));
-            return true;
-        }
-        if (isMonsterNear(destination, 5.0)) {
-            player.sendActionBar(Component.text("The vent is blocked by a monster.", NamedTextColor.RED));
-            world.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_ATTACK_IRON_DOOR, 0.55f, 1.6f);
             return true;
         }
         player.teleport(destination);
@@ -4146,6 +4210,7 @@ public final class HallsSession {
         }
         tickDeathFog();
         tickBlueprintDistilleryBeams();
+        tickLibraryVentSmoke();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
@@ -4174,9 +4239,11 @@ public final class HallsSession {
                 campKeys,
                 campHudBankProgress(),
                 researchPoints,
+                runShame,
                 remainingLives,
                 sculkRuntime.sculkPercent(player),
                 researchCrateDepositedThisFloor,
+                !blueprintDistilleries.isEmpty(),
                 blueprintDistilleryRewardClaimedThisFloor,
                 activeFloorModifiers.iconSummary()
         );
@@ -4311,6 +4378,7 @@ public final class HallsSession {
                 holes,
                 sculkPatches,
                 coinQuota,
+                floor.blueprintDistilleries(),
                 floor.layout(),
                 floor.boss());
     }
@@ -4933,6 +5001,17 @@ public final class HallsSession {
                 case REDSTONE_SCRAP -> dropSessionItem(dropLocation,
                         scrapItem(Material.REDSTONE, "Redstone Scrap", NamedTextColor.RED, PropReward.REDSTONE_SCRAP, 1));
             }
+        }
+    }
+
+    private void tickLibraryVentSmoke() {
+        if (libraryVents.isEmpty()) {
+            return;
+        }
+        for (LibraryVent vent : libraryVents.values()) {
+            world.spawnParticle(Particle.SMOKE,
+                    new Location(world, vent.x() + 0.5, vent.y() + 1.0, vent.z() + 0.5),
+                    2, 0.12, 0.18, 0.12, 0.01);
         }
     }
 
@@ -7118,7 +7197,7 @@ public final class HallsSession {
             activeLiquidCells = renderExplorationLiquids(build, reservedCells);
             Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
             Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
-            renderExplorationSculk(build, liquidReservedCells);
+            renderExplorationSculk(build, reservedCells);
             reservedCells = withReserved(reservedCells, vegetationCells);
             reservedCells = withReserved(reservedCells, placeResearchCrate(build, reservedCells));
             reservedCells = withReserved(reservedCells, placeBlueprintDistilleries(build, reservedCells));
@@ -7317,9 +7396,11 @@ public final class HallsSession {
                         int keys,
                         String campBank,
                         int researchPoints,
+                        int shame,
                         int lives,
                         int sculkPercent,
                         boolean researchCrateDeposited,
+                        boolean blueprintDistillerPresent,
                         boolean blueprintDistillerCollected,
                         String modifiers) {
     }

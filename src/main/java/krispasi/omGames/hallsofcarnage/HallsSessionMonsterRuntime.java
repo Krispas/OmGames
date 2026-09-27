@@ -811,7 +811,7 @@ final class HallsSessionMonsterRuntime {
         if (plan == null) {
             return List.of();
         }
-        return plan.walkableCells().stream()
+        return plan.monsterSpawnCells().stream()
                 .filter(cell -> Math.abs(cell.x() - origin.x()) + Math.abs(cell.z() - origin.z()) > 16)
                 .filter(cell -> world.getBlockAt(cell.x(), origin.y(), cell.z()).getType().isAir())
                 .toList();

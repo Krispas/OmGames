@@ -1,0 +1,14 @@
+id: baked_potato
+name: "Baked Potato"
+category: food
+rarity: normal
+material: BAKED_POTATO
+item-model: om:baked_potato
+max-stack-size: 1
+lore:
+  - "A hot camp staple from any working farm."
+stats:
+  heal: 4
+recipe:
+  potato: 1
+  wood_scrap: 1

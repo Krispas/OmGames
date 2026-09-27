@@ -127,6 +127,7 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
+- Next development slice applied: Untold Depths now follows `Extra Resources/halls_of_carnage/UntoldDepthsLevels.csv` after the Overdrive Spawner, ending with Archaic Guard on floor 40 while preserving its difficulty at 40. Scenario floors support explicit `blueprint-distilleries`; Untold Depths enables five-link chains only on pre-camp exploration floors, the HUD hides distillery state when absent, and completed chains now award every normal/rare blueprint in the current level type pool. The HUD now displays run shame. Boss projectile handling now also covers thrown ranged Halls weapons, with Frost Lance marked as a ranged trident. Sewer sculk patches can occupy liquid cells and replace the submerged solid bed. Blueprint lore now shows building size. More Sculk was removed from bundled modifiers and ignored by the loader. Added Baked Potato, updated early research/crafting and food item models/recipes. Library generation now marks about 25% of non-entry rooms as vent-only, excludes those rooms from monster spawn cells, creates vents only for those rooms, adds vent smoke, and no longer blocks vent use because of nearby monsters. Maven verification still depends on a local Maven/JDK 25 toolchain.
 - Next reviewer slice applied: Homing Mines now acquire targets through the active floor walkable-cell graph instead of straight-line distance, only arm/detonate when the target remains path-reachable, clamp movement toward the next BFS path cell, and use the moving mine display location for player/monster proximity checks. This prevents adjacent rooms separated by walls from triggering or being chased through solid geometry. Maven verification could not be run because `mvn` is not installed on PATH.
 - Next development slice applied: Fixed the Adrenaline Shot self-buff crash by replacing the `Particle.EFFECT` spawn with a payload-free `WITCH` particle, avoiding the Paper 26.2 `Particle.Spell` data requirement. Utility durability now has a shared fallback for non-damageable utility materials, stores remaining uses in item PDC when vanilla damage metadata is unavailable, syncs changed held items back to the player's hand, and removes the used hand item when charges run out. This covers Absorption Tonic and Ironhide Salve while preserving the same activation/cooldown wrapper used by other Halls utilities. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only Java 18 while the project targets Java 25.
 - Next reviewer slice applied: Conductpole chain damage now has a session-local recursion guard so secondary Bukkit damage does not re-enter Halls chain handling and overflow the stack. Halls utility activation now runs through one shared cooldown/durability wrapper, with utility effects reporting whether they actually fired before spending charge. Lodestone now traces a route through the generated floor walkable mask instead of drawing a direct line to the elevator. Handheld Scanner now reports active monster count without exposing spawn caps/timers. Added `absorption_tonic`, a 60-second-cooldown reusable absorption utility with 50 seconds of absorption, seeded it as a bundled resource, allowed it in Untold Depths, and added it to Knight's Feast. Homing Mines now stop and telegraph for 2 seconds after reaching a target before exploding. Maven verification could not be run because `mvn` is not installed and no Maven wrapper is present; targeted JDK 25 `javac` verification passed against the cached Paper `26.2.build.121-stable` API and required transitive jars.
@@ -164,16 +165,8 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Rework UntoldDepths scenario based on Extra Resources/halls_of_carnage/UntoldDepthsLevels.csv, only floors after Overdrive spawner floor changed. The difficulty for Archaic Guard should be preserved at 40
-- Make it so blueprint distilleries are only present on floors which have them configured in scenario file. Make it so each exploration level before camp has it. If the distillery is not on a floor, dont display it on hud.
-- Display Shame on the HUD
-- Make it so Blueprint Distillery rewards you with full set of blueprints you can find on the current level instead of just one
-- Make it so bosses are affected by ranged equipment such as bows, crossbows and tridents
-- Sculk seems to not replace solid blocks underwater on sewer floors, fix that
-- Make it so blueprint item says how large the building is
-- Remove the more sculk modifier from the game
-- Add a new item called baked potato, make from potatoes simillar to cooked mycelia, its gonna be available for crafting in the first research node. Edit some recipes for advanced foods to contain this item instead of cooked mycelia, also change textures for cooked mycelia, sculk cleanshing hash and deeproot stew to have more unique textures which other food items dont have
-- Rework generation for the library floors and vent generation there. When generating the floor, make it so around 25% dont have corridors leading to them, instead they are connected to the rest via vents (vents also dont generate randomly anymore), make it so vents create smoke particles to attract more attention. Remove the restriction for entering vents and make it so mobs cannot spawn in these out of reach rooms.
+- Bosses still dont take ranged damage from stuff like bows, crossbows and tridents
+- Library generation now takes too long and doesnt even generate stuff in those disconnected rooms properly (i've seen traps, but no breakables or vents), the performance must be improved, it almost crashed the server
 
 Future slices (dont do yet):
 - TBD
@@ -187,3 +180,4 @@ For reviewer to figure out:
 
 - Add a new scenario called Dammed Corridors. I will provide details:
 - Floor information is in document in Extra Resources/halls_of_carnage/DammedCorridorsLevels.csv
+- Fixed textures for cooked potato / mycelia and sculk removing foods

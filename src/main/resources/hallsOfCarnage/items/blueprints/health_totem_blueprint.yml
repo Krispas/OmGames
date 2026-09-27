@@ -5,4 +5,5 @@ rarity: rare
 material: PAPER
 max-stack-size: 1
 lore:
+  - "Building size: Large"
   - "Builds a large camp totem that grants temporary max health."

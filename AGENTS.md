@@ -1305,6 +1305,7 @@ SQLite tables:
 - Generated room and corridor wall columns should use wall material down through their foundation block instead of placing floor material under walls.
 - Room lighting should be embedded directly in generated room ceilings.
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
+- Halls exploration floor definitions may set `blueprint-distilleries`; `true` uses the default chain size of `5`, a positive number sets that exact chain size, and missing/false disables distilleries and their HUD line.
 - Scenario combat floors may define `boss: <boss-id>`. Boss definitions are loaded from `plugins/OmGames/HallsOfCarnage/bosses/*.yml`; bundled boss resources are copied on first run/reset like other Halls resources.
 - If a scenario floor is not explicitly configured but a prior exploration floor is configured, runtime reuses that prior exploration floor definition for the requested floor instead of falling back to the generic 8-room placeholder.
 - Exploration floors grow their per-session generation/cleanup radius from the configured room count and retry with larger radii if planning underfills.
@@ -1339,7 +1340,7 @@ SQLite tables:
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, optional `recipe` cost map, and an optional `stats` map.
 - Bundled Halls armor item resources are organized by equipped slot under `items/armors/helmets/`, `items/armors/chestplates/`, `items/armors/leggings/`, and `items/armors/boots/`.
-- Halls player item defaults include first-pass ranged bows/crossbows; ranged Halls weapons use `stats.ranged` / `stats.ranged-damage`, keep a marked arrow stack in a blocked inventory row, and should not consume arrows on shot.
+- Halls player item defaults include first-pass ranged bows/crossbows/tridents; ranged Halls weapons use `stats.ranged` / `stats.ranged-damage`, keep a marked arrow stack in a blocked inventory row for bows/crossbows, and should not consume arrows on shot.
 - Armor `item-model` controls the item icon/model; armor `armor-model` is written to Paper's equippable component for the worn armor model.
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
 - Halls scenarios may define top-level `camp.layout`, `camp.team-lives`, and `camp.key-costs`; camp floors use the scenario's shared camp layout instead of separate per-floor camp layouts.

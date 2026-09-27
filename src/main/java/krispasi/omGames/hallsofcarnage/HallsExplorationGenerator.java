@@ -117,11 +117,17 @@ final class HallsExplorationGenerator {
             if (path.isEmpty()) {
                 continue;
             }
-            candidate.anchor().openings().put(candidate.anchorFace(), candidate.anchorOffset());
-            candidate.room().openings().put(candidate.roomFace(), candidate.roomOffset());
-            networkCells.add(anchorDoor);
+            boolean ventOnlyRoom = shouldMakeLibraryVentOnlyRoom();
+            candidate.room().setVentOnly(ventOnlyRoom);
+            if (!ventOnlyRoom) {
+                candidate.anchor().openings().put(candidate.anchorFace(), candidate.anchorOffset());
+                candidate.room().openings().put(candidate.roomFace(), candidate.roomOffset());
+                networkCells.add(anchorDoor);
+            }
             addRoom(candidate.room());
-            rememberCorridor(path, shouldUseLibraryVentConnector(path));
+            if (!ventOnlyRoom) {
+                rememberCorridor(path, shouldUseLibraryVentConnector(path));
+            }
         }
         addFirstRoomOnwardRoutes();
         addRoomToRoomLoops();
@@ -236,6 +242,7 @@ final class HallsExplorationGenerator {
 
     private RoomConnection randomRoomConnection(HallsLayout layout) {
         List<Room> anchors = rooms.stream()
+                .filter(room -> !room.ventOnly())
                 .filter(room -> !availableFaces(room).isEmpty())
                 .toList();
         if (anchors.isEmpty()) {
@@ -721,6 +728,10 @@ final class HallsExplorationGenerator {
         }
     }
 
+    private boolean shouldMakeLibraryVentOnlyRoom() {
+        return corridorMode == CorridorMode.LIBRARY && rooms.size() > 2 && random.nextDouble() < 0.25;
+    }
+
     private void rememberCorridor(List<Cell> path) {
         rememberCorridor(path, false);
     }
@@ -874,6 +885,9 @@ final class HallsExplorationGenerator {
         int attempts = 0;
         while (first.openings().size() < wantedOpenings && attempts++ < rooms.size() * 8) {
             Room target = rooms.get(1 + random.nextInt(rooms.size() - 1));
+            if (target.ventOnly()) {
+                continue;
+            }
             if (connectRooms(first, target, true)) {
                 continue;
             }
@@ -888,7 +902,8 @@ final class HallsExplorationGenerator {
         while (added < target && attempts++ < roomLoopAttemptLimit()) {
             Room from = rooms.get(random.nextInt(rooms.size()));
             Room to = rooms.get(random.nextInt(rooms.size()));
-            if (from == to || manhattanDistance(new Cell(from.centerX(), from.centerZ()), new Cell(to.centerX(), to.centerZ())) < 12) {
+            if (from == to || from.ventOnly() || to.ventOnly()
+                    || manhattanDistance(new Cell(from.centerX(), from.centerZ()), new Cell(to.centerX(), to.centerZ())) < 12) {
                 continue;
             }
             if (connectRooms(from, to, false)) {
@@ -1533,6 +1548,12 @@ final class HallsExplorationGenerator {
     private Plan plan() {
         Set<Cell> walkable = new HashSet<>(corridorCells);
         walkable.addAll(roomInteriorCells);
+        Set<Cell> monsterSpawnCells = new HashSet<>(corridorCells);
+        for (Room room : rooms) {
+            if (!room.ventOnly()) {
+                monsterSpawnCells.addAll(openInteriorCells(room));
+            }
+        }
         return new Plan(
                 List.copyOf(rooms),
                 Set.copyOf(corridorCells),
@@ -1541,6 +1562,7 @@ final class HallsExplorationGenerator {
                 Set.copyOf(ventGateCells),
                 Set.copyOf(liquidCells),
                 Set.copyOf(walkable),
+                Set.copyOf(monsterSpawnCells),
                 allRoomsReachable(walkable)
         );
     }
@@ -1566,6 +1588,9 @@ final class HallsExplorationGenerator {
             }
         }
         for (Room room : rooms) {
+            if (room.ventOnly()) {
+                continue;
+            }
             boolean roomReachable = openInteriorCells(room).stream().anyMatch(reachable::contains);
             if (!roomReachable) {
                 return false;
@@ -1581,6 +1606,7 @@ final class HallsExplorationGenerator {
                 Set<Cell> ventGateCells,
                 Set<Cell> liquidCells,
                 Set<Cell> walkableCells,
+                Set<Cell> monsterSpawnCells,
                 boolean reachable) {
     }
 
@@ -1589,6 +1615,7 @@ final class HallsExplorationGenerator {
         private final int startX;
         private final int startZ;
         private final Map<BlockFace, Integer> openings = new HashMap<>();
+        private boolean ventOnly;
 
         private Room(HallsLayout layout, int startX, int startZ) {
             this.layout = layout;
@@ -1610,6 +1637,14 @@ final class HallsExplorationGenerator {
 
         Map<BlockFace, Integer> openings() {
             return openings;
+        }
+
+        boolean ventOnly() {
+            return ventOnly;
+        }
+
+        void setVentOnly(boolean ventOnly) {
+            this.ventOnly = ventOnly;
         }
 
         int centerX() {

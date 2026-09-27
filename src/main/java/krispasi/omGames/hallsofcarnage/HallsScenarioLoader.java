@@ -239,6 +239,7 @@ public final class HallsScenarioLoader {
                     positiveInt(map.get("holes"), 1),
                     positiveInt(map.get("sculk-patches"), 2),
                     positiveInt(map.get("coin-quota"), 0),
+                    blueprintDistilleryCount(map.get("blueprint-distilleries")),
                     stringValue(map.get("layout"), ""),
                     normalizeId(stringValue(map.get("boss"), ""))
             ));
@@ -271,6 +272,7 @@ public final class HallsScenarioLoader {
                         + " holes=" + floor.holes()
                         + " sculk-patches=" + floor.sculkPatches()
                         + " coin-quota=" + floor.coinQuota()
+                        + " blueprint-distilleries=" + floor.blueprintDistilleries()
                         + " layout=" + floor.layout());
             }
         }
@@ -333,6 +335,26 @@ public final class HallsScenarioLoader {
             return new TrapRange(amount, amount);
         }
         return new TrapRange(1, 2);
+    }
+
+    private static int blueprintDistilleryCount(Object value) {
+        if (value instanceof Boolean enabled) {
+            return enabled ? 5 : 0;
+        }
+        if (value instanceof Number number) {
+            return Math.max(0, number.intValue());
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            String normalized = normalizeId(text);
+            if (normalized.equals("true") || normalized.equals("yes")) {
+                return 5;
+            }
+            if (normalized.equals("false") || normalized.equals("no")) {
+                return 0;
+            }
+            return parsePositiveInt(text, 0);
+        }
+        return 0;
     }
 
     private static int parsePositiveInt(String text, int fallback) {

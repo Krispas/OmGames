@@ -52,7 +52,7 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
     }
 
     public double sculkMultiplier() {
-        return multipliedEffect("sculk_multiplier", 1.0);
+        return 1.0;
     }
 
     public double coinMultiplier() {
@@ -171,6 +171,7 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
                 holes,
                 sculkPatches,
                 coinQuota,
+                floor.blueprintDistilleries(),
                 floor.layout(),
                 floor.boss()
         );
