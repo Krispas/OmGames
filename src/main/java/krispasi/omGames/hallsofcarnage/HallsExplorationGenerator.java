@@ -980,8 +980,6 @@ final class HallsExplorationGenerator {
             trunk = new ArrayList<>(corridorCells);
         }
         addRoomToRoomLoops();
-        int extraBranches = Math.max(4, rooms.size() / 2);
-        addMazeBranches(extraBranches);
     }
 
     private List<Cell> bunkerTrunkPath() {

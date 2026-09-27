@@ -1,5 +1,6 @@
 package krispasi.omGames.hallsofcarnage;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -69,6 +70,7 @@ final class HallsSessionTrapRuntime {
     private final Map<HallsTrap, Long> homingMineDetonateTicks = new IdentityHashMap<>();
     private final Map<HallsTrap, Integer> trapHitPoints = new IdentityHashMap<>();
     private final Set<UUID> transientTrapDisplays = new HashSet<>();
+    private Set<HallsExplorationGenerator.Cell> floorWalkableCells = Set.of();
     private BukkitTask trapTask;
     private long trapRuntimeTick;
 
@@ -116,6 +118,7 @@ final class HallsSessionTrapRuntime {
         homingMineDetonateTicks.clear();
         transientTrapDisplays.clear();
         trapDamageCooldowns.clear();
+        floorWalkableCells = Set.of();
         trapRuntimeTick = 0L;
         stopTrapTask();
     }
@@ -266,6 +269,7 @@ final class HallsSessionTrapRuntime {
                                                             HallsFloorModifiers modifiers,
                                                             Set<HallsExplorationGenerator.Cell> liquidCells) {
         clear();
+        floorWalkableCells = new HashSet<>(plan.walkableCells());
         Set<HallsExplorationGenerator.Cell> liquidTrapCells = liquidCells == null ? Set.of() : Set.copyOf(liquidCells);
         List<TrapCandidate> candidates = trapCandidates(plan);
         List<TrapCandidate> holeCandidates = holeCandidates(plan);
@@ -422,6 +426,8 @@ final class HallsSessionTrapRuntime {
                 continue;
             }
             buildPit(pitCells, bridgeCells, roomPitCells(candidate), type);
+            floorWalkableCells.removeAll(pitCells);
+            floorWalkableCells.addAll(bridgeCells);
             TrapKind kind = bridgeCells.isEmpty() ? TrapKind.HOLE : TrapKind.HOLE_BRIDGE;
             for (HallsExplorationGenerator.Cell pitCell : pitCells) {
                 if (!bridgeCells.contains(pitCell)) {
@@ -1324,20 +1330,20 @@ final class HallsSessionTrapRuntime {
 
     private void tickHomingMine(HallsTrap trap, long tick, Location center) {
         long armedUntil = trapNextTriggerTicks.getOrDefault(trap, 0L);
-        Player target = nearestParticipant(center, 7.0);
         Entity display = trap.movingDisplayId() == null ? null : Bukkit.getEntity(trap.movingDisplayId());
+        Location mineLocation = display == null ? center : display.getLocation();
+        Player target = nearestParticipant(mineLocation, 7.0);
         Long detonateAt = homingMineDetonateTicks.get(trap);
         if (detonateAt != null) {
-            Location location = display == null ? center : display.getLocation();
             if (tick >= detonateAt) {
                 homingMineDetonateTicks.remove(trap);
                 triggerProximityMine(trap, target);
                 return;
             }
             if (tick % 5L == 0L) {
-                world.spawnParticle(Particle.ELECTRIC_SPARK, location.clone().add(0.0, 0.25, 0.0),
+                world.spawnParticle(Particle.ELECTRIC_SPARK, mineLocation.clone().add(0.0, 0.25, 0.0),
                         8, 0.18, 0.08, 0.18, 0.02);
-                world.playSound(location, Sound.BLOCK_NOTE_BLOCK_PLING, 0.45f,
+                world.playSound(mineLocation, Sound.BLOCK_NOTE_BLOCK_PLING, 0.45f,
                         tick + 10L >= detonateAt ? 1.85f : 1.35f);
             }
             return;
@@ -1353,15 +1359,18 @@ final class HallsSessionTrapRuntime {
             return;
         }
         if (target != null && display != null) {
-            Vector delta = target.getLocation().toVector().subtract(display.getLocation().toVector());
-            delta.setY(0.0);
-            if (delta.lengthSquared() <= 1.15 * 1.15) {
+            Vector targetDelta = target.getLocation().toVector().subtract(mineLocation.toVector());
+            targetDelta.setY(0.0);
+            if (targetDelta.lengthSquared() <= 1.15 * 1.15) {
                 homingMineDetonateTicks.put(trap, tick + 40L);
                 world.playSound(display.getLocation(), Sound.BLOCK_COPPER_BULB_TURN_OFF, 0.9f, 0.65f);
                 world.spawnParticle(Particle.SMOKE, display.getLocation().clone().add(0.0, 0.25, 0.0),
                         18, 0.22, 0.08, 0.22, 0.03);
                 return;
             }
+            Location destination = homingMinePathDestination(mineLocation, target.getLocation());
+            Vector delta = destination.toVector().subtract(mineLocation.toVector());
+            delta.setY(0.0);
             if (delta.lengthSquared() > 0.04) {
                 Location previous = display.getLocation().clone();
                 Location next = display.getLocation().add(delta.normalize().multiply(0.22));
@@ -1374,6 +1383,81 @@ final class HallsSessionTrapRuntime {
         if (tick % 10L == 0L) {
             world.playSound(display == null ? center : display.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.35f, 1.8f);
         }
+    }
+
+    private Location homingMinePathDestination(Location mineLocation, Location targetLocation) {
+        if (floorWalkableCells.isEmpty()) {
+            return targetLocation;
+        }
+        HallsExplorationGenerator.Cell start = nearestWalkableCell(cellAt(mineLocation), 3);
+        HallsExplorationGenerator.Cell goal = nearestWalkableCell(cellAt(targetLocation), 4);
+        if (start == null || goal == null) {
+            return mineLocation;
+        }
+        HallsExplorationGenerator.Cell next = nextPathCell(start, goal);
+        if (next == null) {
+            return mineLocation;
+        }
+        return new Location(world, next.x() + 0.5, homingMinePlateY(), next.z() + 0.5);
+    }
+
+    private HallsExplorationGenerator.Cell cellAt(Location location) {
+        return new HallsExplorationGenerator.Cell(location.getBlockX(), location.getBlockZ());
+    }
+
+    private HallsExplorationGenerator.Cell nearestWalkableCell(HallsExplorationGenerator.Cell originCell, int radius) {
+        if (floorWalkableCells.contains(originCell)) {
+            return originCell;
+        }
+        HallsExplorationGenerator.Cell best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (HallsExplorationGenerator.Cell cell : floorWalkableCells) {
+            int distance = Math.abs(cell.x() - originCell.x()) + Math.abs(cell.z() - originCell.z());
+            if (distance <= radius && distance < bestDistance) {
+                best = cell;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    private HallsExplorationGenerator.Cell nextPathCell(HallsExplorationGenerator.Cell start,
+                                                       HallsExplorationGenerator.Cell goal) {
+        if (start.equals(goal)) {
+            return goal;
+        }
+        Set<HallsExplorationGenerator.Cell> seen = new HashSet<>();
+        java.util.Map<HallsExplorationGenerator.Cell, HallsExplorationGenerator.Cell> previous = new java.util.HashMap<>();
+        ArrayDeque<HallsExplorationGenerator.Cell> queue = new ArrayDeque<>();
+        seen.add(start);
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            HallsExplorationGenerator.Cell current = queue.remove();
+            if (current.equals(goal)) {
+                return firstStepOnPath(start, goal, previous);
+            }
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                HallsExplorationGenerator.Cell next = step(current, face);
+                if (!floorWalkableCells.contains(next) || !seen.add(next)) {
+                    continue;
+                }
+                previous.put(next, current);
+                queue.add(next);
+            }
+        }
+        return null;
+    }
+
+    private HallsExplorationGenerator.Cell firstStepOnPath(HallsExplorationGenerator.Cell start,
+                                                          HallsExplorationGenerator.Cell goal,
+                                                          java.util.Map<HallsExplorationGenerator.Cell, HallsExplorationGenerator.Cell> previous) {
+        HallsExplorationGenerator.Cell current = goal;
+        HallsExplorationGenerator.Cell parent = previous.get(current);
+        while (parent != null && !parent.equals(start)) {
+            current = parent;
+            parent = previous.get(current);
+        }
+        return parent == null ? start : current;
     }
 
     private void moveHomingMineDisplays(HallsTrap trap, Location previousAnchor, Location nextAnchor) {
@@ -1552,6 +1636,7 @@ final class HallsSessionTrapRuntime {
         }
         traps.removeIf(candidate -> candidate == trap);
         trapNextTriggerTicks.remove(trap);
+        homingMineDetonateTicks.remove(trap);
         trapHitPoints.remove(trap);
     }
 
