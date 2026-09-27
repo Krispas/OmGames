@@ -614,7 +614,8 @@ final class HallsSessionBossRuntime {
             animateDisplays("shockwave_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw(), -0.05, new Vector());
         }, () -> {
             world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 0.65f);
-            new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond(),
+            Location origin = activeBoss.location().clone().add(0.0, 0.08, 0.0);
+            new Shockwave(origin, config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond(),
                     config.shockwaveMaxRadius(), Particle.ELECTRIC_SPARK).runTaskTimer(plugin, 1L, 2L);
             if (remaining > 1) {
                 Bukkit.getScheduler().runTaskLater(plugin, () -> runArchaicShockwaveChain(config, remaining - 1,
@@ -645,7 +646,8 @@ final class HallsSessionBossRuntime {
             animateDisplays("wall_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw() + activeBoss.attackAnimationTicks() * 5.0f,
                     0.04, new Vector());
         }, () -> {
-            new WallWave(config.wallDamage(), config.wallSpeedBlocksPerSecond(), config.wallMaxRadius(), rotation, safeDegrees)
+            Location origin = activeBoss.location().clone().add(0.0, 0.12, 0.0);
+            new WallWave(origin, config.wallDamage(), config.wallSpeedBlocksPerSecond(), config.wallMaxRadius(), rotation, safeDegrees)
                     .runTaskTimer(plugin, 1L, 2L);
             if (remaining > 1) {
                 Bukkit.getScheduler().runTaskLater(plugin, () -> runWallChain(config, remaining - 1), config.wallGapTicks());
@@ -1172,7 +1174,7 @@ final class HallsSessionBossRuntime {
                 entity.setTeleportDuration(2);
                 entity.setTransformation(HallsDisplayTransforms.centeredBlock(
                         part.scaleX(), part.scaleY(), part.scaleZ(),
-                        new Quaternionf().rotateY((float) Math.toRadians(yaw))));
+                        bossDisplayRotation(yaw, true, 0.0)));
                 entity.addScoreboardTag(BOSS_TAG);
             });
             ids.add(display.getUniqueId());
@@ -1188,7 +1190,7 @@ final class HallsSessionBossRuntime {
                 entity.setTeleportDuration(2);
                 entity.setTransformation(HallsDisplayTransforms.centeredBlock(
                         part.scaleX(), part.scaleY(), part.scaleZ(),
-                        new Quaternionf().rotateY((float) Math.toRadians(yaw))));
+                        bossDisplayRotation(yaw, true, 0.0)));
                 entity.addScoreboardTag(BOSS_TAG);
             });
             ids.add(display.getUniqueId());
@@ -1238,7 +1240,7 @@ final class HallsSessionBossRuntime {
                         part.scaleX() * pose.scaleX() * activeBoss.scaleMultiplier(),
                         part.scaleY() * pose.scaleY() * activeBoss.scaleMultiplier(),
                         part.scaleZ() * pose.scaleZ() * activeBoss.scaleMultiplier(),
-                        new Quaternionf().rotateY((float) Math.toRadians((applyBaseYaw ? yaw : 0.0f) + pose.yawOffset()))));
+                        bossDisplayRotation(yaw, applyBaseYaw, pose.yawOffset())));
             } else {
                 entity.teleport(displayLocation(activeBoss.location(), part, visualYOffset, combinedOffset, yaw, false));
             }
@@ -1351,6 +1353,11 @@ final class HallsSessionBossRuntime {
                 xOffset,
                 part.offsetY() + yOffset + offset.getY() + part.scaleY() * 0.5,
                 zOffset);
+    }
+
+    private Quaternionf bossDisplayRotation(float yaw, boolean applyBaseYaw, double yawOffset) {
+        double baseYaw = applyBaseYaw ? -yaw : 0.0;
+        return new Quaternionf().rotateY((float) Math.toRadians(baseYaw + yawOffset));
     }
 
     private void refreshBossBarPlayers() {
@@ -1558,7 +1565,8 @@ final class HallsSessionBossRuntime {
                 return;
             }
             world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, activeBoss.enraged() ? 0.45f : 0.55f);
-            new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond(), 13.0, Particle.DUST_PLUME)
+            Location origin = activeBoss.location().clone().add(0.0, 0.08, 0.0);
+            new Shockwave(origin, config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond(), 13.0, Particle.DUST_PLUME)
                     .runTaskTimer(plugin, 1L, 2L);
             if (remaining > 1) {
                 Bukkit.getScheduler().runTaskLater(plugin, () -> runJumpChain(config, remaining - 1), 12L);
@@ -1570,6 +1578,7 @@ final class HallsSessionBossRuntime {
     }
 
     private final class Shockwave extends org.bukkit.scheduler.BukkitRunnable {
+        private final Location center;
         private final double damage;
         private final double radiusStep;
         private final double maxRadius;
@@ -1577,7 +1586,8 @@ final class HallsSessionBossRuntime {
         private double radius = 1.0;
         private final Set<UUID> hit = new java.util.HashSet<>();
 
-        private Shockwave(double damage, double speedBlocksPerSecond, double maxRadius, Particle particle) {
+        private Shockwave(Location center, double damage, double speedBlocksPerSecond, double maxRadius, Particle particle) {
+            this.center = center == null ? null : center.clone();
             this.damage = damage;
             this.radiusStep = Math.max(0.05, speedBlocksPerSecond * 2.0 / 20.0);
             this.maxRadius = Math.max(1.0, maxRadius);
@@ -1586,11 +1596,10 @@ final class HallsSessionBossRuntime {
 
         @Override
         public void run() {
-            if (activeBoss == null) {
+            if (activeBoss == null || center == null) {
                 cancel();
                 return;
             }
-            Location center = activeBoss.location().clone().add(0.0, 0.08, 0.0);
             for (double angle = 0.0; angle < Math.PI * 2.0; angle += Math.PI / 18.0) {
                 Location point = center.clone().add(Math.cos(angle) * radius, 0.0, Math.sin(angle) * radius);
                 world.spawnParticle(particle, point, 1, 0.015, 0.015, 0.015, 0.0);
@@ -1615,6 +1624,7 @@ final class HallsSessionBossRuntime {
     }
 
     private final class WallWave extends org.bukkit.scheduler.BukkitRunnable {
+        private final Location center;
         private final double damage;
         private final double radiusStep;
         private final double maxRadius;
@@ -1623,7 +1633,8 @@ final class HallsSessionBossRuntime {
         private final Set<UUID> hit = new java.util.HashSet<>();
         private double radius = 1.0;
 
-        private WallWave(double damage, double speedBlocksPerSecond, double maxRadius, double rotationDegrees, double safeDegrees) {
+        private WallWave(Location center, double damage, double speedBlocksPerSecond, double maxRadius, double rotationDegrees, double safeDegrees) {
+            this.center = center == null ? null : center.clone();
             this.damage = damage;
             this.radiusStep = Math.max(0.05, speedBlocksPerSecond * 2.0 / 20.0);
             this.maxRadius = Math.max(1.0, maxRadius);
@@ -1633,11 +1644,10 @@ final class HallsSessionBossRuntime {
 
         @Override
         public void run() {
-            if (activeBoss == null) {
+            if (activeBoss == null || center == null) {
                 cancel();
                 return;
             }
-            Location center = activeBoss.location().clone().add(0.0, 0.12, 0.0);
             for (double degrees = 0.0; degrees < 360.0; degrees += 5.0) {
                 if (isSafeWallAngle(degrees, rotationDegrees, safeDegrees)) {
                     continue;
