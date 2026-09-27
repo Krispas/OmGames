@@ -89,6 +89,7 @@ public final class HallsSession {
     private static final String PROJECTILE_POISON_TICKS_KEY = "hoc_projectile_poison_ticks";
     private static final String PROJECTILE_POISON_AMPLIFIER_KEY = "hoc_projectile_poison_amplifier";
     private static final String PROJECTILE_IMPACT_PROCESSED_KEY = "hoc_projectile_impact_processed";
+    private static final String ITEM_USES_REMAINING_KEY = "hoc_uses_remaining";
     private static final Display.Brightness FULL_BRIGHTNESS = new Display.Brightness(15, 15);
     private static final int BLUEPRINT_DISTILLERY_TARGET_COUNT = 5;
 
@@ -5045,7 +5046,7 @@ public final class HallsSession {
         int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault(statPrefix + "_seconds", 8.0) * 20.0));
         int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault(statPrefix + "_amplifier", 1.0)) - 1);
         player.addPotionEffect(new PotionEffect(effectType, durationTicks, amplifier, true, true, true));
-        world.spawnParticle(Particle.EFFECT, player.getLocation().add(0.0, 1.0, 0.0),
+        world.spawnParticle(Particle.WITCH, player.getLocation().add(0.0, 1.0, 0.0),
                 32, 0.35, 0.6, 0.35, 0.05);
         world.playSound(player.getLocation(), sound, 0.75f, 1.2f);
         player.sendActionBar(Component.text(message, NamedTextColor.GREEN));
@@ -5293,23 +5294,71 @@ public final class HallsSession {
             return;
         }
         double configuredDurability = type.stats().getOrDefault("durability", 0.0);
-        if (configuredDurability <= 0.0 || !(item.getItemMeta() instanceof Damageable damageable)) {
+        int maxUses = Math.max(0, (int) Math.round(configuredDurability));
+        if (maxUses <= 0) {
             return;
         }
-        int maxDamage = damageable.getMaxDamage();
-        if (maxDamage <= 0) {
-            maxDamage = Math.max(1, (int) Math.round(configuredDurability));
-            damageable.setMaxDamage(maxDamage);
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
         }
-        int nextDamage = damageable.getDamage() + 1;
-        if (nextDamage >= maxDamage) {
+        if (meta instanceof Damageable damageable) {
+            int maxDamage = damageable.getMaxDamage();
+            if (maxDamage <= 0) {
+                maxDamage = maxUses;
+                damageable.setMaxDamage(maxDamage);
+            }
+            int nextDamage = damageable.getDamage() + 1;
+            if (nextDamage >= maxDamage) {
+                breakHeldUtilityItem(player, item, type);
+                return;
+            }
+            damageable.setDamage(nextDamage);
+            item.setItemMeta((ItemMeta) damageable);
+            syncHeldItem(player, item, type);
+            return;
+        }
+
+        org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, ITEM_USES_REMAINING_KEY);
+        Integer remaining = meta.getPersistentDataContainer().get(key, PersistentDataType.INTEGER);
+        int nextRemaining = (remaining == null ? maxUses : remaining) - 1;
+        if (nextRemaining <= 0) {
+            breakHeldUtilityItem(player, item, type);
+            return;
+        }
+        meta.getPersistentDataContainer().set(key, PersistentDataType.INTEGER, nextRemaining);
+        item.setItemMeta(meta);
+        syncHeldItem(player, item, type);
+    }
+
+    private void breakHeldUtilityItem(Player player, ItemStack usedItem, HallsItemType type) {
+        if (sameHeldItem(player.getInventory().getItemInMainHand(), usedItem, type)) {
             player.getInventory().setItemInMainHand(null);
-            world.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 0.8f, 1.0f);
-            player.sendActionBar(Component.text(type.name() + " broke.", NamedTextColor.RED));
-            return;
+        } else if (sameHeldItem(player.getInventory().getItemInOffHand(), usedItem, type)) {
+            player.getInventory().setItemInOffHand(null);
+        } else {
+            player.getInventory().setItemInMainHand(null);
         }
-        damageable.setDamage(nextDamage);
-        item.setItemMeta((ItemMeta) damageable);
+        world.playSound(player.getLocation(), Sound.ENTITY_ITEM_BREAK, 0.8f, 1.0f);
+        player.sendActionBar(Component.text(type.name() + " broke.", NamedTextColor.RED));
+    }
+
+    private void syncHeldItem(Player player, ItemStack item, HallsItemType type) {
+        if (sameHeldItem(player.getInventory().getItemInMainHand(), item, type)) {
+            player.getInventory().setItemInMainHand(item);
+        } else if (sameHeldItem(player.getInventory().getItemInOffHand(), item, type)) {
+            player.getInventory().setItemInOffHand(item);
+        } else {
+            player.getInventory().setItemInMainHand(item);
+        }
+    }
+
+    private boolean sameHeldItem(ItemStack candidate, ItemStack item, HallsItemType type) {
+        if (candidate == item || (candidate != null && item != null && candidate.equals(item))) {
+            return true;
+        }
+        HallsItemType candidateType = itemType(candidate);
+        return candidateType != null && candidateType.id().equals(type.id());
     }
 
     private String utilityCooldownKey(Player player, HallsItemType type) {

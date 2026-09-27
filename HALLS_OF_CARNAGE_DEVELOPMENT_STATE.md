@@ -127,6 +127,7 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
+- Next development slice applied: Fixed the Adrenaline Shot self-buff crash by replacing the `Particle.EFFECT` spawn with a payload-free `WITCH` particle, avoiding the Paper 26.2 `Particle.Spell` data requirement. Utility durability now has a shared fallback for non-damageable utility materials, stores remaining uses in item PDC when vanilla damage metadata is unavailable, syncs changed held items back to the player's hand, and removes the used hand item when charges run out. This covers Absorption Tonic and Ironhide Salve while preserving the same activation/cooldown wrapper used by other Halls utilities. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only Java 18 while the project targets Java 25.
 - Next reviewer slice applied: Conductpole chain damage now has a session-local recursion guard so secondary Bukkit damage does not re-enter Halls chain handling and overflow the stack. Halls utility activation now runs through one shared cooldown/durability wrapper, with utility effects reporting whether they actually fired before spending charge. Lodestone now traces a route through the generated floor walkable mask instead of drawing a direct line to the elevator. Handheld Scanner now reports active monster count without exposing spawn caps/timers. Added `absorption_tonic`, a 60-second-cooldown reusable absorption utility with 50 seconds of absorption, seeded it as a bundled resource, allowed it in Untold Depths, and added it to Knight's Feast. Homing Mines now stop and telegraph for 2 seconds after reaching a target before exploding. Maven verification could not be run because `mvn` is not installed and no Maven wrapper is present; targeted JDK 25 `javac` verification passed against the cached Paper `26.2.build.121-stable` API and required transitive jars.
 - Next development slice applied: Archaic Guard fire-wall charge no longer spins the boss model during the wall attack telegraph. Plugin-side boss and trap damage now route through a shared Halls armor reducer based on the player's live `ARMOR` and `ARMOR_TOUGHNESS` attributes before calling Bukkit damage, so Halls armor affects damage paths that bypass normal entity-combat events. Bundled boss attack values were increased as requested: Overdrive Spawner shockwaves/X-blasts are 150% of prior values, and Archaic Guard missile/shockwave/fire-wall damage is 250% of prior values.
 - Next reviewer slice applied: Archaic Guard boss display transforms now rotate the rendered block-display models with the inverse Bukkit yaw while keeping the already-rotated part offsets, so flat directional parts such as the red eyes stay facing with the body during movement and attacks instead of visually turning the opposite way. Shockwave and radial wall waves now snapshot their cast origin when the wave starts, so a later reposition or circle dash no longer drags the active attack outward from the guard's new location. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `javac 18.0.2-beta` while the project targets Java 25.
@@ -160,8 +161,8 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Exception when using adrenaline shot java.lang.IllegalArgumentException: missing required data class org.bukkit.Particle$Spell
-- Absorption tonic, ironhide salve durability doesnt work, wasnt the whole point of last sprint to have utility behaviour unified?!
+- Make  bunker style worldgen not generate dead corridors which lead nowhere
+- Make homing mines not go through walls, use masks for pathfinding
 
 Future slices (dont do yet):
 - TBD
@@ -173,3 +174,4 @@ For reviewer to figure out:
 - Bunker and library palletes
 - Bunker and library rooms
 - Rework descriptions for all items
+- Rebalance utilities
