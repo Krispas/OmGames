@@ -240,7 +240,8 @@ public final class HallsSession {
         this.bossRuntime = new HallsSessionBossRuntime(plugin, world, participants, this.bossTypes,
                 this::isAliveParticipant, monsterRuntime::spawnBossMinion,
                 this::dropBossRandomScrap,
-                this::setBlock, monsterRuntime::removeAllForBossDefeat, this::unlockBossFloorExit);
+                this::setBlock, trapRuntime::placeBossTrap, trapRuntime::hasBossTrapAt,
+                monsterRuntime::removeAllForBossDefeat, this::unlockBossFloorExit);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
                 type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
             @Override
@@ -1754,6 +1755,7 @@ public final class HallsSession {
         closeElevatorDoors();
         openElevatorDoors();
         Location bossLocation = bossCenterLocation(layout, roomStartX, roomStartZ);
+        Set<HallsExplorationGenerator.Cell> bossArenaCells = bossArenaCells(layout, roomStartX, roomStartZ);
         HallsSessionBossRuntime.DoorSeal seal = new HallsSessionBossRuntime.DoorSeal(
                 roomStartX + openingX - 1,
                 roomStartX + openingX + 1,
@@ -1762,9 +1764,17 @@ public final class HallsSession {
                 roomStartZ + layout.depth(),
                 wallMaterial(levelType, roomStartX + openingX, origin.y(), roomStartZ + layout.depth(), false, 0xB055)
         );
-        bossRuntime.prepare(floorDefinition.boss(), bossLocation, seal,
+        bossRuntime.prepare(floorDefinition.boss(), bossLocation, seal, bossArenaCells,
                 parseDifficulty(floorDefinition.difficulty(), floorDefinition.firstFloor()));
         teleportParticipantsToElevator("Floor " + floor, "Boss: " + bossName(floorDefinition.boss()));
+    }
+
+    private Set<HallsExplorationGenerator.Cell> bossArenaCells(HallsLayout layout, int roomStartX, int roomStartZ) {
+        Set<HallsExplorationGenerator.Cell> cells = new HashSet<>();
+        for (Cell cell : openInteriorCells(layout)) {
+            cells.add(new HallsExplorationGenerator.Cell(roomStartX + cell.x(), roomStartZ + cell.z()));
+        }
+        return cells;
     }
 
     private void placeBossArenaLights(HallsLayout layout,

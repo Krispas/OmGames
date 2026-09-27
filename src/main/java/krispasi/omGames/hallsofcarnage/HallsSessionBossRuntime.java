@@ -48,6 +48,8 @@ final class HallsSessionBossRuntime {
     private final MinionSpawner monsterSpawner;
     private final BossDropper bossDropper;
     private final BlockSetter blockSetter;
+    private final TrapPlacer trapPlacer;
+    private final Predicate<Location> bossTrapPredicate;
     private final Runnable bossMinionClearCallback;
     private final Runnable defeatedCallback;
     private final NamespacedKey bossIdKey;
@@ -68,6 +70,8 @@ final class HallsSessionBossRuntime {
                             MinionSpawner monsterSpawner,
                             BossDropper bossDropper,
                             BlockSetter blockSetter,
+                            TrapPlacer trapPlacer,
+                            Predicate<Location> bossTrapPredicate,
                             Runnable bossMinionClearCallback,
                             Runnable defeatedCallback) {
         this.plugin = plugin;
@@ -78,12 +82,18 @@ final class HallsSessionBossRuntime {
         this.monsterSpawner = monsterSpawner == null ? (id, location) -> null : monsterSpawner;
         this.bossDropper = bossDropper == null ? (location, randomScrap) -> { } : bossDropper;
         this.blockSetter = blockSetter == null ? (x, y, z, material, face) -> { } : blockSetter;
+        this.trapPlacer = trapPlacer == null ? (location, trapId) -> false : trapPlacer;
+        this.bossTrapPredicate = bossTrapPredicate == null ? location -> false : bossTrapPredicate;
         this.bossMinionClearCallback = bossMinionClearCallback == null ? () -> { } : bossMinionClearCallback;
         this.defeatedCallback = defeatedCallback == null ? () -> { } : defeatedCallback;
         this.bossIdKey = new NamespacedKey(plugin, "hoc_boss_id");
     }
 
-    void prepare(String bossId, Location location, DoorSeal seal, int floorDifficulty) {
+    void prepare(String bossId,
+                 Location location,
+                 DoorSeal seal,
+                 Set<HallsExplorationGenerator.Cell> arenaCells,
+                 int floorDifficulty) {
         clear();
         HallsBossType type = bossTypes.get(normalizeId(bossId));
         if (type == null || location == null || !world.equals(location.getWorld())) {
@@ -99,7 +109,7 @@ final class HallsSessionBossRuntime {
             entity.getPersistentDataContainer().set(bossIdKey, PersistentDataType.STRING, type.id());
         });
         activeBoss = new ActiveBoss(type, location.clone(), displayIds, hitbox.getUniqueId(), seal,
-                scaledHealth(type), scaledHealth(type));
+                arenaCells, scaledHealth(type), scaledHealth(type));
         activeBoss.setScaleMultiplier(type.overdrive().initialScaleMultiplier());
         animateDisplays(activeBoss.yaw(), 0.0, new Vector());
         bossBar = Bukkit.createBossBar(type.name(), BarColor.RED, BarStyle.SEGMENTED_10);
@@ -400,15 +410,19 @@ final class HallsSessionBossRuntime {
             case WALLS -> runWallAttack();
             case REPOSITION -> runRepositionAttack();
             case CIRCLE_DASH -> runCircleDashAttack();
+            case TRAP -> runTrapAttack();
         }
     }
 
     private Attack chooseAttack() {
         if (isArchaicGuard()) {
             List<Attack> attacks = new ArrayList<>(List.of(Attack.MISSILE, Attack.JUMP, Attack.WALLS, Attack.SPAWN,
-                    Attack.REPOSITION, Attack.CIRCLE_DASH));
+                    Attack.REPOSITION, Attack.CIRCLE_DASH, Attack.TRAP));
             if (activeBoss.archaicSpawnLockoutTicks() > 0) {
                 attacks.remove(Attack.SPAWN);
+            }
+            if (bossTrapPredicate.test(activeBoss.location())) {
+                attacks.remove(Attack.TRAP);
             }
             if (activeBoss.lastAttack() != null && attacks.size() > 1) {
                 attacks.remove(activeBoss.lastAttack());
@@ -686,6 +700,32 @@ final class HallsSessionBossRuntime {
         }, () -> new CircleDashMove(from, control, target, config, effect).runTaskTimer(plugin, 1L, 1L));
     }
 
+    private void runTrapAttack() {
+        HallsBossType.ArchaicGuard config = activeBoss.type().archaicGuard();
+        if (bossTrapPredicate.test(activeBoss.location())) {
+            scheduleNextAttack(config.trapCooldownTicks());
+            return;
+        }
+        activeBoss.setLastAttack(Attack.TRAP);
+        activeBoss.setAttackAnimationTicks(0);
+        new TimedAttack(config.trapChargeTicks(), () -> {
+            Location center = activeBoss.location().clone().add(0.0, 0.15, 0.0);
+            world.spawnParticle(activeBoss.enraged() ? Particle.FLAME : Particle.DUST_PLUME,
+                    center, 10, 0.75, 0.08, 0.75, 0.03);
+            world.spawnParticle(Particle.CRIT, center, 4, 0.45, 0.06, 0.45, 0.01);
+            animateDisplays("trap", activeBoss.attackAnimationTicks(), activeBoss.yaw(), -0.04, new Vector());
+        }, () -> {
+            String trapId = activeBoss.enraged() ? config.enragedTrapId() : config.normalTrapId();
+            boolean placed = trapPlacer.place(activeBoss.location(), trapId);
+            Location center = activeBoss.location().clone().add(0.0, 0.15, 0.0);
+            if (placed) {
+                world.spawnParticle(Particle.BLOCK, center, 28, 0.45, 0.12, 0.45, Material.IRON_BLOCK.createBlockData());
+                world.playSound(center, Sound.BLOCK_CHAIN_PLACE, 0.9f, activeBoss.enraged() ? 0.65f : 0.9f);
+            }
+            scheduleNextAttack(config.trapCooldownTicks());
+        });
+    }
+
     private void renderXBlastWarning(boolean damaging) {
         if (activeBoss == null) {
             return;
@@ -898,10 +938,76 @@ final class HallsSessionBossRuntime {
         if (activeBoss == null) {
             return null;
         }
-        Location origin = activeBoss.location();
-        double angle = random.nextDouble() * Math.PI * 2.0;
-        double distance = Math.max(2.0, radius * (0.35 + random.nextDouble() * 0.65));
-        return origin.clone().add(Math.cos(angle) * distance, 0.0, Math.sin(angle) * distance);
+        List<HallsExplorationGenerator.Cell> candidates = new ArrayList<>();
+        double maxDistanceSquared = radius * radius;
+        for (HallsExplorationGenerator.Cell cell : activeBoss.arenaCells()) {
+            Location center = arenaCellLocation(cell);
+            double distanceSquared = horizontalDistanceSquared(center, activeBoss.location());
+            if (distanceSquared >= 4.0 && distanceSquared <= maxDistanceSquared && isBossArenaCellClear(cell)) {
+                candidates.add(cell);
+            }
+        }
+        if (!candidates.isEmpty()) {
+            return arenaCellLocation(candidates.get(random.nextInt(candidates.size())));
+        }
+        return nearestSafeArenaLocation(activeBoss.location(), radius);
+    }
+
+    private Location nearestSafeArenaLocation(Location around, double radius) {
+        if (activeBoss == null || around == null) {
+            return null;
+        }
+        HallsExplorationGenerator.Cell best = null;
+        double bestDistance = Double.MAX_VALUE;
+        double maxDistanceSquared = radius * radius;
+        for (HallsExplorationGenerator.Cell cell : activeBoss.arenaCells()) {
+            if (!isBossArenaCellClear(cell)) {
+                continue;
+            }
+            Location center = arenaCellLocation(cell);
+            double distanceSquared = horizontalDistanceSquared(center, around);
+            if (distanceSquared <= maxDistanceSquared && distanceSquared < bestDistance) {
+                bestDistance = distanceSquared;
+                best = cell;
+            }
+        }
+        return best == null ? activeBoss.location().clone() : arenaCellLocation(best);
+    }
+
+    private boolean isBossArenaCellClear(HallsExplorationGenerator.Cell cell) {
+        if (activeBoss == null || activeBoss.arenaCells().isEmpty()) {
+            return true;
+        }
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (!activeBoss.arenaCells().contains(new HallsExplorationGenerator.Cell(cell.x() + dx, cell.z() + dz))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private Location arenaCellLocation(HallsExplorationGenerator.Cell cell) {
+        return new Location(world, cell.x() + 0.5, activeBoss.location().getY(), cell.z() + 0.5);
+    }
+
+    private double horizontalDistanceSquared(Location first, Location second) {
+        double dx = first.getX() - second.getX();
+        double dz = first.getZ() - second.getZ();
+        return dx * dx + dz * dz;
+    }
+
+    private float yawToward(Location from, Location to) {
+        if (from == null || to == null) {
+            return activeBoss == null ? 0.0f : activeBoss.yaw();
+        }
+        double dx = to.getX() - from.getX();
+        double dz = to.getZ() - from.getZ();
+        if (dx * dx + dz * dz < 0.0001) {
+            return activeBoss == null ? 0.0f : activeBoss.yaw();
+        }
+        return (float) Math.toDegrees(Math.atan2(dx, -dz));
     }
 
     private Location circleDashControlPoint(Location from, Location target, double radius) {
@@ -914,7 +1020,8 @@ final class HallsSessionBossRuntime {
             perpendicular.multiply(-1.0);
         }
         double arc = Math.max(2.0, Math.min(radius, chord.length() * 0.65));
-        return from.clone().add(chord.multiply(0.5)).add(perpendicular.multiply(arc));
+        Location control = from.clone().add(chord.multiply(0.5)).add(perpendicular.multiply(arc));
+        return nearestSafeArenaLocation(control, Math.max(2.0, radius));
     }
 
     private Location bezier(Location from, Location control, Location target, double progress) {
@@ -1017,7 +1124,7 @@ final class HallsSessionBossRuntime {
                     stack.setItemMeta(meta);
                 }
             }
-            Location location = displayLocation(base, part, yOffset, new Vector());
+            Location location = displayLocation(base, part, yOffset, new Vector(), yaw, true);
             ItemDisplay display = world.spawn(location, ItemDisplay.class, entity -> {
                 entity.setItemStack(stack);
                 entity.setBillboard(Display.Billboard.FIXED);
@@ -1033,7 +1140,7 @@ final class HallsSessionBossRuntime {
             return ids;
         }
         for (HallsBossType.DisplayPart part : parts) {
-            Location location = displayLocation(base, part, yOffset, new Vector());
+            Location location = displayLocation(base, part, yOffset, new Vector(), yaw, true);
             BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
                 entity.setBlock(part.material().createBlockData());
                 entity.setBillboard(Display.Billboard.FIXED);
@@ -1074,17 +1181,19 @@ final class HallsSessionBossRuntime {
             AnimationPose pose = animationPose(activeBoss.type(), normalizedAnimationId, part.id(), tick);
             Vector combinedOffset = (offset == null ? new Vector() : offset.clone())
                     .add(new Vector(pose.offsetX(), pose.offsetY(), pose.offsetZ()));
-            Location target = displayLocation(activeBoss.location(), part, yOffset, combinedOffset);
-            entity.teleport(target);
             if (entity instanceof Display display) {
                 display.setInterpolationDelay(1);
                 display.setTeleportDuration(2);
                 boolean applyBaseYaw = animation == null ? !isArchaicGuard() : animation.applyBaseYaw();
+                Location target = displayLocation(activeBoss.location(), part, yOffset, combinedOffset, yaw, applyBaseYaw);
+                entity.teleport(target);
                 display.setTransformation(HallsDisplayTransforms.centeredBlock(
                         part.scaleX() * pose.scaleX() * activeBoss.scaleMultiplier(),
                         part.scaleY() * pose.scaleY() * activeBoss.scaleMultiplier(),
                         part.scaleZ() * pose.scaleZ() * activeBoss.scaleMultiplier(),
                         new Quaternionf().rotateY((float) Math.toRadians((applyBaseYaw ? yaw : 0.0f) + pose.yawOffset()))));
+            } else {
+                entity.teleport(displayLocation(activeBoss.location(), part, yOffset, combinedOffset, yaw, false));
             }
             index++;
         }
@@ -1161,12 +1270,28 @@ final class HallsSessionBossRuntime {
         }
     }
 
-    private Location displayLocation(Location base, HallsBossType.DisplayPart part, double yOffset, Vector animationOffset) {
+    private Location displayLocation(Location base,
+                                     HallsBossType.DisplayPart part,
+                                     double yOffset,
+                                     Vector animationOffset,
+                                     float yaw,
+                                     boolean rotateAroundOrigin) {
         Vector offset = animationOffset == null ? new Vector() : animationOffset;
+        double xOffset = part.offsetX() + offset.getX();
+        double zOffset = part.offsetZ() + offset.getZ();
+        if (rotateAroundOrigin) {
+            double radians = Math.toRadians(yaw);
+            double cos = Math.cos(radians);
+            double sin = Math.sin(radians);
+            double rotatedX = xOffset * cos - zOffset * sin;
+            double rotatedZ = xOffset * sin + zOffset * cos;
+            xOffset = rotatedX;
+            zOffset = rotatedZ;
+        }
         return base.clone().add(
-                part.offsetX() + offset.getX(),
+                xOffset,
                 part.offsetY() + yOffset + offset.getY() + part.scaleY() * 0.5,
-                part.offsetZ() + offset.getZ());
+                zOffset);
     }
 
     private void refreshBossBarPlayers() {
@@ -1295,6 +1420,10 @@ final class HallsSessionBossRuntime {
         void drop(Location location, int randomScrap);
     }
 
+    interface TrapPlacer {
+        boolean place(Location location, String trapId);
+    }
+
     record DoorSeal(int minX, int maxX, int y, int minZ, int maxZ, Material material) {
         Location center(World world) {
             return new Location(world, (minX + maxX) / 2.0 + 0.5, y + 1.5, (minZ + maxZ) / 2.0 + 0.5);
@@ -1308,7 +1437,8 @@ final class HallsSessionBossRuntime {
         MISSILE,
         WALLS,
         REPOSITION,
-        CIRCLE_DASH
+        CIRCLE_DASH,
+        TRAP
     }
 
     private final class TimedAttack implements Runnable {
@@ -1499,10 +1629,11 @@ final class HallsSessionBossRuntime {
             ticks++;
             double progress = Math.min(1.0, ticks / (double) config.repositionTicks());
             double eased = 1.0 - Math.pow(1.0 - progress, 2.0);
+            Location previous = activeBoss.location().clone();
             activeBoss.location().setX(from.getX() + (target.getX() - from.getX()) * eased);
             activeBoss.location().setY(from.getY() + (target.getY() - from.getY()) * eased);
             activeBoss.location().setZ(from.getZ() + (target.getZ() - from.getZ()) * eased);
-            activeBoss.setYaw(activeBoss.yaw() + 10.0f);
+            activeBoss.setYaw(yawToward(previous, activeBoss.location()));
             animateDisplays("reposition", ticks, activeBoss.yaw(), 0.18, new Vector());
             Location cloud = activeBoss.location().clone().add(0.0, 0.1, 0.0);
             if (ticks == 1 || ticks % 10 == 0) {
@@ -1551,10 +1682,11 @@ final class HallsSessionBossRuntime {
             ticks++;
             double progress = Math.min(1.0, ticks / (double) config.circleDashTicks());
             Location next = bezier(from, control, target, progress);
+            Location previous = activeBoss.location().clone();
             activeBoss.location().setX(next.getX());
             activeBoss.location().setY(next.getY());
             activeBoss.location().setZ(next.getZ());
-            activeBoss.setYaw(activeBoss.yaw() + 18.0f);
+            activeBoss.setYaw(yawToward(previous, next));
             renderCircleDashPath(from, control, target, true);
             animateDisplays("circle_dash", ticks, activeBoss.yaw(), 0.2, new Vector());
             if (ticks == 1 || ticks % 8 == 0) {
@@ -1741,6 +1873,7 @@ final class HallsSessionBossRuntime {
         private final List<UUID> displayIds;
         private final UUID hitboxId;
         private final DoorSeal seal;
+        private final Set<HallsExplorationGenerator.Cell> arenaCells;
         private final double maxHealth;
         private double health;
         private boolean active;
@@ -1766,6 +1899,7 @@ final class HallsSessionBossRuntime {
                            List<UUID> displayIds,
                            UUID hitboxId,
                            DoorSeal seal,
+                           Set<HallsExplorationGenerator.Cell> arenaCells,
                            double health,
                            double maxHealth) {
             this.type = type;
@@ -1773,6 +1907,7 @@ final class HallsSessionBossRuntime {
             this.displayIds = List.copyOf(displayIds);
             this.hitboxId = hitboxId;
             this.seal = seal;
+            this.arenaCells = arenaCells == null ? Set.of() : Set.copyOf(arenaCells);
             this.health = health;
             this.maxHealth = maxHealth;
         }
@@ -1795,6 +1930,10 @@ final class HallsSessionBossRuntime {
 
         private DoorSeal seal() {
             return seal;
+        }
+
+        private Set<HallsExplorationGenerator.Cell> arenaCells() {
+            return arenaCells;
         }
 
         private double health() {

@@ -218,6 +218,10 @@ record HallsBossType(
                         int circleDashTicks,
                         int circleDashCooldownTicks,
                         double circleDashRadius,
+                        int trapChargeTicks,
+                        int trapCooldownTicks,
+                        String normalTrapId,
+                        String enragedTrapId,
                         double phaseThreshold,
                         List<WeightedMonster> normalSpawnPool,
                         List<WeightedMonster> enragedSpawnPool) {
@@ -261,6 +265,10 @@ record HallsBossType(
             circleDashTicks = Math.max(1, circleDashTicks);
             circleDashCooldownTicks = Math.max(1, circleDashCooldownTicks);
             circleDashRadius = Math.max(1.0, circleDashRadius);
+            trapChargeTicks = Math.max(1, trapChargeTicks);
+            trapCooldownTicks = Math.max(1, trapCooldownTicks);
+            normalTrapId = normalize(normalTrapId == null || normalTrapId.isBlank() ? "bear_trap" : normalTrapId);
+            enragedTrapId = normalize(enragedTrapId == null || enragedTrapId.isBlank() ? "proximity_mine" : enragedTrapId);
             phaseThreshold = Math.max(0.05, Math.min(0.95, phaseThreshold));
             normalSpawnPool = normalSpawnPool == null ? List.of() : List.copyOf(normalSpawnPool);
             enragedSpawnPool = enragedSpawnPool == null ? List.of() : List.copyOf(enragedSpawnPool);
@@ -273,6 +281,7 @@ record HallsBossType(
                     12, 60, 500, 1, 2,
                     40, 60, 9.0, 2.4, 100, 80,
                     20, 26, 60, 9.0,
+                    30, 80, "bear_trap", "proximity_mine",
                     0.33,
                     List.of(new WeightedMonster("bedrock_walker", 1)),
                     List.of(new WeightedMonster("rotting_soldier", 1)));

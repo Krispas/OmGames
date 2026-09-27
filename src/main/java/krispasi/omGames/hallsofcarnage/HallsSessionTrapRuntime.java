@@ -196,6 +196,63 @@ final class HallsSessionTrapRuntime {
         return false;
     }
 
+    boolean hasBossTrapAt(Location location) {
+        if (location == null || !world.equals(location.getWorld())) {
+            return false;
+        }
+        int x = location.getBlockX();
+        int z = location.getBlockZ();
+        for (HallsTrap trap : traps) {
+            if ((trap.kind() == TrapKind.BEAR_TRAP || trap.kind() == TrapKind.PROXIMITY_MINE)
+                    && Math.abs(trap.x() - x) <= 1 && Math.abs(trap.z() - z) <= 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    boolean placeBossTrap(Location location, String trapId) {
+        if (location == null || !world.equals(location.getWorld()) || hasBossTrapAt(location)) {
+            return false;
+        }
+        HallsTrapType type = trapTypes.get(normalizeId(trapId));
+        if (type == null) {
+            return false;
+        }
+        TrapKind kind = trapKind(type.kind());
+        if (kind != TrapKind.BEAR_TRAP && kind != TrapKind.PROXIMITY_MINE) {
+            return false;
+        }
+        HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(location.getBlockX(), location.getBlockZ());
+        if (!isOpenTrapFloor(cell, kind)) {
+            return false;
+        }
+        Set<HallsExplorationGenerator.Cell> footprint = trapFootprint(kind, cell, BlockFace.SELF, 0);
+        for (HallsTrap trap : traps) {
+            if (footprint.contains(new HallsExplorationGenerator.Cell(trap.x(), trap.z()))) {
+                return false;
+            }
+        }
+        List<UUID> displayIds = buildTrap(kind, cell, BlockFace.SELF, type, 0);
+        Random random = new Random();
+        addTrap(new HallsTrap(kind, cell.x(), cell.z(), random.nextInt(80), type,
+                movingDisplayId(kind, displayIds), displayIds, BlockFace.SELF, 0), random);
+        startTrapTask();
+        return true;
+    }
+
+    private boolean isOpenTrapFloor(HallsExplorationGenerator.Cell cell, TrapKind kind) {
+        Set<HallsExplorationGenerator.Cell> footprint = trapFootprint(kind, cell, BlockFace.SELF, 0);
+        for (HallsExplorationGenerator.Cell footprintCell : footprint) {
+            Material floor = world.getBlockAt(footprintCell.x(), origin.y() - 1, footprintCell.z()).getType();
+            Material space = world.getBlockAt(footprintCell.x(), origin.y(), footprintCell.z()).getType();
+            if (!floor.isSolid() || !space.isAir()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     Set<HallsExplorationGenerator.Cell> placeGeneratedTraps(HallsExplorationGenerator.Plan plan,
                                                             Random random,
                                                             HallsScenario.FloorDefinition floorDefinition,
@@ -1914,7 +1971,7 @@ final class HallsSessionTrapRuntime {
     }
 
     private TrapKind trapKind(String kind) {
-        return switch (kind) {
+        return switch (normalizeId(kind)) {
             case "bear_trap" -> TrapKind.BEAR_TRAP;
             case "proximity_mine" -> TrapKind.PROXIMITY_MINE;
             case "swinging_blade" -> TrapKind.SWINGING_BLADE;
@@ -1930,6 +1987,10 @@ final class HallsSessionTrapRuntime {
             case "enchanted_book" -> TrapKind.ENCHANTED_BOOK;
             default -> null;
         };
+    }
+
+    private static String normalizeId(String value) {
+        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_').replace(' ', '_');
     }
 
     private boolean requiresWall(TrapKind kind) {

@@ -290,6 +290,10 @@ final class HallsBossTypeLoader {
                 seconds(section, "circle-dash.move-seconds", defaults.circleDashTicks()),
                 seconds(section, "circle-dash.cooldown-seconds", defaults.circleDashCooldownTicks()),
                 section.getDouble("circle-dash.radius", defaults.circleDashRadius()),
+                seconds(section, "trap.charge-seconds", defaults.trapChargeTicks()),
+                seconds(section, "trap.cooldown-seconds", defaults.trapCooldownTicks()),
+                normalizeId(section.getString("trap.normal", defaults.normalTrapId())),
+                normalizeId(section.getString("trap.enraged", defaults.enragedTrapId())),
                 section.getDouble("phase.threshold", defaults.phaseThreshold()),
                 spawnPool(section.getConfigurationSection("spawn.pool.normal"), defaults.normalSpawnPool()),
                 spawnPool(section.getConfigurationSection("spawn.pool.enraged"), defaults.enragedSpawnPool())
