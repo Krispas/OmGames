@@ -614,7 +614,8 @@ final class HallsSessionBossRuntime {
             animateDisplays("shockwave_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw(), -0.05, new Vector());
         }, () -> {
             world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 0.65f);
-            new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond()).runTaskTimer(plugin, 1L, 2L);
+            new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond(),
+                    config.shockwaveMaxRadius(), Particle.FLAME).runTaskTimer(plugin, 1L, 2L);
             if (remaining > 1) {
                 Bukkit.getScheduler().runTaskLater(plugin, () -> runArchaicShockwaveChain(config, remaining - 1,
                         Math.max(1, (int) Math.round(config.shockwaveChargeTicks() * 0.4))), 1L);
@@ -640,11 +641,12 @@ final class HallsSessionBossRuntime {
         new TimedAttack(config.wallChargeTicks(), () -> {
             world.spawnParticle(Particle.EXPLOSION, activeBoss.location().clone().add(0.0, 2.2, 0.0),
                     1, 1.8, 1.1, 1.8, 0.0);
-            renderWallWarning(rotation, safeDegrees, false);
+            renderWallWarning(rotation, safeDegrees, config.wallMaxRadius(), false);
             animateDisplays("wall_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw() + activeBoss.attackAnimationTicks() * 5.0f,
                     0.04, new Vector());
         }, () -> {
-            new WallWave(config.wallDamage(), config.wallSpeedBlocksPerSecond(), rotation, safeDegrees).runTaskTimer(plugin, 1L, 2L);
+            new WallWave(config.wallDamage(), config.wallSpeedBlocksPerSecond(), config.wallMaxRadius(), rotation, safeDegrees)
+                    .runTaskTimer(plugin, 1L, 2L);
             if (remaining > 1) {
                 Bukkit.getScheduler().runTaskLater(plugin, () -> runWallChain(config, remaining - 1), config.wallGapTicks());
             } else {
@@ -653,12 +655,12 @@ final class HallsSessionBossRuntime {
         });
     }
 
-    private void renderWallWarning(double rotationDegrees, double safeDegrees, boolean damaging) {
+    private void renderWallWarning(double rotationDegrees, double safeDegrees, double maxRadius, boolean damaging) {
         if (activeBoss == null) {
             return;
         }
         Location center = activeBoss.location().clone().add(0.0, 0.12, 0.0);
-        for (double radius = 2.0; radius <= 11.5; radius += 1.5) {
+        for (double radius = 2.0; radius <= maxRadius - 1.5; radius += 1.5) {
             for (double degrees = 0.0; degrees < 360.0; degrees += 8.0) {
                 if (isSafeWallAngle(degrees, rotationDegrees, safeDegrees)) {
                     continue;
@@ -1556,7 +1558,8 @@ final class HallsSessionBossRuntime {
                 return;
             }
             world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, activeBoss.enraged() ? 0.45f : 0.55f);
-            new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond()).runTaskTimer(plugin, 1L, 2L);
+            new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond(), 13.0, Particle.DUST_PLUME)
+                    .runTaskTimer(plugin, 1L, 2L);
             if (remaining > 1) {
                 Bukkit.getScheduler().runTaskLater(plugin, () -> runJumpChain(config, remaining - 1), 12L);
             } else {
@@ -1569,12 +1572,16 @@ final class HallsSessionBossRuntime {
     private final class Shockwave extends org.bukkit.scheduler.BukkitRunnable {
         private final double damage;
         private final double radiusStep;
+        private final double maxRadius;
+        private final Particle particle;
         private double radius = 1.0;
         private final Set<UUID> hit = new java.util.HashSet<>();
 
-        private Shockwave(double damage, double speedBlocksPerSecond) {
+        private Shockwave(double damage, double speedBlocksPerSecond, double maxRadius, Particle particle) {
             this.damage = damage;
             this.radiusStep = Math.max(0.05, speedBlocksPerSecond * 2.0 / 20.0);
+            this.maxRadius = Math.max(1.0, maxRadius);
+            this.particle = particle == null ? Particle.DUST_PLUME : particle;
         }
 
         @Override
@@ -1586,7 +1593,7 @@ final class HallsSessionBossRuntime {
             Location center = activeBoss.location().clone().add(0.0, 0.08, 0.0);
             for (double angle = 0.0; angle < Math.PI * 2.0; angle += Math.PI / 18.0) {
                 Location point = center.clone().add(Math.cos(angle) * radius, 0.0, Math.sin(angle) * radius);
-                world.spawnParticle(Particle.DUST_PLUME, point, 1, 0.03, 0.02, 0.03, 0.0);
+                world.spawnParticle(particle, point, 1, 0.03, 0.03, 0.03, particle == Particle.FLAME ? 0.01 : 0.0);
             }
             for (Player player : alivePlayers()) {
                 if (hit.contains(player.getUniqueId())) {
@@ -1610,14 +1617,16 @@ final class HallsSessionBossRuntime {
     private final class WallWave extends org.bukkit.scheduler.BukkitRunnable {
         private final double damage;
         private final double radiusStep;
+        private final double maxRadius;
         private final double rotationDegrees;
         private final double safeDegrees;
         private final Set<UUID> hit = new java.util.HashSet<>();
         private double radius = 1.0;
 
-        private WallWave(double damage, double speedBlocksPerSecond, double rotationDegrees, double safeDegrees) {
+        private WallWave(double damage, double speedBlocksPerSecond, double maxRadius, double rotationDegrees, double safeDegrees) {
             this.damage = damage;
             this.radiusStep = Math.max(0.05, speedBlocksPerSecond * 2.0 / 20.0);
+            this.maxRadius = Math.max(1.0, maxRadius);
             this.rotationDegrees = rotationDegrees;
             this.safeDegrees = safeDegrees;
         }
@@ -1655,7 +1664,7 @@ final class HallsSessionBossRuntime {
                 player.damage(damage);
             }
             radius += radiusStep;
-            if (radius > 13.0) {
+            if (radius > maxRadius) {
                 cancel();
             }
         }

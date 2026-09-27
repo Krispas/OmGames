@@ -192,6 +192,7 @@ record HallsBossType(
                         int enragedShockwaveMax,
                         double shockwaveDamage,
                         double shockwaveSpeedBlocksPerSecond,
+                        double shockwaveMaxRadius,
                         int wallChargeTicks,
                         int wallGapTicks,
                         int wallCooldownTicks,
@@ -201,6 +202,7 @@ record HallsBossType(
                         int enragedWallMax,
                         double wallDamage,
                         double wallSpeedBlocksPerSecond,
+                        double wallMaxRadius,
                         double normalWallSafeDegrees,
                         double enragedWallSafeDegrees,
                         int spawnRiseTicks,
@@ -239,6 +241,7 @@ record HallsBossType(
             enragedShockwaveMax = Math.max(enragedShockwaveMin, enragedShockwaveMax);
             shockwaveDamage = Math.max(0.0, shockwaveDamage);
             shockwaveSpeedBlocksPerSecond = Math.max(0.5, shockwaveSpeedBlocksPerSecond);
+            shockwaveMaxRadius = Math.max(1.0, shockwaveMaxRadius);
             wallChargeTicks = Math.max(1, wallChargeTicks);
             wallGapTicks = Math.max(1, wallGapTicks);
             wallCooldownTicks = Math.max(1, wallCooldownTicks);
@@ -248,6 +251,7 @@ record HallsBossType(
             enragedWallMax = Math.max(enragedWallMin, enragedWallMax);
             wallDamage = Math.max(0.0, wallDamage);
             wallSpeedBlocksPerSecond = Math.max(0.5, wallSpeedBlocksPerSecond);
+            wallMaxRadius = Math.max(1.0, wallMaxRadius);
             normalWallSafeDegrees = Math.max(1.0, normalWallSafeDegrees);
             enragedWallSafeDegrees = Math.max(1.0, enragedWallSafeDegrees);
             spawnRiseTicks = Math.max(1, spawnRiseTicks);
@@ -276,8 +280,8 @@ record HallsBossType(
 
         static ArchaicGuard defaults() {
             return new ArchaicGuard(60, 20, 40, 10.0, 2.8,
-                    60, 40, 1, 3, 3, 5, 6.0, 4.0,
-                    60, 60, 100, 1, 3, 1, 3, 9.0, 4.0, 30.0, 24.0,
+                    60, 40, 1, 3, 3, 5, 6.0, 4.0, 13.0,
+                    60, 60, 100, 1, 3, 1, 3, 9.0, 4.0, 13.0, 30.0, 24.0,
                     12, 60, 500, 1, 2,
                     40, 60, 9.0, 2.4, 100, 80,
                     20, 26, 60, 9.0,
