@@ -189,9 +189,32 @@ final class HallsExplorationGenerator {
         if (rooms.stream().noneMatch(anchor -> !anchor.ventOnly())) {
             return false;
         }
+        if (!layoutHasLibraryVentCell(room.layout())) {
+            return false;
+        }
         room.setVentOnly(true);
         addRoom(room);
         return true;
+    }
+
+    private boolean layoutHasLibraryVentCell(HallsLayout layout) {
+        for (int z = 0; z < layout.depth(); z++) {
+            for (int x = 0; x < layout.width(); x++) {
+                if (layout.at(x, z) != 'O') {
+                    continue;
+                }
+                for (BlockFace face : CARDINAL_FACES) {
+                    int neighborX = x + face.getModX();
+                    int neighborZ = z + face.getModZ();
+                    if (neighborX < 0 || neighborZ < 0
+                            || neighborX >= layout.width() || neighborZ >= layout.depth()
+                            || layout.at(neighborX, neighborZ) != 'O') {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private Room randomLibraryDisconnectedRoom(HallsLayout layout) {

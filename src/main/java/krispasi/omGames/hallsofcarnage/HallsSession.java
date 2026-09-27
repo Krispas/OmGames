@@ -2689,32 +2689,37 @@ public final class HallsSession {
                 || !"library".equalsIgnoreCase(build.levelType().id())) {
             return Set.of();
         }
-        List<LibraryVentCandidate> candidates = libraryVentCandidates(build, reservedCells);
-        List<LibraryVentCandidate> isolatedCandidates = candidates.stream()
-                .filter(candidate -> build.plan().rooms().get(candidate.roomIndex()).ventOnly())
-                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-        List<LibraryVentCandidate> connectedCandidates = candidates.stream()
+        Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
+        List<Integer> ventOnlyRooms = new ArrayList<>();
+        for (int roomIndex = 0; roomIndex < build.plan().rooms().size(); roomIndex++) {
+            if (build.plan().rooms().get(roomIndex).ventOnly()) {
+                ventOnlyRooms.add(roomIndex);
+            }
+        }
+        java.util.Collections.shuffle(ventOnlyRooms, build.random());
+        List<LibraryVentCandidate> connectedCandidates = libraryVentCandidates(build, reservedCells).stream()
                 .filter(candidate -> !build.plan().rooms().get(candidate.roomIndex()).ventOnly())
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-        java.util.Collections.shuffle(isolatedCandidates, build.random());
         java.util.Collections.shuffle(connectedCandidates, build.random());
-        int targetPairs = isolatedCandidates.stream()
-                .map(LibraryVentCandidate::roomIndex)
-                .collect(java.util.stream.Collectors.toSet())
-                .size();
-        Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
         Map<Integer, Integer> ventsByRoom = new HashMap<>();
         int pairs = 0;
-        while (pairs < targetPairs && !isolatedCandidates.isEmpty() && !connectedCandidates.isEmpty()) {
-            LibraryVentCandidate first = isolatedCandidates.removeFirst();
-            if (reserved.contains(first.cell())) {
+        for (int roomIndex : ventOnlyRooms) {
+            LibraryVentCandidate first = firstLibraryVentCandidateForRoom(build, roomIndex, reservedCells, reserved, true);
+            if (first == null) {
+                first = firstLibraryVentCandidateForRoom(build, roomIndex, null, reserved, false);
+            }
+            if (first == null) {
+                debug("Library vent-only room " + roomIndex + " has no valid wall vent cell on floor " + build.floor() + ".");
                 continue;
             }
             int partnerIndex = bestLibraryVentPartnerIndex(first, connectedCandidates, reserved, ventsByRoom);
-            if (partnerIndex < 0) {
+            LibraryVentCandidate second = partnerIndex >= 0
+                    ? connectedCandidates.remove(partnerIndex)
+                    : fallbackConnectedLibraryVentCandidate(build, reserved);
+            if (second == null) {
+                debug("Library vent-only room " + roomIndex + " has no connected vent partner on floor " + build.floor() + ".");
                 continue;
             }
-            LibraryVentCandidate second = connectedCandidates.remove(partnerIndex);
             LibraryVent firstVent = spawnLibraryVent(first);
             LibraryVent secondVent = spawnLibraryVent(second);
             firstVent.setLinkedInteractionId(secondVent.interactionId());
@@ -2725,36 +2730,78 @@ public final class HallsSession {
             ventsByRoom.merge(second.roomIndex(), 1, Integer::sum);
             pairs++;
         }
-        if (pairs < targetPairs) {
-            debug("Placed " + pairs + "/" + targetPairs + " library vent pairs on floor " + build.floor() + ".");
+        if (pairs < ventOnlyRooms.size()) {
+            debug("Placed " + pairs + "/" + ventOnlyRooms.size() + " library vent pairs on floor " + build.floor() + ".");
         }
         return Set.copyOf(reserved);
+    }
+
+    private LibraryVentCandidate firstLibraryVentCandidateForRoom(ExplorationBuild build,
+                                                                  int roomIndex,
+                                                                  Set<HallsExplorationGenerator.Cell> reservedCells,
+                                                                  Set<HallsExplorationGenerator.Cell> usedCells,
+                                                                  boolean avoidOpenings) {
+        List<LibraryVentCandidate> candidates = libraryVentCandidatesForRoom(build, roomIndex, reservedCells, avoidOpenings);
+        java.util.Collections.shuffle(candidates, build.random());
+        for (LibraryVentCandidate candidate : candidates) {
+            if (!usedCells.contains(candidate.cell())) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private LibraryVentCandidate fallbackConnectedLibraryVentCandidate(ExplorationBuild build,
+                                                                       Set<HallsExplorationGenerator.Cell> usedCells) {
+        List<Integer> connectedRooms = new ArrayList<>();
+        for (int roomIndex = 0; roomIndex < build.plan().rooms().size(); roomIndex++) {
+            if (!build.plan().rooms().get(roomIndex).ventOnly()) {
+                connectedRooms.add(roomIndex);
+            }
+        }
+        java.util.Collections.shuffle(connectedRooms, build.random());
+        for (int roomIndex : connectedRooms) {
+            LibraryVentCandidate candidate = firstLibraryVentCandidateForRoom(build, roomIndex, null, usedCells, false);
+            if (candidate != null) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private List<LibraryVentCandidate> libraryVentCandidates(ExplorationBuild build,
                                                             Set<HallsExplorationGenerator.Cell> reservedCells) {
         List<LibraryVentCandidate> candidates = new ArrayList<>();
         for (int roomIndex = 0; roomIndex < build.plan().rooms().size(); roomIndex++) {
-            HallsExplorationGenerator.Room room = build.plan().rooms().get(roomIndex);
-            for (Cell local : libraryVentCandidateCells(room)) {
-                HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(
-                        room.startX() + local.x(), room.startZ() + local.z());
-                if ((reservedCells != null && reservedCells.contains(absolute))
-                        || build.plan().liquidCells().contains(absolute)
-                        || libraryVentNearRoomOpening(room, absolute)) {
-                    continue;
+            candidates.addAll(libraryVentCandidatesForRoom(build, roomIndex, reservedCells, true));
+        }
+        return candidates;
+    }
+
+    private List<LibraryVentCandidate> libraryVentCandidatesForRoom(ExplorationBuild build,
+                                                                    int roomIndex,
+                                                                    Set<HallsExplorationGenerator.Cell> reservedCells,
+                                                                    boolean avoidOpenings) {
+        List<LibraryVentCandidate> candidates = new ArrayList<>();
+        HallsExplorationGenerator.Room room = build.plan().rooms().get(roomIndex);
+        for (Cell local : libraryVentCandidateCells(room)) {
+            HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(
+                    room.startX() + local.x(), room.startZ() + local.z());
+            if ((reservedCells != null && reservedCells.contains(absolute))
+                    || build.plan().liquidCells().contains(absolute)
+                    || avoidOpenings && libraryVentNearRoomOpening(room, absolute)) {
+                continue;
+            }
+            List<BlockFace> faces = new ArrayList<>();
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                if (isLibraryVentWall(room, local, face)) {
+                    faces.add(face);
                 }
-                List<BlockFace> faces = new ArrayList<>();
-                for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
-                    if (isLibraryVentWall(room, local, face)) {
-                        faces.add(face);
-                    }
-                }
-                java.util.Collections.shuffle(faces, build.random());
-                for (BlockFace face : faces) {
-                    candidates.add(new LibraryVentCandidate(roomIndex, absolute, face));
-                    break;
-                }
+            }
+            java.util.Collections.shuffle(faces, build.random());
+            for (BlockFace face : faces) {
+                candidates.add(new LibraryVentCandidate(roomIndex, absolute, face));
+                break;
             }
         }
         return candidates;
