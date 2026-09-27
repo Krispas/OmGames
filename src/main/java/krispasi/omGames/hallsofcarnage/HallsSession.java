@@ -122,6 +122,7 @@ public final class HallsSession {
     private final Map<String, Long> sculkMaulSplashCooldowns = new HashMap<>();
     private final Set<UUID> weaponChaining = new HashSet<>();
     private final Set<UUID> weaponSplashing = new HashSet<>();
+    private final Set<UUID> trackedBossProjectiles = new HashSet<>();
     private final Map<UUID, CarriedResearchCrate> carriedResearchCrates = new HashMap<>();
     private final Map<UUID, BlueprintDistillery> blueprintDistilleries = new HashMap<>();
     private final Map<UUID, LibraryVent> libraryVents = new HashMap<>();
@@ -1305,6 +1306,52 @@ public final class HallsSession {
             return;
         }
         applyProjectileWeaponMetadata(projectile, type);
+        trackBossProjectile(player, projectile);
+    }
+
+    private void trackBossProjectile(Player player, org.bukkit.entity.Projectile projectile) {
+        if (player == null || projectile == null || projectile.isDead()) {
+            return;
+        }
+        UUID projectileId = projectile.getUniqueId();
+        if (!trackedBossProjectiles.add(projectileId)) {
+            return;
+        }
+        Bukkit.getScheduler().runTaskTimer(plugin, task -> {
+            Entity entity = Bukkit.getEntity(projectileId);
+            if (!(entity instanceof org.bukkit.entity.Projectile tracked)
+                    || !running
+                    || tracked.isDead()
+                    || tracked.isOnGround()
+                    || !tracked.getWorld().equals(world)
+                    || markProjectileImpactProcessedIfBossHit(player, tracked)) {
+                trackedBossProjectiles.remove(projectileId);
+                task.cancel();
+            }
+        }, 1L, 1L);
+    }
+
+    private boolean markProjectileImpactProcessedIfBossHit(Player player, org.bukkit.entity.Projectile projectile) {
+        double damage = projectileDirectDamage(projectile);
+        if (damage <= 0.0) {
+            return false;
+        }
+        HallsSessionBossRuntime.AttackResult bossProjectileAttack =
+                bossRuntime.handleProjectileImpact(player, projectile.getLocation(), projectile.getVelocity(), damage);
+        if (!bossProjectileAttack.handled()) {
+            return false;
+        }
+        projectile.getPersistentDataContainer().set(
+                new org.bukkit.NamespacedKey(plugin, PROJECTILE_IMPACT_PROCESSED_KEY),
+                PersistentDataType.BYTE,
+                (byte) 1
+        );
+        if (bossProjectileAttack.damaged()) {
+            applyBossProjectileEffects(player, projectile);
+            applyProjectileAreaEffect(player, projectile.getLocation(), projectile);
+        }
+        projectile.remove();
+        return true;
     }
 
     private void applyProjectileWeaponMetadata(org.bukkit.entity.Projectile projectile, HallsItemType type) {
@@ -2682,7 +2729,7 @@ public final class HallsSession {
     private List<LibraryVentCandidate> libraryVentCandidates(ExplorationBuild build,
                                                             Set<HallsExplorationGenerator.Cell> reservedCells) {
         List<LibraryVentCandidate> candidates = new ArrayList<>();
-        for (int roomIndex = 1; roomIndex < build.plan().rooms().size(); roomIndex++) {
+        for (int roomIndex = 0; roomIndex < build.plan().rooms().size(); roomIndex++) {
             HallsExplorationGenerator.Room room = build.plan().rooms().get(roomIndex);
             for (Cell local : libraryVentCandidateCells(room)) {
                 HallsExplorationGenerator.Cell absolute = new HallsExplorationGenerator.Cell(
@@ -2902,6 +2949,7 @@ public final class HallsSession {
         }
         player.teleport(destination);
         player.setFallDistance(0.0f);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 60, 4, true, true, true));
         world.playSound(destination, Sound.BLOCK_IRON_TRAPDOOR_OPEN, 0.7f, 1.45f);
         return true;
     }

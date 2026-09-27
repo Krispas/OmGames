@@ -100,6 +100,10 @@ final class HallsExplorationGenerator {
             generateBunkerLayout(layouts, targetRooms);
             return;
         }
+        if (corridorMode == CorridorMode.LIBRARY) {
+            generateLibraryLayout(layouts, targetRooms);
+            return;
+        }
         if (!addFirstRoom(layouts)) {
             return;
         }
@@ -117,17 +121,11 @@ final class HallsExplorationGenerator {
             if (path.isEmpty()) {
                 continue;
             }
-            boolean ventOnlyRoom = shouldMakeLibraryVentOnlyRoom();
-            candidate.room().setVentOnly(ventOnlyRoom);
-            if (!ventOnlyRoom) {
-                candidate.anchor().openings().put(candidate.anchorFace(), candidate.anchorOffset());
-                candidate.room().openings().put(candidate.roomFace(), candidate.roomOffset());
-                networkCells.add(anchorDoor);
-            }
+            candidate.anchor().openings().put(candidate.anchorFace(), candidate.anchorOffset());
+            candidate.room().openings().put(candidate.roomFace(), candidate.roomOffset());
+            networkCells.add(anchorDoor);
             addRoom(candidate.room());
-            if (!ventOnlyRoom) {
-                rememberCorridor(path, shouldUseLibraryVentConnector(path));
-            }
+            rememberCorridor(path, shouldUseLibraryVentConnector(path));
         }
         addFirstRoomOnwardRoutes();
         addRoomToRoomLoops();
@@ -143,6 +141,59 @@ final class HallsExplorationGenerator {
         if (corridorMode == CorridorMode.LIBRARY) {
             markLibraryVentGates();
         }
+    }
+
+    private void generateLibraryLayout(List<HallsLayout> layouts, int targetRooms) {
+        if (!addFirstRoom(layouts)) {
+            return;
+        }
+        int connectedTarget = Math.max(1, (int) Math.ceil(targetRooms * 0.67));
+        int attempts = 0;
+        while (rooms.size() < connectedTarget && attempts++ < roomPlacementAttemptLimit(targetRooms)) {
+            HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
+            RoomConnection candidate = randomRoomConnection(layout);
+            if (candidate == null || !canPlaceRoom(candidate.room())) {
+                continue;
+            }
+            Cell candidateDoor = doorCell(candidate.room(), candidate.roomFace(), candidate.roomOffset());
+            Cell anchorDoor = doorCell(candidate.anchor(), candidate.anchorFace(), candidate.anchorOffset());
+            List<Cell> path = findConnectorPath(candidateDoor, Set.of(anchorDoor),
+                    List.of(Bounds.of(candidate.room()), Bounds.of(candidate.anchor())));
+            if (path.isEmpty()) {
+                continue;
+            }
+            candidate.anchor().openings().put(candidate.anchorFace(), candidate.anchorOffset());
+            candidate.room().openings().put(candidate.roomFace(), candidate.roomOffset());
+            networkCells.add(anchorDoor);
+            addRoom(candidate.room());
+            rememberCorridor(path);
+        }
+        addFirstRoomOnwardRoutes();
+        addRoomToRoomLoops();
+        int disconnectedTarget = Math.max(0, targetRooms - rooms.size());
+        attempts = 0;
+        while (disconnectedTarget > 0 && attempts++ < targetRooms * 220) {
+            HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
+            Room room = randomLibraryDisconnectedRoom(layout);
+            if (!canPlaceRoom(room)) {
+                continue;
+            }
+            room.setVentOnly(true);
+            addRoom(room);
+            disconnectedTarget--;
+        }
+    }
+
+    private Room randomLibraryDisconnectedRoom(HallsLayout layout) {
+        if (rooms.isEmpty() || random.nextInt(100) < 35) {
+            return randomRoomAnywhere(layout);
+        }
+        Room anchor = rooms.get(random.nextInt(rooms.size()));
+        double angle = random.nextDouble() * Math.PI * 2.0;
+        int distance = 18 + random.nextInt(44);
+        int x = anchor.centerX() + (int) Math.round(Math.cos(angle) * distance) - layout.width() / 2;
+        int z = anchor.centerZ() + (int) Math.round(Math.sin(angle) * distance) - layout.depth() / 2;
+        return new Room(layout, x, z);
     }
 
     private void seedElevatorNetwork() {
@@ -726,10 +777,6 @@ final class HallsExplorationGenerator {
         for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
             networkCells.add(doorCell(room, opening.getKey(), opening.getValue()));
         }
-    }
-
-    private boolean shouldMakeLibraryVentOnlyRoom() {
-        return corridorMode == CorridorMode.LIBRARY && rooms.size() > 2 && random.nextDouble() < 0.25;
     }
 
     private void rememberCorridor(List<Cell> path) {

@@ -323,7 +323,7 @@ final class HallsSessionBossRuntime {
         }
         Vector backwards = velocity.clone().normalize().multiply(-0.35);
         Location sample = impactLocation.clone();
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < 32; i++) {
             sample.add(backwards);
             if (pointInsideBossHitbox(sample, hitbox.getLocation(), halfWidth, minY, maxY)) {
                 return true;
