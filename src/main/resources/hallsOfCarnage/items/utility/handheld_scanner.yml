@@ -2,7 +2,8 @@ id: handheld_scanner
 name: "Handheld Scanner"
 category: utility
 rarity: normal
-material: SPYGLASS
+material: FIREWORK_STAR
+item-model: minecraft:spyglass
 max-stack-size: 1
 lore:
   - "Pings the floor for threats and unusual salvage."

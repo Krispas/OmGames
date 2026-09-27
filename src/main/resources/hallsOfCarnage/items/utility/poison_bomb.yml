@@ -3,7 +3,7 @@ name: "Poison Bomb"
 category: utility
 rarity: rare
 material: FIREWORK_STAR
-item-model: om:poison_bomb
+item-model: minecraft:dragon_breath
 max-stack-size: 1
 lore:
   - "Deploys a toxic cloud that hurts monsters, not players."
