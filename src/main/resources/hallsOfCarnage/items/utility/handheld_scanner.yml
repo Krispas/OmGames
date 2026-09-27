@@ -12,5 +12,5 @@ stats:
   cooldown-seconds: 25
   radius: 20
 recipe:
-  iron_scrap: 8
-  redstone_scrap: 6
+  iron_scrap: 4
+  redstone_scrap: 3

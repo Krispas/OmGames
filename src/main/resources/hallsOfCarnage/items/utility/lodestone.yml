@@ -7,8 +7,8 @@ max-stack-size: 1
 lore:
   - "Projects a temporary path back to the elevator."
 stats:
-  durability: 5
-  cooldown-seconds: 45
+  durability: 10
+  cooldown-seconds: 25
   duration-seconds: 20
 recipe:
   iron_scrap: 8

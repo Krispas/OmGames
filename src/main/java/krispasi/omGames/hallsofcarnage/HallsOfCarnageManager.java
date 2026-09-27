@@ -22,12 +22,11 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.*;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Interaction;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.entity.Villager;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -35,7 +34,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class HallsOfCarnageManager {
     private static final String CONFIG_RESOURCE = "halls-of-carnage.yml";
     private static final String DATA_FOLDER_NAME = "HallsOfCarnage";
-    private static final String MENU_VILLAGER_TAG = "omgames_hoc_menu_villager";
+    private static final String MENU_INTERACTION_TAG = "omgames_hoc_menu_interaction";
+    private static final String LEGACY_MENU_VILLAGER_TAG = "omgames_hoc_menu_villager";
     private static final String[] RESOURCE_FILES = {
             "hallsOfCarnage/scenarios/UntoldDepths.yml",
             "hallsOfCarnage/level/special/start_floor.txt",
@@ -284,7 +284,8 @@ public final class HallsOfCarnageManager {
     }
 
     private final JavaPlugin plugin;
-    private final org.bukkit.NamespacedKey menuVillagerKey;
+    private final org.bukkit.NamespacedKey menuInteractionKey;
+    private final org.bukkit.NamespacedKey legacyMenuVillagerKey;
     private final HallsShameService shameService;
     private final Map<Integer, HallsSession> activeSessions = new HashMap<>();
     private final Map<UUID, Integer> playerSessions = new HashMap<>();
@@ -325,7 +326,8 @@ public final class HallsOfCarnageManager {
 
     public HallsOfCarnageManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.menuVillagerKey = new org.bukkit.NamespacedKey(plugin, "hoc_menu_villager");
+        this.menuInteractionKey = new org.bukkit.NamespacedKey(plugin, "hoc_menu_interaction");
+        this.legacyMenuVillagerKey = new org.bukkit.NamespacedKey(plugin, "hoc_menu_villager");
         this.shameService = new HallsShameService(plugin);
     }
 
@@ -344,7 +346,7 @@ public final class HallsOfCarnageManager {
         buildingTypes = HallsBuildingTypeLoader.loadBuildingTypes(plugin, getBuildingsFolder());
         shameService.load();
         applyWorldRules();
-        spawnConfiguredMenuVillager();
+        spawnConfiguredMenuInteraction();
         plugin.getLogger().info("Loaded " + scenarios.size() + " Halls of Carnage scenarios and "
                 + levelTypes.size() + " level types, " + breakableTypes.size() + " breakable types, "
                 + vegetationTypes.size() + " vegetation types, " + itemTypes.size() + " item types, "
@@ -372,7 +374,7 @@ public final class HallsOfCarnageManager {
         modifierTypes = HallsModifierTypeLoader.loadModifierTypes(plugin, getModifiersFolder());
         buildingTypes = HallsBuildingTypeLoader.loadBuildingTypes(plugin, getBuildingsFolder());
         applyWorldRules();
-        spawnConfiguredMenuVillager();
+        spawnConfiguredMenuInteraction();
         return Result.ok("Reloaded Halls of Carnage. Scenarios: " + scenarios.size()
                 + ", level types: " + levelTypes.size() + ", breakables: " + breakableTypes.size()
                 + ", vegetation: " + vegetationTypes.size() + ", items: " + itemTypes.size()
@@ -473,25 +475,26 @@ public final class HallsOfCarnageManager {
         return Result.ok("Halls lobby spawn set to your current location.");
     }
 
-    public Result spawnMenuVillager(Player player, Float yawOverride) {
+    public Result spawnMenuInteraction(Player player, Float yawOverride) {
         if (player == null) {
-            return Result.fail("Only a player can spawn the Halls menu villager.");
+            return Result.fail("Only a player can spawn the Halls menu interaction.");
         }
         Location location = player.getLocation().clone();
         if (yawOverride != null) {
             location.setYaw(yawOverride);
         }
-        saveLocation("lobby.menu-villager", location);
+        saveLocation("lobby.menu-interaction", location);
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(getConfigFile());
-        yaml.set("lobby.menu-villager.enabled", true);
+        yaml.set("lobby.menu-interaction.enabled", true);
+        yaml.set("lobby.menu-villager.enabled", false);
         try {
             yaml.save(getConfigFile());
         } catch (IOException ex) {
-            return Result.fail("Failed to save Halls menu villager location: " + ex.getMessage());
+            return Result.fail("Failed to save Halls menu interaction location: " + ex.getMessage());
         }
         config = HallsConfig.load(getConfigFile());
-        spawnConfiguredMenuVillager();
-        return Result.ok("Halls menu villager spawned.");
+        spawnConfiguredMenuInteraction();
+        return Result.ok("Halls menu interaction spawned.");
     }
 
     public void openMainMenu(Player player) {
@@ -816,9 +819,9 @@ public final class HallsOfCarnageManager {
         }
     }
 
-    public boolean isMenuVillager(Entity entity) {
+    public boolean isMenuInteraction(Entity entity) {
         return entity != null
-                && entity.getPersistentDataContainer().has(menuVillagerKey, PersistentDataType.BYTE);
+                && entity.getPersistentDataContainer().has(menuInteractionKey, PersistentDataType.BYTE);
     }
 
     public boolean isSessionEntity(Entity entity) {
@@ -1573,30 +1576,32 @@ public final class HallsOfCarnageManager {
         playerSessions.clear();
     }
 
-    private void spawnConfiguredMenuVillager() {
-        if (config == null || !config.menuVillagerEnabled()) {
+    private void spawnConfiguredMenuInteraction() {
+        if (config == null || !config.menuInteractionEnabled()) {
             return;
         }
-        Location location = config.menuVillagerLocation();
+        Location location = config.menuInteractionLocation();
         if (location == null || location.getWorld() == null) {
             return;
         }
-        removeMenuVillagers(location.getWorld());
-        Villager villager = (Villager) location.getWorld().spawnEntity(location, EntityType.VILLAGER);
-        villager.customName(Component.text("Halls of Carnage", NamedTextColor.DARK_RED));
-        villager.setCustomNameVisible(true);
-        villager.setAI(false);
-        villager.setInvulnerable(true);
-        villager.setPersistent(true);
-        villager.setRemoveWhenFarAway(false);
-        villager.setProfession(Villager.Profession.CLERIC);
-        villager.addScoreboardTag(MENU_VILLAGER_TAG);
-        villager.getPersistentDataContainer().set(menuVillagerKey, PersistentDataType.BYTE, (byte) 1);
+        removeMenuInteractions(location.getWorld());
+        Interaction interaction = location.getWorld().spawn(location, Interaction.class, entity -> {
+            entity.setInteractionWidth(1.0f);
+            entity.setInteractionHeight(2.0f);
+            entity.setResponsive(true);
+            entity.setPersistent(true);
+            entity.addScoreboardTag(MENU_INTERACTION_TAG);
+            entity.getPersistentDataContainer().set(menuInteractionKey, PersistentDataType.BYTE, (byte) 1);
+        });
+        interaction.customName(Component.text("Halls of Carnage", NamedTextColor.DARK_RED));
     }
 
-    private void removeMenuVillagers(World world) {
+    private void removeMenuInteractions(World world) {
         for (Entity entity : world.getEntities()) {
-            if (entity.getScoreboardTags().contains(MENU_VILLAGER_TAG) || isMenuVillager(entity)) {
+            if (entity.getScoreboardTags().contains(MENU_INTERACTION_TAG)
+                    || entity.getScoreboardTags().contains(LEGACY_MENU_VILLAGER_TAG)
+                    || isMenuInteraction(entity)
+                    || entity.getPersistentDataContainer().has(legacyMenuVillagerKey, PersistentDataType.BYTE)) {
                 entity.remove();
             }
         }

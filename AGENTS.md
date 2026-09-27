@@ -1222,7 +1222,7 @@ Behavior notes:
 
 - `src/main/java/krispasi/omGames/hallsofcarnage/*`
   - Initial Halls of Carnage implementation.
-  - Owns `/hoc`, Halls config/resource loading, lobby/menu-villager handling, scenario discovery, and Halls shame persistence.
+  - Owns `/hoc`, Halls config/resource loading, lobby menu interaction handling, scenario discovery, and Halls shame persistence.
   - Keep Halls logic isolated from BedWars, Egg Hunt, Chess, Bank, and Random classes.
 - `HallsSession` owns active session state; `HallsSessionTrapRuntime` is its session-owned trap placement/ticking helper.
 - `HallsSessionMonsterRuntime` is the session-owned first-pass monster flood helper; keep monster spawning/alert cleanup routed through `HallsSession`.
@@ -1250,7 +1250,7 @@ Operator subcommands:
 - `/hoc shame set <player> <amount>`
 - `/hoc shame add <player> <amount>`
 - `/hoc lobby setspawn`
-- `/hoc lobby spawnMenuVillager [rotation]`
+- `/hoc lobby spawnMenuInteraction [rotation]`
 - `/hoc reload`
 
 Permission declared in `plugin.yml`:
@@ -1368,9 +1368,9 @@ SQLite tables:
 - The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, per-player sculk pressure, per-player active totem buff levels, elevator chest contents, stored scrap/coins, camp bank/key/team-life counters, research points/unlocked nodes, exploration floors since last camp, and shared camp plot building state including building id, level, harvest counters, and storage locker contents.
 - Save snapshots are created/overwritten when a campaign starts, when the elevator leaves a floor, when arriving at a camp floor, when game-over restarts the run at floor 1, and when the host uses `/hoc leave` from the start floor or a camp floor.
 - `/hoc leave` is player-only, does not require OP, and only the active session host can use it to save and end the session from the start floor or a camp floor.
-- The lobby villager opens a GUI flow for New Campaign, Load Save, scenario selection, difficulty selection, and session settings.
+- The lobby menu interaction entity opens a GUI flow for New Campaign, Load Save, scenario selection, difficulty selection, and session settings.
 - New campaign session settings can toggle online players currently in the Halls lobby, then start the run.
-- Starting/loading a Halls session closes any open Halls lobby villager menu for selected participants before teleporting them into the generated session.
+- Starting/loading a Halls session closes any open Halls lobby menu for selected participants before teleporting them into the generated session.
 - Load Save lists save files containing the clicking player, allows shift-right-click deletion of those saves, and requires every saved participant to be online in the Halls lobby and outside other Halls sessions before restoring the save.
 - Difficulty options are Normal/Hard/Extreme with multipliers `1.0`, `1.5`, and `2.0`; the first-pass implementation scales floor difficulty, coin quota, trapped-room count, holes, and sculk patch count.
 - Camp floors with a bottom-edge `L` marker dock that marker just outside the elevator front and carve a south-side layout opening, so large shared camp layouts do not overlap the elevator shell. Older layouts without a bottom `L` still use the north-edge connector fallback.

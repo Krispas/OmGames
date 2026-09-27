@@ -161,18 +161,20 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
         if (args.length == 2 && args[1].equalsIgnoreCase("setspawn")) {
             return manager.setLobbySpawn(player);
         }
-        if (args.length >= 2 && args[1].equalsIgnoreCase("spawnMenuVillager")) {
+        if (args.length >= 2
+                && (args[1].equalsIgnoreCase("spawnMenuInteraction")
+                || args[1].equalsIgnoreCase("spawnMenuVillager"))) {
             Float yaw = null;
             if (args.length >= 3) {
                 try {
                     yaw = Float.parseFloat(args[2]);
                 } catch (NumberFormatException ex) {
-                    return HallsOfCarnageManager.Result.fail("Villager rotation must be a number.");
+                    return HallsOfCarnageManager.Result.fail("Menu interaction rotation must be a number.");
                 }
             }
-            return manager.spawnMenuVillager(player, yaw);
+            return manager.spawnMenuInteraction(player, yaw);
         }
-        return HallsOfCarnageManager.Result.fail("Usage: /hoc lobby setspawn | /hoc lobby spawnMenuVillager [rotation]");
+        return HallsOfCarnageManager.Result.fail("Usage: /hoc lobby setspawn | /hoc lobby spawnMenuInteraction [rotation]");
     }
 
     private HallsOfCarnageManager.Result handleStart(CommandSender sender, String[] args) {
@@ -341,7 +343,7 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
     }
 
     private Component usage() {
-        return Component.text("Usage: /hoc menu | /hoc recipes | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc debug | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc leave | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc give <item> [amount] | /hoc lobby <setspawn|spawnMenuVillager> | /hoc reload | /hoc reset confirm", NamedTextColor.YELLOW);
+        return Component.text("Usage: /hoc menu | /hoc recipes | /hoc scenarios | /hoc scenario <scenario> | /hoc sessions | /hoc debug | /hoc top | /hoc shame [player] | /hoc shame <set|add> <player> <amount> | /hoc tp | /hoc leave | /hoc start <scenario> [player...] | /hoc stop <session_id|*> | /hoc floor <session_id> <floor> | /hoc give <item> [amount] | /hoc lobby <setspawn|spawnMenuInteraction> | /hoc reload | /hoc reset confirm", NamedTextColor.YELLOW);
     }
 
     @Override
@@ -374,7 +376,7 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                     .toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("lobby")) {
-            return filter(args[1], "setspawn", "spawnMenuVillager");
+            return filter(args[1], "setspawn", "spawnMenuInteraction", "spawnMenuVillager");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("stop")) {
             List<String> options = new ArrayList<>();

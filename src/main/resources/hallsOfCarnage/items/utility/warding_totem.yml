@@ -5,10 +5,10 @@ rarity: rare
 material: TOTEM_OF_UNDYING
 max-stack-size: 1
 lore:
-  - "Grants nearby players Resistance II for 10 seconds."
+  - "Grants nearby players Resistance II for 20 seconds."
 stats:
-  durability: 5
-  cooldown-seconds: 120
+  durability: 20
+  cooldown-seconds: 23
   duration-seconds: 20
   radius: 8
   ward-strength: 2

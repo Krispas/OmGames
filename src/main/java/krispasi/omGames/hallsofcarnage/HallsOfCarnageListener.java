@@ -108,7 +108,7 @@ public final class HallsOfCarnageListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent event) {
         Entity entity = event.getEntity();
-        if (manager.isMenuVillager(entity)
+        if (manager.isMenuInteraction(entity)
                 || (manager.isSessionEntity(entity) && !(event instanceof EntityDamageByEntityEvent))) {
             event.setCancelled(true);
             return;
@@ -238,7 +238,7 @@ public final class HallsOfCarnageListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        if (!manager.isMenuVillager(event.getRightClicked())) {
+        if (!manager.isMenuInteraction(event.getRightClicked())) {
             if (manager.isSessionEntity(event.getRightClicked())) {
                 event.setCancelled(true);
             }
