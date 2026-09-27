@@ -52,6 +52,8 @@ final class HallsSessionTrapRuntime {
     private static final int ROOM_HEIGHT = 5;
     private static final int ELEVATOR_OUTER_RADIUS = 3;
     private static final double MONSTER_TRAP_PLAYER_RADIUS = 20.0;
+    private static final int HOMING_MINE_DETECTION_PATH_CELLS = 18;
+    private static final int HOMING_MINE_DETONATION_PATH_CELLS = 2;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -1332,9 +1334,13 @@ final class HallsSessionTrapRuntime {
         long armedUntil = trapNextTriggerTicks.getOrDefault(trap, 0L);
         Entity display = trap.movingDisplayId() == null ? null : Bukkit.getEntity(trap.movingDisplayId());
         Location mineLocation = display == null ? center : display.getLocation();
-        Player target = nearestParticipant(mineLocation, 7.0);
+        Player target = nearestReachableParticipant(mineLocation, HOMING_MINE_DETECTION_PATH_CELLS);
         Long detonateAt = homingMineDetonateTicks.get(trap);
         if (detonateAt != null) {
+            if (target == null || !canHomingMineDetonateAt(mineLocation, target.getLocation())) {
+                homingMineDetonateTicks.remove(trap);
+                return;
+            }
             if (tick >= detonateAt) {
                 homingMineDetonateTicks.remove(trap);
                 triggerProximityMine(trap, target);
@@ -1355,13 +1361,15 @@ final class HallsSessionTrapRuntime {
             trapNextTriggerTicks.put(trap, tick + Math.max(20L, trap.type().activeTicks()));
             world.playSound(center, Sound.BLOCK_COPPER_BULB_TURN_ON, 0.75f, 0.7f);
         } else if (tick >= armedUntil) {
-            triggerProximityMine(trap, target == null ? null : target);
+            if (target == null) {
+                trapNextTriggerTicks.remove(trap);
+                return;
+            }
+            triggerProximityMine(trap, target);
             return;
         }
         if (target != null && display != null) {
-            Vector targetDelta = target.getLocation().toVector().subtract(mineLocation.toVector());
-            targetDelta.setY(0.0);
-            if (targetDelta.lengthSquared() <= 1.15 * 1.15) {
+            if (canHomingMineDetonateAt(mineLocation, target.getLocation())) {
                 homingMineDetonateTicks.put(trap, tick + 40L);
                 world.playSound(display.getLocation(), Sound.BLOCK_COPPER_BULB_TURN_OFF, 0.9f, 0.65f);
                 world.spawnParticle(Particle.SMOKE, display.getLocation().clone().add(0.0, 0.25, 0.0),
@@ -1373,7 +1381,7 @@ final class HallsSessionTrapRuntime {
             delta.setY(0.0);
             if (delta.lengthSquared() > 0.04) {
                 Location previous = display.getLocation().clone();
-                Location next = display.getLocation().add(delta.normalize().multiply(0.22));
+                Location next = nextHomingMineLocation(previous, destination, delta);
                 next.setY(homingMinePlateY());
                 display.teleport(next);
                 moveHomingMineDisplays(trap, previous, next);
@@ -1399,6 +1407,62 @@ final class HallsSessionTrapRuntime {
             return mineLocation;
         }
         return new Location(world, next.x() + 0.5, homingMinePlateY(), next.z() + 0.5);
+    }
+
+    private Player nearestReachableParticipant(Location mineLocation, int maxPathCells) {
+        Player best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.getWorld().equals(world) || !isAliveParticipant(player)) {
+                continue;
+            }
+            int distance = homingMinePathDistance(mineLocation, player.getLocation(), maxPathCells);
+            if (distance >= 0 && distance < bestDistance) {
+                best = player;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    private boolean canHomingMineDetonateAt(Location mineLocation, Location targetLocation) {
+        Vector targetDelta = targetLocation.toVector().subtract(mineLocation.toVector());
+        targetDelta.setY(0.0);
+        if (targetDelta.lengthSquared() > 1.15 * 1.15) {
+            return false;
+        }
+        int pathDistance = homingMinePathDistance(mineLocation, targetLocation, HOMING_MINE_DETONATION_PATH_CELLS);
+        return pathDistance >= 0 && pathDistance <= HOMING_MINE_DETONATION_PATH_CELLS;
+    }
+
+    private int homingMinePathDistance(Location mineLocation, Location targetLocation, int maxPathCells) {
+        if (floorWalkableCells.isEmpty()) {
+            return -1;
+        }
+        HallsExplorationGenerator.Cell start = nearestWalkableCell(cellAt(mineLocation), 2);
+        HallsExplorationGenerator.Cell goal = nearestWalkableCell(cellAt(targetLocation), 2);
+        if (start == null || goal == null) {
+            return -1;
+        }
+        return pathDistance(start, goal, maxPathCells);
+    }
+
+    private Location nextHomingMineLocation(Location current, Location destination, Vector delta) {
+        Location next = current.clone().add(delta.normalize().multiply(0.22));
+        if (floorWalkableCells.isEmpty()) {
+            return next;
+        }
+        HallsExplorationGenerator.Cell currentCell = nearestWalkableCell(cellAt(current), 1);
+        HallsExplorationGenerator.Cell destinationCell = cellAt(destination);
+        HallsExplorationGenerator.Cell nextCell = cellAt(next);
+        if (currentCell == null || !floorWalkableCells.contains(destinationCell)) {
+            return current;
+        }
+        if (nextCell.equals(currentCell) || nextCell.equals(destinationCell)) {
+            return next;
+        }
+        return new Location(world, destinationCell.x() + 0.5, homingMinePlateY(), destinationCell.z() + 0.5);
     }
 
     private HallsExplorationGenerator.Cell cellAt(Location location) {
@@ -1446,6 +1510,40 @@ final class HallsSessionTrapRuntime {
             }
         }
         return null;
+    }
+
+    private int pathDistance(HallsExplorationGenerator.Cell start,
+                             HallsExplorationGenerator.Cell goal,
+                             int maxDistance) {
+        if (start.equals(goal)) {
+            return 0;
+        }
+        Set<HallsExplorationGenerator.Cell> seen = new HashSet<>();
+        java.util.Map<HallsExplorationGenerator.Cell, Integer> distances = new java.util.HashMap<>();
+        ArrayDeque<HallsExplorationGenerator.Cell> queue = new ArrayDeque<>();
+        seen.add(start);
+        distances.put(start, 0);
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            HallsExplorationGenerator.Cell current = queue.remove();
+            int distance = distances.getOrDefault(current, 0);
+            if (distance >= maxDistance) {
+                continue;
+            }
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                HallsExplorationGenerator.Cell next = step(current, face);
+                if (!floorWalkableCells.contains(next) || !seen.add(next)) {
+                    continue;
+                }
+                int nextDistance = distance + 1;
+                if (next.equals(goal)) {
+                    return nextDistance;
+                }
+                distances.put(next, nextDistance);
+                queue.add(next);
+            }
+        }
+        return -1;
     }
 
     private HallsExplorationGenerator.Cell firstStepOnPath(HallsExplorationGenerator.Cell start,
@@ -1508,6 +1606,12 @@ final class HallsSessionTrapRuntime {
         int x = player.getLocation().getBlockX();
         int z = player.getLocation().getBlockZ();
         for (HallsTrap trap : List.copyOf(traps)) {
+            if (trap.kind() == TrapKind.HOMING_MINE) {
+                if (canHomingMineContact(trap, player.getLocation())) {
+                    triggerProximityMine(trap, player);
+                }
+                continue;
+            }
             if (trap.x() != x || trap.z() != z) {
                 if (!(trap.kind() == TrapKind.PROXIMITY_MINE && Math.abs(trap.x() - x) <= 1 && Math.abs(trap.z() - z) <= 1)) {
                     continue;
@@ -1534,6 +1638,12 @@ final class HallsSessionTrapRuntime {
         int x = monster.getLocation().getBlockX();
         int z = monster.getLocation().getBlockZ();
         for (HallsTrap trap : List.copyOf(traps)) {
+            if (trap.kind() == TrapKind.HOMING_MINE) {
+                if (canHomingMineContact(trap, monster.getLocation())) {
+                    triggerProximityMine(trap, monster);
+                }
+                continue;
+            }
             if (trap.x() != x || trap.z() != z) {
                 if (!(trap.kind() == TrapKind.PROXIMITY_MINE && Math.abs(trap.x() - x) <= 1 && Math.abs(trap.z() - z) <= 1)) {
                     continue;
@@ -1571,6 +1681,17 @@ final class HallsSessionTrapRuntime {
             return display.getLocation().clone();
         }
         return new Location(world, trap.x() + 0.5, origin.y(), trap.z() + 0.5);
+    }
+
+    private boolean canHomingMineContact(HallsTrap trap, Location targetLocation) {
+        Location mineLocation = activeMineLocation(trap);
+        double radius = Math.max(1.25, trap.type().radius());
+        if (mineLocation.distanceSquared(targetLocation) > radius * radius) {
+            return false;
+        }
+        int maxPathCells = Math.max(1, (int) Math.ceil(radius));
+        int pathDistance = homingMinePathDistance(mineLocation, targetLocation, maxPathCells);
+        return pathDistance >= 0 && pathDistance <= maxPathCells;
     }
 
     private void triggerBearTrap(HallsTrap trap, LivingEntity trigger) {
