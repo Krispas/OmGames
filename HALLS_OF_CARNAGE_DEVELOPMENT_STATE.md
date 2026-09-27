@@ -171,3 +171,5 @@ For reviewer to figure out:
 - New breakables
 - Texture all items
 - Utility rework
+- Bunker and library palletes
+- Rework lodestone and manual scanner
