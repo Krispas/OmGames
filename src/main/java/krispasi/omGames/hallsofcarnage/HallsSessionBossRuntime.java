@@ -351,9 +351,10 @@ final class HallsSessionBossRuntime {
         updateBossBar();
         updateInvulnerabilityFeedback(System.currentTimeMillis());
         activeBoss.setIdleTicks(activeBoss.idleTicks() + 1);
-        double bob = Math.sin(activeBoss.idleTicks() / 8.0) * 0.04;
+        double bob = isArchaicGuard() ? 0.0 : Math.sin(activeBoss.idleTicks() / 8.0) * 0.04;
         animateDisplays("idle", activeBoss.idleTicks(), activeBoss.yaw(), bob, new Vector());
-        Location core = activeBoss.location().clone().add(0.0, 2.45 + bob, 0.0);
+        double particleBob = isArchaicGuard() ? archaicGuardVisualBob(activeBoss.idleTicks()) : bob;
+        Location core = activeBoss.location().clone().add(0.0, 2.45 + particleBob, 0.0);
         world.spawnParticle(Particle.TRIAL_SPAWNER_DETECTION, core, 2, 1.9, 1.5, 1.9, 0.0);
         if (activeBoss.idleTicks() % 8 == 0) {
             world.spawnParticle(Particle.ELECTRIC_SPARK, core, 8, 2.0, 1.4, 2.0, 0.04);
@@ -534,10 +535,10 @@ final class HallsSessionBossRuntime {
             return;
         }
         activeBoss.setAttackAnimationTicks(0);
-        final Location[] target = {nearestAlivePlayerLocation()};
+        final Location[] target = {missileTargetLocation()};
         new TimedAttack(config.missileAimTicks(), () -> {
             activeBoss.setYaw(activeBoss.yaw() + 6.0f);
-            Location next = nearestAlivePlayerLocation();
+            Location next = missileTargetLocation();
             if (next != null) {
                 target[0] = next;
             }
@@ -551,7 +552,8 @@ final class HallsSessionBossRuntime {
             }, () -> {
                 fireMissile(locked, config.missileRadius(), config.missileDamage());
                 if (remaining > 1) {
-                    runMissileChain(config, remaining - 1);
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> runMissileChain(config, remaining - 1),
+                            Math.max(1L, config.missileLockTicks() / 2L));
                 } else {
                     scheduleNextAttack(config.missileCooldownTicks());
                 }
@@ -612,7 +614,7 @@ final class HallsSessionBossRuntime {
             new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond()).runTaskTimer(plugin, 1L, 2L);
             if (remaining > 1) {
                 Bukkit.getScheduler().runTaskLater(plugin, () -> runArchaicShockwaveChain(config, remaining - 1,
-                        Math.max(1, config.shockwaveChargeTicks() / 2)), 1L);
+                        Math.max(1, (int) Math.round(config.shockwaveChargeTicks() * 0.4))), 1L);
             } else {
                 scheduleNextAttack(config.shockwaveCooldownTicks());
             }
@@ -934,6 +936,17 @@ final class HallsSessionBossRuntime {
         return nearest == null ? null : nearest.getLocation().clone();
     }
 
+    private Location missileTargetLocation() {
+        List<Player> players = alivePlayers();
+        if (players.isEmpty()) {
+            return null;
+        }
+        if (players.size() == 1) {
+            return players.getFirst().getLocation().clone();
+        }
+        return players.get(random.nextInt(players.size())).getLocation().clone();
+    }
+
     private Location randomBossArenaLocation(double radius) {
         if (activeBoss == null) {
             return null;
@@ -1165,6 +1178,7 @@ final class HallsSessionBossRuntime {
         if (activeBoss == null) {
             return;
         }
+        double visualYOffset = isArchaicGuard() ? yOffset + archaicGuardVisualBob(activeBoss.idleTicks()) : yOffset;
         updateHitboxPosition(yOffset, offset);
         List<HallsBossType.DisplayPart> parts = displayParts(activeBoss.type());
         String normalizedAnimationId = normalizeId(animationId);
@@ -1179,13 +1193,17 @@ final class HallsSessionBossRuntime {
             }
             HallsBossType.DisplayPart part = parts.get(Math.min(index, parts.size() - 1));
             AnimationPose pose = animationPose(activeBoss.type(), normalizedAnimationId, part.id(), tick);
+            if (isArchaicGuardPropeller(part.id())) {
+                pose = new AnimationPose(pose.offsetX(), pose.offsetY(), pose.offsetZ(), archaicGuardPropellerYaw(part.id()),
+                        pose.scaleX(), pose.scaleY(), pose.scaleZ());
+            }
             Vector combinedOffset = (offset == null ? new Vector() : offset.clone())
                     .add(new Vector(pose.offsetX(), pose.offsetY(), pose.offsetZ()));
             if (entity instanceof Display display) {
                 display.setInterpolationDelay(1);
                 display.setTeleportDuration(2);
                 boolean applyBaseYaw = animation == null ? !isArchaicGuard() : animation.applyBaseYaw();
-                Location target = displayLocation(activeBoss.location(), part, yOffset, combinedOffset, yaw, applyBaseYaw);
+                Location target = displayLocation(activeBoss.location(), part, visualYOffset, combinedOffset, yaw, applyBaseYaw);
                 entity.teleport(target);
                 display.setTransformation(HallsDisplayTransforms.centeredBlock(
                         part.scaleX() * pose.scaleX() * activeBoss.scaleMultiplier(),
@@ -1193,10 +1211,22 @@ final class HallsSessionBossRuntime {
                         part.scaleZ() * pose.scaleZ() * activeBoss.scaleMultiplier(),
                         new Quaternionf().rotateY((float) Math.toRadians((applyBaseYaw ? yaw : 0.0f) + pose.yawOffset()))));
             } else {
-                entity.teleport(displayLocation(activeBoss.location(), part, yOffset, combinedOffset, yaw, false));
+                entity.teleport(displayLocation(activeBoss.location(), part, visualYOffset, combinedOffset, yaw, false));
             }
             index++;
         }
+    }
+
+    private double archaicGuardVisualBob(int tick) {
+        return Math.sin(tick / 7.0) * 0.08;
+    }
+
+    private boolean isArchaicGuardPropeller(String partId) {
+        return isArchaicGuard() && normalizeId(partId).startsWith("propeller");
+    }
+
+    private double archaicGuardPropellerYaw(String partId) {
+        return activeBoss == null ? 0.0 : activeBoss.idleTicks() * 18.0;
     }
 
     private AnimationPose animationPose(HallsBossType type, String animationId, String partId, int tick) {

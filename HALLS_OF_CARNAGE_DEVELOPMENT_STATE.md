@@ -127,6 +127,7 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
+- Next reviewer slice applied: Archaic Guard now keeps its movement-facing rotation after reposition/circle-dash by letting idle display transforms apply base yaw. Its model gets a small runtime sine-wave visual bob that does not move the hitbox, and propeller display parts spin continuously from runtime ticks independent of YAML attack animation keyframes. Trap attack pacing is now 0.5s charge plus 0.5s cooldown, wall/shockwave post-attack cooldowns are shorter, chained shockwaves recharge about 20% faster than before, and homing missile aim/lock times are shorter with chained shots retargeting randomly across alive players when multiple players are in the arena.
 - Next reviewer slice applied: Floor 26's Overdrive Spawner layout is now included in the Halls resource seed list, and boss layout loading falls back read-only to the bundled resource when an existing data folder does not yet contain the file, avoiding the generic fallback arena until `/hoc reset confirm` is used. Boss arenas now place a lit floor block directly under the boss plus a symmetric ceiling-light pattern across open arena cells. Overdrive Spawner X-blast move/charge timings were shortened by about 33%, and each X-blast attack now chooses a random rotation while using the same rotated cross for warning particles and damage checks. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available; targeted Java 25 `javac` verification could not be run because only `javac 18.0.2-beta` is available.
 - Next development slice applied: Overdrive Spawner phase mechanics were expanded. Boss-spawned minions are tracked by UUID and shield the boss while alive; the bundled boss config exposes `spawn.max-alive`, per-minion respawn cooldown, low-health cooldown multiplier, shockwave chain ranges, enraged X-blast chain count, and phase scale multipliers. Above half health the jump attack chains 2-4 shockwaves, below half it chains 3-5, and enraged X-blast chains three spinning blasts. The spawner starts at 80% scale and plays an overdrive animation, particles, title, and roar when crossing half health before growing to full scale. Below half health, spawn attacks wait for all minions to die before starting the doubled group cooldown and spawning the next full group. Boss hits now drain configured weapon durability only after successful damage, and shielded projectile hits remain handled without applying projectile poison/status effects. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available; targeted Java 25 `javac` verification could not be run because only `javac 18` is available.
 - Next reviewer slice applied: Finished the remaining `New campagin shape` slice cleanup. Monster resources now support `death-children`, and Brooding Mother/Splinter splitting is data-driven from resource YAML. Army Coffin trap monsters now spawn through the normal Halls monster runtime, so configured scale, attack damage, baby/slime flags, movement speed, equipment, tags, and tracking apply to coffin-spawned monsters. Poison Bomb now uses a `FIREWORK_STAR` with the `om:poison_bomb` model hook while retaining utility cooldown/durability handling and poison particles. Enchanted Book defaults explicitly set `hit-points: 10`. Rotting Soldier explosion smoke/flame now fills the damage radius more clearly. Homing Mine display rotation/height now follows the same floor-plate path as proximity mines. Library floors target more paired wall vents, and the bundled vent display depth was adjusted. Maven verification could not be run in this environment because neither `mvn` nor a Maven wrapper is available.
@@ -153,14 +154,9 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-Archaic guard changes:
-- When the guard is rotated a certain way during repositioning, keep that additional rotation after the attack finishes
-- The propeller should rotate indepently off any animations as its not used in any.
-- Add a small bouncing into the guards model offset, do it by making its y coordinates follow sin function (but not too much, -0.1 to 0.1 offset at most), the hitbox doesnt need to move, its just a visual effect to make it more lively
-- When casting the trap attack, make the laying down take only 0.5 second and then cooldown also 0.5 second for better pacing.
-- Make cooldowns after fire wall and shockwave attacks smaller
-- Make cooldown between shockwaves in shockwave attacks around 20% smaller
-- Make charging up the homing missile attack take half the time and reduce the time between shots if multiple are chained. If there are more players in the room, each shot should have a random target.
+- The rotation for the archaic guard are kinda weird as its eyes dont always rotate gotether with the body
+- Archaic guard: make the spawn attack not be able to spawn mobs out of bounds.
+- Archaic guard: when targetting the missle attack, make it face towards the player (only on yaw, not pitch)
 
 Future slices (dont do yet):
 - TBD
@@ -169,3 +165,4 @@ For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
 - New breakables
 - Texture all items
+- Utility rework
