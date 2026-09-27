@@ -147,7 +147,11 @@ final class HallsExplorationGenerator {
         if (!addFirstRoom(layouts)) {
             return;
         }
-        int connectedTarget = Math.max(1, (int) Math.ceil(targetRooms * 0.67));
+        int disconnectedTarget = Math.max(1, (int) Math.round(targetRooms / 3.0));
+        if (targetRooms <= 2) {
+            disconnectedTarget = 0;
+        }
+        int connectedTarget = Math.max(1, targetRooms - disconnectedTarget);
         int attempts = 0;
         while (rooms.size() < connectedTarget && attempts++ < roomPlacementAttemptLimit(targetRooms)) {
             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
@@ -170,9 +174,9 @@ final class HallsExplorationGenerator {
         }
         addFirstRoomOnwardRoutes();
         addRoomToRoomLoops();
-        int disconnectedTarget = Math.max(0, targetRooms - rooms.size());
+        disconnectedTarget = Math.max(disconnectedTarget, targetRooms - rooms.size());
         attempts = 0;
-        while (disconnectedTarget > 0 && attempts++ < targetRooms * 60) {
+        while (disconnectedTarget > 0 && attempts++ < targetRooms * 160) {
             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
             Room room = randomLibraryDisconnectedRoom(layout);
             if (!canPlaceRoom(room)) {
@@ -182,6 +186,7 @@ final class HallsExplorationGenerator {
                 disconnectedTarget--;
             }
         }
+        markLibraryVentGates();
     }
 
     private boolean addLibraryVentOnlyRoom(Room room) {
@@ -242,12 +247,33 @@ final class HallsExplorationGenerator {
         if (rooms.isEmpty()) {
             return randomRoomAnywhere(layout);
         }
-        Room anchor = rooms.get(random.nextInt(rooms.size()));
-        double angle = random.nextDouble() * Math.PI * 2.0;
-        int distance = 14 + random.nextInt(29);
-        int x = anchor.centerX() + (int) Math.round(Math.cos(angle) * distance) - layout.width() / 2;
-        int z = anchor.centerZ() + (int) Math.round(Math.sin(angle) * distance) - layout.depth() / 2;
-        return new Room(layout, x, z);
+        List<Room> anchors = rooms.stream()
+                .filter(room -> !room.ventOnly())
+                .filter(room -> !availableFaces(room).isEmpty())
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        if (anchors.isEmpty()) {
+            return randomRoomAnywhere(layout);
+        }
+        Room anchor = anchors.get(random.nextInt(anchors.size()));
+        List<BlockFace> faces = availableFaces(anchor);
+        Collections.shuffle(faces, random);
+        BlockFace face = faces.getFirst();
+        int gap = 6 + random.nextInt(13);
+        int lateralRange = 6 + Math.max(anchor.layout().width(), anchor.layout().depth()) / 2
+                + Math.max(layout.width(), layout.depth()) / 2;
+        int lateral = random.nextInt(lateralRange * 2 + 1) - lateralRange;
+        return switch (face) {
+            case NORTH -> new Room(layout, anchor.centerX() + lateral - layout.width() / 2,
+                    anchor.startZ() - gap - layout.depth());
+            case SOUTH -> new Room(layout, anchor.centerX() + lateral - layout.width() / 2,
+                    anchor.startZ() + anchor.layout().depth() + gap);
+            case EAST -> new Room(layout, anchor.startX() + anchor.layout().width() + gap,
+                    anchor.centerZ() + lateral - layout.depth() / 2);
+            case WEST -> new Room(layout, anchor.startX() - gap - layout.width(),
+                    anchor.centerZ() + lateral - layout.depth() / 2);
+            default -> new Room(layout, anchor.centerX() - layout.width() / 2,
+                    anchor.centerZ() - layout.depth() / 2);
+        };
     }
 
     private void seedElevatorNetwork() {
@@ -1654,9 +1680,18 @@ final class HallsExplorationGenerator {
     }
 
     private Plan plan() {
+        Set<Cell> ventOnlyRoomCells = new HashSet<>();
+        for (Room room : rooms) {
+            if (room.ventOnly()) {
+                ventOnlyRoomCells.addAll(openInteriorCells(room));
+            }
+        }
         Set<Cell> walkable = new HashSet<>(corridorCells);
+        walkable.removeAll(lowCeilingCorridorCells);
         walkable.addAll(roomInteriorCells);
+        walkable.removeAll(ventOnlyRoomCells);
         Set<Cell> monsterSpawnCells = new HashSet<>(corridorCells);
+        monsterSpawnCells.removeAll(lowCeilingCorridorCells);
         for (Room room : rooms) {
             if (!room.ventOnly()) {
                 monsterSpawnCells.addAll(openInteriorCells(room));

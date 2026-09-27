@@ -5270,10 +5270,7 @@ public final class HallsSession {
                 return;
             }
             List<HallsExplorationGenerator.Cell> path = pathToElevator(player.getLocation());
-            if (path.isEmpty()) {
-                renderPathParticles(player.getLocation().clone().add(0.0, 0.35, 0.0),
-                        elevatorSpawnLocation().add(0.0, 0.35, 0.0), Particle.ELECTRIC_SPARK);
-            } else {
+            if (!path.isEmpty()) {
                 renderCellPathParticles(path, Particle.ELECTRIC_SPARK);
             }
         }, 1L, 10L);
@@ -5287,7 +5284,10 @@ public final class HallsSession {
         if (from == null || activeFloorMapCells.isEmpty()) {
             return List.of();
         }
-        HallsExplorationGenerator.Cell start = nearestFloorCell(from.getBlockX(), from.getBlockZ());
+        HallsExplorationGenerator.Cell start = new HallsExplorationGenerator.Cell(from.getBlockX(), from.getBlockZ());
+        if (!activeFloorMapCells.contains(start)) {
+            return List.of();
+        }
         HallsExplorationGenerator.Cell goal = nearestFloorCell(origin.x(), elevatorFrontZ(1));
         if (start == null || goal == null) {
             return List.of();
