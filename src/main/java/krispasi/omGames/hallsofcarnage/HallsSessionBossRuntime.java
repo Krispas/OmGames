@@ -615,7 +615,7 @@ final class HallsSessionBossRuntime {
         }, () -> {
             world.playSound(activeBoss.location(), Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 0.65f);
             new Shockwave(config.shockwaveDamage(), config.shockwaveSpeedBlocksPerSecond(),
-                    config.shockwaveMaxRadius(), Particle.FLAME).runTaskTimer(plugin, 1L, 2L);
+                    config.shockwaveMaxRadius(), Particle.ELECTRIC_SPARK).runTaskTimer(plugin, 1L, 2L);
             if (remaining > 1) {
                 Bukkit.getScheduler().runTaskLater(plugin, () -> runArchaicShockwaveChain(config, remaining - 1,
                         Math.max(1, (int) Math.round(config.shockwaveChargeTicks() * 0.4))), 1L);
@@ -1593,7 +1593,7 @@ final class HallsSessionBossRuntime {
             Location center = activeBoss.location().clone().add(0.0, 0.08, 0.0);
             for (double angle = 0.0; angle < Math.PI * 2.0; angle += Math.PI / 18.0) {
                 Location point = center.clone().add(Math.cos(angle) * radius, 0.0, Math.sin(angle) * radius);
-                world.spawnParticle(particle, point, 1, 0.03, 0.03, 0.03, particle == Particle.FLAME ? 0.01 : 0.0);
+                world.spawnParticle(particle, point, 1, 0.015, 0.015, 0.015, 0.0);
             }
             for (Player player : alivePlayers()) {
                 if (hit.contains(player.getUniqueId())) {
@@ -1608,7 +1608,7 @@ final class HallsSessionBossRuntime {
                 }
             }
             radius += radiusStep;
-            if (radius > 13.0) {
+            if (radius > maxRadius) {
                 cancel();
             }
         }

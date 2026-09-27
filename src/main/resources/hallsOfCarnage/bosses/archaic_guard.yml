@@ -165,19 +165,6 @@ animations:
         tick: 10
         offset:
           y: 0.06
-    parts:
-      left_eye:
-        frames:
-          0:
-            tick: 0
-          10:
-            tick: 10
-      right_eye:
-        frames:
-          0:
-            tick: 0
-          10:
-            tick: 10
   missile_lock:
     loop: true
     apply-base-yaw: true
@@ -191,19 +178,6 @@ animations:
         tick: 8
         offset:
           y: 0.08
-    parts:
-      left_eye:
-        frames:
-          0:
-            tick: 0
-          8:
-            tick: 8
-      right_eye:
-        frames:
-          0:
-            tick: 0
-          8:
-            tick: 8
   shockwave_charge:
     loop: true
     apply-base-yaw: true
@@ -217,19 +191,6 @@ animations:
         tick: 12
         offset:
           y: -0.06
-    parts:
-      left_eye:
-        frames:
-          0:
-            tick: 0
-          12:
-            tick: 12
-      right_eye:
-        frames:
-          0:
-            tick: 0
-          12:
-            tick: 12
   wall_charge:
     loop: true
     apply-base-yaw: true
@@ -243,19 +204,6 @@ animations:
         tick: 10
         offset:
           y: 0.10
-    parts:
-      left_eye:
-        frames:
-          0:
-            tick: 0
-          10:
-            tick: 10
-      right_eye:
-        frames:
-          0:
-            tick: 0
-          10:
-            tick: 10
   spawn_slam:
     loop: false
     apply-base-yaw: true
@@ -275,23 +223,6 @@ animations:
         tick: 12
         offset:
           y: 0.0
-    parts:
-      left_eye:
-        frames:
-          0:
-            tick: 0
-          6:
-            tick: 6
-          12:
-            tick: 12
-      right_eye:
-        frames:
-          0:
-            tick: 0
-          6:
-            tick: 6
-          12:
-            tick: 12
   reposition:
     loop: true
     apply-base-yaw: true
@@ -305,19 +236,6 @@ animations:
         tick: 8
         offset:
           y: 0.18
-    parts:
-      left_eye:
-        frames:
-          0:
-            tick: 0
-          8:
-            tick: 8
-      right_eye:
-        frames:
-          0:
-            tick: 0
-          8:
-            tick: 8
   circle_dash:
     loop: true
     apply-base-yaw: true
@@ -335,23 +253,6 @@ animations:
         tick: 10
         offset:
           y: 0.12
-    parts:
-      left_eye:
-        frames:
-          0:
-            tick: 0
-          5:
-            tick: 5
-          10:
-            tick: 10
-      right_eye:
-        frames:
-          0:
-            tick: 0
-          5:
-            tick: 5
-          10:
-            tick: 10
   trap:
     loop: true
     apply-base-yaw: true
@@ -369,23 +270,6 @@ animations:
         tick: 16
         offset:
           y: 0.03
-    parts:
-      left_eye:
-        frames:
-          0:
-            tick: 0
-          8:
-            tick: 8
-          16:
-            tick: 16
-      right_eye:
-        frames:
-          0:
-            tick: 0
-          8:
-            tick: 8
-          16:
-            tick: 16
 overdrive:
   phase:
     initial-scale-multiplier: 1.0
@@ -393,7 +277,7 @@ overdrive:
 archaic-guard:
   missile:
     aim-seconds: 1.5
-    lock-seconds: 0.5
+    lock-seconds: 1.0
     cooldown-seconds: 0.75
     damage: 10.0
     radius: 2.8
