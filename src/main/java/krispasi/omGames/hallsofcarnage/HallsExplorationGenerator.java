@@ -138,9 +138,6 @@ final class HallsExplorationGenerator {
         } else if (corridorMode == CorridorMode.CAVE) {
             addMazeBranches(Math.max(rooms.size() / 2, 4));
         }
-        if (corridorMode == CorridorMode.LIBRARY) {
-            markLibraryVentGates();
-        }
     }
 
     private void generateLibraryLayout(List<HallsLayout> layouts, int targetRooms) {
@@ -186,60 +183,14 @@ final class HallsExplorationGenerator {
                 disconnectedTarget--;
             }
         }
-        markLibraryVentGates();
     }
 
     private boolean addLibraryVentOnlyRoom(Room room) {
-        List<LibraryVentConnection> connections = new ArrayList<>();
-        List<Room> anchors = rooms.stream()
-                .filter(anchor -> !anchor.ventOnly())
-                .filter(anchor -> !availableFaces(anchor).isEmpty())
-                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-        Collections.shuffle(anchors, random);
-        List<BlockFace> roomFaces = availableFaces(room);
-        Collections.shuffle(roomFaces, random);
-        int checkedAnchors = 0;
-        for (Room anchor : anchors) {
-            if (checkedAnchors++ >= 3 || connections.size() >= 4) {
-                break;
-            }
-            List<BlockFace> anchorFaces = availableFaces(anchor);
-            Collections.shuffle(anchorFaces, random);
-            for (BlockFace roomFace : roomFaces) {
-                int roomOffset = doorOffset(room.layout(), roomFace);
-                Cell roomDoor = doorCell(room, roomFace, roomOffset);
-                for (BlockFace anchorFace : anchorFaces) {
-                    int anchorOffset = doorOffset(anchor.layout(), anchorFace);
-                    Cell anchorDoor = doorCell(anchor, anchorFace, anchorOffset);
-                    List<Cell> path = findConnectorPath(roomDoor, Set.of(anchorDoor),
-                            List.of(Bounds.of(room), Bounds.of(anchor)));
-                    if (path.size() < 7) {
-                        continue;
-                    }
-                    connections.add(new LibraryVentConnection(anchor, anchorFace, anchorOffset,
-                            roomFace, roomOffset, path));
-                    if (connections.size() >= 4) {
-                        break;
-                    }
-                }
-                if (connections.size() >= 4) {
-                    break;
-                }
-            }
-        }
-        if (connections.isEmpty()) {
+        if (rooms.stream().noneMatch(anchor -> !anchor.ventOnly())) {
             return false;
         }
-        connections.sort(java.util.Comparator.comparingInt(connection -> connection.path().size()));
-        int limit = Math.min(connections.size(), 4);
-        LibraryVentConnection connection = connections.get(random.nextInt(limit));
-        connection.anchor().openings().put(connection.anchorFace(), connection.anchorOffset());
-        room.openings().put(connection.roomFace(), connection.roomOffset());
         room.setVentOnly(true);
         addRoom(room);
-        networkCells.add(doorCell(connection.anchor(), connection.anchorFace(), connection.anchorOffset()));
-        networkCells.add(doorCell(room, connection.roomFace(), connection.roomOffset()));
-        rememberCorridor(connection.path(), true);
         return true;
     }
 
@@ -870,7 +821,7 @@ final class HallsExplorationGenerator {
         Set<Cell> carved = switch (corridorMode) {
             case CAVE -> naturalCaveCorridorCells(path);
             case LARGE_CORRIDORS -> largeCorridorCells(path);
-            case LIBRARY -> libraryCorridorCells(path, forceLibraryVent);
+            case LIBRARY -> largeCorridorCells(path);
             case SEWER -> sewerCorridorCells(path);
             case BUNKER -> new HashSet<>(path);
             case MAZE, BACKROOMS, OPEN_HALLS -> openHallConnectorCells(path);
@@ -906,15 +857,6 @@ final class HallsExplorationGenerator {
 
     private boolean shouldUseLibraryVentConnector(List<Cell> path) {
         return false;
-    }
-
-    private Set<Cell> libraryCorridorCells(List<Cell> path, boolean forceVent) {
-        boolean vent = forceVent && path.size() >= 7;
-        Set<Cell> cells = vent ? new HashSet<>(path) : largeCorridorCells(path);
-        if (vent) {
-            lowCeilingCorridorCells.addAll(cells);
-        }
-        return cells;
     }
 
     private Set<Cell> sewerCorridorCells(List<Cell> path) {
@@ -1201,59 +1143,6 @@ final class HallsExplorationGenerator {
                 }
             }
         }
-    }
-
-    private void markLibraryVentGates() {
-        if (lowCeilingCorridorCells.isEmpty()) {
-            return;
-        }
-        for (Cell vent : lowCeilingCorridorCells) {
-            BlockFace face = libraryVentGateFace(vent);
-            if (face != BlockFace.SELF && libraryVentGateHasSideWalls(vent, face)) {
-                ventGateCells.add(vent);
-            }
-        }
-        for (Room room : rooms) {
-            for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
-                Cell door = doorCell(room, opening.getKey(), opening.getValue());
-                if (lowCeilingCorridorCells.contains(door) && libraryVentGateHasSideWalls(door, opening.getKey().getOppositeFace())) {
-                    ventGateCells.add(door);
-                    continue;
-                }
-                Cell outside = step(door, opening.getKey());
-                if (lowCeilingCorridorCells.contains(outside) && libraryVentGateHasSideWalls(outside, opening.getKey().getOppositeFace())) {
-                    ventGateCells.add(outside);
-                }
-            }
-        }
-    }
-
-    private BlockFace libraryVentGateFace(Cell vent) {
-        for (BlockFace face : CARDINAL_FACES) {
-            Cell neighbor = step(vent, face);
-            if (corridorCells.contains(neighbor) && !lowCeilingCorridorCells.contains(neighbor)) {
-                return face;
-            }
-        }
-        return BlockFace.SELF;
-    }
-
-    private boolean libraryVentGateHasSideWalls(Cell vent, BlockFace transitionFace) {
-        if (transitionFace == BlockFace.SELF) {
-            return false;
-        }
-        boolean eastWestTransition = transitionFace == BlockFace.EAST || transitionFace == BlockFace.WEST;
-        Cell firstSide = eastWestTransition
-                ? new Cell(vent.x(), vent.z() - 1)
-                : new Cell(vent.x() - 1, vent.z());
-        Cell secondSide = eastWestTransition
-                ? new Cell(vent.x(), vent.z() + 1)
-                : new Cell(vent.x() + 1, vent.z());
-        return libraryVentSideIsWall(firstSide) && libraryVentSideIsWall(secondSide);
-    }
-
-    private boolean libraryVentSideIsWall(Cell cell) {
-        return !corridorCells.contains(cell) && !roomInteriorCells.contains(cell);
     }
 
     private void widenBunkerSpine() {
@@ -1824,14 +1713,6 @@ final class HallsExplorationGenerator {
                                   BlockFace roomFace,
                                   int anchorOffset,
                                   int roomOffset) {
-    }
-
-    private record LibraryVentConnection(Room anchor,
-                                         BlockFace anchorFace,
-                                         int anchorOffset,
-                                         BlockFace roomFace,
-                                         int roomOffset,
-                                         List<Cell> path) {
     }
 
     private record DoorCandidate(BlockFace face, int offset) {
