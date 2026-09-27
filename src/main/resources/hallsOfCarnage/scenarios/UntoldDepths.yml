@@ -109,6 +109,7 @@ allowed-items:
   utility:
     - smoke_bomb
     - mending_salve
+    - absorption_tonic
     - warding_totem
     - adrenaline_shot
     - ironhide_salve
@@ -314,6 +315,7 @@ research:
         - rusty_sword
         - stonehide_chowder
         - fleetfoot_ration
+        - absorption_tonic
     improved_gear:
       name: "Improved Gear"
       icon: IRON_SWORD

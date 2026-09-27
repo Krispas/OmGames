@@ -66,6 +66,7 @@ final class HallsSessionTrapRuntime {
     private final List<HallsTrap> traps = new ArrayList<>();
     private final Map<UUID, Long> trapDamageCooldowns = new java.util.HashMap<>();
     private final Map<HallsTrap, Long> trapNextTriggerTicks = new IdentityHashMap<>();
+    private final Map<HallsTrap, Long> homingMineDetonateTicks = new IdentityHashMap<>();
     private final Map<HallsTrap, Integer> trapHitPoints = new IdentityHashMap<>();
     private final Set<UUID> transientTrapDisplays = new HashSet<>();
     private BukkitTask trapTask;
@@ -112,6 +113,7 @@ final class HallsSessionTrapRuntime {
         }
         traps.clear();
         trapNextTriggerTicks.clear();
+        homingMineDetonateTicks.clear();
         transientTrapDisplays.clear();
         trapDamageCooldowns.clear();
         trapRuntimeTick = 0L;
@@ -1324,6 +1326,22 @@ final class HallsSessionTrapRuntime {
         long armedUntil = trapNextTriggerTicks.getOrDefault(trap, 0L);
         Player target = nearestParticipant(center, 7.0);
         Entity display = trap.movingDisplayId() == null ? null : Bukkit.getEntity(trap.movingDisplayId());
+        Long detonateAt = homingMineDetonateTicks.get(trap);
+        if (detonateAt != null) {
+            Location location = display == null ? center : display.getLocation();
+            if (tick >= detonateAt) {
+                homingMineDetonateTicks.remove(trap);
+                triggerProximityMine(trap, target);
+                return;
+            }
+            if (tick % 5L == 0L) {
+                world.spawnParticle(Particle.ELECTRIC_SPARK, location.clone().add(0.0, 0.25, 0.0),
+                        8, 0.18, 0.08, 0.18, 0.02);
+                world.playSound(location, Sound.BLOCK_NOTE_BLOCK_PLING, 0.45f,
+                        tick + 10L >= detonateAt ? 1.85f : 1.35f);
+            }
+            return;
+        }
         if (armedUntil <= 0L) {
             if (target == null) {
                 return;
@@ -1338,7 +1356,10 @@ final class HallsSessionTrapRuntime {
             Vector delta = target.getLocation().toVector().subtract(display.getLocation().toVector());
             delta.setY(0.0);
             if (delta.lengthSquared() <= 1.15 * 1.15) {
-                triggerProximityMine(trap, target);
+                homingMineDetonateTicks.put(trap, tick + 40L);
+                world.playSound(display.getLocation(), Sound.BLOCK_COPPER_BULB_TURN_OFF, 0.9f, 0.65f);
+                world.spawnParticle(Particle.SMOKE, display.getLocation().clone().add(0.0, 0.25, 0.0),
+                        18, 0.22, 0.08, 0.22, 0.03);
                 return;
             }
             if (delta.lengthSquared() > 0.04) {

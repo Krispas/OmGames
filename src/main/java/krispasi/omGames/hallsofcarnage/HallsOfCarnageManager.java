@@ -233,6 +233,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/utility/smoke_bomb.yml",
             "hallsOfCarnage/items/utility/warding_totem.yml",
             "hallsOfCarnage/items/utility/mending_salve.yml",
+            "hallsOfCarnage/items/utility/absorption_tonic.yml",
             "hallsOfCarnage/items/utility/adrenaline_shot.yml",
             "hallsOfCarnage/items/utility/ironhide_salve.yml",
             "hallsOfCarnage/items/utility/storm_vial.yml",

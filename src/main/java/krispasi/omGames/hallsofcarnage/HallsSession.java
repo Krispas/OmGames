@@ -2,6 +2,7 @@ package krispasi.omGames.hallsofcarnage;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -119,6 +120,7 @@ public final class HallsSession {
     private Set<HallsExplorationGenerator.Cell> activeVentGateCells = Set.of();
     private final Map<String, Long> utilityCooldowns = new HashMap<>();
     private final Map<String, Long> sculkMaulSplashCooldowns = new HashMap<>();
+    private final Set<UUID> weaponChaining = new HashSet<>();
     private final Set<UUID> weaponSplashing = new HashSet<>();
     private final Map<UUID, CarriedResearchCrate> carriedResearchCrates = new HashMap<>();
     private final Map<UUID, BlueprintDistillery> blueprintDistilleries = new HashMap<>();
@@ -920,6 +922,9 @@ public final class HallsSession {
     }
 
     public boolean handleWeaponHit(Player player, Entity target, EntityDamageByEntityEvent event) {
+        if (player != null && weaponChaining.contains(player.getUniqueId())) {
+            return false;
+        }
         if (event != null) {
             HallsSessionBossRuntime.AttackResult bossProjectileAttack =
                     bossRuntime.handleProjectileHit(player, target, eventDamageWithProjectileMetadata(event));
@@ -1012,25 +1017,30 @@ public final class HallsSession {
 
     private void applyWeaponChainEffect(Player player, HallsItemType type, LivingEntity primaryTarget, double sourceDamage) {
         int targets = Math.max(0, (int) Math.round(type.stats().getOrDefault("chain_targets", 0.0)));
-        if (targets <= 0) {
+        if (player == null || targets <= 0 || weaponChaining.contains(player.getUniqueId())) {
             return;
         }
         double radius = Math.max(2.0, type.stats().getOrDefault("chain_radius", 7.0));
         double damage = Math.max(0.5, type.stats().getOrDefault("chain_damage", sourceDamage));
         int hits = 0;
-        for (Entity nearby : world.getNearbyEntities(primaryTarget.getLocation(), radius, radius, radius)) {
-            if (!(nearby instanceof LivingEntity living)
-                    || living.getUniqueId().equals(primaryTarget.getUniqueId())
-                    || !monsterRuntime.isSessionMonster(living)
-                    || living.getLocation().distanceSquared(primaryTarget.getLocation()) > radius * radius) {
-                continue;
+        weaponChaining.add(player.getUniqueId());
+        try {
+            for (Entity nearby : world.getNearbyEntities(primaryTarget.getLocation(), radius, radius, radius)) {
+                if (!(nearby instanceof LivingEntity living)
+                        || living.getUniqueId().equals(primaryTarget.getUniqueId())
+                        || !monsterRuntime.isSessionMonster(living)
+                        || living.getLocation().distanceSquared(primaryTarget.getLocation()) > radius * radius) {
+                    continue;
+                }
+                living.damage(Math.min(damage, Math.max(0.0, living.getHealth() - 0.5)), player);
+                world.spawnParticle(Particle.ELECTRIC_SPARK, living.getLocation().add(0.0, 1.0, 0.0), 12, 0.25, 0.35, 0.25, 0.05);
+                hits++;
+                if (hits >= targets) {
+                    break;
+                }
             }
-            living.damage(Math.min(damage, Math.max(0.0, living.getHealth() - 0.5)), player);
-            world.spawnParticle(Particle.ELECTRIC_SPARK, living.getLocation().add(0.0, 1.0, 0.0), 12, 0.25, 0.35, 0.25, 0.05);
-            hits++;
-            if (hits >= targets) {
-                break;
-            }
+        } finally {
+            weaponChaining.remove(player.getUniqueId());
         }
         if (hits > 0) {
             world.playSound(primaryTarget.getLocation(), Sound.BLOCK_COPPER_BULB_TURN_ON, 0.55f, 1.55f);
@@ -1424,89 +1434,22 @@ public final class HallsSession {
         }
         ensureUseCooldownMetadata(item, type);
         return switch (type.id()) {
-            case "smoke_bomb" -> {
-                if (isUtilityOnCooldown(player, type)) {
-                    yield true;
-                }
-                activateSmokeBomb(player, type);
-                applyUtilityCooldown(player, item, type);
-                damageUtilityItem(player, item, type);
-                yield true;
-            }
-            case "warding_totem" -> {
-                if (isUtilityOnCooldown(player, type)) {
-                    yield true;
-                }
-                activateWardingTotem(player, type);
-                applyUtilityCooldown(player, item, type);
-                damageUtilityItem(player, item, type);
-                yield true;
-            }
-            case "mending_salve" -> {
-                if (isUtilityOnCooldown(player, type)) {
-                    yield true;
-                }
-                if (activateHealingUtility(player, type)) {
-                    applyUtilityCooldown(player, item, type);
-                    damageUtilityItem(player, item, type);
-                }
-                yield true;
-            }
-            case "adrenaline_shot" -> {
-                if (isUtilityOnCooldown(player, type)) {
-                    yield true;
-                }
-                activateSelfBuffUtility(player, type, PotionEffectType.SPEED, "speed", "Adrenaline floods your legs.", Sound.ENTITY_RABBIT_JUMP);
-                applyUtilityCooldown(player, item, type);
-                damageUtilityItem(player, item, type);
-                yield true;
-            }
-            case "ironhide_salve" -> {
-                if (isUtilityOnCooldown(player, type)) {
-                    yield true;
-                }
-                activateSelfBuffUtility(player, type, PotionEffectType.RESISTANCE, "resistance", "Ironhide seals your skin.", Sound.BLOCK_ANVIL_USE);
-                applyUtilityCooldown(player, item, type);
-                damageUtilityItem(player, item, type);
-                yield true;
-            }
-            case "storm_vial" -> {
-                if (isUtilityOnCooldown(player, type)) {
-                    yield true;
-                }
-                activateMonsterPulseUtility(player, type, Particle.ELECTRIC_SPARK, Sound.ENTITY_LIGHTNING_BOLT_THUNDER,
-                        "The vial bursts into chained sparks.");
-                applyUtilityCooldown(player, item, type);
-                damageUtilityItem(player, item, type);
-                yield true;
-            }
-            case "poison_bomb" -> {
-                if (isUtilityOnCooldown(player, type)) {
-                    yield true;
-                }
-                activatePoisonBomb(player, type);
-                applyUtilityCooldown(player, item, type);
-                damageUtilityItem(player, item, type);
-                yield true;
-            }
-            case "lodestone" -> {
-                if (isUtilityOnCooldown(player, type)) {
-                    yield true;
-                }
-                activateLodestone(player, type);
-                applyUtilityCooldown(player, item, type);
-                damageUtilityItem(player, item, type);
-                yield true;
-            }
-            case "handheld_scanner" -> {
-                if (isUtilityOnCooldown(player, type)) {
-                    yield true;
-                }
-                activateHandheldScanner(player, type);
-                applyUtilityCooldown(player, item, type);
-                damageUtilityItem(player, item, type);
-                yield true;
-            }
+            case "smoke_bomb" -> activateUtility(player, item, type, () -> activateSmokeBomb(player, type));
+            case "warding_totem" -> activateUtility(player, item, type, () -> activateWardingTotem(player, type));
+            case "mending_salve" -> activateUtility(player, item, type, () -> activateHealingUtility(player, type));
+            case "adrenaline_shot" -> activateUtility(player, item, type,
+                    () -> activateSelfBuffUtility(player, type, PotionEffectType.SPEED, "speed", "Adrenaline floods your legs.", Sound.ENTITY_RABBIT_JUMP));
+            case "ironhide_salve" -> activateUtility(player, item, type,
+                    () -> activateSelfBuffUtility(player, type, PotionEffectType.RESISTANCE, "resistance", "Ironhide seals your skin.", Sound.BLOCK_ANVIL_USE));
+            case "storm_vial" -> activateUtility(player, item, type,
+                    () -> activateMonsterPulseUtility(player, type, Particle.ELECTRIC_SPARK, Sound.ENTITY_LIGHTNING_BOLT_THUNDER,
+                            "The vial bursts into chained sparks."));
+            case "poison_bomb" -> activateUtility(player, item, type, () -> activatePoisonBomb(player, type));
+            case "lodestone" -> activateUtility(player, item, type, () -> activateLodestone(player, type));
+            case "handheld_scanner" -> activateUtility(player, item, type, () -> activateHandheldScanner(player, type));
+            case "absorption_tonic" -> activateUtility(player, item, type,
+                    () -> activateSelfBuffUtility(player, type, PotionEffectType.ABSORPTION, "absorption",
+                            "Absorption steadies your body.", Sound.ITEM_HONEY_BOTTLE_DRINK));
             default -> false;
         };
     }
@@ -5032,7 +4975,19 @@ public final class HallsSession {
         return HallsItemFactory.create(plugin, type, amount);
     }
 
-    private void activateSmokeBomb(Player player, HallsItemType type) {
+    private boolean activateUtility(Player player, ItemStack item, HallsItemType type, UtilityActivation activation) {
+        if (isUtilityOnCooldown(player, type)) {
+            return true;
+        }
+        if (!activation.activate()) {
+            return true;
+        }
+        applyUtilityCooldown(player, item, type);
+        damageUtilityItem(player, item, type);
+        return true;
+    }
+
+    private boolean activateSmokeBomb(Player player, HallsItemType type) {
         double radius = Math.max(6.0, type.stats().getOrDefault("radius", 10.0));
         int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("duration_seconds", 6.0) * 20.0));
         monsterRuntime.concealParticipant(player.getUniqueId(), durationTicks * 50L);
@@ -5044,9 +4999,10 @@ public final class HallsSession {
                 100, radius * 0.28, 0.45, radius * 0.28, 0.02);
         world.playSound(player.getLocation(), Sound.ENTITY_BREEZE_WIND_BURST, 0.9f, 0.65f);
         player.sendActionBar(Component.text("Smoke covers your escape.", NamedTextColor.GRAY));
+        return true;
     }
 
-    private void activateWardingTotem(Player player, HallsItemType type) {
+    private boolean activateWardingTotem(Player player, HallsItemType type) {
         double radius = Math.max(4.0, type.stats().getOrDefault("radius", 8.0));
         int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("duration_seconds", 10.0) * 20.0));
         for (UUID playerId : participants) {
@@ -5061,6 +5017,7 @@ public final class HallsSession {
         world.spawnParticle(Particle.TOTEM_OF_UNDYING, player.getLocation().add(0.0, 1.0, 0.0),
                 80, radius * 0.22, 0.9, radius * 0.22, 0.08);
         world.playSound(player.getLocation(), Sound.ITEM_TOTEM_USE, 0.85f, 1.15f);
+        return true;
     }
 
     private boolean activateHealingUtility(Player player, HallsItemType type) {
@@ -5079,12 +5036,12 @@ public final class HallsSession {
         return true;
     }
 
-    private void activateSelfBuffUtility(Player player,
-                                         HallsItemType type,
-                                         PotionEffectType effectType,
-                                         String statPrefix,
-                                         String message,
-                                         Sound sound) {
+    private boolean activateSelfBuffUtility(Player player,
+                                            HallsItemType type,
+                                            PotionEffectType effectType,
+                                            String statPrefix,
+                                            String message,
+                                            Sound sound) {
         int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault(statPrefix + "_seconds", 8.0) * 20.0));
         int amplifier = Math.max(0, (int) Math.round(type.stats().getOrDefault(statPrefix + "_amplifier", 1.0)) - 1);
         player.addPotionEffect(new PotionEffect(effectType, durationTicks, amplifier, true, true, true));
@@ -5092,13 +5049,14 @@ public final class HallsSession {
                 32, 0.35, 0.6, 0.35, 0.05);
         world.playSound(player.getLocation(), sound, 0.75f, 1.2f);
         player.sendActionBar(Component.text(message, NamedTextColor.GREEN));
+        return true;
     }
 
-    private void activateMonsterPulseUtility(Player player,
-                                             HallsItemType type,
-                                             Particle particle,
-                                             Sound sound,
-                                             String message) {
+    private boolean activateMonsterPulseUtility(Player player,
+                                                HallsItemType type,
+                                                Particle particle,
+                                                Sound sound,
+                                                String message) {
         double radius = Math.max(1.0, type.stats().getOrDefault("radius", 5.0));
         double damage = Math.max(0.0, type.stats().getOrDefault("monster_damage", 5.0));
         Location center = player.getLocation();
@@ -5113,9 +5071,10 @@ public final class HallsSession {
                 80, radius * 0.35, 0.7, radius * 0.35, 0.08);
         world.playSound(center, sound, 0.7f, 1.45f);
         player.sendActionBar(Component.text(message, NamedTextColor.AQUA));
+        return true;
     }
 
-    private void activatePoisonBomb(Player player, HallsItemType type) {
+    private boolean activatePoisonBomb(Player player, HallsItemType type) {
         double radius = Math.max(1.0, type.stats().getOrDefault("radius", 4.0));
         double damage = Math.max(0.0, type.stats().getOrDefault("monster_damage", 3.0));
         int cloudTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("poison_seconds", 5.0) * 20.0));
@@ -5125,20 +5084,104 @@ public final class HallsSession {
         HallsPoisonClouds.spawn(plugin, world, player, center, radius, Math.min(cloudTicks, 200), 5,
                 PotionEffectType.POISON, poisonTicks, amplifier, damage, monsterRuntime::isSessionMonster);
         player.sendActionBar(Component.text("Poison vapor blooms from the bomb.", NamedTextColor.DARK_GREEN));
+        return true;
     }
 
-    private void activateLodestone(Player player, HallsItemType type) {
+    private boolean activateLodestone(Player player, HallsItemType type) {
         int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("duration_seconds", 20.0) * 20.0));
-        Location target = elevatorSpawnLocation();
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!running || !player.isOnline() || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())) {
                 return;
             }
-            renderPathParticles(player.getLocation().clone().add(0.0, 0.35, 0.0), target.clone().add(0.0, 0.35, 0.0), Particle.ELECTRIC_SPARK);
+            List<HallsExplorationGenerator.Cell> path = pathToElevator(player.getLocation());
+            if (path.isEmpty()) {
+                renderPathParticles(player.getLocation().clone().add(0.0, 0.35, 0.0),
+                        elevatorSpawnLocation().add(0.0, 0.35, 0.0), Particle.ELECTRIC_SPARK);
+            } else {
+                renderCellPathParticles(path, Particle.ELECTRIC_SPARK);
+            }
         }, 1L, 10L);
         Bukkit.getScheduler().runTaskLater(plugin, task::cancel, durationTicks);
         world.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.2f);
-        player.sendActionBar(Component.text("The lodestone points toward the elevator.", NamedTextColor.AQUA));
+        player.sendActionBar(Component.text("The lodestone traces the way back to the elevator.", NamedTextColor.AQUA));
+        return true;
+    }
+
+    private List<HallsExplorationGenerator.Cell> pathToElevator(Location from) {
+        if (from == null || activeFloorMapCells.isEmpty()) {
+            return List.of();
+        }
+        HallsExplorationGenerator.Cell start = nearestFloorCell(from.getBlockX(), from.getBlockZ());
+        HallsExplorationGenerator.Cell goal = nearestFloorCell(origin.x(), elevatorFrontZ(1));
+        if (start == null || goal == null) {
+            return List.of();
+        }
+        ArrayDeque<HallsExplorationGenerator.Cell> queue = new ArrayDeque<>();
+        Map<HallsExplorationGenerator.Cell, HallsExplorationGenerator.Cell> previous = new HashMap<>();
+        queue.add(start);
+        previous.put(start, start);
+        while (!queue.isEmpty()) {
+            HallsExplorationGenerator.Cell cell = queue.removeFirst();
+            if (cell.equals(goal)) {
+                return reconstructCellPath(previous, start, goal);
+            }
+            for (HallsExplorationGenerator.Cell next : List.of(
+                    new HallsExplorationGenerator.Cell(cell.x() + 1, cell.z()),
+                    new HallsExplorationGenerator.Cell(cell.x() - 1, cell.z()),
+                    new HallsExplorationGenerator.Cell(cell.x(), cell.z() + 1),
+                    new HallsExplorationGenerator.Cell(cell.x(), cell.z() - 1))) {
+                if (!activeFloorMapCells.contains(next) || previous.containsKey(next)) {
+                    continue;
+                }
+                previous.put(next, cell);
+                queue.addLast(next);
+            }
+        }
+        return List.of();
+    }
+
+    private HallsExplorationGenerator.Cell nearestFloorCell(int x, int z) {
+        HallsExplorationGenerator.Cell exact = new HallsExplorationGenerator.Cell(x, z);
+        if (activeFloorMapCells.contains(exact)) {
+            return exact;
+        }
+        HallsExplorationGenerator.Cell best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (HallsExplorationGenerator.Cell cell : activeFloorMapCells) {
+            int distance = Math.abs(cell.x() - x) + Math.abs(cell.z() - z);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = cell;
+            }
+        }
+        return best;
+    }
+
+    private List<HallsExplorationGenerator.Cell> reconstructCellPath(Map<HallsExplorationGenerator.Cell, HallsExplorationGenerator.Cell> previous,
+                                                                     HallsExplorationGenerator.Cell start,
+                                                                     HallsExplorationGenerator.Cell goal) {
+        ArrayList<HallsExplorationGenerator.Cell> reversed = new ArrayList<>();
+        HallsExplorationGenerator.Cell cursor = goal;
+        while (cursor != null) {
+            reversed.add(cursor);
+            if (cursor.equals(start)) {
+                break;
+            }
+            cursor = previous.get(cursor);
+        }
+        java.util.Collections.reverse(reversed);
+        return reversed;
+    }
+
+    private void renderCellPathParticles(List<HallsExplorationGenerator.Cell> path, Particle particle) {
+        int step = Math.max(1, path.size() / 48);
+        int rendered = 0;
+        for (int i = 0; i < path.size() && rendered < 48; i += step) {
+            HallsExplorationGenerator.Cell cell = path.get(i);
+            world.spawnParticle(particle, new Location(world, cell.x() + 0.5, origin.y() + 0.35, cell.z() + 0.5),
+                    1, 0.03, 0.03, 0.03, 0.0);
+            rendered++;
+        }
     }
 
     private void renderPathParticles(Location from, Location to, Particle particle) {
@@ -5156,7 +5199,7 @@ public final class HallsSession {
         }
     }
 
-    private void activateHandheldScanner(Player player, HallsItemType type) {
+    private boolean activateHandheldScanner(Player player, HallsItemType type) {
         double radius = Math.max(1.0, type.stats().getOrDefault("radius", 20.0));
         Location location = player.getLocation();
         boolean nearbyResearchCrate = researchCrate != null && researchCrate.blocks().stream()
@@ -5170,13 +5213,14 @@ public final class HallsSession {
             fog = Math.max(0L, witherAfterSeconds - elapsed) + "s";
         }
         player.sendMessage(Component.text("Scanner", NamedTextColor.AQUA)
-                .append(Component.text(" | Monsters: " + monsterRuntime.debugStatus(), NamedTextColor.GRAY)));
+                .append(Component.text(" | Active monsters: " + monsterRuntime.activeMonsterCount(), NamedTextColor.GRAY)));
         player.sendMessage(Component.text("Nearby research crate: " + yesNo(nearbyResearchCrate)
                 + " | Nearby distillery: " + yesNo(nearbyDistillery), NamedTextColor.GRAY));
         player.sendMessage(Component.text("Death fog: " + fog + " | Unbroken breakables: "
                 + new HashSet<>(breakableProps.values()).size(), NamedTextColor.GRAY));
         world.spawnParticle(Particle.ELECTRIC_SPARK, location.clone().add(0.0, 1.0, 0.0), 48, radius * 0.08, 0.55, radius * 0.08, 0.03);
         world.playSound(location, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.75f, 1.7f);
+        return true;
     }
 
     private double distanceSquared(Location location, double x, double y, double z) {
@@ -7311,6 +7355,11 @@ public final class HallsSession {
         private int eastExitX() {
             return startX + layout.width();
         }
+    }
+
+    @FunctionalInterface
+    private interface UtilityActivation {
+        boolean activate();
     }
 
     private record Cell(int x, int z) {

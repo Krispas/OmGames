@@ -195,6 +195,11 @@ final class HallsSessionMonsterRuntime {
                 + Math.max(0, capExtensionCooldownTicks / 20) + "s";
     }
 
+    int activeMonsterCount() {
+        pruneDeadMonsters();
+        return spawnedMonsters.size();
+    }
+
     boolean registerSplitMonster(Entity entity) {
         if (!(entity instanceof Slime slime) || !world.equals(entity.getWorld()) || spawnCells.isEmpty()) {
             return false;
