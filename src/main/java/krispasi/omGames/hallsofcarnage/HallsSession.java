@@ -598,7 +598,6 @@ public final class HallsSession {
         }
         Location destination = ventGateDestination(player.getLocation(), gate);
         if (destination == null) {
-            player.sendActionBar(Component.text("The vent is blocked.", NamedTextColor.GRAY));
             return true;
         }
         destination.setYaw(player.getLocation().getYaw());
@@ -2944,15 +2943,10 @@ public final class HallsSession {
         Entity linkedEntity = vent.linkedInteractionId() == null ? null : Bukkit.getEntity(vent.linkedInteractionId());
         LibraryVent linked = linkedEntity == null ? null : libraryVents.get(linkedEntity.getUniqueId());
         if (linked == null) {
-            player.sendActionBar(Component.text("The vent is blocked.", NamedTextColor.GRAY));
             return true;
         }
         Location destination = new Location(world, linked.x() + 0.5, linked.y(), linked.z() + 0.5,
                 (float) wallFixtureYawDegrees(linked.face().getOppositeFace()), player.getLocation().getPitch());
-        if (!isVentDestinationClear(new HallsExplorationGenerator.Cell(linked.x(), linked.z()))) {
-            player.sendActionBar(Component.text("The vent is blocked.", NamedTextColor.GRAY));
-            return true;
-        }
         player.teleport(destination);
         player.setFallDistance(0.0f);
         player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 60, 4, true, true, true));
@@ -2994,19 +2988,12 @@ public final class HallsSession {
             candidates.add(new HallsExplorationGenerator.Cell(gate.x() + face.getModX(), gate.z() + face.getModZ()));
         }
         for (HallsExplorationGenerator.Cell candidate : candidates) {
-            if (candidate.equals(gate) || !isVentDestinationClear(candidate)) {
+            if (candidate.equals(gate)) {
                 continue;
             }
             return new Location(world, candidate.x() + 0.5, origin.y(), candidate.z() + 0.5);
         }
         return null;
-    }
-
-    private boolean isVentDestinationClear(HallsExplorationGenerator.Cell cell) {
-        Material feet = world.getBlockAt(cell.x(), origin.y(), cell.z()).getType();
-        Material head = world.getBlockAt(cell.x(), origin.y() + 1, cell.z()).getType();
-        Material floor = world.getBlockAt(cell.x(), origin.y() - 1, cell.z()).getType();
-        return feet.isAir() && head.isAir() && floor.isSolid();
     }
 
     private Set<HallsExplorationGenerator.Cell> renderExplorationVegetation(ExplorationBuild build,
