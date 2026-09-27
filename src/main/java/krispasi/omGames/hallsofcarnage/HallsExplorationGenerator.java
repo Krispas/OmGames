@@ -172,25 +172,79 @@ final class HallsExplorationGenerator {
         addRoomToRoomLoops();
         int disconnectedTarget = Math.max(0, targetRooms - rooms.size());
         attempts = 0;
-        while (disconnectedTarget > 0 && attempts++ < targetRooms * 220) {
+        while (disconnectedTarget > 0 && attempts++ < targetRooms * 60) {
             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
             Room room = randomLibraryDisconnectedRoom(layout);
             if (!canPlaceRoom(room)) {
                 continue;
             }
-            room.setVentOnly(true);
-            addRoom(room);
-            disconnectedTarget--;
+            if (addLibraryVentOnlyRoom(room)) {
+                disconnectedTarget--;
+            }
         }
     }
 
+    private boolean addLibraryVentOnlyRoom(Room room) {
+        List<LibraryVentConnection> connections = new ArrayList<>();
+        List<Room> anchors = rooms.stream()
+                .filter(anchor -> !anchor.ventOnly())
+                .filter(anchor -> !availableFaces(anchor).isEmpty())
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        Collections.shuffle(anchors, random);
+        List<BlockFace> roomFaces = availableFaces(room);
+        Collections.shuffle(roomFaces, random);
+        int checkedAnchors = 0;
+        for (Room anchor : anchors) {
+            if (checkedAnchors++ >= 3 || connections.size() >= 4) {
+                break;
+            }
+            List<BlockFace> anchorFaces = availableFaces(anchor);
+            Collections.shuffle(anchorFaces, random);
+            for (BlockFace roomFace : roomFaces) {
+                int roomOffset = doorOffset(room.layout(), roomFace);
+                Cell roomDoor = doorCell(room, roomFace, roomOffset);
+                for (BlockFace anchorFace : anchorFaces) {
+                    int anchorOffset = doorOffset(anchor.layout(), anchorFace);
+                    Cell anchorDoor = doorCell(anchor, anchorFace, anchorOffset);
+                    List<Cell> path = findConnectorPath(roomDoor, Set.of(anchorDoor),
+                            List.of(Bounds.of(room), Bounds.of(anchor)));
+                    if (path.size() < 7) {
+                        continue;
+                    }
+                    connections.add(new LibraryVentConnection(anchor, anchorFace, anchorOffset,
+                            roomFace, roomOffset, path));
+                    if (connections.size() >= 4) {
+                        break;
+                    }
+                }
+                if (connections.size() >= 4) {
+                    break;
+                }
+            }
+        }
+        if (connections.isEmpty()) {
+            return false;
+        }
+        connections.sort(java.util.Comparator.comparingInt(connection -> connection.path().size()));
+        int limit = Math.min(connections.size(), 4);
+        LibraryVentConnection connection = connections.get(random.nextInt(limit));
+        connection.anchor().openings().put(connection.anchorFace(), connection.anchorOffset());
+        room.openings().put(connection.roomFace(), connection.roomOffset());
+        room.setVentOnly(true);
+        addRoom(room);
+        networkCells.add(doorCell(connection.anchor(), connection.anchorFace(), connection.anchorOffset()));
+        networkCells.add(doorCell(room, connection.roomFace(), connection.roomOffset()));
+        rememberCorridor(connection.path(), true);
+        return true;
+    }
+
     private Room randomLibraryDisconnectedRoom(HallsLayout layout) {
-        if (rooms.isEmpty() || random.nextInt(100) < 35) {
+        if (rooms.isEmpty()) {
             return randomRoomAnywhere(layout);
         }
         Room anchor = rooms.get(random.nextInt(rooms.size()));
         double angle = random.nextDouble() * Math.PI * 2.0;
-        int distance = 18 + random.nextInt(44);
+        int distance = 14 + random.nextInt(29);
         int x = anchor.centerX() + (int) Math.round(Math.cos(angle) * distance) - layout.width() / 2;
         int z = anchor.centerZ() + (int) Math.round(Math.sin(angle) * distance) - layout.depth() / 2;
         return new Room(layout, x, z);
@@ -1735,6 +1789,14 @@ final class HallsExplorationGenerator {
                                   BlockFace roomFace,
                                   int anchorOffset,
                                   int roomOffset) {
+    }
+
+    private record LibraryVentConnection(Room anchor,
+                                         BlockFace anchorFace,
+                                         int anchorOffset,
+                                         BlockFace roomFace,
+                                         int roomOffset,
+                                         List<Cell> path) {
     }
 
     private record DoorCandidate(BlockFace face, int offset) {

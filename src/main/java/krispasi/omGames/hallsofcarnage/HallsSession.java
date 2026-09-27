@@ -1350,8 +1350,14 @@ public final class HallsSession {
             applyBossProjectileEffects(player, projectile);
             applyProjectileAreaEffect(player, projectile.getLocation(), projectile);
         }
-        projectile.remove();
+        if (shouldRemoveAfterBossFlightHit(projectile)) {
+            projectile.remove();
+        }
         return true;
+    }
+
+    private boolean shouldRemoveAfterBossFlightHit(org.bukkit.entity.Projectile projectile) {
+        return !(projectile instanceof org.bukkit.entity.Trident);
     }
 
     private void applyProjectileWeaponMetadata(org.bukkit.entity.Projectile projectile, HallsItemType type) {
