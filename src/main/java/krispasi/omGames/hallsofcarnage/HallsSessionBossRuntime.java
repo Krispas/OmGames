@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.ObjDoubleConsumer;
 import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -52,6 +53,7 @@ final class HallsSessionBossRuntime {
     private final Predicate<Location> bossTrapPredicate;
     private final Runnable bossMinionClearCallback;
     private final Runnable defeatedCallback;
+    private final ObjDoubleConsumer<Player> playerDamageSink;
     private final NamespacedKey bossIdKey;
     private final Random random = new Random();
 
@@ -73,7 +75,8 @@ final class HallsSessionBossRuntime {
                             TrapPlacer trapPlacer,
                             Predicate<Location> bossTrapPredicate,
                             Runnable bossMinionClearCallback,
-                            Runnable defeatedCallback) {
+                            Runnable defeatedCallback,
+                            ObjDoubleConsumer<Player> playerDamageSink) {
         this.plugin = plugin;
         this.world = world;
         this.participants = participants;
@@ -86,6 +89,7 @@ final class HallsSessionBossRuntime {
         this.bossTrapPredicate = bossTrapPredicate == null ? location -> false : bossTrapPredicate;
         this.bossMinionClearCallback = bossMinionClearCallback == null ? () -> { } : bossMinionClearCallback;
         this.defeatedCallback = defeatedCallback == null ? () -> { } : defeatedCallback;
+        this.playerDamageSink = playerDamageSink == null ? Player::damage : playerDamageSink;
         this.bossIdKey = new NamespacedKey(plugin, "hoc_boss_id");
     }
 
@@ -592,7 +596,7 @@ final class HallsSessionBossRuntime {
         double radiusSquared = radius * radius;
         for (Player player : alivePlayers()) {
             if (player.getLocation().distanceSquared(target) <= radiusSquared) {
-                player.damage(damage);
+                damagePlayer(player, damage);
             }
         }
     }
@@ -643,8 +647,7 @@ final class HallsSessionBossRuntime {
             world.spawnParticle(Particle.EXPLOSION, activeBoss.location().clone().add(0.0, 2.2, 0.0),
                     1, 1.8, 1.1, 1.8, 0.0);
             renderWallWarning(rotation, safeDegrees, config.wallMaxRadius(), false);
-            animateDisplays("wall_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw() + activeBoss.attackAnimationTicks() * 5.0f,
-                    0.04, new Vector());
+            animateDisplays("wall_charge", activeBoss.attackAnimationTicks(), activeBoss.yaw(), 0.04, new Vector());
         }, () -> {
             Location origin = activeBoss.location().clone().add(0.0, 0.12, 0.0);
             new WallWave(origin, config.wallDamage(), config.wallSpeedBlocksPerSecond(), config.wallMaxRadius(), rotation, safeDegrees)
@@ -783,9 +786,16 @@ final class HallsSessionBossRuntime {
         for (Player player : alivePlayers()) {
             Location playerLocation = player.getLocation();
             if (Math.abs(playerLocation.getY() - center.getY()) <= 2.8 && isInsideXBlastBeam(playerLocation, center)) {
-                player.damage(damage);
+                damagePlayer(player, damage);
             }
         }
+    }
+
+    private void damagePlayer(Player player, double damage) {
+        if (player == null || damage <= 0.0) {
+            return;
+        }
+        playerDamageSink.accept(player, damage);
     }
 
     private void checkEnrage() {
@@ -1613,7 +1623,7 @@ final class HallsSessionBossRuntime {
                 boolean jumped = !player.isOnGround() || yFraction > 0.08 || player.getVelocity().getY() > 0.02;
                 if (Math.abs(horizontal - radius) <= 0.6 && !jumped) {
                     hit.add(player.getUniqueId());
-                    player.damage(damage);
+                    damagePlayer(player, damage);
                 }
             }
             radius += radiusStep;
@@ -1671,7 +1681,7 @@ final class HallsSessionBossRuntime {
                     continue;
                 }
                 hit.add(player.getUniqueId());
-                player.damage(damage);
+                damagePlayer(player, damage);
             }
             radius += radiusStep;
             if (radius > maxRadius) {

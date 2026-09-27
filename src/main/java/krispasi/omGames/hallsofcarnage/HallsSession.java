@@ -236,12 +236,14 @@ public final class HallsSession {
         this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::isAliveParticipant,
                 this::setBlock, this.trapTypes,
                 () -> activeFloorModifiers.trapDamageMultiplier(),
-                location -> dropSessionItem(location, coinItem(1)), monsterRuntime::spawnConfiguredMonster);
+                location -> dropSessionItem(location, coinItem(1)), monsterRuntime::spawnConfiguredMonster,
+                this::damagePlayerWithHallsArmor);
         this.bossRuntime = new HallsSessionBossRuntime(plugin, world, participants, this.bossTypes,
                 this::isAliveParticipant, monsterRuntime::spawnBossMinion,
                 this::dropBossRandomScrap,
                 this::setBlock, trapRuntime::placeBossTrap, trapRuntime::hasBossTrapAt,
-                monsterRuntime::removeAllForBossDefeat, this::unlockBossFloorExit);
+                monsterRuntime::removeAllForBossDefeat, this::unlockBossFloorExit,
+                this::damagePlayerWithHallsArmor);
         this.campRuntime = new HallsCampRuntime(plugin, world, scenario, this.buildingTypes, this.itemTypes,
                 type -> HallsItemFactory.create(plugin, type, 1), new HallsCampRuntime.ScrapAccount() {
             @Override
@@ -895,6 +897,13 @@ public final class HallsSession {
         event.setCancelled(true);
         makeGhost(player);
         return true;
+    }
+
+    private void damagePlayerWithHallsArmor(Player player, double damage) {
+        if (player == null || damage <= 0.0) {
+            return;
+        }
+        player.damage(HallsDamageSupport.applyArmor(player, damage));
     }
 
     public boolean handleFriendlyFire(EntityDamageByEntityEvent event) {

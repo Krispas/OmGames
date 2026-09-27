@@ -279,7 +279,7 @@ archaic-guard:
     aim-seconds: 1.5
     lock-seconds: 1.0
     cooldown-seconds: 0.75
-    damage: 10.0
+    damage: 20.0
     radius: 2.8
   shockwave:
     charge-seconds: 2.0
@@ -291,7 +291,7 @@ archaic-guard:
       enraged:
         min: 3
         max: 5
-    damage: 6.0
+    damage: 10.0
     speed-blocks-per-second: 4.0
     max-radius: 26.0
   walls:
@@ -305,7 +305,7 @@ archaic-guard:
       enraged:
         min: 1
         max: 3
-    damage: 9.0
+    damage: 10.0
     speed-blocks-per-second: 4.0
     max-radius: 26.0
     safe-degrees:

@@ -127,6 +127,7 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
+- Next development slice applied: Archaic Guard fire-wall charge no longer spins the boss model during the wall attack telegraph. Plugin-side boss and trap damage now route through a shared Halls armor reducer based on the player's live `ARMOR` and `ARMOR_TOUGHNESS` attributes before calling Bukkit damage, so Halls armor affects damage paths that bypass normal entity-combat events. Bundled boss attack values were increased as requested: Overdrive Spawner shockwaves/X-blasts are 150% of prior values, and Archaic Guard missile/shockwave/fire-wall damage is 250% of prior values.
 - Next reviewer slice applied: Archaic Guard boss display transforms now rotate the rendered block-display models with the inverse Bukkit yaw while keeping the already-rotated part offsets, so flat directional parts such as the red eyes stay facing with the body during movement and attacks instead of visually turning the opposite way. Shockwave and radial wall waves now snapshot their cast origin when the wave starts, so a later reposition or circle dash no longer drags the active attack outward from the guard's new location. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `javac 18.0.2-beta` while the project targets Java 25.
 - Next reviewer slice applied: Archaic Guard eye display parts no longer define independent animation tracks, so the red eye displays inherit the same global body/base animation offsets and origin yaw as the main body while only propeller parts keep separate spin. Archaic Guard missile lock time was increased from 0.5s to 1.0s, adding the requested half-second between target lock and missile fire. Archaic Guard shockwaves now render with short-lived electric spark particles instead of lingering flame particles, and the shared shockwave runtime now honors the configured max radius instead of stopping at a hard-coded 13 blocks. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `javac 18.0.2-beta` while the project targets Java 25.
 - Next reviewer slice applied: Archaic Guard shockwaves now render with flame particles while Overdrive Spawner keeps its dust shockwave visuals. Archaic Guard shockwave and radial flame-wall reach are now config-driven through `archaic-guard.shockwave.max-radius` and `archaic-guard.walls.max-radius` with `reach` aliases, and the bundled Archaic Guard resource doubles both to `26.0` blocks. The bundled Archaic Guard attack animations now explicitly keep left/right eye parts on the same base animation timing as the body so future part-specific edits do not make the eyes drift independently. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `javac 18.0.2-beta` while the project targets Java 25.
@@ -158,10 +159,12 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Archaic guard - during the fire wall attack, remove the animation of it spinning
-- Boss change, make armor affect boss attack damage
-- Increase damage for overdrive spawner attacks to 150%, increase damage for archaic guard to 250% (by editting their attack values)
-- Make trap damage also affected by armor
+- Conductpole crashes the game with stack overflow error
+- Utilities are completely borked. Each of them seems to be programmed differently and their common mechanics differ. Make it so utilities are a single system that is built upon. Right now probably mending salve is the closest it should be when it comes to stuff like cooldown and durability mechanics. Rework all utilities based on this.
+- Lodestone utility is not supposed to show direct line to the elevator, but run pathfind through the level (using masks?) and show a route to it.
+- Handheld scanner is working pretty neatly, but it shouldnt show developer like information, also cut the info about spawn caps, only thing about monsters which needs to be shown is their active amount.
+- Add a new utility which gives player absorption effect for 50 seconds (the util itself has 60 charge time). Add it into Knight's Feast research node.
+- Make it so when homing mine locks onto target, it stops for 2 seconds before exploding when getting to the target, so players have a chance to run.
 
 Future slices (dont do yet):
 - TBD
@@ -170,6 +173,4 @@ For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
 - New breakables
 - Texture all items
-- Utility rework
 - Bunker and library palletes
-- Rework lodestone and manual scanner

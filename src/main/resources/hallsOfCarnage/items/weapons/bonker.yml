@@ -1,8 +1,8 @@
 id: bonker
 name: "Bonker"
 category: weapon
-rarity: rare
-material: WOODEN_AXE
+rarity: normal
+material: STONE_AXE
 max-stack-size: 1
 lore:
   - "A ridiculous club that leaves monsters seeing stars."

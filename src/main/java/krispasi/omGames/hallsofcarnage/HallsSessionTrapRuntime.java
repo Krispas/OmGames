@@ -12,6 +12,7 @@ import java.util.IdentityHashMap;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.DoubleSupplier;
+import java.util.function.ObjDoubleConsumer;
 import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -61,6 +62,7 @@ final class HallsSessionTrapRuntime {
     private final DoubleSupplier trapDamageMultiplier;
     private final Consumer<Location> lootDropSink;
     private final BiPredicate<String, Location> trapMonsterSpawner;
+    private final ObjDoubleConsumer<Player> playerDamageSink;
     private final List<HallsTrap> traps = new ArrayList<>();
     private final Map<UUID, Long> trapDamageCooldowns = new java.util.HashMap<>();
     private final Map<HallsTrap, Long> trapNextTriggerTicks = new IdentityHashMap<>();
@@ -78,7 +80,8 @@ final class HallsSessionTrapRuntime {
                             Map<String, HallsTrapType> trapTypes,
                             DoubleSupplier trapDamageMultiplier,
                             Consumer<Location> lootDropSink,
-                            BiPredicate<String, Location> trapMonsterSpawner) {
+                            BiPredicate<String, Location> trapMonsterSpawner,
+                            ObjDoubleConsumer<Player> playerDamageSink) {
         this.plugin = plugin;
         this.world = world;
         this.origin = origin;
@@ -89,6 +92,7 @@ final class HallsSessionTrapRuntime {
         this.trapDamageMultiplier = trapDamageMultiplier == null ? () -> 1.0 : trapDamageMultiplier;
         this.lootDropSink = lootDropSink == null ? ignored -> { } : lootDropSink;
         this.trapMonsterSpawner = trapMonsterSpawner;
+        this.playerDamageSink = playerDamageSink == null ? Player::damage : playerDamageSink;
     }
 
     void clear() {
@@ -1946,7 +1950,7 @@ final class HallsSessionTrapRuntime {
         }
         trapDamageCooldowns.put(player.getUniqueId(), now + 900L);
         player.sendActionBar(Component.text(message, NamedTextColor.RED));
-        player.damage(damage * Math.max(0.0, trapDamageMultiplier.getAsDouble()));
+        playerDamageSink.accept(player, damage * Math.max(0.0, trapDamageMultiplier.getAsDouble()));
     }
 
     private void damageMonsterFromTrap(LivingEntity monster, double damage) {
