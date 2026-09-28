@@ -11,7 +11,7 @@ commands:
     usage: /egghunt add | /egghunt prepare | /egghunt timer <seconds> | /egghunt start | /egghunt start_test | /egghunt stop | /egghunt clear <near/all/scoreboard>
   chess:
     description: Chess game commands
-    usage: /chess board build <x> <y> <z> | /chess board reset [board] | /chess board remove <board|*> | /chess board blocks <b1> <b2> <b3> | /chess match <white|black|start|timer|settings|test|cancel> | /chess log <print|delete|search> | /chess pause | /chess resign | /chess draw | /chess undo | /chess redo | /chess checkmate
+    usage: /chess [menu] | /chess board build <x> <y> <z> | /chess board reset [board] | /chess board reset player <player> | /chess board remove <board|*> | /chess board blocks <b1> <b2> <b3> | /chess match <white|black|start|spectate|timer|settings|test|cancel> | /chess timer [match|*] <off|time|move|check> | /chess log <print|delete|search> | /chess pause | /chess resign | /chess draw | /chess undo | /chess redo | /chess checkmate
   bank:
     description: Bank and Fortuna commands
     usage: /bank admin | /bank atm | /bank fortuna | /bank register_items

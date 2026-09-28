@@ -107,6 +107,7 @@ public final class ChessDatabaseService {
               white_timer_millis INTEGER NOT NULL DEFAULT 0,
               black_timer_millis INTEGER NOT NULL DEFAULT 0,
               check_bonus_millis INTEGER NOT NULL DEFAULT 0,
+              move_bonus_millis INTEGER NOT NULL DEFAULT 0,
               turn_started_millis INTEGER NOT NULL DEFAULT 0,
               en_passant_square TEXT,
               en_passant_pawn_id TEXT,
@@ -159,6 +160,7 @@ public final class ChessDatabaseService {
             long whiteTimerMillis,
             long blackTimerMillis,
             long checkBonusMillis,
+            long moveBonusMillis,
             long turnStartedMillis
     ) {
     }
@@ -197,6 +199,7 @@ public final class ChessDatabaseService {
             ensureActiveMatchColumn("white_timer_millis", "INTEGER NOT NULL DEFAULT 0");
             ensureActiveMatchColumn("black_timer_millis", "INTEGER NOT NULL DEFAULT 0");
             ensureActiveMatchColumn("check_bonus_millis", "INTEGER NOT NULL DEFAULT 0");
+            ensureActiveMatchColumn("move_bonus_millis", "INTEGER NOT NULL DEFAULT 0");
             ensureActiveMatchColumn("turn_started_millis", "INTEGER NOT NULL DEFAULT 0");
         } catch (SQLException ex) {
             logger.log(Level.SEVERE, "Failed to load Chess database tables.", ex);
@@ -326,6 +329,7 @@ public final class ChessDatabaseService {
                   white_timer_millis,
                   black_timer_millis,
                   check_bonus_millis,
+                  move_bonus_millis,
                   turn_started_millis,
                   en_passant_square,
                   en_passant_pawn_id,
@@ -337,7 +341,7 @@ public final class ChessDatabaseService {
                   black_queenside_rook_moved,
                   pieces,
                   pending_promotion
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             ChessMatchRuntime.BoardContext board = state.board();
@@ -364,17 +368,18 @@ public final class ChessDatabaseService {
             statement.setLong(21, state.whiteTimerMillis());
             statement.setLong(22, state.blackTimerMillis());
             statement.setLong(23, state.checkBonusMillis());
-            statement.setLong(24, state.turnStartedMillis());
-            statement.setString(25, state.enPassantSquare() == null ? null : state.enPassantSquare().notation());
-            statement.setString(26, state.enPassantPawnId() == null ? null : state.enPassantPawnId().toString());
-            statement.setInt(27, state.whiteKingMoved() ? 1 : 0);
-            statement.setInt(28, state.blackKingMoved() ? 1 : 0);
-            statement.setInt(29, state.whiteKingsideRookMoved() ? 1 : 0);
-            statement.setInt(30, state.whiteQueensideRookMoved() ? 1 : 0);
-            statement.setInt(31, state.blackKingsideRookMoved() ? 1 : 0);
-            statement.setInt(32, state.blackQueensideRookMoved() ? 1 : 0);
-            statement.setString(33, serializePieces(state.pieces()));
-            statement.setString(34, state.pendingPromotion());
+            statement.setLong(24, state.moveBonusMillis());
+            statement.setLong(25, state.turnStartedMillis());
+            statement.setString(26, state.enPassantSquare() == null ? null : state.enPassantSquare().notation());
+            statement.setString(27, state.enPassantPawnId() == null ? null : state.enPassantPawnId().toString());
+            statement.setInt(28, state.whiteKingMoved() ? 1 : 0);
+            statement.setInt(29, state.blackKingMoved() ? 1 : 0);
+            statement.setInt(30, state.whiteKingsideRookMoved() ? 1 : 0);
+            statement.setInt(31, state.whiteQueensideRookMoved() ? 1 : 0);
+            statement.setInt(32, state.blackKingsideRookMoved() ? 1 : 0);
+            statement.setInt(33, state.blackQueensideRookMoved() ? 1 : 0);
+            statement.setString(34, serializePieces(state.pieces()));
+            statement.setString(35, state.pendingPromotion());
             statement.executeUpdate();
         } catch (SQLException ex) {
             logger.log(Level.WARNING, "Failed to save active Chess match state.", ex);
@@ -440,6 +445,7 @@ public final class ChessDatabaseService {
                         resultSet.getLong("white_timer_millis"),
                         resultSet.getLong("black_timer_millis"),
                         resultSet.getLong("check_bonus_millis"),
+                        resultSet.getLong("move_bonus_millis"),
                         resultSet.getLong("turn_started_millis")
                 ));
             }

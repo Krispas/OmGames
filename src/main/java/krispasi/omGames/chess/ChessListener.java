@@ -49,6 +49,11 @@ public final class ChessListener implements Listener {
 
     @EventHandler
     public void onPlayerInteract(PlayerInteractEvent event) {
+        if (event.getHand() == EquipmentSlot.HAND
+                && chessManager.handleGuiHotbarInteract(event.getPlayer(), event.getItem())) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.getHand() != EquipmentSlot.HAND || event.getAction() != Action.RIGHT_CLICK_AIR) {
             return;
         }
@@ -88,6 +93,10 @@ public final class ChessListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
+        if (chessManager.handleGuiInventoryClick(player, event.getInventory(), event.getRawSlot())) {
+            event.setCancelled(true);
+            return;
+        }
         if (chessManager.handlePromotionInventoryClick(player, event.getInventory(), event.getRawSlot())) {
             event.setCancelled(true);
         }
@@ -98,6 +107,10 @@ public final class ChessListener implements Listener {
         if (!(event.getPlayer() instanceof Player player)) {
             return;
         }
+        if (chessManager.handleGuiInventoryClose(player, event.getInventory())) {
+            return;
+        }
         chessManager.handlePromotionInventoryClose(player, event.getInventory());
     }
+
 }

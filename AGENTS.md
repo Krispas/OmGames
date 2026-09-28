@@ -948,9 +948,10 @@ Files:
 - `src/main/java/krispasi/omGames/chess/*`
   - Chess game implementation.
   - Owns `/chess`, saved boards, active match runtimes, item displays, interaction boxes, move validation, undo/redo state, timers, and SQLite match/stat logging.
-  - `ChessManager` is the command/event coordinator.
-  - `ChessMatchRuntime` owns one active match on one board timestamp.
-  - Keep Chess logic inside this package; do not push Chess rules into BedWars or Egg Hunt classes.
+- `ChessManager` is the command/event coordinator.
+- `ChessGuiController` owns the inventory GUI and chess hotbar item actions.
+- `ChessMatchRuntime` owns one active match on one board timestamp.
+- Keep Chess logic inside this package; do not push Chess rules into BedWars or Egg Hunt classes.
 
 ### 4.2 Command Surface
 
@@ -959,11 +960,13 @@ Operator subcommands:
 - `/chess board blocks <b1> <b2> <b3>`
 - `/chess board blocks reset`
 - `/chess board reset`
+- `/chess board reset player <player>`
 - `/chess board remove <timestamp|*>`
 - `/chess match white <player> [player] [player]`
 - `/chess match black <player> [player] [player]`
 - `/chess match start [board_timestamp]`
-- `/chess match test`
+- `/chess match spectate [match|*]`
+- `/chess match test <on|off> [match]`
 - `/chess match cancel <timestamp|*>`
 - `/chess match settings do_movement_check <true|false>`
 - `/chess match settings visualize_movement_check <true|false>`
@@ -975,9 +978,13 @@ Operator subcommands:
 - `/chess log delete <timestamp|*>`
 - `/chess log search <player> [player...]`
 - `/chess timer off`
-- `/chess timer time <duration> [check <duration>]`
+- `/chess timer time <duration> [move <duration>] [check <duration>]`
+- `/chess timer [match|*] move <duration>`
+- `/chess timer [match|*] check <duration>`
 
 Team/player subcommands:
+- `/chess`
+- `/chess menu`
 - `/chess resign`
 - `/chess draw`
 - `/chess undo`
@@ -1010,16 +1017,21 @@ SQLite tables:
 - Piece item displays use `minecraft:iron_nugget` with `ItemMeta#setItemModel()`.
 - Normal models are `om:<piece>` for white and `om:black_<piece>` for black; selected models are `om:selected_<piece>`.
 - Multiple boards and active matches may exist at the same time; each active match is identified by its match timestamp and runs on one board timestamp.
-- `/chess match start` without a board timestamp uses the most recent saved board.
+- `/chess board build <x> <y> <z>` and `/chess board reset [board]` place board blocks only; square interactions and figure displays spawn when `/chess match start` starts a match.
+- `/chess match start` without a board timestamp uses the nearest saved board to the player issuing the command, falling back to the most recent saved board for non-player senders.
 - A player may be assigned to any side in any number of concurrent matches; clicked board entities route moves to the match for that entity timestamp.
+- Player/opponent commands such as pause, undo, redo, rewind, forward, draw, and resign target the nearest active match that includes the player.
 - Each active match board owns 64 square interaction boxes, 32 piece interaction boxes, and 32 item displays.
 - Chess board entities are persistent and can be removed with `/chess board remove <timestamp|*>`.
 - Chess interaction entities use persistent data and scoreboard tags for identity; do not rely on visible custom names.
 - Active non-test matches are saved in `chess_active_match_state` so they can continue after restart until a win, draw, resign, cancel, board reset, or board removal.
+- `/chess match test on` disables logging for the target active/next match; `/chess match test off` reenables logging and creates a log for the active match from that point forward.
 - During an active match, online team players in the board world are put in Adventure mode with flight enabled and 16-block block/entity interaction reach; this must be restored when they leave the board world or the match ends.
+- Chess spectators are put in Adventure mode with flight and no-particle invisibility and receive the spectator exit hotbar item; `/chess board reset player <player>` clears chess reach, glow, flight, and invisibility for an online player.
 - Flat figure style uses `om:<side>_<piece>_icon` item models on `minecraft:iron_nugget`; default style keeps the existing standing figure models.
 - Pawn promotion uses a forced small inventory selection for bishop, horse, queen, or rook, not captured-piece selection.
-- Chess timer durations accept decimal values with optional `s`, `m`, `h`, or `d` units; unqualified match time defaults to minutes and unqualified check bonus defaults to seconds.
+- Chess timer durations accept decimal values with optional `s`, `m`, `h`, or `d` units; unqualified match time defaults to minutes and unqualified move/check bonuses default to seconds.
+- Chess move selection and move notation should be logged to SQLite, not sent as normal chat messages.
 
 ## 5) Bank
 

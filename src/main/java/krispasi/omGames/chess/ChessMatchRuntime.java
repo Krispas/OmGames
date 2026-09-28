@@ -39,6 +39,8 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -95,6 +97,7 @@ public final class ChessMatchRuntime {
     private final LinkedHashMap<UUID, String> blackPlayers = new LinkedHashMap<>();
     private final Map<UUID, Boolean> previousGlowing = new LinkedHashMap<>();
     private final Map<UUID, PlayerRuntimeState> playerRuntimeStates = new LinkedHashMap<>();
+    private final Map<UUID, PlayerRuntimeState> spectatorRuntimeStates = new LinkedHashMap<>();
     private final List<CapturedPieceDisplay> capturedPieceDisplays = new ArrayList<>();
     private final Map<UUID, CapturedPieceDisplay> promotionChoiceInteractions = new LinkedHashMap<>();
     private final Set<UUID> drawVotes = new LinkedHashSet<>();
@@ -132,6 +135,7 @@ public final class ChessMatchRuntime {
     private long whiteTimerMillis;
     private long blackTimerMillis;
     private long checkBonusMillis;
+    private long moveBonusMillis;
     private long turnStartedMillis;
     private boolean timerEnabled;
 
@@ -218,6 +222,7 @@ public final class ChessMatchRuntime {
         whiteTimerMillis = source.whiteTimerMillis;
         blackTimerMillis = source.blackTimerMillis;
         checkBonusMillis = source.checkBonusMillis;
+        moveBonusMillis = source.moveBonusMillis;
     }
 
     public Result setFigureStyle(String style) {
@@ -249,6 +254,7 @@ public final class ChessMatchRuntime {
             whiteTimerMillis = 0L;
             blackTimerMillis = 0L;
             checkBonusMillis = 0L;
+            moveBonusMillis = 0L;
             stopTimerTask();
             return Result.ok("Chess timer disabled.");
         }
@@ -256,6 +262,7 @@ public final class ChessMatchRuntime {
         whiteTimerMillis = timerConfig.initialMillis();
         blackTimerMillis = timerConfig.initialMillis();
         checkBonusMillis = timerConfig.checkBonusMillis();
+        moveBonusMillis = timerConfig.moveBonusMillis();
         turnStartedMillis = System.currentTimeMillis();
         if (matchActive && !paused) {
             startTimerTask();
@@ -311,11 +318,12 @@ public final class ChessMatchRuntime {
         boardContext = new BoardContext(databaseService.nextBoardName(world.getName()), world.getName(), x, y, z);
         databaseService.saveBoard(boardContext);
         placeCheckerboard(List.of());
-        spawnSquareInteractions();
-        resetPiecesToStartingPosition(true);
+        clearBoardEntities();
+        pieces.clear();
+        resetMoveState();
         updateAnnotations();
         return Result.ok("Chess board " + boardContext.timestamp() + " built at minecraft:" + BOARD_WORLD_NAME + " " + x + " " + y + " " + z
-                + " with 64 board interactions, 32 piece interactions, and 32 item displays.");
+                + " with blocks only. Figures and interactions spawn when the match starts.");
     }
 
     public Result resetBoard() {
@@ -343,11 +351,12 @@ public final class ChessMatchRuntime {
         clearBoardEntities();
         databaseService.saveBoard(boardContext);
         placeCheckerboard(List.of());
-        spawnSquareInteractions();
-        resetPiecesToStartingPosition(true);
+        clearBoardEntities();
+        pieces.clear();
+        resetMoveState();
         updateAnnotations();
         clearMatchRuntime();
-        return Result.ok("Chess board " + boardContext.timestamp() + " reset to the starting position.");
+        return Result.ok("Chess board " + boardContext.timestamp() + " reset to blocks only.");
     }
 
     public Result setPalette(Material lightBlock, Material darkBlock, Material highlightBlock) {
@@ -436,18 +445,39 @@ public final class ChessMatchRuntime {
         return Result.ok("Chess match " + matchCommandName() + " started. White moves first." + suffix);
     }
 
-    public Result enableTestMode() {
+    public Result setTestMode(boolean enabled) {
         if (matchActive) {
-            testMode = true;
-            if (matchId > 0L) {
-                databaseService.deleteMatch(matchId);
-                databaseService.deleteActiveMatchState(matchId);
-                matchId = -1L;
+            if (enabled) {
+                testMode = true;
+                if (matchId > 0L) {
+                    databaseService.deleteMatch(matchId);
+                    databaseService.deleteActiveMatchState(matchId);
+                    matchId = -1L;
+                }
+                return Result.ok("Chess test mode enabled for the active match. Logging is disabled.");
             }
-            return Result.ok("Chess test mode enabled for the active match. Logging is disabled.");
+            if (!testMode) {
+                return Result.ok("Chess test mode is already disabled. Logging is enabled.");
+            }
+            testMode = false;
+            if (activeMatchStartedAt == null || activeMatchStartedAt.isBlank()) {
+                activeMatchStartedAt = currentMatchLogName();
+            }
+            matchId = databaseService.startMatch(
+                    boardContext,
+                    playerRefs(whitePlayers),
+                    playerRefs(blackPlayers),
+                    settings.copy(),
+                    false,
+                    activeMatchStartedAt
+            );
+            saveActiveMatchState();
+            return matchId > 0L
+                    ? Result.ok("Chess test mode disabled for the active match. Logging is enabled.")
+                    : Result.fail("Chess test mode disabled, but the match log could not be created.");
         }
-        pendingTestMode = true;
-        return Result.ok("Chess test mode enabled for the next match.");
+        pendingTestMode = enabled;
+        return Result.ok("Chess test mode " + (enabled ? "enabled" : "disabled") + " for the next match.");
     }
 
     public Result setSetting(String settingKey, boolean value) {
@@ -704,6 +734,41 @@ public final class ChessMatchRuntime {
         return Result.fail("The side to move is not checkmated.");
     }
 
+    public Result spectate(Player player) {
+        if (player == null) {
+            return Result.fail("Player is not online.");
+        }
+        if (!matchActive || boardContext == null) {
+            return Result.fail("No chess match is active.");
+        }
+        applySpectatorRuntimeEffects(player);
+        Location target = new Location(
+                Bukkit.getWorld(boardContext.worldName()),
+                boardContext.originX() + 8.0,
+                boardContext.originY() + 8.0,
+                boardContext.originZ() - 7.0,
+                0.0f,
+                55.0f
+        );
+        teleportToBoard(player, target);
+        return Result.ok("Spectating chess match " + matchCommandName() + ".");
+    }
+
+    public void resetPlayerRuntime(Player player) {
+        if (player == null) {
+            return;
+        }
+        restorePlayerRuntimeEffects(player);
+        restoreSpectatorRuntimeEffects(player);
+        previousGlowing.remove(player.getUniqueId());
+        player.setGlowing(false);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        player.removePotionEffect(PotionEffectType.INVISIBILITY);
+        restoreAttributeBaseValue(player, 4.5D, "BLOCK_INTERACTION_RANGE", "PLAYER_BLOCK_INTERACTION_RANGE");
+        restoreAttributeBaseValue(player, 3.0D, "ENTITY_INTERACTION_RANGE", "PLAYER_ENTITY_INTERACTION_RANGE");
+    }
+
     public boolean handleEntityInteraction(Player player, Entity entity) {
         if (player == null || entity == null) {
             return false;
@@ -804,6 +869,7 @@ public final class ChessMatchRuntime {
             return;
         }
         restorePlayerRuntimeEffects(player);
+        restoreSpectatorRuntimeEffects(player);
         previousGlowing.remove(player.getUniqueId());
     }
 
@@ -817,6 +883,7 @@ public final class ChessMatchRuntime {
             return;
         }
         restorePlayerRuntimeEffects(player);
+        restoreSpectatorRuntimeEffects(player);
         previousGlowing.remove(player.getUniqueId());
     }
 
@@ -958,8 +1025,6 @@ public final class ChessMatchRuntime {
             return;
         }
         selectPiece(clickedPiece);
-        player.sendMessage(Component.text("Selected " + clickedPiece.logName() + " at "
-                + clickedPiece.square().notation() + ".", NamedTextColor.YELLOW));
     }
 
     private void handleSquareClick(Player player, ChessSquare square) {
@@ -1047,6 +1112,9 @@ public final class ChessMatchRuntime {
                             String promotionPieceName,
                             boolean legal) {
         updateTimerBeforeTurnChange(side);
+        if (moveBonusMillis > 0L) {
+            addTimer(side, moveBonusMillis);
+        }
         turn = side.opposite();
         moveCount++;
         recordTimelineSnapshot();
@@ -1078,7 +1146,6 @@ public final class ChessMatchRuntime {
         }
         applyTurnGlow();
         turnStartedMillis = System.currentTimeMillis();
-        actor.sendMessage(Component.text(record.moveLabel() + (check ? " check" : ""), NamedTextColor.GREEN));
         if (settings.doEndgameChecks()) {
             evaluateEndgame();
         }
@@ -1301,6 +1368,7 @@ public final class ChessMatchRuntime {
         databaseService.deleteActiveMatchState(matchId);
         clearTurnGlow();
         clearPlayerRuntimeEffects();
+        clearSpectatorRuntimeEffects();
         stopTimerTask();
         for (UUID playerId : allTeamPlayerIds()) {
             Player player = Bukkit.getPlayer(playerId);
@@ -1324,6 +1392,7 @@ public final class ChessMatchRuntime {
         }
         clearTurnGlow();
         clearPlayerRuntimeEffects();
+        clearSpectatorRuntimeEffects();
         stopTimerTask();
         clearMatchRuntime();
     }
@@ -1358,6 +1427,7 @@ public final class ChessMatchRuntime {
         pendingPromotionInventory = null;
         paused = false;
         captureSequence = 0;
+        moveBonusMillis = 0L;
         drawVotes.clear();
         turn = ChessSide.WHITE;
         enPassantSquare = null;
@@ -1413,6 +1483,7 @@ public final class ChessMatchRuntime {
                 whiteTimerMillis,
                 blackTimerMillis,
                 checkBonusMillis,
+                moveBonusMillis,
                 turnStartedMillis
         ));
     }
@@ -1468,6 +1539,7 @@ public final class ChessMatchRuntime {
         whiteTimerMillis = state.whiteTimerMillis();
         blackTimerMillis = state.blackTimerMillis();
         checkBonusMillis = state.checkBonusMillis();
+        moveBonusMillis = state.moveBonusMillis();
         turnStartedMillis = state.turnStartedMillis();
         matchActive = true;
         testMode = false;
@@ -2505,6 +2577,57 @@ public final class ChessMatchRuntime {
         for (UUID playerId : new ArrayList<>(playerRuntimeStates.keySet())) {
             restorePlayerRuntimeEffects(playerId);
         }
+    }
+
+    private void applySpectatorRuntimeEffects(Player player) {
+        if (player == null) {
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        spectatorRuntimeStates.putIfAbsent(playerId, new PlayerRuntimeState(
+                player.getGameMode(),
+                player.getAllowFlight(),
+                player.isFlying(),
+                getAttributeBaseValue(player, "BLOCK_INTERACTION_RANGE", "PLAYER_BLOCK_INTERACTION_RANGE"),
+                getAttributeBaseValue(player, "ENTITY_INTERACTION_RANGE", "PLAYER_ENTITY_INTERACTION_RANGE")
+        ));
+        player.setGameMode(GameMode.ADVENTURE);
+        player.setAllowFlight(true);
+        player.setFlying(true);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, PotionEffect.INFINITE_DURATION, 0, false, false, false));
+    }
+
+    private void clearSpectatorRuntimeEffects() {
+        for (UUID playerId : new ArrayList<>(spectatorRuntimeStates.keySet())) {
+            restoreSpectatorRuntimeEffects(playerId);
+        }
+    }
+
+    private void restoreSpectatorRuntimeEffects(Player player) {
+        if (player == null) {
+            return;
+        }
+        restoreSpectatorRuntimeEffects(player.getUniqueId());
+    }
+
+    private void restoreSpectatorRuntimeEffects(UUID playerId) {
+        if (playerId == null) {
+            return;
+        }
+        PlayerRuntimeState state = spectatorRuntimeStates.remove(playerId);
+        Player player = Bukkit.getPlayer(playerId);
+        if (player == null) {
+            return;
+        }
+        player.removePotionEffect(PotionEffectType.INVISIBILITY);
+        if (state == null) {
+            return;
+        }
+        player.setGameMode(state.gameMode());
+        player.setAllowFlight(state.allowFlight());
+        player.setFlying(state.flying() && state.allowFlight());
+        restoreAttributeBaseValue(player, state.blockInteractionRange(), "BLOCK_INTERACTION_RANGE", "PLAYER_BLOCK_INTERACTION_RANGE");
+        restoreAttributeBaseValue(player, state.entityInteractionRange(), "ENTITY_INTERACTION_RANGE", "PLAYER_ENTITY_INTERACTION_RANGE");
     }
 
     private void restorePlayerRuntimeEffects(Player player) {
