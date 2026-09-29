@@ -231,6 +231,7 @@ public final class HallsOfCarnageManager {
             "hallsOfCarnage/items/food/hearty_mycelia_stew.yml",
             "hallsOfCarnage/items/food/fleetfoot_ration.yml",
             "hallsOfCarnage/items/food/stonehide_chowder.yml",
+            "hallsOfCarnage/items/food/deepdelver_pie.yml",
             "hallsOfCarnage/items/utility/smoke_bomb.yml",
             "hallsOfCarnage/items/utility/warding_totem.yml",
             "hallsOfCarnage/items/utility/mending_salve.yml",

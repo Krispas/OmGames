@@ -107,6 +107,7 @@ allowed-items:
     - stonehide_chowder
     - ember_stew
     - golden_jerky
+    - deepdelver_pie
   utility:
     - smoke_bomb
     - mending_salve
@@ -225,6 +226,7 @@ crafting-stations:
       - stonehide_chowder
       - ember_stew
       - golden_jerky
+      - deepdelver_pie
       - vagabonds_club
       - rusty_sword
       - poking_stick
@@ -318,6 +320,7 @@ research:
         - rusty_sword
         - stonehide_chowder
         - fleetfoot_ration
+        - deepdelver_pie
         - absorption_tonic
     improved_gear:
       name: "Improved Gear"
