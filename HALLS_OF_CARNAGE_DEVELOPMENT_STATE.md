@@ -130,6 +130,7 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- The generation during the trap generation part is incredibly taxing on large floors, could there be a way to speed it up? Seems like a problem with O() complexity to me.
 
 Future slices (dont do yet):
 - TBD
