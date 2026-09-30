@@ -74,8 +74,8 @@ final class HallsGeneratedTrapPlacement {
             return true;
         }
         long started = System.nanoTime();
-        for (int work = 0; work < 8 && !done; work++) {
-            if (work > 0 && System.nanoTime() - started >= 4_000_000L) {
+        for (int work = 0; work < 32 && !done; work++) {
+            if (work > 0 && System.nanoTime() - started >= 8_000_000L) {
                 break;
             }
             if (preparedRooms < plan.rooms().size()) {

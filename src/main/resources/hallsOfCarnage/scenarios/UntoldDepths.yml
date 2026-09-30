@@ -1,5 +1,6 @@
 id: untold_depths
 name: "Untold Depths"
+ordering: 0
 difficulty: "Medium"
 description:
   - "A long descent through many floors."

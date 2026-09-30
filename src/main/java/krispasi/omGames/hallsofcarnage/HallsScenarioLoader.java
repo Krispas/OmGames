@@ -31,7 +31,9 @@ public final class HallsScenarioLoader {
                 scenarios.add(scenario);
             }
         }
-        scenarios.sort(Comparator.comparing(HallsScenario::name, String.CASE_INSENSITIVE_ORDER));
+        scenarios.sort(Comparator.comparingInt(HallsScenario::ordering)
+                .thenComparing(HallsScenario::name, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(HallsScenario::id, String.CASE_INSENSITIVE_ORDER));
         return List.copyOf(scenarios);
     }
 
@@ -40,6 +42,7 @@ public final class HallsScenarioLoader {
         String fallbackId = file.getName().replaceFirst("\\.[^.]+$", "");
         String id = normalizeId(config.getString("id", fallbackId));
         String name = config.getString("name", fallbackId);
+        int ordering = config.getInt("ordering", 1000);
         String difficulty = config.getString("difficulty", "Unknown");
         List<String> description = config.getStringList("description");
         if (description.isEmpty()) {
@@ -71,7 +74,7 @@ public final class HallsScenarioLoader {
             plugin.getLogger().warning("Skipping invalid Halls scenario file " + file.getName() + ".");
             return null;
         }
-        return new HallsScenario(id, name, difficulty, List.copyOf(description), minPlayers, maxPlayers,
+        return new HallsScenario(id, name, ordering, difficulty, List.copyOf(description), minPlayers, maxPlayers,
                 floorCount, camp, allowedItems, blueprintPools, levelTypeBlueprintPools,
                 craftingStations, researchNodes, List.copyOf(floors), debugLines(file, config, floors, researchNodes.size()));
     }

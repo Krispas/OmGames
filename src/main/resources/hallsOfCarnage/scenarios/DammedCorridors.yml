@@ -1,5 +1,6 @@
 id: dammed_corridors
 name: "Dammed Corridors"
+ordering: 10
 difficulty: "Hard"
 description:
   - "Nine sprawling dungeon floors, with a bunker camp after each descent."

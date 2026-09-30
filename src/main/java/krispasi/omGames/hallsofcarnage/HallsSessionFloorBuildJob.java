@@ -22,7 +22,7 @@ final class HallsSessionFloorBuildJob {
     private static final int CONTENT_CELLS_PER_TICK = 128;
     private static final long CONTENT_BUDGET_NANOS = 4_000_000L;
     private static final int MIN_TRANSITION_TICKS = 100;
-    private static final double[] PROGRESS = {0, .03, .18, .20, .40, .55, .65, .70, .78, .83, .88, .90, .93, .96, .99, 1};
+    private static final double[] PROGRESS = {0, .15, .18, .20, .40, .55, .65, .70, .78, .83, .88, .90, .93, .96, .99, 1};
     private static final String[] PHASES = {"Planning", "Clearing", "Elevator", "Rooms", "Corridors", "Traps",
             "Liquid Planning", "Liquids", "Room Vegetation", "Corridor Vegetation", "Sculk", "Research Crate",
             "Distilleries", "Library Vents", "Breakables", "Arrival"};
@@ -64,10 +64,17 @@ final class HallsSessionFloorBuildJob {
         ticksElapsed++;
         switch (stage) {
             case 0 -> {
-                build = session.beginFloorBuild(floor);
-                clearRadius = Math.max(clearRadius, session.floorBuildClearRadius());
-                clearX = originX - clearRadius;
-                advance();
+                if (!session.floorBuildPlanningStarted()) {
+                    session.beginFloorBuild(floor);
+                }
+                if (!session.floorBuildPlanReady()) {
+                    phaseProgress = Math.min(0.95, ticksElapsed / 100.0);
+                } else {
+                    build = session.takeFloorBuildPlan();
+                    clearRadius = Math.max(clearRadius, session.floorBuildClearRadius());
+                    clearX = originX - clearRadius;
+                    advance();
+                }
             }
             case 1 -> {
                 int endX = Math.min(originX + clearRadius, clearX + CLEAR_COLUMNS_PER_TICK - 1);

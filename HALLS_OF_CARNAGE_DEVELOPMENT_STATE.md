@@ -90,6 +90,9 @@ Last updated: 2026-09-30
 - Trap ticking now runs every tick; swinging blade damage follows the moving blade display rather than the static trap center.
 - Wall spikes and poison dart launchers are display-only wall fixtures. Poison darts no longer place a solid dispenser block and now render a directional particle line when firing.
 - Default trap weights now bias Frozen Halls toward falling ice and Deep Crypt toward poison darts for easier playtest visibility.
+- Exploration layout planning now runs off the main thread and hands the completed pure-Java plan back to the main-thread build job, so large room/path planning is included in the visible Planning loading phase instead of blocking before progress appears.
+- Trap placement now evaluates up to 32 atomic candidate units per tick within an 8 ms budget, retaining cached connectivity and reservation safety while reducing long trap-generation tails.
+- Scenario resources support an `ordering` field; scenario lists sort by ordering, name, and id, with Untold Depths explicitly first.
 
 ## Current Scope
 
@@ -117,18 +120,7 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Some level types have stutter when generating large floors even before the progress bar shows up, could you also work in the incremental progression like for other parts of the generation and work it into the bar? 
-- Traps now generate faster, but they still take too long, CPU is used only like 10%, giving it more work per tick could work as long as we are not lagging the server.
-- Make it so when picking a scenario to start, the scenarios are sorted, to decide on sorting, give each scenario an "ordering" variable. I want Untold Depths to be first.
-
+- On boss floors, the doors open instantly, time it so they open together with the door open sound
 Future slices (dont do yet):
 - TBD
-
-For reviewer to figure out:
-- New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
-- Texture all items
-- Bunker and library palletes
-- Bunker and library rooms
-- Rework descriptions for all items
-- Fixed textures for cooked potato / mycelia and sculk removing foods
 

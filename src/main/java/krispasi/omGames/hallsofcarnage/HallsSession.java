@@ -145,6 +145,9 @@ public final class HallsSession {
     private BukkitTask physicsDropTask;
     private BukkitTask researchCrateTask;
     private BukkitTask floorBuildTask;
+    private volatile ExplorationBuild pendingFloorBuild;
+    private volatile boolean floorPlanningStarted;
+    private volatile int planningFloor;
     private final HallsSessionFloorBuildJob.LoadingProgress floorBuildProgress;
     private BukkitTask gameOverTask;
     private long startedAtMillis;
@@ -2215,12 +2218,9 @@ public final class HallsSession {
         Random random = floorRandom();
         activeFloorModifiers = scannedFloorModifiers.remove(floor);
         if (activeFloorModifiers == null) {
-            activeFloorModifiers = selectFloorModifiers(rawFloorDefinition, levelType, random, true);
-        } else {
-            revealFloorModifiers(activeFloorModifiers);
+            activeFloorModifiers = selectFloorModifiers(rawFloorDefinition, levelType, random, false);
         }
         HallsScenario.FloorDefinition floorDefinition = activeFloorModifiers.adjustFloor(rawFloorDefinition, random);
-        debugModifierAdjustments(rawFloorDefinition, floorDefinition, activeFloorModifiers, levelType);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = Math.max(1, floorDefinition.rooms());
         activeGeneratedRooms = 0;
@@ -6916,6 +6916,8 @@ public final class HallsSession {
             floorBuildTask.cancel();
             floorBuildTask = null;
         }
+        floorPlanningStarted = false;
+        pendingFloorBuild = null;
         floorBuildProgress.clear();
     }
 
@@ -7296,11 +7298,55 @@ public final class HallsSession {
     }
 
     ExplorationBuild beginFloorBuild(int floor) {
+        if (floorPlanningStarted) {
+            return pendingFloorBuild;
+        }
         captureElevatorChestContents();
         removeSessionEntities();
-        ExplorationBuild build = planExplorationBuild(floor);
         currentFloor = floor;
         researchCrateDepositedThisFloor = false;
+        planningFloor = floor;
+        floorPlanningStarted = true;
+        pendingFloorBuild = null;
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                ExplorationBuild planned = planExplorationBuild(floor);
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (running && floorPlanningStarted && planningFloor == floor) {
+                        pendingFloorBuild = planned;
+                        HallsScenario.FloorDefinition definition = adjustedDifficulty(scenario.floor(floor));
+                        debugModifierAdjustments(definition, planned.floorDefinition(), activeFloorModifiers, planned.levelType());
+                        revealFloorModifiers(activeFloorModifiers);
+                    }
+                });
+            } catch (Throwable failure) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (!running || !floorPlanningStarted || planningFloor != floor) {
+                        return;
+                    }
+                    plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                            "Failed to plan Halls floor " + floor + ".", failure);
+                    cancelFloorBuildTask();
+                    transitioning = false;
+                    openElevatorDoors();
+                });
+            }
+        });
+        return null;
+    }
+
+    boolean floorBuildPlanningStarted() {
+        return floorPlanningStarted;
+    }
+
+    boolean floorBuildPlanReady() {
+        return pendingFloorBuild != null;
+    }
+
+    ExplorationBuild takeFloorBuildPlan() {
+        ExplorationBuild build = pendingFloorBuild;
+        pendingFloorBuild = null;
+        floorPlanningStarted = false;
         return build;
     }
 

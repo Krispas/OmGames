@@ -6,6 +6,7 @@ import java.util.Map;
 public record HallsScenario(
         String id,
         String name,
+        int ordering,
         String difficulty,
         List<String> description,
         int minPlayers,
