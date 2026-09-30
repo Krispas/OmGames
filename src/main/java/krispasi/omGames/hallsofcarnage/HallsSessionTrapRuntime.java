@@ -71,6 +71,7 @@ final class HallsSessionTrapRuntime {
     private final Map<HallsTrap, Long> trapNextTriggerTicks = new IdentityHashMap<>();
     private final Map<HallsTrap, Long> homingMineDetonateTicks = new IdentityHashMap<>();
     private final Map<HallsTrap, Integer> trapHitPoints = new IdentityHashMap<>();
+    private final Map<HallsExplorationGenerator.Room, Set<HallsExplorationGenerator.Cell>> roomPitCells = new IdentityHashMap<>();
     private final Set<UUID> transientTrapDisplays = new HashSet<>();
     private Set<HallsExplorationGenerator.Cell> floorWalkableCells = Set.of();
     private BukkitTask trapTask;
@@ -123,6 +124,7 @@ final class HallsSessionTrapRuntime {
             }
         }
         traps.clear();
+        roomPitCells.clear();
         trapHitPoints.clear();
         trapNextTriggerTicks.clear();
         homingMineDetonateTicks.clear();
@@ -345,14 +347,14 @@ final class HallsSessionTrapRuntime {
     }
 
     boolean tryPlaceTrap(TrapCandidate candidate,
-                                 HallsExplorationGenerator.Plan plan,
+                                 HallsTrapPlacementGeometry.FloorConnectivity floorConnectivity,
                                  Random random,
                                  HallsTrapType type,
                                  Set<HallsExplorationGenerator.Cell> occupied,
                                  boolean globalReachabilityChecks,
                                  Set<HallsExplorationGenerator.Cell> liquidCells) {
         HallsExplorationGenerator.Cell cell = candidate.cell();
-        if (isNearExistingTrap(cell, occupied)) {
+        if (HallsTrapPlacementGeometry.isNearOccupied(cell, occupied)) {
             return false;
         }
         TrapKind kind = trapKind(type.kind());
@@ -380,14 +382,14 @@ final class HallsSessionTrapRuntime {
         } else if (!Collections.disjoint(footprint, liquidCells)) {
             return false;
         }
-        if (globalReachabilityChecks && (kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.BUBBLES || requiresWall(kind))
-                && !floorReachableWithout(plan.walkableCells(), footprint)) {
-            return false;
-        }
         for (HallsExplorationGenerator.Cell footprintCell : footprint) {
-            if (isNearExistingTrap(footprintCell, occupied)) {
+            if (HallsTrapPlacementGeometry.isNearOccupied(footprintCell, occupied)) {
                 return false;
             }
+        }
+        if (globalReachabilityChecks && (kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.BUBBLES || requiresWall(kind))
+                && !floorConnectivity.reachableWithout(footprint)) {
+            return false;
         }
         List<UUID> displayIds = buildTrap(kind, cell, face, type, laneSpan);
         addTrap(new HallsTrap(kind, cell.x(), cell.z(), random.nextInt(80), type,
@@ -397,13 +399,15 @@ final class HallsSessionTrapRuntime {
     }
 
     boolean placeHole(TrapCandidate candidate,
-                              HallsExplorationGenerator.Plan plan,
+                              HallsTrapPlacementGeometry.FloorConnectivity floorConnectivity,
                               Random random,
                               HallsTrapType type,
                               Set<HallsExplorationGenerator.Cell> occupied,
                               boolean globalReachabilityChecks,
                               HallsFloorModifiers modifiers,
                               Set<HallsExplorationGenerator.Cell> liquidCells) {
+        Set<HallsExplorationGenerator.Cell> existingPits = roomPitCells(candidate);
+        boolean enforceRoomReachability = roomEntrancesReachable(candidate, existingPits, Set.of());
         for (Set<HallsExplorationGenerator.Cell> pitCells : pitMasks(candidate, random, type)) {
             if (pitCells.isEmpty()
                     || !Collections.disjoint(pitCells, liquidCells)
@@ -411,15 +415,18 @@ final class HallsSessionTrapRuntime {
                     || !Collections.disjoint(pitCells, occupied)) {
                 continue;
             }
-            Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(candidate, plan.walkableCells(),
-                    pitCells, globalReachabilityChecks, modifiers);
+            Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(candidate, floorConnectivity,
+                    pitCells, existingPits, globalReachabilityChecks, enforceRoomReachability, modifiers);
             if (bridgeCells == null) {
                 continue;
             }
             if (bridgeCells.containsAll(pitCells)) {
                 continue;
             }
-            buildPit(pitCells, bridgeCells, roomPitCells(candidate), type);
+            buildPit(pitCells, bridgeCells, existingPits, type);
+            Set<HallsExplorationGenerator.Cell> roomPits = new HashSet<>(existingPits);
+            roomPits.addAll(pitCells);
+            roomPitCells.put(candidate.room(), roomPits);
             floorWalkableCells.removeAll(pitCells);
             floorWalkableCells.addAll(bridgeCells);
             TrapKind kind = bridgeCells.isEmpty() ? TrapKind.HOLE : TrapKind.HOLE_BRIDGE;
@@ -514,15 +521,6 @@ final class HallsSessionTrapRuntime {
         return Math.abs(cell.x() - origin.x()) + Math.abs(cell.z() - origin.z()) > 12;
     }
 
-    private boolean isNearExistingTrap(HallsExplorationGenerator.Cell cell, Set<HallsExplorationGenerator.Cell> occupied) {
-        for (HallsExplorationGenerator.Cell other : occupied) {
-            if (Math.abs(cell.x() - other.x()) + Math.abs(cell.z() - other.z()) <= 4) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     List<HallsTrapType> trapPool(String levelTypeId) {
         List<HallsTrapType> pool = new ArrayList<>();
         for (HallsTrapType type : trapTypes.values()) {
@@ -601,16 +599,16 @@ final class HallsSessionTrapRuntime {
     }
 
     private Set<HallsExplorationGenerator.Cell> bridgeCellsIfNeeded(TrapCandidate candidate,
-                                                      Set<HallsExplorationGenerator.Cell> walkable,
-                                                      Set<HallsExplorationGenerator.Cell> pitCells,
-                                                      boolean globalReachabilityChecks,
-                                                      HallsFloorModifiers modifiers) {
-        Set<HallsExplorationGenerator.Cell> existingPits = roomPitCells(candidate);
+                                                       HallsTrapPlacementGeometry.FloorConnectivity floorConnectivity,
+                                                       Set<HallsExplorationGenerator.Cell> pitCells,
+                                                       Set<HallsExplorationGenerator.Cell> existingPits,
+                                                       boolean globalReachabilityChecks,
+                                                       boolean enforceRoomReachability,
+                                                       HallsFloorModifiers modifiers) {
         Set<HallsExplorationGenerator.Cell> allPitCells = new HashSet<>(existingPits);
         allPitCells.addAll(pitCells);
-        boolean enforceRoomReachability = roomEntrancesReachable(candidate, existingPits, Set.of());
-        if ((!globalReachabilityChecks || floorReachableWithout(walkable, allPitCells))
-                && (!enforceRoomReachability || roomEntrancesReachable(candidate, allPitCells, Set.of()))) {
+        if ((!enforceRoomReachability || roomEntrancesReachable(candidate, allPitCells, Set.of()))
+                && (!globalReachabilityChecks || floorConnectivity.reachableWithout(allPitCells))) {
             return Set.of();
         }
         int minX = pitCells.stream().mapToInt(HallsExplorationGenerator.Cell::x).min().orElse(0);
@@ -620,23 +618,23 @@ final class HallsSessionTrapRuntime {
         int centerX = (minX + maxX) / 2;
         int centerZ = (minZ + maxZ) / 2;
         if ((maxX - minX) >= (maxZ - minZ)) {
-            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, walkable, allPitCells, pitCells,
+            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, floorConnectivity, allPitCells,
                     widenBridgeOptions(horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ), pitCells, modifiers),
                     globalReachabilityChecks, enforceRoomReachability);
             if (bridge != null) {
                 return bridge;
             }
-            return firstReachableBridge(candidate, walkable, allPitCells, pitCells,
+            return firstReachableBridge(candidate, floorConnectivity, allPitCells,
                     widenBridgeOptions(verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX), pitCells, modifiers),
                     globalReachabilityChecks, enforceRoomReachability);
         } else {
-            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, walkable, allPitCells, pitCells,
+            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, floorConnectivity, allPitCells,
                     widenBridgeOptions(verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX), pitCells, modifiers),
                     globalReachabilityChecks, enforceRoomReachability);
             if (bridge != null) {
                 return bridge;
             }
-            return firstReachableBridge(candidate, walkable, allPitCells, pitCells,
+            return firstReachableBridge(candidate, floorConnectivity, allPitCells,
                     widenBridgeOptions(horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ), pitCells, modifiers),
                     globalReachabilityChecks, enforceRoomReachability);
         }
@@ -674,17 +672,16 @@ final class HallsSessionTrapRuntime {
     }
 
     private Set<HallsExplorationGenerator.Cell> firstReachableBridge(TrapCandidate candidate,
-                                                                     Set<HallsExplorationGenerator.Cell> walkable,
+                                                                     HallsTrapPlacementGeometry.FloorConnectivity floorConnectivity,
                                                                      Set<HallsExplorationGenerator.Cell> allPitCells,
-                                                                     Set<HallsExplorationGenerator.Cell> newPitCells,
                                                                      List<Set<HallsExplorationGenerator.Cell>> bridgeOptions,
                                                                      boolean globalReachabilityChecks,
                                                                      boolean enforceRoomReachability) {
         for (Set<HallsExplorationGenerator.Cell> bridge : bridgeOptions) {
             Set<HallsExplorationGenerator.Cell> passableBridge = intersection(bridge, candidate.roomCells());
             if (!passableBridge.isEmpty()
-                    && (!globalReachabilityChecks || floorReachableWithout(walkable, difference(allPitCells, passableBridge)))
-                    && (!enforceRoomReachability || roomEntrancesReachable(candidate, allPitCells, passableBridge))) {
+                    && (!enforceRoomReachability || roomEntrancesReachable(candidate, allPitCells, passableBridge))
+                    && (!globalReachabilityChecks || floorConnectivity.reachableWithout(difference(allPitCells, passableBridge)))) {
                 return passableBridge;
             }
         }
@@ -692,6 +689,10 @@ final class HallsSessionTrapRuntime {
     }
 
     private Set<HallsExplorationGenerator.Cell> roomPitCells(TrapCandidate candidate) {
+        Set<HallsExplorationGenerator.Cell> cached = roomPitCells.get(candidate.room());
+        if (cached != null) {
+            return cached;
+        }
         Set<HallsExplorationGenerator.Cell> result = new HashSet<>();
         for (HallsTrap trap : traps) {
             if (trap.kind() != TrapKind.HOLE && trap.kind() != TrapKind.HOLE_BRIDGE) {
@@ -702,45 +703,15 @@ final class HallsSessionTrapRuntime {
                 result.add(cell);
             }
         }
+        roomPitCells.put(candidate.room(), result);
         return result;
     }
 
     private boolean roomEntrancesReachable(TrapCandidate candidate,
                                            Set<HallsExplorationGenerator.Cell> pitCells,
                                            Set<HallsExplorationGenerator.Cell> bridgeCells) {
-        Set<HallsExplorationGenerator.Cell> blocked = difference(pitCells, bridgeCells);
-        Set<HallsExplorationGenerator.Cell> target = difference(candidate.roomCells(), blocked);
-        if (target.isEmpty()) {
-            return false;
-        }
-        List<HallsExplorationGenerator.Cell> entrances = roomEntranceCells(candidate.room());
-        if (entrances.isEmpty()) {
-            entrances = List.of(target.iterator().next());
-        }
-        for (HallsExplorationGenerator.Cell entrance : entrances) {
-            if (!target.contains(entrance) || !roomReachableFrom(entrance, target).containsAll(target)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private Set<HallsExplorationGenerator.Cell> roomReachableFrom(HallsExplorationGenerator.Cell start,
-                                                                  Set<HallsExplorationGenerator.Cell> walkable) {
-        Set<HallsExplorationGenerator.Cell> reachable = new HashSet<>();
-        java.util.ArrayDeque<HallsExplorationGenerator.Cell> queue = new java.util.ArrayDeque<>();
-        reachable.add(start);
-        queue.add(start);
-        while (!queue.isEmpty()) {
-            HallsExplorationGenerator.Cell current = queue.remove();
-            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
-                HallsExplorationGenerator.Cell next = step(current, face);
-                if (walkable.contains(next) && reachable.add(next)) {
-                    queue.add(next);
-                }
-            }
-        }
-        return reachable;
+        return HallsTrapPlacementGeometry.roomEntrancesReachable(candidate.roomCells(),
+                roomEntranceCells(candidate.room()), pitCells, bridgeCells);
     }
 
     private List<HallsExplorationGenerator.Cell> roomEntranceCells(HallsExplorationGenerator.Room room) {
@@ -828,53 +799,13 @@ final class HallsSessionTrapRuntime {
         return result;
     }
 
-    private boolean floorReachableWithout(Set<HallsExplorationGenerator.Cell> walkable,
-                                          Set<HallsExplorationGenerator.Cell> blocked) {
-        HallsExplorationGenerator.Cell start = floorReachabilityStart(walkable, blocked);
-        if (start == null) {
-            return false;
-        }
-        Set<HallsExplorationGenerator.Cell> reachable = new HashSet<>();
-        java.util.ArrayDeque<HallsExplorationGenerator.Cell> queue = new java.util.ArrayDeque<>();
-        reachable.add(start);
-        queue.add(start);
-        while (!queue.isEmpty()) {
-            HallsExplorationGenerator.Cell current = queue.remove();
-            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
-                HallsExplorationGenerator.Cell next = switch (face) {
-                    case NORTH -> new HallsExplorationGenerator.Cell(current.x(), current.z() - 1);
-                    case SOUTH -> new HallsExplorationGenerator.Cell(current.x(), current.z() + 1);
-                    case EAST -> new HallsExplorationGenerator.Cell(current.x() + 1, current.z());
-                    case WEST -> new HallsExplorationGenerator.Cell(current.x() - 1, current.z());
-                    default -> current;
-                };
-                if (!blocked.contains(next) && walkable.contains(next) && reachable.add(next)) {
-                    queue.add(next);
-                }
-            }
-        }
-        for (HallsExplorationGenerator.Cell cell : walkable) {
-            if (!blocked.contains(cell) && !reachable.contains(cell)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private HallsExplorationGenerator.Cell floorReachabilityStart(Set<HallsExplorationGenerator.Cell> walkable,
-                                                                  Set<HallsExplorationGenerator.Cell> blocked) {
-        List<HallsExplorationGenerator.Cell> starts = List.of(
+    List<HallsExplorationGenerator.Cell> floorReachabilityStarts() {
+        return List.of(
                 new HallsExplorationGenerator.Cell(origin.x(), origin.z() - ELEVATOR_OUTER_RADIUS - 1),
                 new HallsExplorationGenerator.Cell(origin.x(), origin.z() + ELEVATOR_OUTER_RADIUS + 1),
                 new HallsExplorationGenerator.Cell(origin.x() + ELEVATOR_OUTER_RADIUS + 1, origin.z()),
                 new HallsExplorationGenerator.Cell(origin.x() - ELEVATOR_OUTER_RADIUS - 1, origin.z())
         );
-        for (HallsExplorationGenerator.Cell start : starts) {
-            if (walkable.contains(start) && !blocked.contains(start)) {
-                return start;
-            }
-        }
-        return null;
     }
 
     private List<UUID> buildTrap(TrapKind kind, HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type, int laneSpan) {

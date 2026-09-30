@@ -41,6 +41,7 @@ final class HallsGeneratedTrapPlacement {
     private int placedInRoom;
     private boolean holesDone;
     private boolean done;
+    private HallsTrapPlacementGeometry.FloorConnectivity floorConnectivity;
 
     HallsGeneratedTrapPlacement(HallsSessionTrapRuntime runtime, Map<String, HallsTrapType> trapTypes,
                                HallsExplorationGenerator.Plan plan, Random random,
@@ -92,7 +93,7 @@ final class HallsGeneratedTrapPlacement {
                 if (holeType != null && holesPlaced < targetHoles && holeIndex < holes.size()) {
                     TrapCandidate candidate = holes.get(holeIndex++);
                     if (!liquidCells.contains(candidate.cell())
-                            && runtime.placeHole(candidate, plan, random, holeType, occupied,
+                            && runtime.placeHole(candidate, floorConnectivity(), random, holeType, occupied,
                             globalReachabilityChecks, modifiers, liquidCells)) {
                         holesPlaced++;
                     }
@@ -111,7 +112,11 @@ final class HallsGeneratedTrapPlacement {
                 Collections.shuffle(roomCandidates, random);
                 roomType = runtime.weightedTrap(pool, random, modifiers);
                 if (runtime.trapKind(roomType.kind()) == TrapKind.SWINGING_BLADE) {
-                    roomCandidates.sort((first, second) -> Integer.compare(runtime.bestSwingLaneHalfSpan(second), runtime.bestSwingLaneHalfSpan(first)));
+                    Map<TrapCandidate, Integer> scores = new IdentityHashMap<>();
+                    for (TrapCandidate candidate : roomCandidates) {
+                        scores.put(candidate, runtime.bestSwingLaneHalfSpan(candidate));
+                    }
+                    roomCandidates.sort((first, second) -> Integer.compare(scores.get(second), scores.get(first)));
                 }
                 targetRoomTraps = minTrapsPerRoom == maxTrapsPerRoom ? minTrapsPerRoom
                         : minTrapsPerRoom + random.nextInt(maxTrapsPerRoom - minTrapsPerRoom + 1);
@@ -129,7 +134,7 @@ final class HallsGeneratedTrapPlacement {
             }
             TrapCandidate candidate = roomCandidates.get(candidateIndex++);
             HallsTrapType type = random.nextInt(100) < 10 ? runtime.weightedTrap(pool, random, modifiers) : roomType;
-            if (runtime.tryPlaceTrap(candidate, plan, random, type, occupied, globalReachabilityChecks, liquidCells)) {
+            if (runtime.tryPlaceTrap(candidate, floorConnectivity(), random, type, occupied, globalReachabilityChecks, liquidCells)) {
                 placedInRoom++;
             }
         }
@@ -160,6 +165,15 @@ final class HallsGeneratedTrapPlacement {
     void cancel() {
         done = true;
         occupied.clear();
+        floorConnectivity = null;
+    }
+
+    private HallsTrapPlacementGeometry.FloorConnectivity floorConnectivity() {
+        if (globalReachabilityChecks && floorConnectivity == null) {
+            floorConnectivity = new HallsTrapPlacementGeometry.FloorConnectivity(
+                    plan.walkableCells(), runtime.floorReachabilityStarts());
+        }
+        return floorConnectivity;
     }
 
     private void prepareRoom(HallsExplorationGenerator.Room room, int roomIndex) {
