@@ -1,0 +1,474 @@
+id: dammed_corridors
+name: "Dammed Corridors"
+difficulty: "Hard"
+description:
+  - "Nine sprawling dungeon floors, with a bunker camp after each descent."
+  - "Limited research and relentless hazards lead to the Archaic Guard."
+players:
+  min: 1
+  max: 6
+camp:
+  layout: camps/camp_dammed_corridors.txt
+  team-lives: 3
+  key-costs:
+    - 10000
+allowed-items:
+  scrap:
+    - wood
+    - iron
+    - diamond
+    - redstone
+  weapon:
+    - vagabonds_club
+    - rusty_sword
+    - miner_pick
+    - poking_stick
+    - bone_cleaver
+    - frost_lance
+    - echo_blade
+    - sculk_maul
+    - conductpole
+    - smasher
+    - bonker
+    - royal_halberd
+    - poisoned_dagger
+    - explodificator
+    - shortbow
+    - crossbow
+    - longbow
+    - reinforced_crossbow
+    - bubblebow
+    - stormterrow
+  armor:
+    - padded_cap
+    - padded_armor
+    - padded_leggings
+    - padded_boots
+    - chainmail_coif
+    - chainmail_hauberk
+    - chainmail_leggings
+    - chainmail_boots
+    - ironbound_helmet
+    - ironbound_chestplate
+    - ironbound_leggings
+    - ironbound_boots
+    - cinder_helmet
+    - cinderplate
+    - cinder_leggings
+    - cinder_boots
+    - reinforced_helmet
+    - reinforced_chestplate
+    - reinforced_leggings
+    - reinforced_boots
+    - deepguard_helmet
+    - deepguard_plate
+    - deepguard_leggings
+    - deepguard_boots
+    - sightline
+    - the_crosshair
+    - replated
+    - superguard
+    - sneakers
+    - the_undetected
+    - sprinters_treasure
+    - marathons
+  food:
+    - raw_mycelia
+    - potato
+    - carrot
+    - raw_pufferfish
+    - stale_bread
+    - cooked_mycelia
+    - baked_potato
+    - pufferfish_stew
+    - sculk_cleansing_hash
+    - deeproot_purge_stew
+    - hearty_mycelia_stew
+    - fleetfoot_ration
+    - stonehide_chowder
+    - ember_stew
+    - golden_jerky
+    - deepdelver_pie
+  utility:
+    - smoke_bomb
+    - mending_salve
+    - absorption_tonic
+    - warding_totem
+    - adrenaline_shot
+    - ironhide_salve
+    - storm_vial
+    - poison_bomb
+    - lodestone
+    - handheld_scanner
+  blueprint:
+    - forge_blueprint
+    - grindstone_blueprint
+    - storage_locker_blueprint
+    - health_totem_blueprint
+    - speed_totem_blueprint
+    - mycelia_farm_blueprint
+    - potato_farm_blueprint
+    - carrot_farm_blueprint
+    - alchemy_cauldron_blueprint
+    - deconstructor_blueprint
+    - sculk_purifier_blueprint
+  buildings:
+    - forge
+    - grindstone
+    - storage_locker
+    - mycelia_farm
+    - potato_farm
+    - carrot_farm
+    - alchemy_cauldron
+    - deconstructor
+    - health_totem
+    - speed_totem
+    - sculk_purifier
+blueprint-pools:
+  normal:
+    - forge_blueprint
+    - grindstone_blueprint
+    - storage_locker_blueprint
+    - speed_totem_blueprint
+    - mycelia_farm_blueprint
+    - potato_farm_blueprint
+    - carrot_farm_blueprint
+    - alchemy_cauldron_blueprint
+    - deconstructor_blueprint
+    - sculk_purifier_blueprint
+  rare:
+    - health_totem_blueprint
+crafting-stations:
+  camp_station:
+    1:
+      - vagabonds_club
+      - padded_cap
+      - padded_armor
+      - padded_leggings
+      - padded_boots
+      - miner_pick
+      - poking_stick
+      - cooked_mycelia
+      - baked_potato
+      - sculk_cleansing_hash
+      - shortbow
+      - rusty_sword
+      - stonehide_chowder
+      - fleetfoot_ration
+      - deepdelver_pie
+      - absorption_tonic
+      - chainmail_coif
+      - chainmail_hauberk
+      - chainmail_leggings
+      - chainmail_boots
+      - smoke_bomb
+      - lodestone
+      - bone_cleaver
+      - crossbow
+      - bonker
+      - ember_stew
+      - hearty_mycelia_stew
+      - pufferfish_stew
+      - poisoned_dagger
+      - warding_totem
+      - replated
+      - sightline
+      - cinder_helmet
+      - cinderplate
+      - cinder_leggings
+      - cinder_boots
+      - ironbound_helmet
+      - ironbound_chestplate
+      - ironbound_leggings
+      - ironbound_boots
+      - frost_lance
+      - adrenaline_shot
+      - sneakers
+      - sprinters_treasure
+      - conductpole
+      - ironhide_salve
+research:
+  nodes:
+    basics:
+      name: "Basics"
+      icon: BOOK
+      cost: 0
+      row: 3
+      column: 1
+      unlocks:
+        - vagabonds_club
+        - padded_cap
+        - padded_armor
+        - padded_leggings
+        - padded_boots
+        - miner_pick
+        - poking_stick
+        - cooked_mycelia
+        - baked_potato
+        - sculk_cleansing_hash
+    knights_feast:
+      name: "Knight's Feast"
+      icon: COOKED_BEEF
+      cost: 1
+      row: 2
+      column: 3
+      prerequisites:
+        - improved_gear
+      unlocks:
+        - shortbow
+        - rusty_sword
+        - stonehide_chowder
+        - fleetfoot_ration
+        - deepdelver_pie
+        - absorption_tonic
+    improved_gear:
+      name: "Improved Gear"
+      icon: IRON_SWORD
+      cost: 1
+      row: 3
+      column: 3
+      prerequisites:
+        - basics
+      unlocks:
+        - chainmail_coif
+        - chainmail_hauberk
+        - chainmail_leggings
+        - chainmail_boots
+        - smoke_bomb
+        - lodestone
+        - bone_cleaver
+    soup_mastery:
+      name: "Soup Mastery"
+      icon: RABBIT_STEW
+      cost: 1
+      row: 4
+      column: 3
+      prerequisites:
+        - improved_gear
+      unlocks:
+        - crossbow
+        - bonker
+        - ember_stew
+        - hearty_mycelia_stew
+        - pufferfish_stew
+    magic_gear:
+      name: "Magic Gear"
+      icon: TOTEM_OF_UNDYING
+      cost: 2
+      row: 1
+      column: 5
+      prerequisites:
+        - knights_feast
+      unlocks:
+        - poisoned_dagger
+        - warding_totem
+    advanced_combat:
+      name: "Advanced Combat"
+      icon: DIAMOND_SWORD
+      cost: 1
+      row: 2
+      column: 5
+      prerequisites:
+        - sturdy_armor
+        - magic_gear
+      unlocks:
+        - replated
+        - sightline
+    sturdy_armor:
+      name: "Sturdy Armor"
+      icon: IRON_CHESTPLATE
+      cost: 2
+      row: 3
+      column: 5
+      prerequisites:
+        - improved_gear
+      unlocks:
+        - cinder_helmet
+        - cinderplate
+        - cinder_leggings
+        - cinder_boots
+        - ironbound_helmet
+        - ironbound_chestplate
+        - ironbound_leggings
+        - ironbound_boots
+        - frost_lance
+        - adrenaline_shot
+    scouting:
+      name: "Scouting"
+      icon: LEATHER_LEGGINGS
+      cost: 1
+      row: 4
+      column: 5
+      prerequisites:
+        - sturdy_armor
+        - conduction
+      unlocks:
+        - sneakers
+        - sprinters_treasure
+    conduction:
+      name: "Conduction"
+      icon: LIGHTNING_ROD
+      cost: 2
+      row: 5
+      column: 5
+      prerequisites:
+        - soup_mastery
+      unlocks:
+        - conductpole
+        - ironhide_salve
+floors:
+  - number: 1
+    kind: start
+    level-type: howling_corridors
+    difficulty: 5
+    layout: special/start_floor.txt
+  - number: 2
+    kind: exploration
+    level-type: howling_corridors
+    difficulty: 32
+    rooms: 30
+    breakables: 100
+    traps: 25
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 30
+    sculk-patches: 12
+    coin-quota: 60
+  - number: 3
+    kind: camp
+    level-type: bunker
+  - number: 4
+    kind: exploration
+    level-type: infernal_chambers
+    difficulty: 34
+    rooms: 33
+    breakables: 115
+    traps: 28
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 25
+    sculk-patches: 13
+    coin-quota: 65
+  - number: 5
+    kind: camp
+    level-type: bunker
+  - number: 6
+    kind: exploration
+    level-type: backrooms
+    difficulty: 36
+    rooms: 36
+    breakables: 130
+    traps: 30
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 10
+    sculk-patches: 14
+    coin-quota: 70
+  - number: 7
+    kind: camp
+    level-type: bunker
+  - number: 8
+    kind: exploration
+    level-type: sewer
+    difficulty: 38
+    rooms: 39
+    breakables: 145
+    traps: 30
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 10
+    sculk-patches: 15
+    coin-quota: 75
+  - number: 9
+    kind: camp
+    level-type: bunker
+  - number: 10
+    kind: exploration
+    level-type: deep_crypt
+    difficulty: 40
+    rooms: 42
+    breakables: 160
+    traps: 32
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 20
+    sculk-patches: 16
+    coin-quota: 80
+  - number: 11
+    kind: camp
+    level-type: bunker
+  - number: 12
+    kind: exploration
+    level-type: bunker
+    difficulty: 42
+    rooms: 45
+    breakables: 175
+    traps: 34
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 10
+    sculk-patches: 17
+    coin-quota: 85
+  - number: 13
+    kind: camp
+    level-type: bunker
+  - number: 14
+    kind: exploration
+    level-type: factory
+    difficulty: 44
+    rooms: 48
+    breakables: 190
+    traps: 36
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 40
+    sculk-patches: 18
+    coin-quota: 90
+  - number: 15
+    kind: camp
+    level-type: bunker
+  - number: 16
+    kind: exploration
+    level-type: library
+    difficulty: 46
+    rooms: 49
+    breakables: 205
+    traps: 38
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 30
+    sculk-patches: 19
+    coin-quota: 95
+  - number: 17
+    kind: camp
+    level-type: bunker
+  - number: 18
+    kind: exploration
+    level-type: frozen_halls
+    difficulty: 48
+    rooms: 50
+    breakables: 220
+    traps: 40
+    traps-per-room:
+      min: 1
+      max: 7
+    holes: 50
+    sculk-patches: 20
+    coin-quota: 100
+  - number: 19
+    kind: camp
+    level-type: bunker
+  - number: 20
+    kind: combat
+    level-type: factory
+    difficulty: 40
+    layout: special/untold_depths_overdrive_spawner.txt
+    boss: archaic_guard

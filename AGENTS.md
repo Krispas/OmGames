@@ -1317,6 +1317,7 @@ SQLite tables:
 - Generated room and corridor wall columns should use wall material down through their foundation block instead of placing floor material under walls.
 - Room lighting should be embedded directly in generated room ceilings.
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
+- Bundled Dammed Corridors (`dammed_corridors`) has 20 consecutive floors: the standard start room, nine exploration/camp pairs, and Archaic Guard. It uses the Bunker-themed `camps/camp_dammed_corridors.txt` camp, one `10000`-coin key, global blueprint pools for its eleven enabled buildings, no blueprint distilleries, and the Untold Depths research tree only through Conduction; later gear remains eligible for drops but is not craftable.
 - Halls exploration floor definitions may set `blueprint-distilleries`; `true` uses the default chain size of `5`, a positive number sets that exact chain size, and missing/false disables distilleries and their HUD line.
 - Scenario combat floors may define `boss: <boss-id>`. Boss definitions are loaded from `plugins/OmGames/HallsOfCarnage/bosses/*.yml`; bundled boss resources are copied on first run/reset like other Halls resources.
 - If a scenario floor is not explicitly configured but a prior exploration floor is configured, runtime reuses that prior exploration floor definition for the requested floor instead of falling back to the generic 8-room placeholder.

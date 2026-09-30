@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-27
+Last updated: 2026-09-30
 
 ## Implemented
 
@@ -114,6 +114,7 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
+- Dammed Corridors scenario slice completed: added `scenarios/DammedCorridors.yml` (`dammed_corridors`) using Untold Depths as the base. Per reviewer clarification, inserted the standard start floor and mapped CSV rows in order to consecutive floors, removing the source numbering gap: exploration floors 2/4/6/8/10/12/14/16/18, Bunker camps 3/5/7/9/11/13/15/17/19, and Archaic Guard at floor 20. All exploration difficulty/quota/breakable/room/trap/hole/sculk values match `Extra Resources/halls_of_carnage/DammedCorridorsLevels.csv`; trap-per-room limits retain the base's 1-7 range. Camps use `camps/camp_dammed_corridors.txt`, three team lives, and one key costing 10000. Only the eleven requested buildings and matching blueprints are enabled; global normal/rare blueprint pools apply to every level type. No blueprint distilleries are enabled. All base scrap/weapon/armor/utility/food drop lists remain available. Research retains the nine nodes through Conduction inclusive, and Camp Station recipes contain exactly their unlocks, including Absorption Tonic; later-node gear remains drop-only. The new scenario and existing camp resource are registered for missing-file copying and `/hoc reset confirm`. SnakeYAML static validation passed for YAML parsing, CSV values, floor numbering, item/layout references, blueprint membership/rarities, research node equality, and crafting restrictions. `mvn -DskipTests compile` could not run because Maven and a wrapper are unavailable; installed Java is 18 rather than the required 25. In-server loading, generation, and playtesting remain unverified.
 - Next reviewer slice applied: Halls lobby menu setup now spawns a tagged invisible `Interaction` entity instead of a villager. New config writes use `lobby.menu-interaction`, bundled defaults advertise that key, and `/hoc lobby spawnMenuInteraction [rotation]` is the primary setup command. The old `menu-villager` config and `spawnMenuVillager` command remain read/alias compatibility only, and spawning the new hook removes old tagged menu villagers.
 - Next reviewer slice applied: Library vent-only room generation now only accepts a disconnected room after carving a forced low-ceiling vent corridor to a connected anchor room, so vent-only rooms are no longer left without an entrance. The disconnected-room retry budget and sampled anchor/path checks were reduced, and candidate placement now stays nearer existing connected rooms to keep Library floor planning bounded. Boss projectile fallback no longer removes thrown tridents after a flight-path boss hit, preserving Bukkit's normal return behavior while still marking the projectile processed to prevent duplicate boss damage.
 - Next reviewer slice applied: Library exploration generation now targets one-third vent-only rooms directly, improves disconnected-room placement near connected anchors, and marks forced low-ceiling vent corridors with vent gates before the plan is returned. Vent-only room interiors and low-ceiling vent corridor cells are excluded from the normal floor walk graph and monster spawn graph, so those rooms remain disconnected from normal corridor pathing while paired Library vents still connect normal rooms to vent-only rooms only. Lodestone no longer renders a fallback straight trail when the player is off the connected floor graph, which keeps it quiet inside disconnected vent rooms. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `18.0.2-beta` while the project targets Java 25.
@@ -124,17 +125,6 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- Add a new scenario called Dammed Corridors. Use UntoldDepths as a base. I will provide details:
-- Floor information is in document in Extra Resources/halls_of_carnage/DammedCorridorsLevels.csv
-- Blueprint distilleries are not present on any floor
-- For camp, use bunker level theme and file camp_dammed_corridors.txt
-- Available buildings in the scenario are: health totem, alchemy cauldron, carrot farm, potato farm, mycelia farm, deconstructor, forge, grindstone, sculk purifier, speed totem and storage locker
-- Blueprint distribution: all blueprints are available on all level types.
-- There is only a single key and its cost is 10000 (meant to be unatainable)
-- Normal scrap set.
-- All weapons, armors, utilities, foods.
-- Blueprints for the enabled buildings
-- Copy the research notes, but only until Conduction node, nothing after it, remove the items from those further nodes from crafting, but keep them in weapons, armors and such, so they can still drop
 
 Future slices (dont do yet):
 - TBD
