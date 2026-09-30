@@ -2,8 +2,8 @@ id: untold_depths
 name: "Untold Depths"
 difficulty: "Medium"
 description:
-  - "A long descent through the first halls beneath Om Nom Lands."
-  - "A shared expedition camp anchors progression. The final floor is a combat arena."
+  - "A long descent through many floors."
+  - "What kind of ancient sec"
 players:
   min: 1
   max: 6
@@ -482,7 +482,7 @@ research:
     resonance:
       name: "Resonance"
       icon: ECHO_SHARD
-      cost: 3
+      cost: 2
       row: 1
       column: 9
       prerequisites:
@@ -506,7 +506,7 @@ research:
     deepguard_armor:
       name: "Deepguard Armor"
       icon: NETHERITE_CHESTPLATE
-      cost: 3
+      cost: 2
       row: 3
       column: 9
       prerequisites:
@@ -531,7 +531,7 @@ research:
     sculk_studies:
       name: "Sculk Studies"
       icon: SCULK_CATALYST
-      cost: 3
+      cost: 2
       row: 5
       column: 9
       prerequisites:

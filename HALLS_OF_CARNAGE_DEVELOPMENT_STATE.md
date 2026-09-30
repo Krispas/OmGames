@@ -124,7 +124,17 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- TBD
+- Add a new scenario called Dammed Corridors. Use UntoldDepths as a base. I will provide details:
+- Floor information is in document in Extra Resources/halls_of_carnage/DammedCorridorsLevels.csv
+- Blueprint distilleries are not present on any floor
+- For camp, use bunker level theme and file camp_dammed_corridors.txt
+- Available buildings in the scenario are: health totem, alchemy cauldron, carrot farm, potato farm, mycelia farm, deconstructor, forge, grindstone, sculk purifier, speed totem and storage locker
+- Blueprint distribution: all blueprints are available on all level types.
+- There is only a single key and its cost is 10000 (meant to be unatainable)
+- Normal scrap set.
+- All weapons, armors, utilities, foods.
+- Blueprints for the enabled buildings
+- Copy the research notes, but only until Conduction node, nothing after it, remove the items from those further nodes from crafting, but keep them in weapons, armors and such, so they can still drop
 
 Future slices (dont do yet):
 - TBD
@@ -135,7 +145,5 @@ For reviewer to figure out:
 - Bunker and library palletes
 - Bunker and library rooms
 - Rework descriptions for all items
-
-- Add a new scenario called Dammed Corridors. I will provide details:
-- Floor information is in document in Extra Resources/halls_of_carnage/DammedCorridorsLevels.csv
 - Fixed textures for cooked potato / mycelia and sculk removing foods
+
