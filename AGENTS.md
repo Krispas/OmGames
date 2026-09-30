@@ -1239,6 +1239,7 @@ Behavior notes:
 - `HallsSession` owns active session state; `HallsSessionTrapRuntime` is its session-owned trap placement/ticking helper.
 - `HallsSessionMonsterRuntime` is the session-owned first-pass monster flood helper; keep monster spawning/alert cleanup routed through `HallsSession`.
 - `HallsModifierTypeLoader` loads configurable exploration modifiers; `HallsFloorModifiers` owns the active floor's stacked modifier effects.
+- `HallsResourceManager` discovers bundled Halls content recursively and owns missing-file copying and resource reset I/O; do not add per-file content whitelists.
 
 ### 7.2 Command Surface
 
@@ -1425,8 +1426,9 @@ SQLite tables:
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
 - Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, full item definitions, full camp building behavior, persistent floor sculk patches, polished trap visuals/config, and polished monster AI/combat are pending.
 - Exploration doorway selection must reject side offsets where the room mask has `X` at the edge or first inward cell.
-- Howling Corridors room resources are seeded from all bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`.
-- Frozen Halls and Deep Crypt room resources are also seeded from their bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`; use `/hoc reset confirm` to copy newly bundled resource files into an existing server data folder.
+- All bundled files under `hallsOfCarnage/` are discovered recursively from the plugin JAR (or exploded development resources) and copied into `HallsOfCarnage/` when missing. Existing server files are never overwritten at startup; adding bundled content requires no Java file-list update.
+- Resource copying excludes the editor-tool filenames `level-maker.jar`, `run.bat`, and `run.vbs` at any nesting depth. Keep server saves and lobby config outside resettable game-content folders; `/hoc reset confirm` deliberately replaces game resources but preserves saved runs and lobby config.
+- Resource reset retains an explicit game-folder deletion boundary rather than deleting every server directory. Bundled resources are read and their paths validated before reset deletes existing content; adding a new disposable top-level content family requires updating that boundary, not a per-file list.
 - Exploration floors have first-pass session-owned trap generation/runtime for holes, bridged holes, model-display bear traps, model-display proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, Deep Crypt poison darts, and Factory steam vents.
 - Trap placement uses the generated walkable mask and BFS reachability before accepting an unbridged pit; pits that would disconnect traversal receive a spruce bridge.
 - Halls trap animation/cooldown logic must use `HallsSessionTrapRuntime`'s session-local scheduler tick, not world time, because the Halls dimension may have frozen or nonstandard time progression.

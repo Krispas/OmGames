@@ -3,10 +3,8 @@ package krispasi.omGames.hallsofcarnage;
 import krispasi.omGames.OmVeinsAPI;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -36,246 +34,6 @@ public final class HallsOfCarnageManager {
     private static final String DATA_FOLDER_NAME = "HallsOfCarnage";
     private static final String MENU_INTERACTION_TAG = "omgames_hoc_menu_interaction";
     private static final String LEGACY_MENU_VILLAGER_TAG = "omgames_hoc_menu_villager";
-    private static final String[] RESOURCE_FILES = {
-            "hallsOfCarnage/scenarios/UntoldDepths.yml",
-            "hallsOfCarnage/scenarios/DammedCorridors.yml",
-            "hallsOfCarnage/level/special/start_floor.txt",
-            "hallsOfCarnage/level/special/final_floor_1.txt",
-            "hallsOfCarnage/level/special/untold_depths_overdrive_spawner.txt",
-            "hallsOfCarnage/level/camps/camp_1.txt",
-            "hallsOfCarnage/level/camps/camp_untold_depths.txt",
-            "hallsOfCarnage/level/camps/camp_dammed_corridors.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_1.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_2.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_3.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_4.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_5.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_6.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_7.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_8.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_9.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_10.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_11.txt",
-            "hallsOfCarnage/level/howling_corridors/exploration_12.txt",
-            "hallsOfCarnage/level/frozen_halls/exploration_1.txt",
-            "hallsOfCarnage/level/frozen_halls/exploration_2.txt",
-            "hallsOfCarnage/level/frozen_halls/exploration_3.txt",
-            "hallsOfCarnage/level/frozen_halls/exploration_4.txt",
-            "hallsOfCarnage/level/frozen_halls/exploration_5.txt",
-            "hallsOfCarnage/level/frozen_halls/exploration_6.txt",
-            "hallsOfCarnage/level/frozen_halls/exploration_7.txt",
-            "hallsOfCarnage/level/frozen_halls/exploration_8.txt",
-            "hallsOfCarnage/level/frozen_halls/exploration_9.txt",
-            "hallsOfCarnage/level/frozen_halls/exploration_10.txt",
-            "hallsOfCarnage/level/deep_crypt/exploration_1.txt",
-            "hallsOfCarnage/level/deep_crypt/exploration_2.txt",
-            "hallsOfCarnage/level/deep_crypt/exploration_3.txt",
-            "hallsOfCarnage/level/deep_crypt/exploration_4.txt",
-            "hallsOfCarnage/level/deep_crypt/exploration_5.txt",
-            "hallsOfCarnage/level/deep_crypt/exploration_6.txt",
-            "hallsOfCarnage/level/deep_crypt/exploration_7.txt",
-            "hallsOfCarnage/level/deep_crypt/exploration_8.txt",
-            "hallsOfCarnage/level/deep_crypt/exploration_9.txt",
-            "hallsOfCarnage/level/deep_crypt/exploration_10.txt",
-            "hallsOfCarnage/level/infernal_chambers/exploration_1.txt",
-            "hallsOfCarnage/level/factory/exploration_1.txt",
-            "hallsOfCarnage/level/backrooms/exploration_1.txt",
-            "hallsOfCarnage/level/sewer/exploration_1.txt",
-            "hallsOfCarnage/level/library/exploration_1.txt",
-            "hallsOfCarnage/level/library/exploration_2.txt",
-            "hallsOfCarnage/level/bunker/exploration_1.txt",
-            "hallsOfCarnage/level/bunker/exploration_2.txt",
-            "hallsOfCarnage/level_type/howling_corridors.yml",
-            "hallsOfCarnage/level_type/frozen_halls.yml",
-            "hallsOfCarnage/level_type/deep_crypt.yml",
-            "hallsOfCarnage/level_type/infernal_chambers.yml",
-            "hallsOfCarnage/level_type/factory.yml",
-            "hallsOfCarnage/level_type/backrooms.yml",
-            "hallsOfCarnage/level_type/sewer.yml",
-            "hallsOfCarnage/level_type/library.yml",
-            "hallsOfCarnage/level_type/bunker.yml",
-            "hallsOfCarnage/modifiers/shared.yml",
-            "hallsOfCarnage/modifiers/frozen_halls.yml",
-            "hallsOfCarnage/modifiers/deep_crypt.yml",
-            "hallsOfCarnage/modifiers/factory.yml",
-            "hallsOfCarnage/modifiers/sewer.yml",
-            "hallsOfCarnage/modifiers/bunker.yml",
-            "hallsOfCarnage/modifiers/library.yml",
-            "hallsOfCarnage/breakables/barrel.yml",
-            "hallsOfCarnage/breakables/chest.yml",
-            "hallsOfCarnage/breakables/ender_chest.yml",
-            "hallsOfCarnage/breakables/table.yml",
-            "hallsOfCarnage/breakables/chair.yml",
-            "hallsOfCarnage/breakables/stool.yml",
-            "hallsOfCarnage/breakables/radiator.yml",
-            "hallsOfCarnage/breakables/metal_barrel.yml",
-            "hallsOfCarnage/breakable_loot_pools/common.yml",
-            "hallsOfCarnage/breakable_loot_pools/rare.yml",
-            "hallsOfCarnage/vegetation/grass.yml",
-            "hallsOfCarnage/vegetation/deadbush.yml",
-            "hallsOfCarnage/vegetation/tall_dry_grass.yml",
-            "hallsOfCarnage/vegetation/bush.yml",
-            "hallsOfCarnage/traps/hole.yml",
-            "hallsOfCarnage/traps/bear_trap.yml",
-            "hallsOfCarnage/traps/proximity_mine.yml",
-            "hallsOfCarnage/traps/swinging_blade.yml",
-            "hallsOfCarnage/traps/wall_spikes.yml",
-            "hallsOfCarnage/traps/falling_ice.yml",
-            "hallsOfCarnage/traps/poison_darts.yml",
-            "hallsOfCarnage/traps/steam_vent.yml",
-            "hallsOfCarnage/traps/bubbles.yml",
-            "hallsOfCarnage/traps/geyser.yml",
-            "hallsOfCarnage/traps/pufferfish.yml",
-            "hallsOfCarnage/traps/army_coffin.yml",
-            "hallsOfCarnage/traps/homing_mine.yml",
-            "hallsOfCarnage/traps/enchanted_book.yml",
-            "hallsOfCarnage/bosses/overdrive_spawner.yml",
-            "hallsOfCarnage/bosses/archaic_guard.yml",
-            "hallsOfCarnage/monsters/zombie.yml",
-            "hallsOfCarnage/monsters/creeper.yml",
-            "hallsOfCarnage/monsters/creaking.yml",
-            "hallsOfCarnage/monsters/slime_medium.yml",
-            "hallsOfCarnage/monsters/zombie_vanguard.yml",
-            "hallsOfCarnage/monsters/skeleton.yml",
-            "hallsOfCarnage/monsters/cave_spider.yml",
-            "hallsOfCarnage/monsters/stray.yml",
-            "hallsOfCarnage/monsters/bogged.yml",
-            "hallsOfCarnage/monsters/husk.yml",
-            "hallsOfCarnage/monsters/breeze.yml",
-            "hallsOfCarnage/monsters/vindicator.yml",
-            "hallsOfCarnage/monsters/silverfish.yml",
-            "hallsOfCarnage/monsters/pillager.yml",
-            "hallsOfCarnage/monsters/witch.yml",
-            "hallsOfCarnage/monsters/wither_skeleton.yml",
-            "hallsOfCarnage/monsters/warden.yml",
-            "hallsOfCarnage/monsters/piglin.yml",
-            "hallsOfCarnage/monsters/blaze.yml",
-            "hallsOfCarnage/monsters/piglin_brute.yml",
-            "hallsOfCarnage/monsters/parched.yml",
-            "hallsOfCarnage/monsters/drowned.yml",
-            "hallsOfCarnage/monsters/guardian.yml",
-            "hallsOfCarnage/monsters/ravager.yml",
-            "hallsOfCarnage/monsters/hoglin_slow.yml",
-            "hallsOfCarnage/monsters/magma_cube_large.yml",
-            "hallsOfCarnage/monsters/splinter.yml",
-            "hallsOfCarnage/monsters/splinter_small.yml",
-            "hallsOfCarnage/monsters/splinter_baby.yml",
-            "hallsOfCarnage/monsters/old_bones.yml",
-            "hallsOfCarnage/monsters/brooding_mother.yml",
-            "hallsOfCarnage/monsters/spiderling.yml",
-            "hallsOfCarnage/monsters/dammed_librarian.yml",
-            "hallsOfCarnage/monsters/rotting_soldier.yml",
-            "hallsOfCarnage/monsters/bedrock_walker.yml",
-            "hallsOfCarnage/items/weapons/vagabonds_club.yml",
-            "hallsOfCarnage/items/weapons/rusty_sword.yml",
-            "hallsOfCarnage/items/weapons/poking_stick.yml",
-            "hallsOfCarnage/items/weapons/echo_blade.yml",
-            "hallsOfCarnage/items/weapons/miner_pick.yml",
-            "hallsOfCarnage/items/weapons/bone_cleaver.yml",
-            "hallsOfCarnage/items/weapons/frost_lance.yml",
-            "hallsOfCarnage/items/weapons/sculk_maul.yml",
-            "hallsOfCarnage/items/weapons/conductpole.yml",
-            "hallsOfCarnage/items/weapons/smasher.yml",
-            "hallsOfCarnage/items/weapons/bonker.yml",
-            "hallsOfCarnage/items/weapons/royal_halberd.yml",
-            "hallsOfCarnage/items/weapons/poisoned_dagger.yml",
-            "hallsOfCarnage/items/weapons/explodificator.yml",
-            "hallsOfCarnage/items/weapons/shortbow.yml",
-            "hallsOfCarnage/items/weapons/crossbow.yml",
-            "hallsOfCarnage/items/weapons/longbow.yml",
-            "hallsOfCarnage/items/weapons/reinforced_crossbow.yml",
-            "hallsOfCarnage/items/weapons/bubblebow.yml",
-            "hallsOfCarnage/items/weapons/stormterrow.yml",
-            "hallsOfCarnage/items/armors/helmets/padded_cap.yml",
-            "hallsOfCarnage/items/armors/helmets/chainmail_coif.yml",
-            "hallsOfCarnage/items/armors/helmets/ironbound_helmet.yml",
-            "hallsOfCarnage/items/armors/helmets/cinder_helmet.yml",
-            "hallsOfCarnage/items/armors/helmets/reinforced_helmet.yml",
-            "hallsOfCarnage/items/armors/helmets/deepguard_helmet.yml",
-            "hallsOfCarnage/items/armors/helmets/sightline.yml",
-            "hallsOfCarnage/items/armors/helmets/the_crosshair.yml",
-            "hallsOfCarnage/items/armors/chestplates/padded_armor.yml",
-            "hallsOfCarnage/items/armors/chestplates/chainmail_hauberk.yml",
-            "hallsOfCarnage/items/armors/chestplates/ironbound_chestplate.yml",
-            "hallsOfCarnage/items/armors/chestplates/cinderplate.yml",
-            "hallsOfCarnage/items/armors/chestplates/reinforced_chestplate.yml",
-            "hallsOfCarnage/items/armors/chestplates/deepguard_plate.yml",
-            "hallsOfCarnage/items/armors/chestplates/replated.yml",
-            "hallsOfCarnage/items/armors/chestplates/superguard.yml",
-            "hallsOfCarnage/items/armors/leggings/padded_leggings.yml",
-            "hallsOfCarnage/items/armors/leggings/chainmail_leggings.yml",
-            "hallsOfCarnage/items/armors/leggings/ironbound_leggings.yml",
-            "hallsOfCarnage/items/armors/leggings/cinder_leggings.yml",
-            "hallsOfCarnage/items/armors/leggings/reinforced_leggings.yml",
-            "hallsOfCarnage/items/armors/leggings/deepguard_leggings.yml",
-            "hallsOfCarnage/items/armors/leggings/sneakers.yml",
-            "hallsOfCarnage/items/armors/leggings/the_undetected.yml",
-            "hallsOfCarnage/items/armors/boots/padded_boots.yml",
-            "hallsOfCarnage/items/armors/boots/chainmail_boots.yml",
-            "hallsOfCarnage/items/armors/boots/ironbound_boots.yml",
-            "hallsOfCarnage/items/armors/boots/cinder_boots.yml",
-            "hallsOfCarnage/items/armors/boots/reinforced_boots.yml",
-            "hallsOfCarnage/items/armors/boots/deepguard_boots.yml",
-            "hallsOfCarnage/items/armors/boots/sprinters_treasure.yml",
-            "hallsOfCarnage/items/armors/boots/marathons.yml",
-            "hallsOfCarnage/items/food/stale_bread.yml",
-            "hallsOfCarnage/items/food/raw_mycelia.yml",
-            "hallsOfCarnage/items/food/potato.yml",
-            "hallsOfCarnage/items/food/carrot.yml",
-            "hallsOfCarnage/items/food/raw_pufferfish.yml",
-            "hallsOfCarnage/items/food/cooked_mycelia.yml",
-            "hallsOfCarnage/items/food/baked_potato.yml",
-            "hallsOfCarnage/items/food/pufferfish_stew.yml",
-            "hallsOfCarnage/items/food/sculk_cleansing_hash.yml",
-            "hallsOfCarnage/items/food/deeproot_purge_stew.yml",
-            "hallsOfCarnage/items/food/ember_stew.yml",
-            "hallsOfCarnage/items/food/golden_jerky.yml",
-            "hallsOfCarnage/items/food/hearty_mycelia_stew.yml",
-            "hallsOfCarnage/items/food/fleetfoot_ration.yml",
-            "hallsOfCarnage/items/food/stonehide_chowder.yml",
-            "hallsOfCarnage/items/food/deepdelver_pie.yml",
-            "hallsOfCarnage/items/utility/smoke_bomb.yml",
-            "hallsOfCarnage/items/utility/warding_totem.yml",
-            "hallsOfCarnage/items/utility/mending_salve.yml",
-            "hallsOfCarnage/items/utility/absorption_tonic.yml",
-            "hallsOfCarnage/items/utility/adrenaline_shot.yml",
-            "hallsOfCarnage/items/utility/ironhide_salve.yml",
-            "hallsOfCarnage/items/utility/storm_vial.yml",
-            "hallsOfCarnage/items/utility/poison_bomb.yml",
-            "hallsOfCarnage/items/utility/lodestone.yml",
-            "hallsOfCarnage/items/utility/handheld_scanner.yml",
-            "hallsOfCarnage/items/blueprints/forge_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/grindstone_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/storage_locker_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/elevator_drill_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/scanner_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/health_totem_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/speed_totem_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/mycelia_farm_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/potato_farm_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/carrot_farm_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/research_table_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/alchemy_cauldron_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/deconstructor_blueprint.yml",
-            "hallsOfCarnage/items/blueprints/sculk_purifier_blueprint.yml",
-            "hallsOfCarnage/buildings/camp_station.yml",
-            "hallsOfCarnage/buildings/blueprint_distillery.yml",
-            "hallsOfCarnage/buildings/library_vent.yml",
-            "hallsOfCarnage/buildings/forge.yml",
-            "hallsOfCarnage/buildings/mycelia_farm.yml",
-            "hallsOfCarnage/buildings/potato_farm.yml",
-            "hallsOfCarnage/buildings/carrot_farm.yml",
-            "hallsOfCarnage/buildings/research_table.yml",
-            "hallsOfCarnage/buildings/alchemy_cauldron.yml",
-            "hallsOfCarnage/buildings/deconstructor.yml",
-            "hallsOfCarnage/buildings/storage_locker.yml",
-            "hallsOfCarnage/buildings/grindstone.yml",
-            "hallsOfCarnage/buildings/elevator_drill.yml",
-            "hallsOfCarnage/buildings/scanner.yml",
-            "hallsOfCarnage/buildings/health_totem.yml",
-            "hallsOfCarnage/buildings/speed_totem.yml",
-            "hallsOfCarnage/buildings/sculk_purifier.yml"
-    };
 
     public record Result(boolean success, String message) {
         public static Result ok(String message) {
@@ -395,25 +153,11 @@ public final class HallsOfCarnageManager {
         if (!activeSessions.isEmpty()) {
             return Result.fail("Stop active Halls sessions before resetting game resources.");
         }
-        File folder = getDataFolder();
         try {
-            deleteGameResourceFolder(new File(folder, "scenarios"));
-            deleteGameResourceFolder(new File(folder, "level"));
-            deleteGameResourceFolder(new File(folder, "level_type"));
-            deleteGameResourceFolder(new File(folder, "modifiers"));
-            deleteGameResourceFolder(new File(folder, "breakables"));
-            deleteGameResourceFolder(new File(folder, "breakable_loot_pools"));
-            deleteGameResourceFolder(new File(folder, "vegetation"));
-            deleteGameResourceFolder(new File(folder, "traps"));
-            deleteGameResourceFolder(new File(folder, "bosses"));
-            deleteGameResourceFolder(new File(folder, "monsters"));
-            deleteGameResourceFolder(new File(folder, "items"));
-            deleteGameResourceFolder(new File(folder, "buildings"));
-        } catch (IOException ex) {
-            return Result.fail("Failed to delete Halls game resources: " + ex.getMessage());
-        }
-        for (String resource : RESOURCE_FILES) {
-            copyResourceIfMissing(resource, new File(folder, resource.substring("hallsOfCarnage/".length())));
+            HallsResourceManager.reset(getDataFolder());
+        } catch (IOException | RuntimeException ex) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING, "Failed to reset Halls game resources.", ex);
+            return Result.fail("Failed to reset Halls game resources: " + ex.getMessage());
         }
         scenarios = HallsScenarioLoader.loadScenarios(plugin, getScenariosFolder());
         levelTypes = HallsLevelTypeLoader.loadLevelTypes(plugin, getLevelTypesFolder());
@@ -1464,31 +1208,10 @@ public final class HallsOfCarnageManager {
     }
 
     private void ensureDefaultFiles() {
-        File folder = getDataFolder();
-        if (!folder.exists()) {
-            folder.mkdirs();
-        }
-        copyResourceIfMissing(CONFIG_RESOURCE, new File(folder, CONFIG_RESOURCE));
-        for (String resource : RESOURCE_FILES) {
-            copyResourceIfMissing(resource, new File(folder, resource.substring("hallsOfCarnage/".length())));
-        }
-    }
-
-    private void copyResourceIfMissing(String resourcePath, File target) {
-        if (target.exists()) {
-            return;
-        }
-        File parent = target.getParentFile();
-        if (parent != null) {
-            parent.mkdirs();
-        }
-        try (InputStream input = plugin.getResource(resourcePath)) {
-            if (input == null) {
-                return;
-            }
-            Files.copy(input, target.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException ex) {
-            plugin.getLogger().warning("Failed to save Halls resource " + resourcePath + ": " + ex.getMessage());
+        try {
+            HallsResourceManager.copyMissing(getDataFolder());
+        } catch (IOException | RuntimeException ex) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING, "Failed to save bundled Halls resources.", ex);
         }
     }
 
@@ -1647,22 +1370,6 @@ public final class HallsOfCarnageManager {
 
     private File getScenariosFolder() {
         return new File(getDataFolder(), "scenarios");
-    }
-
-    private void deleteGameResourceFolder(File folder) throws IOException {
-        if (!folder.exists()) {
-            return;
-        }
-        Path root = getDataFolder().getCanonicalFile().toPath();
-        Path target = folder.getCanonicalFile().toPath();
-        if (!target.startsWith(root) || target.equals(root)) {
-            throw new IOException("Refusing to delete outside the Halls data folder.");
-        }
-        try (java.util.stream.Stream<Path> paths = Files.walk(target)) {
-            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
-                Files.deleteIfExists(path);
-            }
-        }
     }
 
     private File getLevelTypesFolder() {

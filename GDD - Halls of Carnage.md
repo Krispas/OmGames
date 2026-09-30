@@ -16,6 +16,8 @@ The difference from these games is simple, instead of normal play, there are sce
 
 Game should be developed dynamically, allowing for future content integration.
 
+Bundled game content under `resources/hallsOfCarnage/` is discovered recursively and copied into the server's Halls data folder only when missing, without a Java file whitelist. The editor tools `level-maker.jar`, `run.bat`, and `run.vbs` are excluded. Existing server content is preserved on startup; `/hoc reset confirm` deliberately restores game-content defaults while preserving lobby configuration and saved campaigns.
+
 Also instead of score, the game defines shame, which is accumulated through various means. The game records the shame and the shame leaderboards are then in the lobby, ascending.
 
 
