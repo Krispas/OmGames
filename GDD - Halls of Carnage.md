@@ -78,6 +78,8 @@ Rooms are 5 blocks tall, corridors 3 blocks tall.
 
 First rooms generate, then corridors, then traps, then decorative vegetation, then items and breakables.
 
+During normal elevator descent, exploration floor loading distributes trap placement and subsequent content rendering across main-thread ticks instead of spawning all floor content in one pass. Players in the session see a phase-labelled loading bar and percentage above the hotbar until the floor is ready; the elevator stays closed while generation is incomplete.
+
 There are three types of corridor generations which level types can pick from.
 #### Normal
 Straight corridors with 90 degree turns are created between the rooms, they are 1 block wide.

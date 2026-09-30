@@ -33,6 +33,7 @@ final class HallsSessionSculkRuntime {
     private final Map<UUID, Double> playerSculk = new HashMap<>();
     private final Predicate<UUID> canGainSculk;
     private BukkitTask tickTask;
+    private PatchPlacement pendingPlacement;
 
     HallsSessionSculkRuntime(JavaPlugin plugin,
                              World world,
@@ -52,39 +53,95 @@ final class HallsSessionSculkRuntime {
                                                      HallsScenario.FloorDefinition floor,
                                                      Random random,
                                                      Set<HallsExplorationGenerator.Cell> blockedCells) {
-        clearFloor();
-        if (plan == null || plan.walkableCells().isEmpty() || floor == null || floor.sculkPatches() <= 0) {
-            startTicking();
-            return Set.of();
+        PatchPlacement placement = beginPatches(plan, floor, random, blockedCells);
+        while (!placement.tick()) {
+            // Direct development rebuilds still finish synchronously.
         }
-        java.util.List<HallsExplorationGenerator.Cell> cells = plan.walkableCells().stream()
-                .filter(cell -> Math.abs(cell.x() - origin.x()) + Math.abs(cell.z() - origin.z()) > 12)
-                .toList();
-        if (cells.isEmpty()) {
-            startTicking();
-            return Set.of();
-        }
-        Set<HallsExplorationGenerator.Cell> validCells = new HashSet<>(plan.walkableCells());
-        if (blockedCells != null) {
-            validCells.removeAll(blockedCells);
-        }
-        cells = cells.stream()
-                .filter(validCells::contains)
-                .toList();
-        if (cells.isEmpty()) {
-            startTicking();
-            return Set.of();
-        }
-        for (int i = 0; i < floor.sculkPatches(); i++) {
-            HallsExplorationGenerator.Cell center = cells.get(random.nextInt(cells.size()));
-            int radius = 3 + random.nextInt(5);
-            carvePatch(center, radius, validCells, random);
-        }
-        startTicking();
         return Set.copyOf(patchCells);
     }
 
+    PatchPlacement beginPatches(HallsExplorationGenerator.Plan plan,
+                                HallsScenario.FloorDefinition floor,
+                                Random random,
+                                Set<HallsExplorationGenerator.Cell> blockedCells) {
+        clearFloor();
+        pendingPlacement = new PatchPlacement(plan, floor, random, blockedCells);
+        return pendingPlacement;
+    }
+
+    final class PatchPlacement {
+        private final Set<HallsExplorationGenerator.Cell> validCells;
+        private final List<HallsExplorationGenerator.Cell> candidates;
+        private final Random random;
+        private final int target;
+        private int placed;
+        private boolean complete;
+        private HallsExplorationGenerator.Cell center;
+        private int radius;
+        private int dx;
+        private int dz;
+        private double xStretch;
+        private double zStretch;
+
+        private PatchPlacement(HallsExplorationGenerator.Plan plan,
+                               HallsScenario.FloorDefinition floor,
+                               Random random,
+                               Set<HallsExplorationGenerator.Cell> blockedCells) {
+            this.random = random;
+            validCells = plan == null ? new HashSet<>() : new HashSet<>(plan.walkableCells());
+            if (blockedCells != null) {
+                validCells.removeAll(blockedCells);
+            }
+            candidates = validCells.stream()
+                    .filter(cell -> Math.abs(cell.x() - origin.x()) + Math.abs(cell.z() - origin.z()) > 12)
+                    .toList();
+            target = floor == null || candidates.isEmpty() ? 0 : Math.max(0, floor.sculkPatches());
+        }
+
+        boolean tick() {
+            if (complete || pendingPlacement != this) {
+                return true;
+            }
+            long deadline = System.nanoTime() + 4_000_000L;
+            for (int work = 0; work < 128 && placed < target; work++) {
+                if (center == null) {
+                    center = candidates.get(random.nextInt(candidates.size()));
+                    radius = 3 + random.nextInt(5);
+                    xStretch = 0.85 + random.nextDouble() * 0.45;
+                    zStretch = 0.85 + random.nextDouble() * 0.45;
+                    patches.add(new Patch(center.x() + 0.5, center.z() + 0.5, radius, xStretch, zStretch));
+                    dx = -radius;
+                    dz = -radius;
+                }
+                carvePatchCell(center, radius, dx, dz, xStretch, zStretch, validCells, random);
+                if (++dz > radius) {
+                    dz = -radius;
+                    if (++dx > radius) {
+                        center = null;
+                        placed++;
+                    }
+                }
+                if (System.nanoTime() >= deadline) {
+                    break;
+                }
+            }
+            if (placed >= target) {
+                complete = true;
+                pendingPlacement = null;
+                startTicking();
+            }
+            return complete;
+        }
+
+        double progress() {
+            int width = radius * 2 + 1;
+            double partial = center == null ? 0.0 : ((dx + radius) * width + dz + radius) / (double) (width * width);
+            return target == 0 ? 1.0 : (placed + partial) / target;
+        }
+    }
+
     void clearFloor() {
+        pendingPlacement = null;
         if (tickTask != null) {
             tickTask.cancel();
             tickTask = null;
@@ -147,41 +204,34 @@ final class HallsSessionSculkRuntime {
         return false;
     }
 
-    private void carvePatch(HallsExplorationGenerator.Cell center,
-                            int radius,
-                            Set<HallsExplorationGenerator.Cell> validCells,
-                            Random random) {
-        double radiusSquared = radius * radius;
-        double xStretch = 0.85 + random.nextDouble() * 0.45;
-        double zStretch = 0.85 + random.nextDouble() * 0.45;
-        patches.add(new Patch(center.x() + 0.5, center.z() + 0.5, radius, xStretch, zStretch));
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
-                double shaped = (dx * dx) / xStretch + (dz * dz) / zStretch;
-                if (shaped > radiusSquared || random.nextDouble() > 0.86) {
-                    continue;
-                }
-                int x = center.x() + dx;
-                int z = center.z() + dz;
-                HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(x, z);
-                if (!validCells.contains(cell)) {
-                    continue;
-                }
-                patchCells.add(cell);
-                if (random.nextDouble() < 0.80) {
-                    int floorY = sculkFloorY(x, z);
-                    blockSetter.setBlock(x, floorY, z, Material.SCULK, null);
-                }
-                maybePlaceVein(x, origin.y(), z, BlockFace.DOWN, random);
-                for (int y = origin.y(); y <= origin.y() + ROOM_HEIGHT; y++) {
-                    maybePlaceVein(x, y, z, BlockFace.EAST, random);
-                    maybePlaceVein(x, y, z, BlockFace.WEST, random);
-                    maybePlaceVein(x, y, z, BlockFace.SOUTH, random);
-                    maybePlaceVein(x, y, z, BlockFace.NORTH, random);
-                }
-                maybePlaceVein(x, origin.y() + ROOM_HEIGHT - 1, z, BlockFace.UP, random);
-            }
+    private void carvePatchCell(HallsExplorationGenerator.Cell center,
+                                int radius, int dx, int dz,
+                                double xStretch, double zStretch,
+                                Set<HallsExplorationGenerator.Cell> validCells,
+                                Random random) {
+        double shaped = (dx * dx) / xStretch + (dz * dz) / zStretch;
+        if (shaped > radius * radius || random.nextDouble() > 0.86) {
+            return;
         }
+        int x = center.x() + dx;
+        int z = center.z() + dz;
+        HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(x, z);
+        if (!validCells.contains(cell)) {
+            return;
+        }
+        patchCells.add(cell);
+        if (random.nextDouble() < 0.80) {
+            int floorY = sculkFloorY(x, z);
+            blockSetter.setBlock(x, floorY, z, Material.SCULK, null);
+        }
+        maybePlaceVein(x, origin.y(), z, BlockFace.DOWN, random);
+        for (int y = origin.y(); y <= origin.y() + ROOM_HEIGHT; y++) {
+            maybePlaceVein(x, y, z, BlockFace.EAST, random);
+            maybePlaceVein(x, y, z, BlockFace.WEST, random);
+            maybePlaceVein(x, y, z, BlockFace.SOUTH, random);
+            maybePlaceVein(x, y, z, BlockFace.NORTH, random);
+        }
+        maybePlaceVein(x, origin.y() + ROOM_HEIGHT - 1, z, BlockFace.UP, random);
     }
 
     private void maybePlaceVein(int x, int y, int z, BlockFace face, Random random) {

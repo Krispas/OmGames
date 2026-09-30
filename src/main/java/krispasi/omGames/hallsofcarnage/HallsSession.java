@@ -69,8 +69,6 @@ public final class HallsSession {
     private static final int ELEVATOR_OUTER_RADIUS = 3;
     private static final BlockFace ELEVATOR_FRONT_FACE = BlockFace.NORTH;
     private static final int CAMP_ELEVATOR_CORRIDOR_LENGTH = 5;
-    private static final int CLEAR_COLUMNS_PER_TICK = 3;
-    private static final int CORRIDOR_CELLS_PER_TICK = 96;
     private static final int MIN_ELEVATOR_TRANSITION_TICKS = 100;
     private static final int DISPLAY_INTERPOLATION_DELAY_TICKS = 1;
     private static final int DISPLAY_TELEPORT_DURATION_TICKS = 2;
@@ -147,6 +145,7 @@ public final class HallsSession {
     private BukkitTask physicsDropTask;
     private BukkitTask researchCrateTask;
     private BukkitTask floorBuildTask;
+    private final HallsSessionFloorBuildJob.LoadingProgress floorBuildProgress;
     private BukkitTask gameOverTask;
     private long startedAtMillis;
     private int currentFloor = 1;
@@ -228,15 +227,17 @@ public final class HallsSession {
         this.initialSave = initialSave;
         this.completionHandler = completionHandler;
         this.participants = new HashSet<>();
+        this.floorBuildProgress = new HallsSessionFloorBuildJob.LoadingProgress(world, participants);
         for (Player player : players) {
             participants.add(player.getUniqueId());
         }
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
-                this::isAliveParticipant);
+                playerId -> !transitioning && isAliveParticipant(playerId));
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
                 this::maxAliveSculkPercent, this::isAliveParticipant,
                 location -> dropSessionItem(location, coinItem(1)), this::debug);
-        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::isAliveParticipant,
+        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants,
+                playerId -> !transitioning && isAliveParticipant(playerId),
                 this::setBlock, this.trapTypes,
                 () -> activeFloorModifiers.trapDamageMultiplier(),
                 location -> dropSessionItem(location, coinItem(1)), monsterRuntime::spawnConfiguredMonster,
@@ -2099,7 +2100,9 @@ public final class HallsSession {
         }
         int oldClearRadius = activeClearRadius;
         activeClearRadius = clearRadiusFor(scenario.floor(floor));
-        FloorBuildJob job = new FloorBuildJob(floor, Math.max(oldClearRadius, activeClearRadius));
+        HallsSessionFloorBuildJob job = new HallsSessionFloorBuildJob(this, floor,
+                Math.max(oldClearRadius, activeClearRadius), origin.x());
+        updateFloorBuildProgress(0.0, "Planning");
         floorBuildTask = Bukkit.getScheduler().runTaskTimer(plugin, job::tick, 1L, 1L);
     }
 
@@ -2373,7 +2376,7 @@ public final class HallsSession {
         debugGeneration("contents", started, "breakables " + (new HashSet<>(breakableProps.values()).size() - before));
     }
 
-    private Set<HallsExplorationGenerator.Cell> placeResearchCrate(ExplorationBuild build,
+    Set<HallsExplorationGenerator.Cell> placeResearchCrate(ExplorationBuild build,
                                                                    Set<HallsExplorationGenerator.Cell> reservedCells) {
         if (build == null || build.plan().rooms().isEmpty() || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())) {
             return Set.of();
@@ -2516,7 +2519,15 @@ public final class HallsSession {
 
     private Set<HallsExplorationGenerator.Cell> placeBlueprintDistilleries(ExplorationBuild build,
                                                                            Set<HallsExplorationGenerator.Cell> reservedCells) {
-        removeBlueprintDistilleries();
+        return placeFloorDistilleryRoom(build, reservedCells, null);
+    }
+
+    Set<HallsExplorationGenerator.Cell> placeFloorDistilleryRoom(ExplorationBuild build,
+                                                                Set<HallsExplorationGenerator.Cell> reservedCells,
+                                                                HallsExplorationGenerator.Room onlyRoom) {
+        if (onlyRoom == null) {
+            removeBlueprintDistilleries();
+        }
         if (build == null || build.plan().rooms().size() <= 1
                 || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())
                 || build.floorDefinition().blueprintDistilleries() <= 0) {
@@ -2527,6 +2538,9 @@ public final class HallsSession {
         Set<HallsExplorationGenerator.Cell> occupied = reservedCells == null ? Set.of() : reservedCells;
         List<HallsExplorationGenerator.Room> rooms = new ArrayList<>(build.plan().rooms());
         rooms.removeFirst();
+        if (onlyRoom != null) {
+            rooms = new ArrayList<>(List.of(onlyRoom));
+        }
         java.util.Collections.shuffle(rooms, build.random());
         int placed = 0;
         for (HallsExplorationGenerator.Room room : rooms) {
@@ -2555,7 +2569,7 @@ public final class HallsSession {
                 break;
             }
         }
-        if (placed < targetCount) {
+        if (onlyRoom == null && placed < targetCount) {
             debug("Placed " + placed + "/" + targetCount
                     + " blueprint distilleries on floor " + build.floor() + ".");
         }
@@ -2684,13 +2698,26 @@ public final class HallsSession {
 
     private Set<HallsExplorationGenerator.Cell> placeLibraryVents(ExplorationBuild build,
                                                                   Set<HallsExplorationGenerator.Cell> reservedCells) {
-        removeLibraryVents();
+        return placeFloorLibraryVent(build, reservedCells, -1);
+    }
+
+    Set<HallsExplorationGenerator.Cell> placeFloorLibraryVent(ExplorationBuild build,
+                                                             Set<HallsExplorationGenerator.Cell> reservedCells,
+                                                             int onlyRoomIndex) {
+        if (onlyRoomIndex < 0) {
+            removeLibraryVents();
+        }
         if (build == null || build.plan().rooms().size() <= 1
                 || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())
                 || !"library".equalsIgnoreCase(build.levelType().id())) {
             return Set.of();
         }
         Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
+        if (onlyRoomIndex >= 0) {
+            for (LibraryVent vent : libraryVents.values()) {
+                reserved.add(new HallsExplorationGenerator.Cell(vent.x(), vent.z()));
+            }
+        }
         List<Integer> ventOnlyRooms = new ArrayList<>();
         for (int roomIndex = 0; roomIndex < build.plan().rooms().size(); roomIndex++) {
             if (build.plan().rooms().get(roomIndex).ventOnly()) {
@@ -2703,8 +2730,20 @@ public final class HallsSession {
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         java.util.Collections.shuffle(connectedCandidates, build.random());
         Map<Integer, Integer> ventsByRoom = new HashMap<>();
+        if (onlyRoomIndex >= 0) {
+            for (int i = 0; i < build.plan().rooms().size(); i++) {
+                HallsExplorationGenerator.Room room = build.plan().rooms().get(i);
+                int count = (int) reserved.stream().filter(cell -> cell.x() >= room.startX()
+                        && cell.x() < room.startX() + room.layout().width()
+                        && cell.z() >= room.startZ() && cell.z() < room.startZ() + room.layout().depth()).count();
+                if (count > 0) ventsByRoom.put(i, count);
+            }
+        }
         int pairs = 0;
         for (int roomIndex : ventOnlyRooms) {
+            if (onlyRoomIndex >= 0 && roomIndex != onlyRoomIndex) {
+                continue;
+            }
             LibraryVentCandidate first = firstLibraryVentCandidateForRoom(build, roomIndex, reservedCells, reserved, true);
             if (first == null) {
                 first = firstLibraryVentCandidateForRoom(build, roomIndex, null, reserved, false);
@@ -2731,7 +2770,7 @@ public final class HallsSession {
             ventsByRoom.merge(second.roomIndex(), 1, Integer::sum);
             pairs++;
         }
-        if (pairs < ventOnlyRooms.size()) {
+        if (onlyRoomIndex < 0 && pairs < ventOnlyRooms.size()) {
             debug("Placed " + pairs + "/" + ventOnlyRooms.size() + " library vent pairs on floor " + build.floor() + ".");
         }
         return Set.copyOf(reserved);
@@ -3184,7 +3223,7 @@ public final class HallsSession {
         return Set.copyOf(liquidCells);
     }
 
-    private Set<HallsExplorationGenerator.Cell> roomLiquidCells(ExplorationBuild build,
+    Set<HallsExplorationGenerator.Cell> roomLiquidCells(ExplorationBuild build,
                                                                 HallsExplorationGenerator.Room room,
                                                                 Set<HallsExplorationGenerator.Cell> reservedCells) {
         List<HallsExplorationGenerator.Cell> candidates = roomLiquidCandidateCells(room).stream()
@@ -3271,7 +3310,7 @@ public final class HallsSession {
         return cells;
     }
 
-    private void renderLiquidCell(HallsExplorationGenerator.Cell cell,
+    void renderLiquidCell(HallsExplorationGenerator.Cell cell,
                                   HallsLevelType levelType,
                                   Set<HallsExplorationGenerator.Cell> liquidCells) {
         Material liquid = levelType.liquid().material();
@@ -3292,12 +3331,12 @@ public final class HallsSession {
         }
     }
 
-    private void placeVegetationInCells(ExplorationBuild build,
+    void placeVegetationInCells(ExplorationBuild build,
                                         List<HallsExplorationGenerator.Cell> cells,
                                         Set<HallsExplorationGenerator.Cell> reservedCells,
                                         Set<HallsExplorationGenerator.Cell> occupied,
                                         double chanceMultiplier) {
-        if (cells.isEmpty()) {
+        if (cells.isEmpty() || vegetationTypes.isEmpty() || build.levelType().vegetation().isEmpty()) {
             return;
         }
         java.util.Collections.shuffle(cells, build.random());
@@ -3328,7 +3367,7 @@ public final class HallsSession {
         return cells;
     }
 
-    private List<HallsExplorationGenerator.Cell> vegetationCorridorCells(ExplorationBuild build) {
+    List<HallsExplorationGenerator.Cell> vegetationCorridorCells(ExplorationBuild build) {
         return build.plan().corridorCells().stream()
                 .filter(cell -> Math.abs(cell.x() - origin.x()) + Math.abs(cell.z() - origin.z()) > 12)
                 .filter(cell -> !isInsideGeneratedRoomShell(cell, build.plan().rooms()))
@@ -3350,7 +3389,7 @@ public final class HallsSession {
         return Set.copyOf(result);
     }
 
-    private int rareBreakableRoomIndex(HallsExplorationGenerator.Plan plan,
+    int rareBreakableRoomIndex(HallsExplorationGenerator.Plan plan,
                                        Set<HallsExplorationGenerator.Cell> reservedCells,
                                        Random random) {
         List<Integer> candidates = new ArrayList<>();
@@ -3584,7 +3623,7 @@ public final class HallsSession {
         clearBuildVolumeColumns(origin.x() - activeClearRadius, origin.x() + activeClearRadius, activeClearRadius);
     }
 
-    private void clearBuildVolumeColumns(int minX, int maxX, int radius) {
+    void clearBuildVolumeColumns(int minX, int maxX, int radius) {
         for (int x = minX; x <= maxX; x++) {
             for (int y = origin.y() - 16; y <= origin.y() + CLEAR_HEIGHT; y++) {
                 for (int z = origin.z() - radius; z <= origin.z() + radius; z++) {
@@ -4123,7 +4162,7 @@ public final class HallsSession {
         }
     }
 
-    private void placeGeneratedRoomContents(HallsExplorationGenerator.Room room,
+    void placeGeneratedRoomContents(HallsExplorationGenerator.Room room,
                                             Random random,
                                             int floor,
                                             int roomIndex,
@@ -4339,9 +4378,12 @@ public final class HallsSession {
         if (!running) {
             return;
         }
-        tickDeathFog();
-        tickBlueprintDistilleryBeams();
-        tickLibraryVentSmoke();
+        if (!transitioning) {
+            tickDeathFog();
+            tickBlueprintDistilleryBeams();
+            tickLibraryVentSmoke();
+        }
+        floorBuildProgress.send();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
@@ -4354,6 +4396,10 @@ public final class HallsSession {
                 sidebar.restore(playerId);
             }
         }
+    }
+
+    void updateFloorBuildProgress(double progress, String phase) {
+        floorBuildProgress.update(progress, phase);
     }
 
     private SidebarState sidebarState(Player player) {
@@ -6865,11 +6911,12 @@ public final class HallsSession {
         }
     }
 
-    private void cancelFloorBuildTask() {
+    void cancelFloorBuildTask() {
         if (floorBuildTask != null) {
             floorBuildTask.cancel();
             floorBuildTask = null;
         }
+        floorBuildProgress.clear();
     }
 
     private void tickPhysicsDrops() {
@@ -7248,140 +7295,74 @@ public final class HallsSession {
         return Material.IRON_BARS;
     }
 
-    private final class FloorBuildJob {
-        private final int floor;
-        private int clearRadius;
-        private int clearX;
-        private int stage;
-        private int roomIndex;
-        private int corridorIndex;
-        private int contentRoomIndex;
-        private int rareBreakableRoomIndex = -1;
-        private int ticksElapsed;
-        private ExplorationBuild build;
-        private List<HallsExplorationGenerator.Cell> corridorShellCells = List.of();
-        private Set<HallsExplorationGenerator.Cell> reservedCells = Set.of();
-        private long contentStartedNanos;
-        private int contentBreakablesBefore;
+    ExplorationBuild beginFloorBuild(int floor) {
+        captureElevatorChestContents();
+        removeSessionEntities();
+        ExplorationBuild build = planExplorationBuild(floor);
+        currentFloor = floor;
+        researchCrateDepositedThisFloor = false;
+        return build;
+    }
 
-        private FloorBuildJob(int floor, int clearRadius) {
-            this.floor = floor;
-            this.clearRadius = clearRadius;
-        }
+    boolean floorBuildRunning() {
+        return running;
+    }
 
-        private void tick() {
-            if (!running) {
-                cancelFloorBuildTask();
-                return;
-            }
-            ticksElapsed++;
-            switch (stage) {
-                case 0 -> plan();
-                case 1 -> clearNextColumns();
-                case 2 -> buildElevatorPass();
-                case 3 -> buildNextRoom();
-                case 4 -> buildNextCorridorCells();
-                case 5 -> buildTraps();
-                case 6 -> buildNextRoomContents();
-                default -> finish();
-            }
-        }
+    int floorBuildClearRadius() {
+        return activeClearRadius;
+    }
 
-        private void plan() {
-            captureElevatorChestContents();
-            removeSessionEntities();
-            build = planExplorationBuild(floor);
-            clearRadius = Math.max(clearRadius, activeClearRadius);
-            clearX = origin.x() - clearRadius;
-            currentFloor = floor;
-            researchCrateDepositedThisFloor = false;
-            stage = 1;
-        }
+    void buildFloorElevator() {
+        buildElevator();
+        ensureElevatorWaypoint();
+        closeElevatorDoors();
+    }
 
-        private void clearNextColumns() {
-            int maxX = origin.x() + clearRadius;
-            int endX = Math.min(maxX, clearX + CLEAR_COLUMNS_PER_TICK - 1);
-            clearBuildVolumeColumns(clearX, endX, clearRadius);
-            clearX = endX + 1;
-            if (clearX > maxX) {
-                stage = 2;
-            }
-        }
+    void buildFloorRoom(ExplorationBuild build, HallsExplorationGenerator.Room room) {
+        buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(),
+                room.openings(), build.levelType(), build.random());
+    }
 
-        private void buildElevatorPass() {
-            buildElevator();
-            ensureElevatorWaypoint();
-            closeElevatorDoors();
-            stage = 3;
-        }
+    void buildFloorCorridor(ExplorationBuild build, HallsExplorationGenerator.Cell cell) {
+        buildGeneratedCorridorCell(build.plan(), build.levelType(), cell);
+    }
 
-        private void buildNextRoom() {
-            if (build.plan().rooms().isEmpty() || roomIndex >= build.plan().rooms().size()) {
-                corridorShellCells = new ArrayList<>(build.plan().corridorShellCells());
-                stage = 4;
-                return;
-            }
-            HallsExplorationGenerator.Room room = build.plan().rooms().get(roomIndex++);
-            buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(),
-                    room.openings(), build.levelType(), build.random());
-        }
+    HallsSessionTrapRuntime.GeneratedTrapPlacement beginFloorTraps(ExplorationBuild build) {
+        HallsSessionTrapRuntime.GeneratedTrapPlacement placement = trapRuntime.beginGeneratedTraps(
+                build.plan(), build.random(), build.floorDefinition(),
+                build.levelType(), activeFloorModifiers, Set.of());
+        trapRuntime.pause();
+        return placement;
+    }
 
-        private void buildNextCorridorCells() {
-            if (corridorIndex >= corridorShellCells.size()) {
-                stage = 5;
-                return;
-            }
-            int end = Math.min(corridorShellCells.size(), corridorIndex + CORRIDOR_CELLS_PER_TICK);
-            while (corridorIndex < end) {
-                buildGeneratedCorridorCell(build.plan(), build.levelType(), corridorShellCells.get(corridorIndex++));
-            }
-        }
+    HallsSessionSculkRuntime.PatchPlacement beginFloorSculk(ExplorationBuild build,
+                                                         Set<HallsExplorationGenerator.Cell> reserved) {
+        return sculkRuntime.beginPatches(build.plan(), build.floorDefinition(), build.random(), reserved);
+    }
 
-        private void buildTraps() {
-            reservedCells = renderExplorationTraps(build, Set.of());
-            activeLiquidCells = renderExplorationLiquids(build, reservedCells);
-            Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
-            Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
-            renderExplorationSculk(build, reservedCells);
-            reservedCells = withReserved(reservedCells, vegetationCells);
-            reservedCells = withReserved(reservedCells, placeResearchCrate(build, reservedCells));
-            reservedCells = withReserved(reservedCells, placeBlueprintDistilleries(build, reservedCells));
-            reservedCells = withReserved(reservedCells, placeLibraryVents(build, reservedCells));
-            rareBreakableRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
-            contentStartedNanos = System.nanoTime();
-            contentBreakablesBefore = new HashSet<>(breakableProps.values()).size();
-            stage = 6;
-        }
+    void setFloorLiquids(Set<HallsExplorationGenerator.Cell> cells) {
+        activeLiquidCells = Set.copyOf(cells);
+    }
 
-        private void buildNextRoomContents() {
-            if (contentRoomIndex >= build.plan().rooms().size()) {
-                debugGeneration("contents", contentStartedNanos,
-                        "breakables " + (new HashSet<>(breakableProps.values()).size() - contentBreakablesBefore));
-                startExplorationMonsters(build);
-                stage = 7;
-                return;
-            }
-            placeGeneratedRoomContents(build.plan().rooms().get(contentRoomIndex), build.random(), build.floor(),
-                    contentRoomIndex, build.floorDefinition(), build.levelType(), reservedCells,
-                    contentRoomIndex == rareBreakableRoomIndex);
-            contentRoomIndex++;
-        }
+    List<HallsExplorationGenerator.Cell> floorRoomVegetationCells(HallsExplorationGenerator.Room room) {
+        return openInteriorCells(room).stream()
+                .map(cell -> new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+    }
 
-        private void finish() {
-            if (ticksElapsed < MIN_ELEVATOR_TRANSITION_TICKS) {
-                return;
-            }
-            restoreElevatorChestContents();
-            closeElevatorDoors();
-            floorStartedAtMillis = System.currentTimeMillis();
-            teleportParticipantsToElevator("Floor " + floor, explorationFloorSubtitle(build.levelType()));
-            applyCompassModifier();
-            openElevatorDoors();
-            transitioning = false;
-            world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
-                    Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.8f);
-            cancelFloorBuildTask();
-        }
+    void finishFloorBuild(ExplorationBuild build) {
+        restoreElevatorChestContents();
+        closeElevatorDoors();
+        floorStartedAtMillis = System.currentTimeMillis();
+        teleportParticipantsToElevator("Floor " + build.floor(), explorationFloorSubtitle(build.levelType()));
+        applyCompassModifier();
+        openElevatorDoors();
+        transitioning = false;
+        trapRuntime.resume();
+        startExplorationMonsters(build);
+        world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.8f);
+        cancelFloorBuildTask();
     }
 
     private record RoomBounds(int minX, int maxX, int minZ, int maxZ) {
@@ -7406,7 +7387,7 @@ public final class HallsSession {
     private record BlockSnapshot(int x, int y, int z, BlockData blockData) {
     }
 
-    private record ExplorationBuild(int floor,
+    record ExplorationBuild(int floor,
                                     HallsScenario.FloorDefinition floorDefinition,
                                     HallsLevelType levelType,
                                     Random random,

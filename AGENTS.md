@@ -1237,6 +1237,8 @@ Behavior notes:
   - Owns `/hoc`, Halls config/resource loading, lobby menu interaction handling, scenario discovery, and Halls shame persistence.
   - Keep Halls logic isolated from BedWars, Egg Hunt, Chess, Bank, and Random classes.
 - `HallsSession` owns active session state; `HallsSessionTrapRuntime` is its session-owned trap placement/ticking helper.
+- `HallsSessionFloorBuildJob` owns incremental exploration rebuild cursors; keep it session-owned and do not move build scheduling back into a large nested `HallsSession` class.
+- `HallsGeneratedTrapPlacement` owns resumable generated-trap candidate preparation and placement through `HallsSessionTrapRuntime`; trap runtime activation must wait until floor loading finishes.
 - `HallsSessionMonsterRuntime` is the session-owned first-pass monster flood helper; keep monster spawning/alert cleanup routed through `HallsSession`.
 - `HallsModifierTypeLoader` loads configurable exploration modifiers; `HallsFloorModifiers` owns the active floor's stacked modifier effects.
 - `HallsResourceManager` discovers bundled Halls content recursively and owns missing-file copying and resource reset I/O; do not add per-file content whitelists.
@@ -1330,7 +1332,7 @@ SQLite tables:
 - Generated corridors use ceiling-embedded light blocks so the walkable corridor remains 3 blocks tall, and the elevator has a ceiling light.
 - The elevator exterior vestibule is generated as a sealed mini-tunnel outside the door; opening the door clears only the passage while preserving the vestibule floor, side walls, and ceiling.
 - Halls elevators spawn a hidden waypoint-transmitting marker entity at the elevator spawn so participants see the elevator on the vanilla locator bar; keep this separate from the Compass modifier's item/HUD/trail behavior.
-- Elevator transitions rebuild exploration floors through a staged session-local main-thread build job: plan, clear old columns, elevator shell, room batches, corridor batches, traps, content batches, chest restore, and door opening.
+- Elevator transitions rebuild exploration floors through a staged session-local main-thread build job: plan, clear old columns, elevator shell, room batches, corridor batches, incremental traps, liquid planning/rendering, vegetation, sculk, fixtures, content batches, chest restore, and door opening. Trap/content work must remain spread across ticks rather than restoring a single bulk post-corridor pass. Session participants receive a phase-labelled percentage loading bar above the hotbar during the rebuild; loading state is cleared on cancellation/arrival.
 - Staged Halls floor clears must not clear the protected elevator footprint while players are inside it.
 - Active Halls participants should have their respawn location set to the session elevator; normal session exit should restore their respawn location to the configured Halls lobby spawn.
 - Elevator floor arrival heals living players for `6` health and revives ghost players with `10` health.

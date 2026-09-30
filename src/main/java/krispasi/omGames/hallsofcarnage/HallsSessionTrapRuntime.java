@@ -75,6 +75,8 @@ final class HallsSessionTrapRuntime {
     private Set<HallsExplorationGenerator.Cell> floorWalkableCells = Set.of();
     private BukkitTask trapTask;
     private long trapRuntimeTick;
+    private GeneratedTrapPlacement generatedTrapPlacement;
+    private boolean paused;
 
     HallsSessionTrapRuntime(JavaPlugin plugin,
                             World world,
@@ -101,6 +103,11 @@ final class HallsSessionTrapRuntime {
     }
 
     void clear() {
+        paused = false;
+        if (generatedTrapPlacement != null) {
+            generatedTrapPlacement.cancel();
+            generatedTrapPlacement = null;
+        }
         for (HallsTrap trap : List.copyOf(traps)) {
             for (UUID displayId : trap.displayIds()) {
                 Entity display = Bukkit.getEntity(displayId);
@@ -116,6 +123,7 @@ final class HallsSessionTrapRuntime {
             }
         }
         traps.clear();
+        trapHitPoints.clear();
         trapNextTriggerTicks.clear();
         homingMineDetonateTicks.clear();
         transientTrapDisplays.clear();
@@ -129,8 +137,19 @@ final class HallsSessionTrapRuntime {
         return traps.size();
     }
 
+    void pause() {
+        paused = true;
+        stopTrapTask();
+    }
+
+    void resume() {
+        paused = false;
+        startTrapTask();
+    }
+
     boolean handlePlayerMove(Player player, boolean running) {
-        if (player == null || !running || !participants.contains(player.getUniqueId()) || !player.getWorld().equals(world)) {
+        if (paused || generatedTrapPlacement != null || player == null || !running
+                || !participants.contains(player.getUniqueId()) || !player.getWorld().equals(world)) {
             return false;
         }
         if (!isAliveParticipant(player)) {
@@ -152,7 +171,7 @@ final class HallsSessionTrapRuntime {
     }
 
     boolean handleTrapInteract(Player player, Entity entity) {
-        if (player == null || entity == null) {
+        if (paused || generatedTrapPlacement != null || player == null || entity == null) {
             return false;
         }
         for (HallsTrap trap : List.copyOf(traps)) {
@@ -169,7 +188,7 @@ final class HallsSessionTrapRuntime {
     }
 
     boolean handleTrapAttack(Player player, Entity entity) {
-        if (player == null || entity == null) {
+        if (paused || generatedTrapPlacement != null || player == null || entity == null) {
             return false;
         }
         for (HallsTrap trap : List.copyOf(traps)) {
@@ -223,7 +242,8 @@ final class HallsSessionTrapRuntime {
     }
 
     boolean placeBossTrap(Location location, String trapId) {
-        if (location == null || !world.equals(location.getWorld()) || hasBossTrapAt(location)) {
+        if (paused || generatedTrapPlacement != null || location == null
+                || !world.equals(location.getWorld()) || hasBossTrapAt(location)) {
             return false;
         }
         HallsTrapType type = trapTypes.get(normalizeId(trapId));
@@ -270,89 +290,61 @@ final class HallsSessionTrapRuntime {
                                                             HallsLevelType levelType,
                                                             HallsFloorModifiers modifiers,
                                                             Set<HallsExplorationGenerator.Cell> liquidCells) {
+        GeneratedTrapPlacement placement = beginGeneratedTraps(plan, random, floorDefinition, levelType, modifiers, liquidCells);
+        while (!placement.tick()) {
+            // Direct debug rebuilds intentionally run the same job synchronously.
+        }
+        return placement.occupiedCells();
+    }
+
+    GeneratedTrapPlacement beginGeneratedTraps(HallsExplorationGenerator.Plan plan,
+                                               Random random,
+                                               HallsScenario.FloorDefinition floorDefinition,
+                                               HallsLevelType levelType,
+                                               HallsFloorModifiers modifiers,
+                                               Set<HallsExplorationGenerator.Cell> liquidCells) {
         clear();
         floorWalkableCells = new HashSet<>(plan.walkableCells());
-        Set<HallsExplorationGenerator.Cell> liquidTrapCells = liquidCells == null ? Set.of() : Set.copyOf(liquidCells);
-        List<TrapCandidate> candidates = trapCandidates(plan);
-        List<TrapCandidate> holeCandidates = holeCandidates(plan);
-        if (candidates.isEmpty() && holeCandidates.isEmpty()) {
-            return Set.of();
-        }
-        int targetHoles = Math.min(holeCandidates.size(), Math.max(0, floorDefinition.holes()));
-        int targetTrappedRooms = Math.max(0, floorDefinition.trappedRooms());
-        int minTrapsPerRoom = Math.max(0, floorDefinition.minTrapsPerRoom());
-        int maxTrapsPerRoom = Math.max(minTrapsPerRoom, floorDefinition.maxTrapsPerRoom());
-        List<HallsTrapType> pool = trapPool(levelType.id());
-        HallsTrapType holeType = trapTypes.values().stream()
-                .filter(type -> type.kind().equals("hole") && type.weight() > 0 && type.allowedForLevelType(levelType.id()))
-                .findFirst()
-                .orElse(null);
-        if ((pool.isEmpty() || targetTrappedRooms <= 0 || maxTrapsPerRoom <= 0) && (holeType == null || targetHoles <= 0)) {
-            return Set.of();
-        }
-        boolean globalReachabilityChecks = globalReachabilityChecks(levelType);
-        Collections.shuffle(holeCandidates, random);
-        Set<HallsExplorationGenerator.Cell> occupied = new HashSet<>();
-        int holesPlaced = 0;
-        for (TrapCandidate candidate : holeCandidates) {
-            HallsExplorationGenerator.Cell cell = candidate.cell();
-            if (holesPlaced >= targetHoles) {
-                break;
-            }
-            if (holeType == null) {
-                continue;
-            }
-            if (liquidTrapCells.contains(candidate.cell())) {
-                continue;
-            }
-            if (placeHole(candidate, plan, random, holeType, occupied, globalReachabilityChecks, modifiers, liquidTrapCells)) {
-                holesPlaced++;
-            }
-        }
-        Map<HallsExplorationGenerator.Room, List<TrapCandidate>> candidatesByRoom = candidatesByRoom(candidates);
-        List<HallsExplorationGenerator.Room> trappedRooms = new ArrayList<>(candidatesByRoom.keySet());
-        Collections.shuffle(trappedRooms, random);
-        int roomsPlaced = 0;
-        for (HallsExplorationGenerator.Room room : trappedRooms) {
-            if (roomsPlaced >= targetTrappedRooms || pool.isEmpty()) {
-                break;
-            }
-            List<TrapCandidate> roomCandidates = new ArrayList<>(candidatesByRoom.getOrDefault(room, List.of()));
-            Collections.shuffle(roomCandidates, random);
-            HallsTrapType roomType = weightedTrap(pool, random, modifiers);
-            if (trapKind(roomType.kind()) == TrapKind.SWINGING_BLADE) {
-                roomCandidates.sort((first, second) -> Integer.compare(bestSwingLaneHalfSpan(second), bestSwingLaneHalfSpan(first)));
-            }
-            int targetRoomTraps = minTrapsPerRoom == maxTrapsPerRoom
-                    ? minTrapsPerRoom
-                    : minTrapsPerRoom + random.nextInt(maxTrapsPerRoom - minTrapsPerRoom + 1);
-            int placedInRoom = 0;
-            for (TrapCandidate candidate : roomCandidates) {
-                if (placedInRoom >= targetRoomTraps) {
-                    break;
-                }
-                HallsTrapType type = random.nextInt(100) < 10 ? weightedTrap(pool, random, modifiers) : roomType;
-                if (tryPlaceTrap(candidate, plan, random, type, occupied, globalReachabilityChecks, liquidTrapCells)) {
-                    placedInRoom++;
-                }
-            }
-            if (placedInRoom > 0) {
-                roomsPlaced++;
-            }
-        }
-        startTrapTask();
-        return Set.copyOf(occupied);
+        generatedTrapPlacement = new GeneratedTrapPlacement(plan, random, floorDefinition, levelType, modifiers, liquidCells);
+        return generatedTrapPlacement;
     }
 
-    private Map<HallsExplorationGenerator.Room, List<TrapCandidate>> candidatesByRoom(List<TrapCandidate> candidates) {
-        Map<HallsExplorationGenerator.Room, List<TrapCandidate>> byRoom = new IdentityHashMap<>();
-        for (TrapCandidate candidate : candidates) {
-            byRoom.computeIfAbsent(candidate.room(), ignored -> new ArrayList<>()).add(candidate);
+    final class GeneratedTrapPlacement {
+        private final HallsGeneratedTrapPlacement placement;
+
+        private GeneratedTrapPlacement(HallsExplorationGenerator.Plan plan, Random random,
+                                       HallsScenario.FloorDefinition floorDefinition, HallsLevelType levelType,
+                                       HallsFloorModifiers modifiers, Set<HallsExplorationGenerator.Cell> liquidCells) {
+            placement = new HallsGeneratedTrapPlacement(HallsSessionTrapRuntime.this, trapTypes,
+                    plan, random, floorDefinition, levelType, modifiers, liquidCells);
         }
-        return byRoom;
+
+        boolean tick() {
+            if (generatedTrapPlacement != this) {
+                return true;
+            }
+            if (placement.tick()) {
+                generatedTrapPlacement = null;
+                startTrapTask();
+                return true;
+            }
+            return false;
+        }
+
+        double progress() {
+            return placement.progress();
+        }
+
+        Set<HallsExplorationGenerator.Cell> occupiedCells() {
+            return placement.occupiedCells();
+        }
+
+        private void cancel() {
+            placement.cancel();
+        }
     }
 
-    private boolean tryPlaceTrap(TrapCandidate candidate,
+    boolean tryPlaceTrap(TrapCandidate candidate,
                                  HallsExplorationGenerator.Plan plan,
                                  Random random,
                                  HallsTrapType type,
@@ -404,7 +396,7 @@ final class HallsSessionTrapRuntime {
         return true;
     }
 
-    private boolean placeHole(TrapCandidate candidate,
+    boolean placeHole(TrapCandidate candidate,
                               HallsExplorationGenerator.Plan plan,
                               Random random,
                               HallsTrapType type,
@@ -443,57 +435,13 @@ final class HallsSessionTrapRuntime {
         return false;
     }
 
-    private boolean globalReachabilityChecks(HallsLevelType levelType) {
+    boolean globalReachabilityChecks(HallsLevelType levelType) {
         if (levelType == null || levelType.corridorGeneration() == null) {
             return true;
         }
         String mode = levelType.corridorGeneration().trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_');
         return !mode.equals("maze") && !mode.equals("backrooms")
                 && !mode.equals("open_halls") && !mode.equals("open_hall");
-    }
-
-    private List<TrapCandidate> trapCandidates(HallsExplorationGenerator.Plan plan) {
-        Set<HallsExplorationGenerator.Cell> walkable = plan.walkableCells();
-        List<TrapCandidate> candidates = new ArrayList<>();
-        for (HallsExplorationGenerator.Room room : plan.rooms()) {
-            Set<HallsExplorationGenerator.Cell> candidateCells = Set.copyOf(roomTrapCandidateCells(room));
-            Set<HallsExplorationGenerator.Cell> openCells = Set.copyOf(roomOpenCells(room));
-            Set<HallsExplorationGenerator.Cell> roomCells = Set.copyOf(roomAllCells(room));
-            for (HallsExplorationGenerator.Cell cell : candidateCells) {
-                if (walkable.contains(cell) && farFromElevator(cell)) {
-                    candidates.add(new TrapCandidate(room, cell, openCells, roomCells));
-                }
-            }
-        }
-        return candidates;
-    }
-
-    private List<TrapCandidate> holeCandidates(HallsExplorationGenerator.Plan plan) {
-        Set<HallsExplorationGenerator.Cell> walkable = plan.walkableCells();
-        List<TrapCandidate> preferred = new ArrayList<>();
-        List<TrapCandidate> fallback = new ArrayList<>();
-        List<HallsExplorationGenerator.Room> rooms = plan.rooms();
-        for (int roomIndex = 0; roomIndex < rooms.size(); roomIndex++) {
-            HallsExplorationGenerator.Room room = rooms.get(roomIndex);
-            Set<HallsExplorationGenerator.Cell> openCells = Set.copyOf(roomOpenCells(room));
-            Set<HallsExplorationGenerator.Cell> roomCells = Set.copyOf(roomAllCells(room));
-            for (HallsExplorationGenerator.Cell cell : openCells) {
-                if (!walkable.contains(cell) || nearRoomOpening(room, cell)) {
-                    continue;
-                }
-                TrapCandidate candidate = new TrapCandidate(room, cell, openCells, roomCells);
-                if (farFromElevator(cell)) {
-                    preferred.add(candidate);
-                } else if (roomIndex > 0) {
-                    fallback.add(candidate);
-                }
-            }
-        }
-        if (preferred.isEmpty()) {
-            return fallback;
-        }
-        preferred.addAll(fallback);
-        return preferred;
     }
 
     private HallsTrapType trapTypeForRoom(TrapCandidate candidate,
@@ -507,7 +455,7 @@ final class HallsSessionTrapRuntime {
         return weightedTrap(pool, random, null);
     }
 
-    private List<HallsExplorationGenerator.Cell> roomTrapCandidateCells(HallsExplorationGenerator.Room room) {
+    List<HallsExplorationGenerator.Cell> roomTrapCandidateCells(HallsExplorationGenerator.Room room) {
         List<HallsExplorationGenerator.Cell> cells = new ArrayList<>();
         for (int z = 0; z < room.layout().depth(); z++) {
             for (int x = 0; x < room.layout().width(); x++) {
@@ -524,7 +472,7 @@ final class HallsSessionTrapRuntime {
         return cells;
     }
 
-    private boolean nearRoomOpening(HallsExplorationGenerator.Room room, HallsExplorationGenerator.Cell cell) {
+    boolean nearRoomOpening(HallsExplorationGenerator.Room room, HallsExplorationGenerator.Cell cell) {
         for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
             HallsExplorationGenerator.Cell interior = switch (opening.getKey()) {
                 case NORTH -> new HallsExplorationGenerator.Cell(room.startX() + opening.getValue(), room.startZ());
@@ -540,7 +488,7 @@ final class HallsSessionTrapRuntime {
         return false;
     }
 
-    private List<HallsExplorationGenerator.Cell> roomOpenCells(HallsExplorationGenerator.Room room) {
+    List<HallsExplorationGenerator.Cell> roomOpenCells(HallsExplorationGenerator.Room room) {
         List<HallsExplorationGenerator.Cell> cells = new ArrayList<>();
         for (int z = 0; z < room.layout().depth(); z++) {
             for (int x = 0; x < room.layout().width(); x++) {
@@ -552,7 +500,7 @@ final class HallsSessionTrapRuntime {
         return cells;
     }
 
-    private List<HallsExplorationGenerator.Cell> roomAllCells(HallsExplorationGenerator.Room room) {
+    List<HallsExplorationGenerator.Cell> roomAllCells(HallsExplorationGenerator.Room room) {
         List<HallsExplorationGenerator.Cell> cells = new ArrayList<>();
         for (int z = 0; z < room.layout().depth(); z++) {
             for (int x = 0; x < room.layout().width(); x++) {
@@ -562,7 +510,7 @@ final class HallsSessionTrapRuntime {
         return cells;
     }
 
-    private boolean farFromElevator(HallsExplorationGenerator.Cell cell) {
+    boolean farFromElevator(HallsExplorationGenerator.Cell cell) {
         return Math.abs(cell.x() - origin.x()) + Math.abs(cell.z() - origin.z()) > 12;
     }
 
@@ -575,7 +523,7 @@ final class HallsSessionTrapRuntime {
         return false;
     }
 
-    private List<HallsTrapType> trapPool(String levelTypeId) {
+    List<HallsTrapType> trapPool(String levelTypeId) {
         List<HallsTrapType> pool = new ArrayList<>();
         for (HallsTrapType type : trapTypes.values()) {
             if (type.weight() <= 0 || !type.allowedForLevelType(levelTypeId)) {
@@ -589,7 +537,7 @@ final class HallsSessionTrapRuntime {
         return pool;
     }
 
-    private HallsTrapType weightedTrap(List<HallsTrapType> pool, Random random, HallsFloorModifiers modifiers) {
+    HallsTrapType weightedTrap(List<HallsTrapType> pool, Random random, HallsFloorModifiers modifiers) {
         List<String> boostedKinds = modifiers == null ? List.of() : modifiers.trapBoostKinds();
         int totalWeight = pool.stream().mapToInt(type -> adjustedTrapWeight(type, boostedKinds)).sum();
         int roll = random.nextInt(Math.max(1, totalWeight));
@@ -1188,7 +1136,7 @@ final class HallsSessionTrapRuntime {
 
     private void startTrapTask() {
         stopTrapTask();
-        if (!traps.isEmpty()) {
+        if (!paused && generatedTrapPlacement == null && !traps.isEmpty()) {
             trapTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickTraps, 1L, 1L);
         }
     }
@@ -2201,7 +2149,7 @@ final class HallsSessionTrapRuntime {
         player.teleport(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5, 180.0f, 0.0f));
     }
 
-    private TrapKind trapKind(String kind) {
+    TrapKind trapKind(String kind) {
         return switch (normalizeId(kind)) {
             case "bear_trap" -> TrapKind.BEAR_TRAP;
             case "proximity_mine" -> TrapKind.PROXIMITY_MINE;
@@ -2280,7 +2228,7 @@ final class HallsSessionTrapRuntime {
         return halfSpan;
     }
 
-    private int bestSwingLaneHalfSpan(TrapCandidate candidate) {
+    int bestSwingLaneHalfSpan(TrapCandidate candidate) {
         return Math.max(swingLaneHalfSpan(candidate, BlockFace.EAST), swingLaneHalfSpan(candidate, BlockFace.NORTH));
     }
 
@@ -2369,7 +2317,7 @@ final class HallsSessionTrapRuntime {
         void setBlock(int x, int y, int z, Material material, BlockFace face);
     }
 
-    private record TrapCandidate(HallsExplorationGenerator.Room room,
+    record TrapCandidate(HallsExplorationGenerator.Room room,
                                  HallsExplorationGenerator.Cell cell,
                                  Set<HallsExplorationGenerator.Cell> roomCells,
                                  Set<HallsExplorationGenerator.Cell> allRoomCells) {
@@ -2447,7 +2395,7 @@ final class HallsSessionTrapRuntime {
     private record HallsTrap(TrapKind kind, int x, int z, int phase, HallsTrapType type, UUID movingDisplayId, List<UUID> displayIds, BlockFace face, int laneSpan) {
     }
 
-    private enum TrapKind {
+    enum TrapKind {
         HOLE,
         HOLE_BRIDGE,
         BEAR_TRAP,
