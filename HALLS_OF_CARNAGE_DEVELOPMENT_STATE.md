@@ -120,7 +120,19 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
+- When disconnecting while in the game, reset player stats to their intended numbers as if leaving game normally, dont forget to disable the ghost invisibility
 - On boss floors, the doors open instantly, time it so they open together with the door open sound
+- Loading a savefile gives charges to all buildings even if depleted before saving.
 Future slices (dont do yet):
 - TBD
 
+For reviewer to figure out:
+- New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
+- Texture all items
+- Bunker and library palletes
+- Bunker and library rooms
+- Rework descriptions for all items
+- Fixed textures for cooked potato / mycelia and sculk removing foods
+- Lodestone performance
+- REmove big durability debuff
+- Building which adds durability
