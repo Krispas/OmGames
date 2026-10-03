@@ -136,3 +136,13 @@ For reviewer to figure out:
 - Lodestone performance
 - REmove big durability debuff
 - Building which adds durability
+- Easy mode
+- Distillery gives an extra blueprint
+- Distellery bluepritn announcent
+- Distilleries shouldnt generate in disconnected library rooms
+- Better bunker generation
+- Endless mode
+- Lobby
+- Minigame Machine connection
+- Nerf librarians
+- Make modifiers scenario dependent and remove death fog from Dammed Corridors

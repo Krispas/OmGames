@@ -1,5 +1,5 @@
 id: witch
 name: "Witch"
 entity-type: WITCH
-health: 26
+health: 10
 attack-damage: 1.5
