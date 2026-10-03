@@ -1,9 +1,12 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-30
+Last updated: 2026-10-03
 
 ## Implemented
 
+- Disconnecting session participants have temporary totem modifiers and ghost visuals cleared, and their health and food state reset; ghost status remains session-owned and is restored on reconnect.
+- Boss-floor elevator doors open immediately with the door-open sound synchronized to the opening.
+- Loading a campaign save refreshes per-run charges for all saved buildings, including depleted buildings.
 - Initial Halls of Carnage plugin foundation is being developed under `src/main/java/krispasi/omGames/hallsofcarnage/`.
 - Runtime data folder is `plugins/OmGames/HallsOfCarnage/`.
 - Bundled config/resources are copied on first run without migration logic.
@@ -120,9 +123,6 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer note (Delete entries once done, but keep the header)
 Do all following for the next slice (and keep this line):
-- When disconnecting while in the game, reset player stats to their intended numbers as if leaving game normally, dont forget to disable the ghost invisibility
-- On boss floors, the doors open instantly, time it so they open together with the door open sound
-- Loading a savefile gives charges to all buildings even if depleted before saving.
 Future slices (dont do yet):
 - TBD
 

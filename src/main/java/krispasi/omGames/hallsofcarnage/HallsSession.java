@@ -845,7 +845,16 @@ public final class HallsSession {
             return;
         }
         removeCarriedResearchCrate(player.getUniqueId());
-        clearTotemAttributeModifiers(player);
+        clearTotemBuffs(player);
+        player.setInvisible(false);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        player.removePotionEffect(PotionEffectType.INVISIBILITY);
+        player.removePotionEffect(PotionEffectType.GLOWING);
+        player.setGameMode(GameMode.ADVENTURE);
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
+        healPlayerToFull(player);
         sidebar.restore(player.getUniqueId());
     }
 
@@ -1817,6 +1826,8 @@ public final class HallsSession {
         restoreElevatorChestContents();
         closeElevatorDoors();
         openElevatorDoors();
+        world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
         Location bossLocation = bossCenterLocation(layout, roomStartX, roomStartZ);
         Set<HallsExplorationGenerator.Cell> bossArenaCells = bossArenaCells(layout, roomStartX, roomStartZ);
         HallsSessionBossRuntime.DoorSeal seal = new HallsSessionBossRuntime.DoorSeal(
@@ -6338,6 +6349,7 @@ public final class HallsSession {
         ghostPlayers.clear();
         savedCampStates.clear();
         savedCampStates.putAll(save.camps());
+        resetCampHarvestForNewRun();
         savedCampUnlockedDoors.clear();
         savedCampUnlockedDoors.putAll(save.campUnlockedDoors());
         elevatorChestContents = cloneArray(save.elevatorChest(), 27);
