@@ -156,7 +156,10 @@ public record HallsScenario(
     }
 
     public FloorDefinition endlessFloor(int floor, long runSeed) {
-        if (floor <= 1) return FloorDefinition.fallback(1).atFloor(1);
+        if (floor <= 1) {
+            return new FloorDefinition(1, 1, "start", "howling_corridors", "5", 1, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, "special/start_floor.txt", "");
+        }
         EndlessProgression p = endlessProgression;
         int modulesPerBoss = Math.max(1, p.bossEveryModules());
         int bossStart = modulesPerBoss * 4;
