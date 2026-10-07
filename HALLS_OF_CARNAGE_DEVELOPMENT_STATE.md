@@ -140,7 +140,8 @@ This is the first implementation slice. It focuses on:
 - Endless exploration floor room cap is 100; Untold Depths' More Rooms modifier can add up to five additional rooms.
 
 ## Reviewer notes (Delete entries once done, but keep the header)
-
+- There should be a separate leaderboard for each scenario
+- Bunker level type seems to not generate properly, as most of the times less than half of the intended rooms generate, my hunch is that the main corridor may be too small, but there could be other causes
 ## Future slices (dont do yet):
 -TBD
 ## For reviewer to figure out:
