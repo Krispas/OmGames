@@ -1,9 +1,12 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-09-30
+Last updated: 2026-10-07
 
 ## Implemented
 
+- Disconnecting session participants have temporary totem modifiers and ghost visuals cleared, and their health and food state reset; ghost status remains session-owned and is restored on reconnect.
+- Boss-floor elevator doors open immediately with the door-open sound synchronized to the opening.
+- Loading a campaign save refreshes per-run charges for all saved buildings, including depleted buildings.
 - Initial Halls of Carnage plugin foundation is being developed under `src/main/java/krispasi/omGames/hallsofcarnage/`.
 - Runtime data folder is `plugins/OmGames/HallsOfCarnage/`.
 - Bundled config/resources are copied on first run without migration logic.
@@ -90,6 +93,15 @@ Last updated: 2026-09-30
 - Trap ticking now runs every tick; swinging blade damage follows the moving blade display rather than the static trap center.
 - Wall spikes and poison dart launchers are display-only wall fixtures. Poison darts no longer place a solid dispenser block and now render a directional particle line when firing.
 - Default trap weights now bias Frozen Halls toward falling ice and Deep Crypt toward poison darts for easier playtest visibility.
+- Exploration layout planning now runs off the main thread and hands the completed pure-Java plan back to the main-thread build job, so large room/path planning is included in the visible Planning loading phase instead of blocking before progress appears.
+- Trap placement now evaluates up to 32 atomic candidate units per tick within an 8 ms budget, retaining cached connectivity and reservation safety while reducing long trap-generation tails.
+- Scenario resources support an `ordering` field; scenario lists sort by ordering, name, and id, with Untold Depths explicitly first.
+- Lodestone activations calculate and cache their elevator path once per activation, so repeated particle displays do not rerun pathfinding and simultaneous players keep independent routes.
+- Removed the Rusty Tools floor modifier from the shared modifier pool.
+- Blueprint distillery rewards now use the unique blueprint set available to the active level type, distilleries skip vent-only disconnected library rooms, and floor arrival announces the available rewards in chat.
+- Ghost announcements use the player's colored display name followed by aqua text: "succumbed to the halls."
+- Dammed Librarians deploy their poison cloud only on death; hitting a player no longer creates one.
+- The lobby Leaderboards menu now lets players open a separate campaign shame board for each non-Endless scenario; each board ranks players by their lowest recorded completion shame for that scenario. Endless scenarios have their own highest-floor boards, while the previous cross-scenario Endless view remains available.
 
 ## Current Scope
 
@@ -114,28 +126,34 @@ This is the first implementation slice. It focuses on:
 
 
 ## Latest Slice Notes
-- Dammed Corridors scenario slice completed: added `scenarios/DammedCorridors.yml` (`dammed_corridors`) using Untold Depths as the base. Per reviewer clarification, inserted the standard start floor and mapped CSV rows in order to consecutive floors, removing the source numbering gap: exploration floors 2/4/6/8/10/12/14/16/18, Bunker camps 3/5/7/9/11/13/15/17/19, and Archaic Guard at floor 20. All exploration difficulty/quota/breakable/room/trap/hole/sculk values match `Extra Resources/halls_of_carnage/DammedCorridorsLevels.csv`; trap-per-room limits retain the base's 1-7 range. Camps use `camps/camp_dammed_corridors.txt`, three team lives, and one key costing 10000. Only the eleven requested buildings and matching blueprints are enabled; global normal/rare blueprint pools apply to every level type. No blueprint distilleries are enabled. All base scrap/weapon/armor/utility/food drop lists remain available. Research retains the nine nodes through Conduction inclusive, and Camp Station recipes contain exactly their unlocks, including Absorption Tonic; later-node gear remains drop-only. The new scenario and existing camp resource are registered for missing-file copying and `/hoc reset confirm`. SnakeYAML static validation passed for YAML parsing, CSV values, floor numbering, item/layout references, blueprint membership/rarities, research node equality, and crafting restrictions. `mvn -DskipTests compile` could not run because Maven and a wrapper are unavailable; installed Java is 18 rather than the required 25. In-server loading, generation, and playtesting remain unverified.
-- Next reviewer slice applied: Halls lobby menu setup now spawns a tagged invisible `Interaction` entity instead of a villager. New config writes use `lobby.menu-interaction`, bundled defaults advertise that key, and `/hoc lobby spawnMenuInteraction [rotation]` is the primary setup command. The old `menu-villager` config and `spawnMenuVillager` command remain read/alias compatibility only, and spawning the new hook removes old tagged menu villagers.
-- Next reviewer slice applied: Library vent-only room generation now only accepts a disconnected room after carving a forced low-ceiling vent corridor to a connected anchor room, so vent-only rooms are no longer left without an entrance. The disconnected-room retry budget and sampled anchor/path checks were reduced, and candidate placement now stays nearer existing connected rooms to keep Library floor planning bounded. Boss projectile fallback no longer removes thrown tridents after a flight-path boss hit, preserving Bukkit's normal return behavior while still marking the projectile processed to prevent duplicate boss damage.
-- Next reviewer slice applied: Library exploration generation now targets one-third vent-only rooms directly, improves disconnected-room placement near connected anchors, and marks forced low-ceiling vent corridors with vent gates before the plan is returned. Vent-only room interiors and low-ceiling vent corridor cells are excluded from the normal floor walk graph and monster spawn graph, so those rooms remain disconnected from normal corridor pathing while paired Library vents still connect normal rooms to vent-only rooms only. Lodestone no longer renders a fallback straight trail when the player is off the connected floor graph, which keeps it quiet inside disconnected vent rooms. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `18.0.2-beta` while the project targets Java 25.
-- Next reviewer slice applied: Library vent-only rooms no longer generate or require forced low-ceiling physical vent corridors, room openings, or iron-bar vent gates. They are placed as sealed disconnected rooms near connected rooms, excluded from the normal walk/monster graphs as before, and entered only through the existing paired wall-mounted teleport vent interactions. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `18.0.2-beta` while the project targets Java 25.
-- Follow-up applied: Library vent interactions no longer block teleporting because of destination feet/head/floor occupancy checks, and the old vent-gate fallback no longer reports a blocked vent. Paired wall vents now teleport whenever their interaction is used. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `18.0.2-beta` while the project targets Java 25.
-- Follow-up applied: Library vent-only room planning now rejects room layouts that cannot host any wall-mounted vent cell, and runtime vent placement now works per vent-only room with a reservation-ignoring fallback so disconnected rooms do not silently spawn without paired wall vents. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `18.0.2-beta` while the project targets Java 25.
-- Follow-up applied: When a Halls participant becomes a ghost through lethal damage or being left behind by the elevator, the session now announces it to online participants in chat. Maven verification could not be run because neither `mvn` nor a Maven wrapper is available, and local Java is only `18.0.2-beta` while the project targets Java 25.
-- Resource discovery slice completed: extracted `HallsResourceManager` and removed `HallsOfCarnageManager.RESOURCE_FILES`. All bundled `hallsOfCarnage/` files are discovered recursively from the plugin's own JAR or exploded resource directory, excluding `level-maker.jar`, `run.bat`, and `run.vbs` by case-insensitive filename at any depth. Startup copies only missing files, so server edits are preserved and new bundled content requires no Java file-list update. Reset reads all bundled content and validates source/destination paths before deleting the existing twelve game-resource folders; lobby config, saved campaigns, and unrelated player-data folders remain untouched. The explicit destructive folder boundary is retained for safety; a new disposable top-level content family must be added to that boundary, but its files need no registration. Unsafe traversal paths and symbolic-link destination ancestors are rejected, and copying/reset errors are logged rather than silently reporting success. Updated AGENTS.md and the GDD. Isolated Java helper compilation and fixture checks passed for all 278 bundled content files plus one new-content fixture, both exploded and packaged-JAR discovery (without directory entries), nested editor-tool exclusions, startup preservation, default restoration/stale-file removal, config/save/unrelated-state preservation, and malformed/missing-bundle reset preflight. `git diff --check` passed. `mvn -DskipTests compile` remains blocked: Maven and a wrapper are unavailable, and installed Java is 18 rather than required Java 25. Full plugin compilation and in-server startup/reset remain unverified.
 
-## Reviewer note (Delete entries once done, but keep the header)
-Do all following for the next slice (and keep this line):
-- Generation of large floors takes a long time, lags out the server and sometimes even shuts it down. It always happens after the rooms and corridors are generated, so during the time things such as traps and breakables spawn. Could you also disperse them around multiple ticks? Maybe making it one tick per room and stuff? Not too slow however. And onto the hud line above hotbar, add a loading bar with percentage.
+- Organized modifier pools under `modifiers/<scenario_id>/`. Dammed Corridors' bundled pool omits Death Fog; Untold Depths retains it. Modifier pools are loaded and selected by scenario folder.
+- Reworked the bunker main trunk to use a randomized footprint and turn sequence instead of the repeated mirrored-L route.
+- Fixed bunker trunk waypoint selection: each axis now alternates between distinct randomized leg coordinates with minimum spacing, preserving room frontage as the target grows.
+- Bunker room placement now begins with a target-sized trunk footprint and expands the connected 3-wide main-corridor network in larger-radius passes after repeated placement failures; expanded routes avoid already placed rooms.
+- Added Easy difficulty with a 3.0 shame multiplier, 0.85 floor difficulty scaling, half-rate sculk gain, half-size initial enemy cap, 1.5x spawn and cap-extension intervals, and 25% lower coin quota. These baseline adjustments are applied before floor modifiers.
+- Removed the automatic research-point award for each exploration floor cleared at camp arrival. Depositing a research crate into the elevator chute is now the only gameplay source of research points; the legacy saved exploration-floor counter remains readable for save compatibility.
+- Added the configurable `endless` scenario type and bundled `Endless (Mixed)` / `Endless (Base Game)` scenarios. Both currently draw from all nine existing level types and inherit Untold Depths item, blueprint, crafting, research, and modifier pools.
+- Endless floor-theme randomness is stored as `endless.run-seed` in campaign saves, preserving generated sequence across save/load while fresh runs receive a new sequence.
+- Endless progression generates three distinct randomized exploration themes and then a camp per module. Every fourth exploration module is followed by a seeded boss floor and camp; progression settings follow the Untold Depths curve and continue without a completion floor.
+- Endless sessions suppress shame accrual and save each participant's highest floor reached at game over in `hoc_endless_records`. The scenario picker separates Endless scenarios visually, and the lobby Leaderboards window displays both campaign shame and Endless floor results.
+- Research unlocks continue to be stored by node id in campaign saves, so Endless inherits new research nodes without losing nodes already researched.
+- Extracted Endless floor scaling into scenario `endless.progression` YAML using decimal starting values and per-module/per-exploration rates. Generated values round to the nearest integer, allowing slow-growth stats such as traps to remain unchanged across multiple floors; bundled rates are tuned to better match Untold Depths.
+- Endless floor 1 now has an explicit start-floor definition with a zero coin quota, so parties can always leave the starting elevator.
+- Endless exploration floor room cap is 100; Untold Depths' More Rooms modifier can add up to five additional rooms.
 
-Future slices (dont do yet):
-- TBD
-
-For reviewer to figure out:
+## Reviewer notes (Delete entries once done, but keep the header)
+## Future slices (dont do yet):
+-TBD
+## For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
 - Texture all items
 - Bunker and library palletes
 - Bunker and library rooms
 - Rework descriptions for all items
 - Fixed textures for cooked potato / mycelia and sculk removing foods
+- Lobby
+- Minigame Machine connection
 
+## DLC ideas
+- Building which adds durability

@@ -6,7 +6,14 @@ import java.util.Map;
 public record HallsScenario(
         String id,
         String name,
+        int ordering,
         String difficulty,
+        String type,
+        List<String> endlessLevelTypes,
+        List<BossChoice> endlessBossPool,
+        long endlessBossSeed,
+        String endlessBossLayout,
+        EndlessProgression endlessProgression,
         List<String> description,
         int minPlayers,
         int maxPlayers,
@@ -22,11 +29,37 @@ public record HallsScenario(
 ) {
     public HallsScenario {
         camp = camp == null ? CampSettings.defaults() : camp;
+        type = normalize(type);
+        endlessLevelTypes = endlessLevelTypes == null ? List.of() : List.copyOf(endlessLevelTypes);
+        endlessBossPool = endlessBossPool == null ? List.of() : List.copyOf(endlessBossPool);
+        endlessBossLayout = endlessBossLayout == null ? "" : endlessBossLayout.trim();
+        endlessProgression = endlessProgression == null ? EndlessProgression.defaults() : endlessProgression;
         allowedItems = Map.copyOf(allowedItems);
         blueprintPools = Map.copyOf(blueprintPools);
         levelTypeBlueprintPools = deepCopyBlueprintPools(levelTypeBlueprintPools);
         craftingStations = deepCopyCraftingStations(craftingStations);
         researchNodes = researchNodes == null ? Map.of() : Map.copyOf(researchNodes);
+    }
+
+    public boolean endless() { return "endless".equals(type); }
+
+    public record BossChoice(String levelType, String boss) {
+        public BossChoice { levelType = normalize(levelType); boss = normalize(boss); }
+    }
+
+    public record EndlessProgression(double startingDifficulty, double difficultyPerModule,
+                                     double startingRooms, double roomsPerExploration, int maxRooms,
+                                     double startingBreakables, double breakablesPerExploration,
+                                     double startingTraps, double trapsPerExploration,
+                                     double startingHoles, double holesPerExploration,
+                                     double startingSculkPatches, double sculkPatchesPerExploration,
+                                     double startingCoinQuota, double quotaPerExploration,
+                                     int blueprintDistilleriesOnFinalExploration, int bossEveryModules) {
+        public EndlessProgression { bossEveryModules = Math.max(1, bossEveryModules); }
+        public static EndlessProgression defaults() {
+            return new EndlessProgression(10.0, 2.0, 6.0, 0.62, 100, 24.0, 2.0,
+                    7.0, 0.40, 5.0, 0.62, 1.0, 0.38, 16.0, 1.23, 5, 4);
+        }
     }
 
     public record CampSettings(String layout, int teamLives, List<Integer> keyCosts) {
@@ -104,6 +137,7 @@ public record HallsScenario(
     }
 
     public FloorDefinition floor(int floor) {
+        if (endless() && floor > 1) return endlessFloor(floor, 1L);
         for (FloorDefinition definition : floors) {
             if (definition.includes(floor)) {
                 return definition;
@@ -119,6 +153,52 @@ public record HallsScenario(
             return nearestPriorExploration.atFloor(floor);
         }
         return FloorDefinition.fallback(floor);
+    }
+
+    public FloorDefinition endlessFloor(int floor, long runSeed) {
+        if (floor <= 1) {
+            return new FloorDefinition(1, 1, "start", "howling_corridors", "5", 1, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, "special/start_floor.txt", "");
+        }
+        EndlessProgression p = endlessProgression;
+        int modulesPerBoss = Math.max(1, p.bossEveryModules());
+        int bossStart = modulesPerBoss * 4;
+        int blockSize = bossStart + 2;
+        int block = (floor - 2) / blockSize;
+        int inBlock = (floor - 2) % blockSize;
+        if (inBlock >= bossStart) {
+            if (inBlock == bossStart && !endlessBossPool.isEmpty()) {
+                java.util.Random random = new java.util.Random(endlessBossSeed + (long) block * 0x9E3779B97F4A7C15L);
+                BossChoice choice = endlessBossPool.get(random.nextInt(endlessBossPool.size()));
+                return new FloorDefinition(floor, floor, "combat", choice.levelType(), "40", 1, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, endlessBossLayout, choice.boss());
+            }
+            return new FloorDefinition(floor, floor, "camp", "howling_corridors", "0", 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, "", "");
+        }
+        int module = block * modulesPerBoss + inBlock / 4;
+        int moduleFloor = inBlock % 4;
+        if (moduleFloor == 3) return new FloorDefinition(floor, floor, "camp", "howling_corridors", "0",
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", "");
+        List<String> pool = endlessLevelTypes.isEmpty() ? List.of("howling_corridors") : endlessLevelTypes;
+        java.util.List<String> shuffled = new java.util.ArrayList<>(pool);
+        java.util.Collections.shuffle(shuffled, new java.util.Random(runSeed ^ (long) module * 0x9E3779B97F4A7C15L));
+        String levelType = shuffled.get(moduleFloor % shuffled.size());
+        int explorationIndex = module * 3 + moduleFloor;
+        int difficulty = roundedProgression(p.startingDifficulty(), p.difficultyPerModule(), module);
+        int rooms = Math.min(p.maxRooms(), roundedProgression(p.startingRooms(), p.roomsPerExploration(), explorationIndex));
+        int breakables = roundedProgression(p.startingBreakables(), p.breakablesPerExploration(), explorationIndex);
+        int traps = roundedProgression(p.startingTraps(), p.trapsPerExploration(), explorationIndex);
+        int holes = roundedProgression(p.startingHoles(), p.holesPerExploration(), explorationIndex);
+        int sculk = roundedProgression(p.startingSculkPatches(), p.sculkPatchesPerExploration(), explorationIndex);
+        int quota = roundedProgression(p.startingCoinQuota(), p.quotaPerExploration(), explorationIndex);
+        return new FloorDefinition(floor, floor, "exploration", levelType, Integer.toString(difficulty), rooms,
+                0, breakables, traps, 1, 7, holes, sculk, quota,
+                moduleFloor == 2 ? p.blueprintDistilleriesOnFinalExploration() : 0, "", "");
+    }
+
+    private static int roundedProgression(double startingValue, double perFloor, int floorIndex) {
+        return Math.max(0, (int) Math.round(startingValue + perFloor * floorIndex));
     }
 
     public record FloorDefinition(

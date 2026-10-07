@@ -82,6 +82,7 @@ public final class HallsOfCarnageManager {
     private static final DifficultyOption NORMAL_DIFFICULTY = new DifficultyOption("normal", "Normal", 1.0);
     private static final Map<String, DifficultyOption> DIFFICULTIES = Map.of(
             "normal", NORMAL_DIFFICULTY,
+            "easy", new DifficultyOption("easy", "Easy", 0.85),
             "hard", new DifficultyOption("hard", "Hard", 1.5),
             "extreme", new DifficultyOption("extreme", "Extreme", 2.0)
     );
@@ -342,7 +343,32 @@ public final class HallsOfCarnageManager {
             case HallsMainMenu.ACTION_NEW -> openScenariosMenu(player);
             case HallsMainMenu.ACTION_LOAD -> HallsMainMenu.openSaves(plugin, player, savesFor(player));
             case HallsMainMenu.ACTION_BACK -> openBack(player, holder);
-            case HallsMainMenu.ACTION_SCENARIO -> HallsMainMenu.openDifficulty(plugin, player, value);
+            case HallsMainMenu.ACTION_SCENARIO -> {
+                HallsScenario selected = getScenario(value);
+                if (selected != null && selected.endless()) {
+                    PendingSession pending = new PendingSession(selected.id(), NORMAL_DIFFICULTY, null,
+                            new java.util.LinkedHashSet<>(List.of(player.getUniqueId())));
+                    pendingSessions.put(player.getUniqueId(), pending);
+                    openSessionSettings(player, pending);
+                } else {
+                    HallsMainMenu.openDifficulty(plugin, player, value);
+                }
+            }
+            case HallsMainMenu.ACTION_LEADERBOARDS -> HallsMainMenu.openLeaderboards(plugin, player, scenarios);
+            case HallsMainMenu.ACTION_LEADERBOARD_SCENARIO -> {
+                HallsScenario scenario = getScenario(value);
+                if (scenario != null) {
+                    if (scenario.endless()) {
+                        HallsMainMenu.openScenarioEndlessLeaderboard(plugin, player, scenario,
+                                shameService.getEndlessLeaderboard(1000));
+                    } else {
+                        HallsMainMenu.openScenarioLeaderboard(plugin, player, scenario,
+                                shameService.getScenarioLeaderboard(scenario.id(), 10));
+                    }
+                }
+            }
+            case "leaderboard_endless" -> HallsMainMenu.openEndlessLeaderboard(plugin, player,
+                    shameService.getEndlessLeaderboard(10), scenarios);
             case HallsMainMenu.ACTION_DIFFICULTY -> {
                 DifficultyOption difficulty = DIFFICULTIES.getOrDefault(normalizeId(value), NORMAL_DIFFICULTY);
                 PendingSession pending = new PendingSession(holder.context(), difficulty, null,
@@ -399,12 +425,16 @@ public final class HallsOfCarnageManager {
 
     private void openBack(Player player, HallsMainMenu.MenuHolder holder) {
         switch (holder.type()) {
-            case SCENARIOS, SAVES -> openMainMenu(player);
+            case SCENARIOS, SAVES, LEADERBOARDS -> openMainMenu(player);
+            case LEADERBOARD_DETAIL, LEADERBOARD_ENDLESS -> HallsMainMenu.openLeaderboards(plugin, player, scenarios);
             case DIFFICULTY -> openScenariosMenu(player);
             case SETTINGS -> {
                 PendingSession pending = pendingSessions.get(player.getUniqueId());
                 if (pending != null && pending.loading()) {
                     HallsMainMenu.openSaves(plugin, player, savesFor(player));
+                } else if (pending != null && getScenario(pending.scenarioId()) != null
+                        && getScenario(pending.scenarioId()).endless()) {
+                    openScenariosMenu(player);
                 } else {
                     HallsMainMenu.openDifficulty(plugin, player, pending == null ? "" : pending.scenarioId());
                 }
@@ -1153,7 +1183,9 @@ public final class HallsOfCarnageManager {
             return Result.fail("Halls session " + sessionId + " is already transitioning.");
         }
         if (floor < 1 || floor > session.scenario().floorCount()) {
-            return Result.fail("Floor must be between 1 and " + session.scenario().floorCount() + ".");
+            return Result.fail(session.scenario().endless()
+                    ? "Floor must be a positive number."
+                    : "Floor must be between 1 and " + session.scenario().floorCount() + ".");
         }
         if (!session.forceBuildFloor(floor)) {
             return Result.fail("Could not rebuild Halls session " + sessionId + ".");
@@ -1262,6 +1294,16 @@ public final class HallsOfCarnageManager {
         if (session == null) {
             return;
         }
+        if (completion.endless()) {
+            long recordedAt = System.currentTimeMillis();
+            for (UUID playerId : completion.participants()) {
+                shameService.recordEndlessFloor(completion.scenarioId(), playerId, completion.floorReached(), recordedAt);
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null) player.sendMessage(Component.text("Endless record saved: floor "
+                        + completion.floorReached() + ".", NamedTextColor.LIGHT_PURPLE));
+            }
+            return;
+        }
         long completedAt = System.currentTimeMillis();
         int finalShame = adjustedCompletionShame(completion.rawShame(), completion.difficultyId());
         for (UUID playerId : completion.participants()) {
@@ -1279,6 +1321,7 @@ public final class HallsOfCarnageManager {
 
     private int adjustedCompletionShame(int rawShame, String difficultyId) {
         double factor = switch (normalizeId(difficultyId)) {
+            case "easy" -> 3.0;
             case "hard" -> 0.7;
             case "extreme" -> 0.5;
             default -> 1.0;

@@ -1237,6 +1237,8 @@ Behavior notes:
   - Owns `/hoc`, Halls config/resource loading, lobby menu interaction handling, scenario discovery, and Halls shame persistence.
   - Keep Halls logic isolated from BedWars, Egg Hunt, Chess, Bank, and Random classes.
 - `HallsSession` owns active session state; `HallsSessionTrapRuntime` is its session-owned trap placement/ticking helper.
+- `HallsSessionFloorBuildJob` owns incremental exploration rebuild cursors; keep it session-owned and do not move build scheduling back into a large nested `HallsSession` class.
+- `HallsGeneratedTrapPlacement` owns resumable generated-trap candidate preparation and placement through `HallsSessionTrapRuntime`; trap runtime activation must wait until floor loading finishes.
 - `HallsSessionMonsterRuntime` is the session-owned first-pass monster flood helper; keep monster spawning/alert cleanup routed through `HallsSession`.
 - `HallsModifierTypeLoader` loads configurable exploration modifiers; `HallsFloorModifiers` owns the active floor's stacked modifier effects.
 - `HallsResourceManager` discovers bundled Halls content recursively and owns missing-file copying and resource reset I/O; do not add per-file content whitelists.
@@ -1292,6 +1294,8 @@ SQLite tables:
 - `hoc_shame`
 - `hoc_completed_scenarios`
   - stores `scenario_id`, `player_uuid`, `completed_at`, `difficulty_id`, and `final_shame`
+- `hoc_endless_records`
+  - stores each player's highest reached floor per Endless scenario
 
 ### 7.4 Runtime Notes
 
@@ -1299,6 +1303,11 @@ SQLite tables:
 - The human-built lobby is centered near `0 70 0`; automated session/dungeon placement must stay at least 1000 blocks away.
 - Players in the Halls world are kept in Adventure mode, with full hunger and natural regeneration disabled.
 - Shame leaderboards are ascending because lower shame is better.
+- Endless scenarios use `type: endless`, configurable level-type pools, progression settings, a boss pool, and a fixed boss seed. The bundled Mixed and Base Game scenarios currently contain the same nine level types and inherit Untold Depths items, blueprints, crafting, research, and modifier content.
+- `endless.progression` owns all numeric scaling for Endless floors through decimal starting values and per-module/per-exploration rates. Round each generated floor value to the nearest integer; keep the formula generic so slow rates can hold a value steady across several floors. It also owns the room cap, final-exploration distillery count, and boss cadence. The bundled Endless room cap is 100 base rooms; Untold Depths' More Rooms modifier can add up to 5. If an existing scenario file needs new progression defaults, delete that file and let the plugin copy the bundled version; do not add migration logic.
+- Endless floors use three distinct randomly ordered level types per exploration module, followed by camp; a boss floor and camp follow every configured number of modules. Floor scaling follows the Untold Depths progression curve and has no completion floor.
+- Endless floor selection uses a per-run seed saved as `endless.run-seed`, so a save/load keeps that run's generated theme sequence while fresh runs randomize it.
+- Endless sessions do not accrue or persist shame. Each game-over records the current floor for every participant in `hoc_endless_records`; the lobby leaderboard shows campaign shame and Endless floor records separately.
 - When a party descends after the final configured scenario floor, the session displays completion/shame, records completion, deletes the Halls save file, optionally notifies OmVeins through its Halls completion consumer, and then returns players to the Halls lobby.
 - Halls run shame is saved in active save files as `shame.current`; final completion shame applies difficulty reduction (`normal` unchanged, `hard` 30% less, `extreme` 50% less) before persistence.
 - `/hoc start <scenario> [player...]` allocates a session origin, builds the first start floor/elevator shell, teleports players into it, and tracks changed blocks for cleanup.
@@ -1330,7 +1339,7 @@ SQLite tables:
 - Generated corridors use ceiling-embedded light blocks so the walkable corridor remains 3 blocks tall, and the elevator has a ceiling light.
 - The elevator exterior vestibule is generated as a sealed mini-tunnel outside the door; opening the door clears only the passage while preserving the vestibule floor, side walls, and ceiling.
 - Halls elevators spawn a hidden waypoint-transmitting marker entity at the elevator spawn so participants see the elevator on the vanilla locator bar; keep this separate from the Compass modifier's item/HUD/trail behavior.
-- Elevator transitions rebuild exploration floors through a staged session-local main-thread build job: plan, clear old columns, elevator shell, room batches, corridor batches, traps, content batches, chest restore, and door opening.
+- Elevator transitions rebuild exploration floors through a staged session-local main-thread build job: plan, clear old columns, elevator shell, room batches, corridor batches, incremental traps, liquid planning/rendering, vegetation, sculk, fixtures, content batches, chest restore, and door opening. Trap/content work must remain spread across ticks rather than restoring a single bulk post-corridor pass. Session participants receive a phase-labelled percentage loading bar above the hotbar during the rebuild; loading state is cleared on cancellation/arrival.
 - Staged Halls floor clears must not clear the protected elevator footprint while players are inside it.
 - Active Halls participants should have their respawn location set to the session elevator; normal session exit should restore their respawn location to the configured Halls lobby spawn.
 - Elevator floor arrival heals living players for `6` health and revives ghost players with `10` health.
@@ -1431,6 +1440,7 @@ SQLite tables:
 - Resource reset retains an explicit game-folder deletion boundary rather than deleting every server directory. Bundled resources are read and their paths validated before reset deletes existing content; adding a new disposable top-level content family requires updating that boundary, not a per-file list.
 - Exploration floors have first-pass session-owned trap generation/runtime for holes, bridged holes, model-display bear traps, model-display proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, Deep Crypt poison darts, and Factory steam vents.
 - Trap placement uses the generated walkable mask and BFS reachability before accepting an unbridged pit; pits that would disconnect traversal receive a spruce bridge.
+- Trap-generation optimization must preserve floor and room-entrance connectivity checks. Keep fixed-radius spacing lookups bounded and cache immutable geometry only within the generation job; do not reuse mutable traversal state across sessions or replace the configured floor mask with a different connectivity policy.
 - Halls trap animation/cooldown logic must use `HallsSessionTrapRuntime`'s session-local scheduler tick, not world time, because the Halls dimension may have frozen or nonstandard time progression.
 - Halls traps should damage session monsters as well as players when monsters enter their contact, radius, or lane checks, but only while a participant is within 20 blocks of the trap effect/contact area.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
@@ -1446,8 +1456,9 @@ SQLite tables:
 - Special Halls monster death/attack behavior currently includes data-driven monster splitting, Dammed Librarian poison clouds on attack/death, and Rotting Soldier delayed non-block-breaking explosion.
 - Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
 - Modifier files define `modifiers.<id>.type`, `display-name`, `icon`, `weight`, and `effects`.
+- Modifier files are organized under `modifiers/<scenario_id>/`. Files directly inside a scenario folder are scoped to that scenario; `shared.yml` applies across level types, while other filenames restrict modifiers to the matching level type. Dammed Corridors' folder omits Death Fog.
 - Modifier effects include `enemy-health-multiplier`; duplicate modifiers stack multiplicatively.
-- Shared modifiers live in `modifiers/shared.yml`; level-specific modifier files such as `frozen_halls.yml` and `deep_crypt.yml` are restricted to that level type by filename.
+- Each scenario owns its modifier pool in `modifiers/<scenario_id>/`. Within that folder, `shared.yml` applies across level types and other filenames restrict modifiers to the matching level type.
 - Exploration floors roll three modifiers. Each slot has `max(0, min(100, 50 - difficulty))%` chance to roll from the good pool; otherwise it rolls from the bad pool.
 - Duplicate modifiers are allowed and their effects stack or multiply.
 - Modifier reveal pacing is intentionally slow enough for players to read each selected modifier during elevator descent.
@@ -1459,6 +1470,7 @@ SQLite tables:
 - Session monsters are persistent, have far-away removal disabled, and should prioritize alive participants over ghost players as targets.
 - Session monsters normally acquire targets only at close range; breakable destruction and elevator scrap deposits alert nearby spawned monsters at long range. Smoke Bomb concealment clears and suppresses targeting for its duration, and Creative/Spectator participants are ignored by monster target selection.
 - Exploration monster spawning has no finite total spawn budget. It fills to a live cap, extends that cap periodically based on floor difficulty, reduces the cap by one when an alive participant kills a session monster, and adds one cap slot for each session slime created by slime splitting. Direct spawn attempts stay on a fixed 5-second interval. Less/more-enemy modifier effects change the cap-extension interval, not the initial live cap. After 3 minutes on a floor, the cap-extension cooldown tightens by 1% of its base length per successful spawn until it reaches the 5-second minimum; after 15 minutes, the level type's full special monster pool may spawn.
+- Easy difficulty uses a 3.0 shame multiplier, 0.85 floor difficulty multiplier, half sculk gain, half initial enemy live cap, 1.5x direct spawn interval, 1.5x cap-extension interval, and 0.75x coin quota before floor modifiers.
 - Each extra participant after the first adds 33% to the exploration monster live cap and cap-extension speed before modifier cap-extension multipliers apply.
 - Level type `monsters.common` and `monsters.special` are parsed into runtime pools; exploration floors spawn a first-pass session-local monster flood from the active level type.
 - Breaking Halls props and depositing elevator scrap alert nearby spawned monsters toward the nearest participant.

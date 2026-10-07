@@ -85,13 +85,6 @@ modifiers:
     effects:
       corridor-distance-multiplier: 1.35
       maze-corridor-distance-multiplier: 1.12
-  death_fog:
-    type: bad
-    display-name: "Death Fog"
-    icon: "☁"
-    weight: 2
-    effects:
-      wither-after-seconds: 600
   glass_bones:
     type: bad
     display-name: "Glass Bones"
@@ -116,14 +109,6 @@ modifiers:
     effects:
       hole-multiplier: 1.6
       hole-bridge-extra-width: 1
-  rusty_tools:
-    type: bad
-    display-name: "Rusty Tools"
-    icon: "⚒"
-    weight: 2
-    effects:
-      weapon-durability-loss-multiplier: 2.0
-      armor-damage-multiplier: 0.9
   less_enemy_hp:
     type: good
     display-name: "Less Enemy HP"

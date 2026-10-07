@@ -73,6 +73,7 @@ final class HallsSessionMonsterRuntime {
     private int baseMaxAlive;
     private int spawnedThisFloor;
     private int spawnCooldownTicks;
+    private int spawnIntervalTicks = SPAWN_INTERVAL_TICKS;
     private int baseCapExtensionIntervalTicks;
     private int capExtensionCooldownTicks;
     private int capExtensionIntervalTicks;
@@ -103,7 +104,8 @@ final class HallsSessionMonsterRuntime {
                                HallsScenario.FloorDefinition floor,
                                HallsLevelType levelType,
                                HallsFloorModifiers modifiers,
-                               Random random) {
+                               Random random,
+                               boolean easyDifficulty) {
         clear();
         this.random = random == null ? new Random() : random;
         this.spawnCells = spawnCells(plan);
@@ -119,9 +121,11 @@ final class HallsSessionMonsterRuntime {
         monsterCoinDropChancePercent = Math.max(0, (int) Math.round(10.0
                 * (modifiers == null ? 1.0 : modifiers.monsterCoinDropChanceMultiplier())));
         double playerStack = participantStackMultiplier();
-        this.baseMaxAlive = Math.max(2, Math.min(36, (int) Math.round((1 + rooms / 4.0 + difficulty / 15.0) * playerStack)));
+        int calculatedCap = Math.max(2, Math.min(36, (int) Math.round((1 + rooms / 4.0 + difficulty / 15.0) * playerStack)));
+        this.baseMaxAlive = easyDifficulty ? Math.max(1, (int) Math.ceil(calculatedCap * 0.5)) : calculatedCap;
         this.maxAlive = baseMaxAlive;
-        double capPacingMultiplier = enemyMultiplier <= 0.0 ? 1.0 : enemyMultiplier;
+        double capPacingMultiplier = enemyMultiplier <= 0.0 ? 1.0 : enemyMultiplier * (easyDifficulty ? (2.0 / 3.0) : 1.0);
+        this.spawnIntervalTicks = easyDifficulty ? (int) Math.round(SPAWN_INTERVAL_TICKS * 1.5) : SPAWN_INTERVAL_TICKS;
         this.capExtensionIntervalTicks = Math.max(MIN_CAP_EXTENSION_INTERVAL_TICKS,
                 (int) Math.round(capExtensionIntervalTicks(difficulty) / playerStack / capPacingMultiplier));
         this.baseCapExtensionIntervalTicks = capExtensionIntervalTicks;
@@ -153,6 +157,7 @@ final class HallsSessionMonsterRuntime {
         activeSpecialType = null;
         specialPool = List.of();
         spawnCooldownTicks = 0;
+        spawnIntervalTicks = SPAWN_INTERVAL_TICKS;
         baseCapExtensionIntervalTicks = 0;
         baseMaxAlive = 0;
         maxAlive = 0;
@@ -369,13 +374,7 @@ final class HallsSessionMonsterRuntime {
     }
 
     void handleMonsterAttack(Entity damager, Player target) {
-        if (!(damager instanceof LivingEntity living) || target == null || !isSessionMonster(living)) {
-            return;
-        }
-        String typeId = living.getPersistentDataContainer().get(monsterTypeKey, PersistentDataType.STRING);
-        if ("dammed_librarian".equals(typeId)) {
-            spawnPoisonCloud(target.getLocation());
-        }
+        // Librarians deploy their poison bomb only when they die.
     }
 
     void spawnPoisonCloud(Location location) {
@@ -450,7 +449,7 @@ final class HallsSessionMonsterRuntime {
         if (spawnCooldownTicks > 0) {
             return;
         }
-        spawnCooldownTicks = SPAWN_INTERVAL_TICKS;
+        spawnCooldownTicks = spawnIntervalTicks;
         if (spawnedMonsters.size() >= maxAlive) {
             return;
         }
@@ -466,7 +465,7 @@ final class HallsSessionMonsterRuntime {
             spawnedMonsters.add(living.getUniqueId());
             spawnedThisFloor++;
             debugSink.accept("Spawned " + type.id() + " at " + cell.x() + " " + origin.y() + " " + cell.z()
-                    + "; next spawn in " + (SPAWN_INTERVAL_TICKS / 20) + "s; alive "
+                    + "; next spawn in " + (spawnIntervalTicks / 20) + "s; alive "
                     + spawnedMonsters.size() + "/" + maxAlive + ".");
             accelerateCapExtensionIfNeeded();
         } else {

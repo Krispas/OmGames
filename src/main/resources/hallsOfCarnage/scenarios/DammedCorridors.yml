@@ -1,9 +1,10 @@
 id: dammed_corridors
 name: "Dammed Corridors"
+ordering: 10
 difficulty: "Hard"
 description:
   - "Nine sprawling dungeon floors, with a bunker camp after each descent."
-  - "Limited research and relentless hazards lead to the Archaic Guard."
+  - "Limited research and relentless hazards lead to the Overdrive Spawner."
 players:
   min: 1
   max: 6
@@ -469,6 +470,6 @@ floors:
   - number: 20
     kind: combat
     level-type: factory
-    difficulty: 40
+    difficulty: 65
     layout: special/untold_depths_overdrive_spawner.txt
-    boss: archaic_guard
+    boss: overdrive_spawner

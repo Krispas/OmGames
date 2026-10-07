@@ -69,8 +69,6 @@ public final class HallsSession {
     private static final int ELEVATOR_OUTER_RADIUS = 3;
     private static final BlockFace ELEVATOR_FRONT_FACE = BlockFace.NORTH;
     private static final int CAMP_ELEVATOR_CORRIDOR_LENGTH = 5;
-    private static final int CLEAR_COLUMNS_PER_TICK = 3;
-    private static final int CORRIDOR_CELLS_PER_TICK = 96;
     private static final int MIN_ELEVATOR_TRANSITION_TICKS = 100;
     private static final int DISPLAY_INTERPOLATION_DELAY_TICKS = 1;
     private static final int DISPLAY_TELEPORT_DURATION_TICKS = 2;
@@ -139,6 +137,7 @@ public final class HallsSession {
     private final java.util.function.Predicate<UUID> debugEnabled;
     private final java.util.function.Consumer<CompletedRun> completionHandler;
     private final String elevatorLocatorIconItemModel;
+    private long endlessRunSeed;
     private final Set<UUID> ghostPlayers = new HashSet<>();
     private final Map<UUID, Map<Integer, Integer>> healthTotemLevels = new HashMap<>();
     private final Map<UUID, Map<Integer, Integer>> speedTotemLevels = new HashMap<>();
@@ -147,6 +146,10 @@ public final class HallsSession {
     private BukkitTask physicsDropTask;
     private BukkitTask researchCrateTask;
     private BukkitTask floorBuildTask;
+    private volatile ExplorationBuild pendingFloorBuild;
+    private volatile boolean floorPlanningStarted;
+    private volatile int planningFloor;
+    private final HallsSessionFloorBuildJob.LoadingProgress floorBuildProgress;
     private BukkitTask gameOverTask;
     private long startedAtMillis;
     private int currentFloor = 1;
@@ -223,20 +226,25 @@ public final class HallsSession {
         this.buildingTypes = buildingTypes == null ? Map.of() : Map.copyOf(buildingTypes);
         this.hostId = hostId;
         this.difficultyId = normalizeId(difficultyId == null || difficultyId.isBlank() ? "normal" : difficultyId);
-        this.difficultyMultiplier = Math.max(1.0, difficultyMultiplier);
+        this.difficultyMultiplier = Math.max(0.1, difficultyMultiplier);
         this.elevatorLocatorIconItemModel = elevatorLocatorIconItemModel == null ? "" : elevatorLocatorIconItemModel.trim();
         this.initialSave = initialSave;
         this.completionHandler = completionHandler;
         this.participants = new HashSet<>();
+        this.floorBuildProgress = new HallsSessionFloorBuildJob.LoadingProgress(world, participants);
         for (Player player : players) {
             participants.add(player.getUniqueId());
         }
+        this.endlessRunSeed = initialSave != null && initialSave.endlessRunSeed() != 0L
+                ? initialSave.endlessRunSeed() : java.util.concurrent.ThreadLocalRandom.current().nextLong();
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
-                this::isAliveParticipant);
+                playerId -> !transitioning && isAliveParticipant(playerId),
+                this.difficultyId.equals("easy") ? 0.5 : 1.0);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
                 this::maxAliveSculkPercent, this::isAliveParticipant,
                 location -> dropSessionItem(location, coinItem(1)), this::debug);
-        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants, this::isAliveParticipant,
+        this.trapRuntime = new HallsSessionTrapRuntime(plugin, world, origin, participants,
+                playerId -> !transitioning && isAliveParticipant(playerId),
                 this::setBlock, this.trapTypes,
                 () -> activeFloorModifiers.trapDamageMultiplier(),
                 location -> dropSessionItem(location, coinItem(1)), monsterRuntime::spawnConfiguredMonster,
@@ -754,7 +762,7 @@ public final class HallsSession {
         }
         if (completionHandler != null) {
             completionHandler.accept(new CompletedRun(id, scenario.id(), difficultyId, Math.max(0, runShame),
-                    Set.copyOf(participants), saveFile()));
+                    Set.copyOf(participants), saveFile(), false, currentFloor));
         }
     }
 
@@ -841,7 +849,16 @@ public final class HallsSession {
             return;
         }
         removeCarriedResearchCrate(player.getUniqueId());
-        clearTotemAttributeModifiers(player);
+        clearTotemBuffs(player);
+        player.setInvisible(false);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        player.removePotionEffect(PotionEffectType.INVISIBILITY);
+        player.removePotionEffect(PotionEffectType.GLOWING);
+        player.setGameMode(GameMode.ADVENTURE);
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
+        healPlayerToFull(player);
         sidebar.restore(player.getUniqueId());
     }
 
@@ -1670,7 +1687,7 @@ public final class HallsSession {
         researchCrateDepositedThisFloor = false;
         activeFloorModifiers = HallsFloorModifiers.none();
         floorStartedAtMillis = System.currentTimeMillis();
-        HallsScenario.FloorDefinition floorDefinition = scenario.floor(1);
+        HallsScenario.FloorDefinition floorDefinition = floorDefinition(1);
         HallsLevelType levelType = levelTypeFor(floorDefinition);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = 1;
@@ -1734,7 +1751,7 @@ public final class HallsSession {
     }
 
     private void buildFloor(int floor) {
-        HallsScenario.FloorDefinition definition = scenario.floor(floor);
+        HallsScenario.FloorDefinition definition = floorDefinition(floor);
         if ("camp".equalsIgnoreCase(definition.kind())) {
             buildCampFloor(floor);
             return;
@@ -1750,7 +1767,7 @@ public final class HallsSession {
         captureCurrentCampState();
         captureElevatorChestContents();
         removeSessionEntities();
-        activeClearRadius = clearRadiusFor(scenario.floor(floor));
+        activeClearRadius = clearRadiusFor(floorDefinition(floor));
         ExplorationBuild build = planExplorationBuild(floor);
         clearBuildVolume();
         buildElevator();
@@ -1787,7 +1804,7 @@ public final class HallsSession {
         captureCurrentCampState();
         captureElevatorChestContents();
         removeSessionEntities();
-        HallsScenario.FloorDefinition floorDefinition = adjustedDifficulty(scenario.floor(floor));
+        HallsScenario.FloorDefinition floorDefinition = adjustedDifficulty(floorDefinition(floor));
         HallsLevelType levelType = levelTypeFor(floorDefinition);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = 1;
@@ -1813,6 +1830,8 @@ public final class HallsSession {
         restoreElevatorChestContents();
         closeElevatorDoors();
         openElevatorDoors();
+        world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.7f);
         Location bossLocation = bossCenterLocation(layout, roomStartX, roomStartZ);
         Set<HallsExplorationGenerator.Cell> bossArenaCells = bossArenaCells(layout, roomStartX, roomStartZ);
         HallsSessionBossRuntime.DoorSeal seal = new HallsSessionBossRuntime.DoorSeal(
@@ -1826,6 +1845,10 @@ public final class HallsSession {
         bossRuntime.prepare(floorDefinition.boss(), bossLocation, seal, bossArenaCells,
                 parseDifficulty(floorDefinition.difficulty(), floorDefinition.firstFloor()));
         teleportParticipantsToElevator("Floor " + floor, "Boss: " + bossName(floorDefinition.boss()));
+    }
+
+    private HallsScenario.FloorDefinition floorDefinition(int floor) {
+        return scenario.endless() ? scenario.endlessFloor(floor, endlessRunSeed) : scenario.floor(floor);
     }
 
     private Set<HallsExplorationGenerator.Cell> bossArenaCells(HallsLayout layout, int roomStartX, int roomStartZ) {
@@ -1952,7 +1975,7 @@ public final class HallsSession {
     }
 
     private boolean isCurrentFloorBoss() {
-        HallsScenario.FloorDefinition definition = scenario.floor(currentFloor);
+        HallsScenario.FloorDefinition definition = floorDefinition(currentFloor);
         return "combat".equalsIgnoreCase(definition.kind()) && !definition.boss().isBlank();
     }
 
@@ -1971,7 +1994,7 @@ public final class HallsSession {
         captureCurrentCampState();
         captureElevatorChestContents();
         removeSessionEntities();
-        HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
+        HallsScenario.FloorDefinition floorDefinition = floorDefinition(floor);
         HallsLevelType levelType = levelTypeFor(floorDefinition);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = 1;
@@ -2030,7 +2053,6 @@ public final class HallsSession {
         int connectorTargetZ = southDock ? roomStartZ + linkZ + 1 : roomStartZ + linkZ - 1;
         buildCampConnector(roomStartX + linkX, origin.y(), connectorTargetZ, levelType);
         depositCampBankCoins();
-        awardResearchForCampArrival(refreshRunUses);
         clearAllTotemBuffs();
         restoreElevatorChestContents();
         closeElevatorDoors();
@@ -2070,7 +2092,7 @@ public final class HallsSession {
 
     private void startStagedFloorBuild(int floor) {
         cancelFloorBuildTask();
-        HallsScenario.FloorDefinition definition = scenario.floor(floor);
+        HallsScenario.FloorDefinition definition = floorDefinition(floor);
         if ("camp".equalsIgnoreCase(definition.kind())) {
             buildCampFloor(floor);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -2098,8 +2120,10 @@ public final class HallsSession {
             return;
         }
         int oldClearRadius = activeClearRadius;
-        activeClearRadius = clearRadiusFor(scenario.floor(floor));
-        FloorBuildJob job = new FloorBuildJob(floor, Math.max(oldClearRadius, activeClearRadius));
+        activeClearRadius = clearRadiusFor(floorDefinition(floor));
+        HallsSessionFloorBuildJob job = new HallsSessionFloorBuildJob(this, floor,
+                Math.max(oldClearRadius, activeClearRadius), origin.x());
+        updateFloorBuildProgress(0.0, "Planning");
         floorBuildTask = Bukkit.getScheduler().runTaskTimer(plugin, job::tick, 1L, 1L);
     }
 
@@ -2116,6 +2140,29 @@ public final class HallsSession {
                     teleportSessionPlayer(player, spawn);
                 }
                 player.sendTitle(title, subtitle, 10, 45, 15);
+            }
+        }
+        announceBlueprintDistilleryRewards();
+    }
+
+    private void announceBlueprintDistilleryRewards() {
+        if (blueprintDistilleries.isEmpty()) {
+            return;
+        }
+        List<ItemStack> rewards = currentLevelBlueprintSet();
+        if (rewards.isEmpty()) {
+            return;
+        }
+        String names = rewards.stream()
+                .map(ItemStack::getItemMeta)
+                .filter(java.util.Objects::nonNull)
+                .map(meta -> meta.hasDisplayName() ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(meta.displayName()) : "Blueprint")
+                .collect(java.util.stream.Collectors.joining(", "));
+        Component message = Component.text("Blueprint distillery rewards on this level: " + names + ".", NamedTextColor.AQUA);
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.sendMessage(message);
             }
         }
     }
@@ -2207,17 +2254,14 @@ public final class HallsSession {
 
     private ExplorationBuild planExplorationBuild(int floor) {
         long started = System.nanoTime();
-        HallsScenario.FloorDefinition rawFloorDefinition = adjustedDifficulty(scenario.floor(floor));
+        HallsScenario.FloorDefinition rawFloorDefinition = adjustedDifficulty(floorDefinition(floor));
         HallsLevelType levelType = levelTypeFor(rawFloorDefinition);
         Random random = floorRandom();
         activeFloorModifiers = scannedFloorModifiers.remove(floor);
         if (activeFloorModifiers == null) {
-            activeFloorModifiers = selectFloorModifiers(rawFloorDefinition, levelType, random, true);
-        } else {
-            revealFloorModifiers(activeFloorModifiers);
+            activeFloorModifiers = selectFloorModifiers(rawFloorDefinition, levelType, random, false);
         }
         HallsScenario.FloorDefinition floorDefinition = activeFloorModifiers.adjustFloor(rawFloorDefinition, random);
-        debugModifierAdjustments(rawFloorDefinition, floorDefinition, activeFloorModifiers, levelType);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = Math.max(1, floorDefinition.rooms());
         activeGeneratedRooms = 0;
@@ -2373,7 +2417,7 @@ public final class HallsSession {
         debugGeneration("contents", started, "breakables " + (new HashSet<>(breakableProps.values()).size() - before));
     }
 
-    private Set<HallsExplorationGenerator.Cell> placeResearchCrate(ExplorationBuild build,
+    Set<HallsExplorationGenerator.Cell> placeResearchCrate(ExplorationBuild build,
                                                                    Set<HallsExplorationGenerator.Cell> reservedCells) {
         if (build == null || build.plan().rooms().isEmpty() || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())) {
             return Set.of();
@@ -2384,6 +2428,9 @@ public final class HallsSession {
         }
         java.util.Collections.shuffle(rooms, build.random());
         for (HallsExplorationGenerator.Room room : rooms) {
+            if (room.ventOnly()) {
+                continue;
+            }
             List<Cell> cells = openInteriorCells(room);
             java.util.Collections.shuffle(cells, build.random());
             for (Cell cell : cells) {
@@ -2516,7 +2563,15 @@ public final class HallsSession {
 
     private Set<HallsExplorationGenerator.Cell> placeBlueprintDistilleries(ExplorationBuild build,
                                                                            Set<HallsExplorationGenerator.Cell> reservedCells) {
-        removeBlueprintDistilleries();
+        return placeFloorDistilleryRoom(build, reservedCells, null);
+    }
+
+    Set<HallsExplorationGenerator.Cell> placeFloorDistilleryRoom(ExplorationBuild build,
+                                                                Set<HallsExplorationGenerator.Cell> reservedCells,
+                                                                HallsExplorationGenerator.Room onlyRoom) {
+        if (onlyRoom == null) {
+            removeBlueprintDistilleries();
+        }
         if (build == null || build.plan().rooms().size() <= 1
                 || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())
                 || build.floorDefinition().blueprintDistilleries() <= 0) {
@@ -2527,6 +2582,9 @@ public final class HallsSession {
         Set<HallsExplorationGenerator.Cell> occupied = reservedCells == null ? Set.of() : reservedCells;
         List<HallsExplorationGenerator.Room> rooms = new ArrayList<>(build.plan().rooms());
         rooms.removeFirst();
+        if (onlyRoom != null) {
+            rooms = new ArrayList<>(List.of(onlyRoom));
+        }
         java.util.Collections.shuffle(rooms, build.random());
         int placed = 0;
         for (HallsExplorationGenerator.Room room : rooms) {
@@ -2555,7 +2613,7 @@ public final class HallsSession {
                 break;
             }
         }
-        if (placed < targetCount) {
+        if (onlyRoom == null && placed < targetCount) {
             debug("Placed " + placed + "/" + targetCount
                     + " blueprint distilleries on floor " + build.floor() + ".");
         }
@@ -2684,13 +2742,26 @@ public final class HallsSession {
 
     private Set<HallsExplorationGenerator.Cell> placeLibraryVents(ExplorationBuild build,
                                                                   Set<HallsExplorationGenerator.Cell> reservedCells) {
-        removeLibraryVents();
+        return placeFloorLibraryVent(build, reservedCells, -1);
+    }
+
+    Set<HallsExplorationGenerator.Cell> placeFloorLibraryVent(ExplorationBuild build,
+                                                             Set<HallsExplorationGenerator.Cell> reservedCells,
+                                                             int onlyRoomIndex) {
+        if (onlyRoomIndex < 0) {
+            removeLibraryVents();
+        }
         if (build == null || build.plan().rooms().size() <= 1
                 || !"exploration".equalsIgnoreCase(build.floorDefinition().kind())
                 || !"library".equalsIgnoreCase(build.levelType().id())) {
             return Set.of();
         }
         Set<HallsExplorationGenerator.Cell> reserved = new HashSet<>();
+        if (onlyRoomIndex >= 0) {
+            for (LibraryVent vent : libraryVents.values()) {
+                reserved.add(new HallsExplorationGenerator.Cell(vent.x(), vent.z()));
+            }
+        }
         List<Integer> ventOnlyRooms = new ArrayList<>();
         for (int roomIndex = 0; roomIndex < build.plan().rooms().size(); roomIndex++) {
             if (build.plan().rooms().get(roomIndex).ventOnly()) {
@@ -2703,8 +2774,20 @@ public final class HallsSession {
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         java.util.Collections.shuffle(connectedCandidates, build.random());
         Map<Integer, Integer> ventsByRoom = new HashMap<>();
+        if (onlyRoomIndex >= 0) {
+            for (int i = 0; i < build.plan().rooms().size(); i++) {
+                HallsExplorationGenerator.Room room = build.plan().rooms().get(i);
+                int count = (int) reserved.stream().filter(cell -> cell.x() >= room.startX()
+                        && cell.x() < room.startX() + room.layout().width()
+                        && cell.z() >= room.startZ() && cell.z() < room.startZ() + room.layout().depth()).count();
+                if (count > 0) ventsByRoom.put(i, count);
+            }
+        }
         int pairs = 0;
         for (int roomIndex : ventOnlyRooms) {
+            if (onlyRoomIndex >= 0 && roomIndex != onlyRoomIndex) {
+                continue;
+            }
             LibraryVentCandidate first = firstLibraryVentCandidateForRoom(build, roomIndex, reservedCells, reserved, true);
             if (first == null) {
                 first = firstLibraryVentCandidateForRoom(build, roomIndex, null, reserved, false);
@@ -2731,7 +2814,7 @@ public final class HallsSession {
             ventsByRoom.merge(second.roomIndex(), 1, Integer::sum);
             pairs++;
         }
-        if (pairs < ventOnlyRooms.size()) {
+        if (onlyRoomIndex < 0 && pairs < ventOnlyRooms.size()) {
             debug("Placed " + pairs + "/" + ventOnlyRooms.size() + " library vent pairs on floor " + build.floor() + ".");
         }
         return Set.copyOf(reserved);
@@ -3184,7 +3267,7 @@ public final class HallsSession {
         return Set.copyOf(liquidCells);
     }
 
-    private Set<HallsExplorationGenerator.Cell> roomLiquidCells(ExplorationBuild build,
+    Set<HallsExplorationGenerator.Cell> roomLiquidCells(ExplorationBuild build,
                                                                 HallsExplorationGenerator.Room room,
                                                                 Set<HallsExplorationGenerator.Cell> reservedCells) {
         List<HallsExplorationGenerator.Cell> candidates = roomLiquidCandidateCells(room).stream()
@@ -3271,7 +3354,7 @@ public final class HallsSession {
         return cells;
     }
 
-    private void renderLiquidCell(HallsExplorationGenerator.Cell cell,
+    void renderLiquidCell(HallsExplorationGenerator.Cell cell,
                                   HallsLevelType levelType,
                                   Set<HallsExplorationGenerator.Cell> liquidCells) {
         Material liquid = levelType.liquid().material();
@@ -3292,12 +3375,12 @@ public final class HallsSession {
         }
     }
 
-    private void placeVegetationInCells(ExplorationBuild build,
+    void placeVegetationInCells(ExplorationBuild build,
                                         List<HallsExplorationGenerator.Cell> cells,
                                         Set<HallsExplorationGenerator.Cell> reservedCells,
                                         Set<HallsExplorationGenerator.Cell> occupied,
                                         double chanceMultiplier) {
-        if (cells.isEmpty()) {
+        if (cells.isEmpty() || vegetationTypes.isEmpty() || build.levelType().vegetation().isEmpty()) {
             return;
         }
         java.util.Collections.shuffle(cells, build.random());
@@ -3328,7 +3411,7 @@ public final class HallsSession {
         return cells;
     }
 
-    private List<HallsExplorationGenerator.Cell> vegetationCorridorCells(ExplorationBuild build) {
+    List<HallsExplorationGenerator.Cell> vegetationCorridorCells(ExplorationBuild build) {
         return build.plan().corridorCells().stream()
                 .filter(cell -> Math.abs(cell.x() - origin.x()) + Math.abs(cell.z() - origin.z()) > 12)
                 .filter(cell -> !isInsideGeneratedRoomShell(cell, build.plan().rooms()))
@@ -3350,7 +3433,7 @@ public final class HallsSession {
         return Set.copyOf(result);
     }
 
-    private int rareBreakableRoomIndex(HallsExplorationGenerator.Plan plan,
+    int rareBreakableRoomIndex(HallsExplorationGenerator.Plan plan,
                                        Set<HallsExplorationGenerator.Cell> reservedCells,
                                        Random random) {
         List<Integer> candidates = new ArrayList<>();
@@ -3370,7 +3453,8 @@ public final class HallsSession {
             return;
         }
         debug("Starting monster runtime on floor " + build.floor() + ": " + build.levelType().id() + ".");
-        monsterRuntime.startExplorationFloor(build.plan(), build.floorDefinition(), build.levelType(), activeFloorModifiers, build.random());
+        monsterRuntime.startExplorationFloor(build.plan(), build.floorDefinition(), build.levelType(), activeFloorModifiers,
+                build.random(), difficultyId.equals("easy"));
     }
 
     private void renderExplorationSculk(ExplorationBuild build, Set<HallsExplorationGenerator.Cell> reservedCells) {
@@ -3398,8 +3482,9 @@ public final class HallsSession {
         }
         int difficulty = parseDifficulty(floorDefinition.difficulty(), floorDefinition.firstFloor());
         int goodChance = Math.max(0, Math.min(100, 50 - difficulty));
-        List<HallsModifierType> good = applicableModifiers(levelType, true);
-        List<HallsModifierType> bad = applicableModifiers(levelType, false);
+        String modifierScenario = scenario.endless() ? "untold_depths" : scenario.id();
+        List<HallsModifierType> good = applicableModifiers(levelType, true, modifierScenario);
+        List<HallsModifierType> bad = applicableModifiers(levelType, false, modifierScenario);
         List<HallsModifierType> selected = new ArrayList<>();
         for (int slot = 0; slot < 3; slot++) {
             boolean wantGood = random.nextInt(100) < goodChance;
@@ -3425,7 +3510,7 @@ public final class HallsSession {
         int remaining = Math.max(1, Math.min(3, scannerLevel));
         List<String> lines = new ArrayList<>();
         for (int floor = currentFloor + 1; floor <= scenario.floorCount() && lines.size() < remaining; floor++) {
-            HallsScenario.FloorDefinition raw = adjustedDifficulty(scenario.floor(floor));
+            HallsScenario.FloorDefinition raw = adjustedDifficulty(floorDefinition(floor));
             if (raw == null || !"exploration".equalsIgnoreCase(raw.kind())) {
                 continue;
             }
@@ -3437,11 +3522,14 @@ public final class HallsSession {
         return lines.isEmpty() ? List.of("No upcoming exploration floors found.") : lines;
     }
 
-    private List<HallsModifierType> applicableModifiers(HallsLevelType levelType, boolean good) {
+    private List<HallsModifierType> applicableModifiers(HallsLevelType levelType, boolean good, String scenarioId) {
         String levelTypeId = levelType == null ? "" : levelType.id();
         return modifierTypes.values().stream()
                 .filter(modifier -> modifier.weight() > 0 && modifier.good() == good)
                 .filter(modifier -> {
+                    Object scopedScenario = modifier.effects().get("scenario");
+                    if (scopedScenario == null || !normalizeId(String.valueOf(scopedScenario))
+                            .equals(normalizeId(scenarioId))) return false;
                     Object restricted = modifier.effects().get("level_type");
                     return restricted == null || normalizeId(String.valueOf(restricted)).equals(levelTypeId);
                 })
@@ -3584,7 +3672,7 @@ public final class HallsSession {
         clearBuildVolumeColumns(origin.x() - activeClearRadius, origin.x() + activeClearRadius, activeClearRadius);
     }
 
-    private void clearBuildVolumeColumns(int minX, int maxX, int radius) {
+    void clearBuildVolumeColumns(int minX, int maxX, int radius) {
         for (int x = minX; x <= maxX; x++) {
             for (int y = origin.y() - 16; y <= origin.y() + CLEAR_HEIGHT; y++) {
                 for (int z = origin.z() - radius; z <= origin.z() + radius; z++) {
@@ -4123,7 +4211,7 @@ public final class HallsSession {
         }
     }
 
-    private void placeGeneratedRoomContents(HallsExplorationGenerator.Room room,
+    void placeGeneratedRoomContents(HallsExplorationGenerator.Room room,
                                             Random random,
                                             int floor,
                                             int roomIndex,
@@ -4339,9 +4427,12 @@ public final class HallsSession {
         if (!running) {
             return;
         }
-        tickDeathFog();
-        tickBlueprintDistilleryBeams();
-        tickLibraryVentSmoke();
+        if (!transitioning) {
+            tickDeathFog();
+            tickBlueprintDistilleryBeams();
+            tickLibraryVentSmoke();
+        }
+        floorBuildProgress.send();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
@@ -4354,6 +4445,10 @@ public final class HallsSession {
                 sidebar.restore(playerId);
             }
         }
+    }
+
+    void updateFloorBuildProgress(double progress, String phase) {
+        floorBuildProgress.update(progress, phase);
     }
 
     private SidebarState sidebarState(Player player) {
@@ -4446,7 +4541,7 @@ public final class HallsSession {
     }
 
     private int currentCoinQuota() {
-        HallsScenario.FloorDefinition floor = adjustedDifficulty(scenario.floor(currentFloor));
+        HallsScenario.FloorDefinition floor = adjustedDifficulty(floorDefinition(currentFloor));
         int quota = floor.coinQuota();
         if ("exploration".equalsIgnoreCase(floor.kind()) && !activeFloorModifiers.empty()) {
             quota = Math.max(0, (int) Math.round(quota * activeFloorModifiers.coinQuotaMultiplier())
@@ -4486,14 +4581,15 @@ public final class HallsSession {
     }
 
     private HallsScenario.FloorDefinition adjustedDifficulty(HallsScenario.FloorDefinition floor) {
-        if (floor == null || difficultyMultiplier <= 1.0) {
+        if (floor == null || Math.abs(difficultyMultiplier - 1.0) < 0.0001) {
             return floor;
         }
         int difficulty = Math.max(0, (int) Math.round(parseDifficulty(floor.difficulty(), floor.firstFloor()) * difficultyMultiplier));
-        int trappedRooms = Math.max(0, (int) Math.round(floor.trappedRooms() * difficultyMultiplier));
-        int holes = Math.max(0, (int) Math.round(floor.holes() * difficultyMultiplier));
-        int sculkPatches = Math.max(0, (int) Math.round(floor.sculkPatches() * difficultyMultiplier));
-        int coinQuota = Math.max(0, (int) Math.round(floor.coinQuota() * difficultyMultiplier));
+        boolean easy = difficultyId.equals("easy");
+        int trappedRooms = Math.max(0, (int) Math.round(floor.trappedRooms() * (easy ? 1.0 : difficultyMultiplier)));
+        int holes = Math.max(0, (int) Math.round(floor.holes() * (easy ? 1.0 : difficultyMultiplier)));
+        int sculkPatches = Math.max(0, (int) Math.round(floor.sculkPatches() * (easy ? 1.0 : difficultyMultiplier)));
+        int coinQuota = Math.max(0, (int) Math.round(floor.coinQuota() * (easy ? 0.75 : difficultyMultiplier)));
         return new HallsScenario.FloorDefinition(
                 floor.firstFloor(),
                 floor.lastFloor(),
@@ -4519,7 +4615,7 @@ public final class HallsSession {
     }
 
     private void addRunShame(int amount) {
-        if (amount <= 0) {
+        if (amount <= 0 || scenario.endless()) {
             return;
         }
         runShame = Math.max(0, runShame + amount);
@@ -4527,6 +4623,7 @@ public final class HallsSession {
 
     private int adjustedCompletionShame() {
         double factor = switch (difficultyId) {
+            case "easy" -> 3.0;
             case "hard" -> 0.7;
             case "extreme" -> 0.5;
             default -> 1.0;
@@ -4536,6 +4633,7 @@ public final class HallsSession {
 
     private String displayDifficulty(String difficultyId) {
         return switch (difficultyId) {
+            case "easy" -> "Easy";
             case "hard" -> "Hard";
             case "extreme" -> "Extreme";
             default -> "Normal";
@@ -5300,14 +5398,16 @@ public final class HallsSession {
 
     private boolean activateLodestone(Player player, HallsItemType type) {
         int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("duration_seconds", 20.0) * 20.0));
+        List<HallsExplorationGenerator.Cell> path = List.copyOf(pathToElevator(player.getLocation()));
+        if (path.isEmpty()) {
+            player.sendActionBar(Component.text("The lodestone cannot find a route to the elevator.", NamedTextColor.RED));
+            return true;
+        }
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!running || !player.isOnline() || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())) {
                 return;
             }
-            List<HallsExplorationGenerator.Cell> path = pathToElevator(player.getLocation());
-            if (!path.isEmpty()) {
-                renderCellPathParticles(path, Particle.ELECTRIC_SPARK);
-            }
+            renderCellPathParticles(path, Particle.ELECTRIC_SPARK);
         }, 1L, 10L);
         Bukkit.getScheduler().runTaskLater(plugin, task::cancel, durationTicks);
         world.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.2f);
@@ -5980,7 +6080,8 @@ public final class HallsSession {
         if (ghost == null) {
             return;
         }
-        Component message = Component.text(ghost.getName() + " became a ghost.", NamedTextColor.DARK_RED);
+        Component message = Component.text().append(ghost.displayName())
+                .append(Component.text(" succumbed to the halls.", NamedTextColor.AQUA)).build();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {
@@ -6065,6 +6166,10 @@ public final class HallsSession {
     private void scheduleGameOver() {
         if (gameOverTask != null) {
             return;
+        }
+        if (scenario.endless() && completionHandler != null) {
+            completionHandler.accept(new CompletedRun(id, scenario.id(), difficultyId, 0,
+                    Set.copyOf(participants), saveFile(), true, currentFloor));
         }
         addRunShame(50);
         for (UUID playerId : participants) {
@@ -6255,6 +6360,7 @@ public final class HallsSession {
             yaml.set("schema-version", 1);
             yaml.set("reason", reason);
             yaml.set("scenario", scenario.id());
+            yaml.set("endless.run-seed", endlessRunSeed);
             yaml.set("host", hostId.toString());
             yaml.set("difficulty.id", difficultyId);
             yaml.set("difficulty.multiplier", difficultyMultiplier);
@@ -6292,6 +6398,7 @@ public final class HallsSession {
         ghostPlayers.clear();
         savedCampStates.clear();
         savedCampStates.putAll(save.camps());
+        resetCampHarvestForNewRun();
         savedCampUnlockedDoors.clear();
         savedCampUnlockedDoors.putAll(save.campUnlockedDoors());
         elevatorChestContents = cloneArray(save.elevatorChest(), 27);
@@ -6520,23 +6627,6 @@ public final class HallsSession {
         }
     }
 
-    private void awardResearchForCampArrival(boolean normalArrival) {
-        if (!normalArrival || explorationFloorsSinceCamp <= 0) {
-            return;
-        }
-        int awarded = explorationFloorsSinceCamp;
-        researchPoints += awarded;
-        addRunShame(awarded);
-        explorationFloorsSinceCamp = 0;
-        for (UUID playerId : participants) {
-            Player player = Bukkit.getPlayer(playerId);
-            if (player != null && player.getWorld().equals(world)) {
-                player.sendMessage(Component.text("Camp research gained " + awarded + " point"
-                        + (awarded == 1 ? "." : "s."), NamedTextColor.AQUA));
-            }
-        }
-    }
-
     private void unlockRootResearch() {
         if (scenario == null || !scenario.usesResearch()) {
             return;
@@ -6584,7 +6674,7 @@ public final class HallsSession {
         if (currentFloor < 1 || currentFloor > scenario.floorCount()) {
             return false;
         }
-        return "camp".equalsIgnoreCase(scenario.floor(currentFloor).kind());
+        return "camp".equalsIgnoreCase(floorDefinition(currentFloor).kind());
     }
 
     private void resetRunState(boolean resetCampProgress) {
@@ -6865,11 +6955,14 @@ public final class HallsSession {
         }
     }
 
-    private void cancelFloorBuildTask() {
+    void cancelFloorBuildTask() {
         if (floorBuildTask != null) {
             floorBuildTask.cancel();
             floorBuildTask = null;
         }
+        floorPlanningStarted = false;
+        pendingFloorBuild = null;
+        floorBuildProgress.clear();
     }
 
     private void tickPhysicsDrops() {
@@ -7248,140 +7341,118 @@ public final class HallsSession {
         return Material.IRON_BARS;
     }
 
-    private final class FloorBuildJob {
-        private final int floor;
-        private int clearRadius;
-        private int clearX;
-        private int stage;
-        private int roomIndex;
-        private int corridorIndex;
-        private int contentRoomIndex;
-        private int rareBreakableRoomIndex = -1;
-        private int ticksElapsed;
-        private ExplorationBuild build;
-        private List<HallsExplorationGenerator.Cell> corridorShellCells = List.of();
-        private Set<HallsExplorationGenerator.Cell> reservedCells = Set.of();
-        private long contentStartedNanos;
-        private int contentBreakablesBefore;
-
-        private FloorBuildJob(int floor, int clearRadius) {
-            this.floor = floor;
-            this.clearRadius = clearRadius;
+    ExplorationBuild beginFloorBuild(int floor) {
+        if (floorPlanningStarted) {
+            return pendingFloorBuild;
         }
-
-        private void tick() {
-            if (!running) {
-                cancelFloorBuildTask();
-                return;
+        captureElevatorChestContents();
+        removeSessionEntities();
+        currentFloor = floor;
+        researchCrateDepositedThisFloor = false;
+        planningFloor = floor;
+        floorPlanningStarted = true;
+        pendingFloorBuild = null;
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                ExplorationBuild planned = planExplorationBuild(floor);
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (running && floorPlanningStarted && planningFloor == floor) {
+                        pendingFloorBuild = planned;
+                        HallsScenario.FloorDefinition definition = adjustedDifficulty(floorDefinition(floor));
+                        debugModifierAdjustments(definition, planned.floorDefinition(), activeFloorModifiers, planned.levelType());
+                        revealFloorModifiers(activeFloorModifiers);
+                    }
+                });
+            } catch (Throwable failure) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (!running || !floorPlanningStarted || planningFloor != floor) {
+                        return;
+                    }
+                    plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                            "Failed to plan Halls floor " + floor + ".", failure);
+                    cancelFloorBuildTask();
+                    transitioning = false;
+                    openElevatorDoors();
+                });
             }
-            ticksElapsed++;
-            switch (stage) {
-                case 0 -> plan();
-                case 1 -> clearNextColumns();
-                case 2 -> buildElevatorPass();
-                case 3 -> buildNextRoom();
-                case 4 -> buildNextCorridorCells();
-                case 5 -> buildTraps();
-                case 6 -> buildNextRoomContents();
-                default -> finish();
-            }
-        }
+        });
+        return null;
+    }
 
-        private void plan() {
-            captureElevatorChestContents();
-            removeSessionEntities();
-            build = planExplorationBuild(floor);
-            clearRadius = Math.max(clearRadius, activeClearRadius);
-            clearX = origin.x() - clearRadius;
-            currentFloor = floor;
-            researchCrateDepositedThisFloor = false;
-            stage = 1;
-        }
+    boolean floorBuildPlanningStarted() {
+        return floorPlanningStarted;
+    }
 
-        private void clearNextColumns() {
-            int maxX = origin.x() + clearRadius;
-            int endX = Math.min(maxX, clearX + CLEAR_COLUMNS_PER_TICK - 1);
-            clearBuildVolumeColumns(clearX, endX, clearRadius);
-            clearX = endX + 1;
-            if (clearX > maxX) {
-                stage = 2;
-            }
-        }
+    boolean floorBuildPlanReady() {
+        return pendingFloorBuild != null;
+    }
 
-        private void buildElevatorPass() {
-            buildElevator();
-            ensureElevatorWaypoint();
-            closeElevatorDoors();
-            stage = 3;
-        }
+    ExplorationBuild takeFloorBuildPlan() {
+        ExplorationBuild build = pendingFloorBuild;
+        pendingFloorBuild = null;
+        floorPlanningStarted = false;
+        return build;
+    }
 
-        private void buildNextRoom() {
-            if (build.plan().rooms().isEmpty() || roomIndex >= build.plan().rooms().size()) {
-                corridorShellCells = new ArrayList<>(build.plan().corridorShellCells());
-                stage = 4;
-                return;
-            }
-            HallsExplorationGenerator.Room room = build.plan().rooms().get(roomIndex++);
-            buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(),
-                    room.openings(), build.levelType(), build.random());
-        }
+    boolean floorBuildRunning() {
+        return running;
+    }
 
-        private void buildNextCorridorCells() {
-            if (corridorIndex >= corridorShellCells.size()) {
-                stage = 5;
-                return;
-            }
-            int end = Math.min(corridorShellCells.size(), corridorIndex + CORRIDOR_CELLS_PER_TICK);
-            while (corridorIndex < end) {
-                buildGeneratedCorridorCell(build.plan(), build.levelType(), corridorShellCells.get(corridorIndex++));
-            }
-        }
+    int floorBuildClearRadius() {
+        return activeClearRadius;
+    }
 
-        private void buildTraps() {
-            reservedCells = renderExplorationTraps(build, Set.of());
-            activeLiquidCells = renderExplorationLiquids(build, reservedCells);
-            Set<HallsExplorationGenerator.Cell> liquidReservedCells = withReserved(reservedCells, activeLiquidCells);
-            Set<HallsExplorationGenerator.Cell> vegetationCells = renderExplorationVegetation(build, liquidReservedCells);
-            renderExplorationSculk(build, reservedCells);
-            reservedCells = withReserved(reservedCells, vegetationCells);
-            reservedCells = withReserved(reservedCells, placeResearchCrate(build, reservedCells));
-            reservedCells = withReserved(reservedCells, placeBlueprintDistilleries(build, reservedCells));
-            reservedCells = withReserved(reservedCells, placeLibraryVents(build, reservedCells));
-            rareBreakableRoomIndex = rareBreakableRoomIndex(build.plan(), reservedCells, build.random());
-            contentStartedNanos = System.nanoTime();
-            contentBreakablesBefore = new HashSet<>(breakableProps.values()).size();
-            stage = 6;
-        }
+    void buildFloorElevator() {
+        buildElevator();
+        ensureElevatorWaypoint();
+        closeElevatorDoors();
+    }
 
-        private void buildNextRoomContents() {
-            if (contentRoomIndex >= build.plan().rooms().size()) {
-                debugGeneration("contents", contentStartedNanos,
-                        "breakables " + (new HashSet<>(breakableProps.values()).size() - contentBreakablesBefore));
-                startExplorationMonsters(build);
-                stage = 7;
-                return;
-            }
-            placeGeneratedRoomContents(build.plan().rooms().get(contentRoomIndex), build.random(), build.floor(),
-                    contentRoomIndex, build.floorDefinition(), build.levelType(), reservedCells,
-                    contentRoomIndex == rareBreakableRoomIndex);
-            contentRoomIndex++;
-        }
+    void buildFloorRoom(ExplorationBuild build, HallsExplorationGenerator.Room room) {
+        buildLayoutRoom(room.layout(), room.startX(), origin.y(), room.startZ(),
+                room.openings(), build.levelType(), build.random());
+    }
 
-        private void finish() {
-            if (ticksElapsed < MIN_ELEVATOR_TRANSITION_TICKS) {
-                return;
-            }
-            restoreElevatorChestContents();
-            closeElevatorDoors();
-            floorStartedAtMillis = System.currentTimeMillis();
-            teleportParticipantsToElevator("Floor " + floor, explorationFloorSubtitle(build.levelType()));
-            applyCompassModifier();
-            openElevatorDoors();
-            transitioning = false;
-            world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
-                    Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.8f);
-            cancelFloorBuildTask();
-        }
+    void buildFloorCorridor(ExplorationBuild build, HallsExplorationGenerator.Cell cell) {
+        buildGeneratedCorridorCell(build.plan(), build.levelType(), cell);
+    }
+
+    HallsSessionTrapRuntime.GeneratedTrapPlacement beginFloorTraps(ExplorationBuild build) {
+        HallsSessionTrapRuntime.GeneratedTrapPlacement placement = trapRuntime.beginGeneratedTraps(
+                build.plan(), build.random(), build.floorDefinition(),
+                build.levelType(), activeFloorModifiers, Set.of());
+        trapRuntime.pause();
+        return placement;
+    }
+
+    HallsSessionSculkRuntime.PatchPlacement beginFloorSculk(ExplorationBuild build,
+                                                         Set<HallsExplorationGenerator.Cell> reserved) {
+        return sculkRuntime.beginPatches(build.plan(), build.floorDefinition(), build.random(), reserved);
+    }
+
+    void setFloorLiquids(Set<HallsExplorationGenerator.Cell> cells) {
+        activeLiquidCells = Set.copyOf(cells);
+    }
+
+    List<HallsExplorationGenerator.Cell> floorRoomVegetationCells(HallsExplorationGenerator.Room room) {
+        return openInteriorCells(room).stream()
+                .map(cell -> new HallsExplorationGenerator.Cell(room.startX() + cell.x(), room.startZ() + cell.z()))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+    }
+
+    void finishFloorBuild(ExplorationBuild build) {
+        restoreElevatorChestContents();
+        closeElevatorDoors();
+        floorStartedAtMillis = System.currentTimeMillis();
+        teleportParticipantsToElevator("Floor " + build.floor(), explorationFloorSubtitle(build.levelType()));
+        applyCompassModifier();
+        openElevatorDoors();
+        transitioning = false;
+        trapRuntime.resume();
+        startExplorationMonsters(build);
+        world.playSound(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5),
+                Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 0.8f);
+        cancelFloorBuildTask();
     }
 
     private record RoomBounds(int minX, int maxX, int minZ, int maxZ) {
@@ -7406,7 +7477,7 @@ public final class HallsSession {
     private record BlockSnapshot(int x, int y, int z, BlockData blockData) {
     }
 
-    private record ExplorationBuild(int floor,
+    record ExplorationBuild(int floor,
                                     HallsScenario.FloorDefinition floorDefinition,
                                     HallsLevelType levelType,
                                     Random random,
@@ -7555,7 +7626,9 @@ public final class HallsSession {
                                String difficultyId,
                                int rawShame,
                                Set<UUID> participants,
-                               File saveFile) {
+                               File saveFile,
+                               boolean endless,
+                               int floorReached) {
         public CompletedRun {
             participants = participants == null ? Set.of() : Set.copyOf(participants);
         }

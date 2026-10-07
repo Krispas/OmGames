@@ -1,0 +1,22 @@
+modifiers:
+  bubbling_floor:
+    type: bad
+    display-name: "Bubbling Floor"
+    icon: "~"
+    weight: 7
+    effects:
+      trap: bubbles
+  geyser_field:
+    type: bad
+    display-name: "Geyser Field"
+    icon: "^"
+    weight: 7
+    effects:
+      trap: geyser
+  pufferfish_nest:
+    type: bad
+    display-name: "Pufferfish Nest"
+    icon: "o"
+    weight: 7
+    effects:
+      trap: pufferfish

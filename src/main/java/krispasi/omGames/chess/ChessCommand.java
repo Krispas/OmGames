@@ -100,7 +100,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                 }
                 result = chessManager.redo(player, sender.isOp());
             }
-            case "rewind" -> {
+            case "backward" -> {
                 if (!requireOpponent(sender)) {
                     return true;
                 }
@@ -108,7 +108,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.text("Only players can use this chess command.", NamedTextColor.RED));
                     return true;
                 }
-                result = chessManager.rewind(player);
+                result = chessManager.backward(player);
             }
             case "forward" -> {
                 if (!requireOpponent(sender)) {
@@ -190,7 +190,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
         if (args.length == 3 && args[1].equalsIgnoreCase("remove")) {
             return chessManager.removeBoard(args[2]);
         }
-        return ChessManager.Result.fail("Usage: /chess board build <x> <y> <z> | /chess board blocks <b1> <b2> <b3> | /chess board blocks reset | /chess board reset [board] | /chess board reset player <player> | /chess board remove <board|*>");
+        return ChessManager.Result.fail("Usage: /chess board build <x> <y> <z> | /chess board blocks <b1> <b2> <b3> | /chess board blocks reset | /chess board reset [board|*] | /chess board reset player <player> | /chess board remove <board|*>");
     }
 
     private ChessManager.Result handleMatch(CommandSender sender, String[] args) {
@@ -482,7 +482,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return filter(args[0], "menu", "board", "match", "timer", "log", "pause", "resign", "draw", "undo", "redo", "rewind", "forward", "checkmate");
+            return filter(args[0], "menu", "board", "match", "timer", "log", "pause", "resign", "draw", "undo", "redo", "backward", "forward", "checkmate");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("board")) {
             return filter(args[1], "build", "blocks", "reset", "remove");
@@ -490,6 +490,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
         if (args.length == 3 && args[0].equalsIgnoreCase("board") && args[1].equalsIgnoreCase("reset")) {
             List<String> options = new ArrayList<>();
             options.add("player");
+            options.add("*");
             options.addAll(chessManager.getBoardTimestamps());
             return filter(args[2], options.toArray(String[]::new));
         }
@@ -612,7 +613,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
 
     private Component usage() {
         return Component.text(
-                "Usage: /chess [menu] | /chess board build <x> <y> <z> | /chess board reset [board] | /chess board reset player <player> | /chess match <white|black|start|spectate|timer|settings|test|cancel> | /chess timer [match|*] <off|time|move|check> | /chess log <print|delete|search> | /chess pause | /chess resign | /chess draw | /chess undo | /chess redo | /chess rewind | /chess forward | /chess checkmate",
+                "Usage: /chess [menu] | /chess board build <x> <y> <z> | /chess board reset [board|*] | /chess board reset player <player> | /chess match <white|black|start|spectate|timer|settings|test|cancel> | /chess timer [match|*] <off|time|move|check> | /chess log <print|delete|search> | /chess pause | /chess resign | /chess draw | /chess undo | /chess redo | /chess backward | /chess forward | /chess checkmate",
                 NamedTextColor.YELLOW
         );
     }
