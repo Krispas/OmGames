@@ -72,7 +72,7 @@ public final class ChessMatchRuntime {
     );
     private static final Transformation FLAT_WHITE_TRANSFORMATION = new Transformation(
             new Vector3f(),
-            new Quaternionf(0.0f, -0.7071068f, 0.7071068f, 0.0f),
+            new Quaternionf(0.0f, 0.7071068f, -0.7071068f, 0.0f),
             new Vector3f(1.8750004f, 1.875f, 1.8749976f),
             new Quaternionf()
     );
@@ -412,6 +412,9 @@ public final class ChessMatchRuntime {
             return Result.fail("All chess players must be online before the match starts.");
         }
 
+        loadBoardChunks(toBoardRef(boardContext));
+        clearBoardBlocks(toBoardRef(boardContext));
+        removeBoardEntities(boardContext.timestamp());
         clearBoardEntities();
         placeCheckerboard(List.of());
         spawnSquareInteractions();
@@ -680,7 +683,7 @@ public final class ChessMatchRuntime {
         return Result.ok("Chess move redone.");
     }
 
-    public Result rewind(Player player) {
+    public Result backward(Player player) {
         if (!matchActive) {
             return Result.fail("No chess match is active.");
         }
@@ -2735,7 +2738,7 @@ public final class ChessMatchRuntime {
         for (Map.Entry<UUID, Boolean> entry : new ArrayList<>(previousGlowing.entrySet())) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player != null) {
-                player.setGlowing(Boolean.TRUE.equals(entry.getValue()));
+                player.setGlowing(false);
             }
         }
         previousGlowing.clear();

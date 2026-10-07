@@ -62,6 +62,20 @@ public final class ChessManager {
     }
 
     public Result resetBoard(org.bukkit.command.CommandSender sender, String boardName) {
+        if ("*".equals(boardName)) {
+            List<ChessDatabaseService.BoardRef> boards = databaseService.getBoards();
+            if (boards.isEmpty()) return Result.fail("No chess boards are available.");
+            int reset = 0;
+            for (ChessDatabaseService.BoardRef board : boards) {
+                ChessMatchRuntime runtime = activeMatchByBoard(board.timestamp());
+                if (runtime != null) {
+                    runtime.cancelMatch(runtime.matchCommandName());
+                    activeMatches.remove(runtime.matchCommandName());
+                }
+                if (setupRuntime.resetBoard(board.timestamp()).success()) reset++;
+            }
+            return Result.ok("Reset " + reset + " chess board" + (reset == 1 ? "" : "s") + ".");
+        }
         String resolved = resolveBoardName(sender, boardName);
         if (resolved == null) {
             return Result.fail("No chess board is available.");
@@ -410,9 +424,9 @@ public final class ChessManager {
         return runtime == null ? Result.fail("No chess match is active for you.") : runtime.redo(player, operator);
     }
 
-    public Result rewind(Player player) {
+    public Result backward(Player player) {
         ChessMatchRuntime runtime = activeMatchByTarget(player, null);
-        return runtime == null ? Result.fail("No chess match is active for you.") : runtime.rewind(player);
+        return runtime == null ? Result.fail("No chess match is active for you.") : runtime.backward(player);
     }
 
     public Result forward(Player player) {
