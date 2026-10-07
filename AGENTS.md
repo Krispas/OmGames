@@ -734,8 +734,9 @@ Behavior notes:
   - rotating held item with model `om:coiled_energy`
   - right-click charges the held item by `10`, up to `100`, and uses the durability bar to display charge
   - shift + right-click fires and resets charge to `0`
-  - charge `10-49` fires a straight shock bolt with range equal to charge and damage `10 + charge * 0.2`
-  - charge `50+` fires a spherical shockwave with radius `charge / 3`, same damage formula, and only breaks tracked BedWars placed blocks
+  - charge `10-49` fires a straight shock bolt with range equal to charge and half the former damage (`(10 + charge * 0.2) / 2`)
+  - charge `50+` fires a spherical shockwave with half the former damage and half the former radius (`charge / 6`)
+  - shockwaves break only tracked wool blocks, and a solid block between the wave center and wool prevents that wool from breaking
 
 ### 2.9 Match Event Workflow
 

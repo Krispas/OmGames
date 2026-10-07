@@ -25,6 +25,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
+import org.bukkit.FluidCollisionMode;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -48,6 +49,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Transformation;
+import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -1758,7 +1760,7 @@ final class GameSessionCustomItemRuntime {
         owner.playSound(owner.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_IMPACT, 1.0f, 1.45f);
         owner.getWorld().playSound(origin, Sound.BLOCK_BEACON_DEACTIVATE, 0.9f, 1.35f);
         if (hitTarget != null) {
-            double damage = 10.0 + charge * 0.2;
+            double damage = (10.0 + charge * 0.2) * 0.5;
             session.recordCombat(owner.getUniqueId(), hitTarget.getUniqueId());
             hitTarget.setNoDamageTicks(0);
             hitTarget.damage(Math.max(1.0, damage), owner);
@@ -1775,8 +1777,9 @@ final class GameSessionCustomItemRuntime {
         if (!isInsideRailgunSample(center)) {
             return false;
         }
-        double radius = Math.max(1.0, charge / 3.0);
-        double damage = 10.0 + charge * 0.2;
+        double radius = Math.max(1.0, charge / 6.0);
+        double damage = (10.0 + charge * 0.2) * 0.5;
+        World world = center.getWorld();
         TeamColor ownerTeam = session.getTeam(owner.getUniqueId());
         UUID ownerId = owner.getUniqueId();
         for (UUID playerId : assignments.keySet()) {
@@ -1806,8 +1809,22 @@ final class GameSessionCustomItemRuntime {
                         continue;
                     }
                     Block block = sample.getBlock();
-                    if (block.getType() == Material.AIR) {
+                    if (!block.getType().name().endsWith("_WOOL")) {
                         continue;
+                    }
+                    Location woolCenter = block.getLocation().add(0.5, 0.5, 0.5);
+                    Vector toWool = woolCenter.toVector().subtract(center.toVector());
+                    if (toWool.lengthSquared() > 0.0001) {
+                        RayTraceResult obstruction = world.rayTraceBlocks(
+                                center,
+                                toWool.normalize(),
+                                Math.sqrt(center.distanceSquared(woolCenter)),
+                                FluidCollisionMode.NEVER,
+                                true
+                        );
+                        if (obstruction != null && obstruction.getHitBlock() != block) {
+                            continue;
+                        }
                     }
                     BlockPoint point = new BlockPoint(block.getX(), block.getY(), block.getZ());
                     if (!session.isPlacedBlock(point)) {
@@ -1818,7 +1835,6 @@ final class GameSessionCustomItemRuntime {
                 }
             }
         }
-        World world = center.getWorld();
         for (double d = 0.0; d <= radius; d += SHOCK_CELL_WAVE_SAMPLE_STEP) {
             world.spawnParticle(Particle.FLAME, center, 20, d * 0.5, d * 0.35, d * 0.5, 0.02);
             world.spawnParticle(Particle.ELECTRIC_SPARK, center, 14, d * 0.5, d * 0.35, d * 0.5, 0.01);
