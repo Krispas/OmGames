@@ -129,6 +129,8 @@ This is the first implementation slice. It focuses on:
 
 - Organized modifier pools under `modifiers/<scenario_id>/`. Dammed Corridors' bundled pool omits Death Fog; Untold Depths retains it. Modifier pools are loaded and selected by scenario folder.
 - Reworked the bunker main trunk to use a randomized footprint and turn sequence instead of the repeated mirrored-L route.
+- Fixed bunker trunk waypoint selection: each axis now alternates between distinct randomized leg coordinates with minimum spacing, preserving room frontage as the target grows.
+- Bunker room placement now begins with a target-sized trunk footprint and expands the connected 3-wide main-corridor network in larger-radius passes after repeated placement failures; expanded routes avoid already placed rooms.
 - Added Easy difficulty with a 3.0 shame multiplier, 0.85 floor difficulty scaling, half-rate sculk gain, half-size initial enemy cap, 1.5x spawn and cap-extension intervals, and 25% lower coin quota. These baseline adjustments are applied before floor modifiers.
 - Removed the automatic research-point award for each exploration floor cleared at camp arrival. Depositing a research crate into the elevator chute is now the only gameplay source of research points; the legacy saved exploration-floor counter remains readable for save compatibility.
 - Added the configurable `endless` scenario type and bundled `Endless (Mixed)` / `Endless (Base Game)` scenarios. Both currently draw from all nine existing level types and inherit Untold Depths item, blueprint, crafting, research, and modifier pools.
@@ -141,7 +143,6 @@ This is the first implementation slice. It focuses on:
 - Endless exploration floor room cap is 100; Untold Depths' More Rooms modifier can add up to five additional rooms.
 
 ## Reviewer notes (Delete entries once done, but keep the header)
-- Bunker level type seems to not generate properly, as most of the times less than half of the intended rooms generate, my hunch is that the main corridor may be too small, but there could be other causes
 ## Future slices (dont do yet):
 -TBD
 ## For reviewer to figure out:

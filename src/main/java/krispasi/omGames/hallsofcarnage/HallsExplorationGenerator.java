@@ -1080,48 +1080,92 @@ final class HallsExplorationGenerator {
     }
 
     private void generateBunkerLayout(List<HallsLayout> layouts, int targetRooms) {
-        List<Cell> trunk = bunkerTrunkPath();
+        int maximumTrunkRadius = Math.max(32, clearRadius - 10);
+        int trunkRadius = Math.min(maximumTrunkRadius,
+                Math.max(32, 24 + (int) Math.ceil(Math.sqrt(targetRooms) * 5.0)));
+        List<Cell> trunk = bunkerTrunkPath(trunkRadius);
         rememberBunkerMainCorridor(trunk);
         int attempts = 0;
+        int failedPlacements = 0;
+        int expansionThreshold = Math.max(8, targetRooms / 2);
         while (rooms.size() < targetRooms && attempts++ < targetRooms * 120) {
             HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
             if (placeBunkerRoom(layout, trunk)) {
+                failedPlacements = 0;
                 continue;
             }
             trunk = new ArrayList<>(corridorCells);
+            if (++failedPlacements >= expansionThreshold && trunkRadius < maximumTrunkRadius) {
+                int expandedRadius = Math.min(maximumTrunkRadius, trunkRadius + 18);
+                if (expandBunkerMainCorridor(expandedRadius)) {
+                    trunkRadius = expandedRadius;
+                    trunk = new ArrayList<>(corridorCells);
+                    failedPlacements = 0;
+                }
+            }
         }
         addRoomToRoomLoops();
     }
 
-    private List<Cell> bunkerTrunkPath() {
-        int radius = Math.min(clearRadius - 10, Math.max(32, 38 + rooms.size() * 2));
+    private boolean expandBunkerMainCorridor(int radius) {
+        for (int attempt = 0; attempt < 8; attempt++) {
+            List<Cell> candidate = bunkerTrunkPath(radius);
+            Set<Cell> widened = largeCorridorCells(candidate);
+            boolean overlapsRoom = widened.stream().anyMatch(cell ->
+                    (roomShellCells.contains(cell) || roomInteriorCells.contains(cell))
+                            && !corridorCells.contains(cell));
+            if (overlapsRoom) {
+                continue;
+            }
+            long newCells = widened.stream().filter(cell -> !corridorCells.contains(cell)).count();
+            if (newCells < 32) {
+                continue;
+            }
+            rememberBunkerMainCorridor(candidate);
+            return true;
+        }
+        return false;
+    }
+
+    private List<Cell> bunkerTrunkPath(int radius) {
+        radius = Math.min(radius, clearRadius - 10);
         int frontZ = elevatorFrontCell(4).z();
         int min = originX - clearRadius + 4;
         int max = originX + clearRadius - 4;
         int minZ = originZ - clearRadius + 4;
         int maxZ = originZ + clearRadius - 4;
-        int x1 = clamp(originX + random.nextInt(radius * 2 + 1) - radius, min, max);
-        int x2 = clamp(originX + random.nextInt(radius * 2 + 1) - radius, min, max);
-        int z1 = clamp(originZ + random.nextInt(radius * 2 + 1) - radius, minZ, maxZ);
-        int z2 = clamp(originZ + random.nextInt(radius * 2 + 1) - radius, minZ, maxZ);
+        int x1 = randomBunkerCoordinate(originX, radius, min, max);
+        int x2 = randomBunkerCoordinate(originX, radius, min, max);
+        int z1 = randomBunkerCoordinate(originZ, radius, minZ, maxZ);
+        int z2 = randomBunkerCoordinate(originZ, radius, minZ, maxZ);
+        // Keep opposite trunk legs far enough apart to create usable room frontage.
+        while (Math.abs(x1 - x2) < 16) {
+            x2 = randomBunkerCoordinate(originX, radius, min, max);
+        }
+        while (Math.abs(z1 - z2) < 16) {
+            z2 = randomBunkerCoordinate(originZ, radius, minZ, maxZ);
+        }
         List<Cell> waypoints = new ArrayList<>();
         waypoints.add(new Cell(originX, clamp(frontZ + (frontZ < originZ ? -3 : 3), minZ, maxZ)));
         // Vary both the trunk's footprint and its turns; avoid the old fixed mirrored-L loop.
         int turns = 4 + random.nextInt(4);
         boolean horizontal = random.nextBoolean();
-        int x = x1;
-        int z = z1;
+        int horizontalLeg = 0;
+        int verticalLeg = 0;
         for (int turn = 0; turn < turns; turn++) {
             if (horizontal) {
-                x = turn % 2 == 0 ? x1 : x2;
+                waypoints.add(new Cell((horizontalLeg++ % 2 == 0) ? x1 : x2, waypoints.getLast().z()));
             } else {
-                z = turn % 2 == 0 ? z1 : z2;
+                waypoints.add(new Cell(waypoints.getLast().x(), (verticalLeg++ % 2 == 0) ? z1 : z2));
             }
-            waypoints.add(new Cell(x, z));
             horizontal = !horizontal;
         }
         waypoints.add(new Cell(originX + random.nextInt(17) - 8, frontZ));
         return pathThrough(elevatorFrontCell(1), waypoints);
+    }
+
+    private int randomBunkerCoordinate(int center, int radius, int min, int max) {
+        return clamp(center + random.nextInt(radius * 2 + 1) - radius, min, max);
     }
 
     private boolean placeBunkerRoom(HallsLayout layout, List<Cell> trunk) {
