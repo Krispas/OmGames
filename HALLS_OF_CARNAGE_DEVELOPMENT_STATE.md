@@ -133,9 +133,10 @@ This is the first implementation slice. It focuses on:
 
 ## Reviewer notes (Delete entries once done, but keep the header)
 ## Do all following for the next slice (and keep this line):
+- Add a new scenario type called endless, its details are in a file called ENDLESS_MODE.md
 
 ## Future slices (dont do yet):
-- Add a new scenario type called endless, its details are in a file called ENDLESS_MODE.md
+-TBD
 ## For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
 - Texture all items
