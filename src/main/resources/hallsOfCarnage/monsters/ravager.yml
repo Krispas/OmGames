@@ -2,3 +2,5 @@ id: ravager
 name: "Ravager"
 entity-type: RAVAGER
 health: 10
+
+attack-damage: 2.0

@@ -1,0 +1,15 @@
+id: deepdelver_pie
+name: "Deepdelver Pie"
+category: food
+rarity: rare
+material: PUMPKIN_PIE
+max-stack-size: 1
+lore:
+  - "A warm root-and-mycelia pie for the long descent."
+stats:
+  heal: 10
+  sculk-reduction-percent: 5
+recipe:
+  baked_potato: 1
+  carrot: 1
+  wood_scrap: 4

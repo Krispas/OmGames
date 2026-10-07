@@ -2,3 +2,5 @@ id: guardian
 name: "Guardian"
 entity-type: GUARDIAN
 health: 10
+
+attack-damage: 1.5

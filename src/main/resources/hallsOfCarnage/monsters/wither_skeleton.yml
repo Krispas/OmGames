@@ -2,3 +2,5 @@ id: wither_skeleton
 name: "Wither Skeleton"
 entity-type: WITHER_SKELETON
 health: 20
+
+attack-damage: 2.5

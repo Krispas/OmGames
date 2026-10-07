@@ -8,6 +8,8 @@ lore:
   - "A salvaged prong balanced for keeping monsters at reach."
 stats:
   melee-damage: 5
+  ranged: 1
+  ranged-damage: 5
   attack-speed: 1.4
   durability: 85
 recipe:

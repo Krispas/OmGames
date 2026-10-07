@@ -2,14 +2,14 @@ id: poison_bomb
 name: "Poison Bomb"
 category: utility
 rarity: rare
-material: SPLASH_POTION
-item-model: minecraft:spider_eye
+material: FIREWORK_STAR
+item-model: minecraft:dragon_breath
 max-stack-size: 1
 lore:
   - "Deploys a toxic cloud that hurts monsters, not players."
 stats:
-  durability: 4
-  cooldown-seconds: 75
+  durability: 8
+  cooldown-seconds: 15
   monster-damage: 3
   poison-seconds: 6
   poison-amplifier: 2

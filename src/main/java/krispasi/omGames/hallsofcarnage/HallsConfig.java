@@ -12,37 +12,45 @@ public final class HallsConfig {
 
     private final String lobbyWorldName;
     private final LocationValues lobbySpawn;
-    private final LocationValues menuVillager;
-    private final boolean menuVillagerEnabled;
+    private final LocationValues menuInteraction;
+    private final boolean menuInteractionEnabled;
     private final BlockPoint firstSessionOrigin;
     private final int sessionSpacing;
     private final int maxPlayers;
     private final int disconnectGraceSeconds;
+    private final String elevatorLocatorIconItemModel;
 
     private HallsConfig(String lobbyWorldName,
                         LocationValues lobbySpawn,
-                        LocationValues menuVillager,
-                        boolean menuVillagerEnabled,
+                        LocationValues menuInteraction,
+                        boolean menuInteractionEnabled,
                         BlockPoint firstSessionOrigin,
                         int sessionSpacing,
                         int maxPlayers,
-                        int disconnectGraceSeconds) {
+                        int disconnectGraceSeconds,
+                        String elevatorLocatorIconItemModel) {
         this.lobbyWorldName = lobbyWorldName;
         this.lobbySpawn = lobbySpawn;
-        this.menuVillager = menuVillager;
-        this.menuVillagerEnabled = menuVillagerEnabled;
+        this.menuInteraction = menuInteraction;
+        this.menuInteractionEnabled = menuInteractionEnabled;
         this.firstSessionOrigin = firstSessionOrigin;
         this.sessionSpacing = sessionSpacing;
         this.maxPlayers = maxPlayers;
         this.disconnectGraceSeconds = disconnectGraceSeconds;
+        this.elevatorLocatorIconItemModel = elevatorLocatorIconItemModel == null ? "" : elevatorLocatorIconItemModel.trim();
     }
 
     public static HallsConfig load(File file) {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         String world = config.getString("lobby.world", DEFAULT_WORLD);
         LocationValues spawn = readLocation(config, "lobby.spawn", new LocationValues(0.5, 70.0, 0.5, 0.0f, 0.0f));
-        LocationValues villager = readLocation(config, "lobby.menu-villager", spawn);
-        boolean villagerEnabled = config.getBoolean("lobby.menu-villager.enabled", false);
+        boolean hasInteraction = config.contains("lobby.menu-interaction");
+        LocationValues interaction = readLocation(config,
+                hasInteraction ? "lobby.menu-interaction" : "lobby.menu-villager",
+                spawn);
+        boolean interactionEnabled = hasInteraction
+                ? config.getBoolean("lobby.menu-interaction.enabled", false)
+                : config.getBoolean("lobby.menu-villager.enabled", false);
         BlockPoint firstOrigin = new BlockPoint(
                 config.getInt("sessions.first-origin.x", 2000),
                 config.getInt("sessions.first-origin.y", 70),
@@ -51,7 +59,9 @@ public final class HallsConfig {
         int spacing = Math.max(250, config.getInt("sessions.spacing", 1000));
         int maxPlayers = clamp(config.getInt("sessions.max-players", 6), 1, 6);
         int graceSeconds = Math.max(1, config.getInt("sessions.disconnect-grace-seconds", 300));
-        return new HallsConfig(world, spawn, villager, villagerEnabled, firstOrigin, spacing, maxPlayers, graceSeconds);
+        String locatorIcon = config.getString("elevator.locator-icon-item-model", "om:hoc_elevator");
+        return new HallsConfig(world, spawn, interaction, interactionEnabled, firstOrigin, spacing, maxPlayers, graceSeconds,
+                locatorIcon);
     }
 
     public String lobbyWorldName() {
@@ -66,21 +76,25 @@ public final class HallsConfig {
         return disconnectGraceSeconds;
     }
 
+    public String elevatorLocatorIconItemModel() {
+        return elevatorLocatorIconItemModel;
+    }
+
     public BlockPoint sessionOrigin(int slot) {
         int safeSlot = Math.max(0, slot);
         return new BlockPoint(firstSessionOrigin.x() + safeSlot * sessionSpacing, firstSessionOrigin.y(), firstSessionOrigin.z());
     }
 
-    public boolean menuVillagerEnabled() {
-        return menuVillagerEnabled;
+    public boolean menuInteractionEnabled() {
+        return menuInteractionEnabled;
     }
 
     public Location lobbySpawn() {
         return lobbySpawn.toLocation(resolveLobbyWorld());
     }
 
-    public Location menuVillagerLocation() {
-        return menuVillager.toLocation(resolveLobbyWorld());
+    public Location menuInteractionLocation() {
+        return menuInteraction.toLocation(resolveLobbyWorld());
     }
 
     public World resolveLobbyWorld() {

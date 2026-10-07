@@ -2,6 +2,7 @@ id: zombie_vanguard
 name: "Zombie Vanguard"
 entity-type: ZOMBIE
 health: 16
+attack-damage: 2.5
 baby: false
 equipment:
   main-hand: IRON_SWORD

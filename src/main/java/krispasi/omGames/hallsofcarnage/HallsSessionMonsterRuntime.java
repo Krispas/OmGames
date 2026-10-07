@@ -3,6 +3,7 @@ package krispasi.omGames.hallsofcarnage;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -18,6 +19,8 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.BlockDisplay;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Ageable;
 import org.bukkit.entity.Creature;
 import org.bukkit.entity.Entity;
@@ -35,6 +38,10 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.Transformation;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 final class HallsSessionMonsterRuntime {
     private static final int SPAWN_INTERVAL_TICKS = 100;
@@ -59,12 +66,14 @@ final class HallsSessionMonsterRuntime {
     private List<HallsMonsterType> specialPool = List.of();
     private HallsMonsterType activeSpecialType;
     private int monsterCoinDropChancePercent = 10;
+    private double monsterHealthMultiplier = 1.0;
     private Random random = new Random();
     private BukkitTask spawnTask;
     private int maxAlive;
     private int baseMaxAlive;
     private int spawnedThisFloor;
     private int spawnCooldownTicks;
+    private int spawnIntervalTicks = SPAWN_INTERVAL_TICKS;
     private int baseCapExtensionIntervalTicks;
     private int capExtensionCooldownTicks;
     private int capExtensionIntervalTicks;
@@ -95,7 +104,8 @@ final class HallsSessionMonsterRuntime {
                                HallsScenario.FloorDefinition floor,
                                HallsLevelType levelType,
                                HallsFloorModifiers modifiers,
-                               Random random) {
+                               Random random,
+                               boolean easyDifficulty) {
         clear();
         this.random = random == null ? new Random() : random;
         this.spawnCells = spawnCells(plan);
@@ -107,12 +117,17 @@ final class HallsSessionMonsterRuntime {
         int difficulty = parseDifficulty(floor == null ? "0" : floor.difficulty(), floor == null ? 1 : floor.firstFloor());
         int rooms = Math.max(1, floor == null ? 1 : floor.rooms());
         double enemyMultiplier = modifiers == null ? 1.0 : modifiers.enemySpawnMultiplier();
+        monsterHealthMultiplier = Math.max(0.1, modifiers == null ? 1.0 : modifiers.enemyHealthMultiplier());
         monsterCoinDropChancePercent = Math.max(0, (int) Math.round(10.0
                 * (modifiers == null ? 1.0 : modifiers.monsterCoinDropChanceMultiplier())));
         double playerStack = participantStackMultiplier();
-        this.baseMaxAlive = Math.max(2, Math.min(36, (int) Math.round((1 + rooms / 4.0 + difficulty / 15.0) * playerStack * enemyMultiplier)));
+        int calculatedCap = Math.max(2, Math.min(36, (int) Math.round((1 + rooms / 4.0 + difficulty / 15.0) * playerStack)));
+        this.baseMaxAlive = easyDifficulty ? Math.max(1, (int) Math.ceil(calculatedCap * 0.5)) : calculatedCap;
         this.maxAlive = baseMaxAlive;
-        this.capExtensionIntervalTicks = Math.max(MIN_CAP_EXTENSION_INTERVAL_TICKS, (int) Math.round(capExtensionIntervalTicks(difficulty) / playerStack));
+        double capPacingMultiplier = enemyMultiplier <= 0.0 ? 1.0 : enemyMultiplier * (easyDifficulty ? (2.0 / 3.0) : 1.0);
+        this.spawnIntervalTicks = easyDifficulty ? (int) Math.round(SPAWN_INTERVAL_TICKS * 1.5) : SPAWN_INTERVAL_TICKS;
+        this.capExtensionIntervalTicks = Math.max(MIN_CAP_EXTENSION_INTERVAL_TICKS,
+                (int) Math.round(capExtensionIntervalTicks(difficulty) / playerStack / capPacingMultiplier));
         this.baseCapExtensionIntervalTicks = capExtensionIntervalTicks;
         this.capExtensionCooldownTicks = capExtensionIntervalTicks;
         this.floorStartedAtMillis = System.currentTimeMillis();
@@ -142,6 +157,7 @@ final class HallsSessionMonsterRuntime {
         activeSpecialType = null;
         specialPool = List.of();
         spawnCooldownTicks = 0;
+        spawnIntervalTicks = SPAWN_INTERVAL_TICKS;
         baseCapExtensionIntervalTicks = 0;
         baseMaxAlive = 0;
         maxAlive = 0;
@@ -149,6 +165,31 @@ final class HallsSessionMonsterRuntime {
         capExtensionIntervalTicks = 0;
         floorStartedAtMillis = 0L;
         monsterCoinDropChancePercent = 10;
+        monsterHealthMultiplier = 1.0;
+    }
+
+    void removeAllForBossDefeat() {
+        if (spawnTask != null) {
+            spawnTask.cancel();
+            spawnTask = null;
+        }
+        for (UUID entityId : Set.copyOf(spawnedMonsters)) {
+            Entity entity = Bukkit.getEntity(entityId);
+            if (entity == null) {
+                continue;
+            }
+            Location location = entity.getLocation().clone().add(0.0, 0.6, 0.0);
+            if (entity instanceof LivingEntity living) {
+                world.spawnParticle(org.bukkit.Particle.SOUL, location, 18, 0.35, 0.45, 0.35, 0.03);
+                world.playSound(location, org.bukkit.Sound.ENTITY_WITHER_HURT, 0.35f, 1.45f);
+                living.remove();
+            } else {
+                entity.remove();
+            }
+        }
+        spawnedMonsters.clear();
+        spawnedThisFloor = 0;
+        maxAlive = 0;
     }
 
     String debugStatus() {
@@ -157,6 +198,11 @@ final class HallsSessionMonsterRuntime {
                 + ", spawned " + spawnedThisFloor + ", next spawn "
                 + Math.max(0, spawnCooldownTicks / 20) + "s, next cap +"
                 + Math.max(0, capExtensionCooldownTicks / 20) + "s";
+    }
+
+    int activeMonsterCount() {
+        pruneDeadMonsters();
+        return spawnedMonsters.size();
     }
 
     boolean registerSplitMonster(Entity entity) {
@@ -195,50 +241,151 @@ final class HallsSessionMonsterRuntime {
     }
 
     void handleMonsterDeath(LivingEntity entity, Player killer) {
-        if (entity == null || !spawnedMonsters.remove(entity.getUniqueId())) {
+        if (entity == null || !isSessionMonster(entity)) {
             return;
         }
+        spawnedMonsters.remove(entity.getUniqueId());
         if (random.nextInt(100) < monsterCoinDropChancePercent) {
             coinDropSink.accept(entity.getLocation().clone().add(0.0, 0.35, 0.0));
         }
-        spawnSplinterChildren(entity);
+        spawnDeathChildren(entity);
+        triggerDeathEffect(entity);
         if (killer != null && participants.contains(killer.getUniqueId()) && aliveParticipantPredicate.test(killer.getUniqueId())) {
             maxAlive = Math.max(0, maxAlive - 1);
         }
     }
 
-    private void spawnSplinterChildren(LivingEntity entity) {
+    boolean spawnConfiguredMonster(String monsterId, Location location) {
+        return spawnConfiguredMonsterEntity(monsterId, location) != null;
+    }
+
+    UUID spawnBossMinion(String monsterId, Location location) {
+        LivingEntity living = spawnConfiguredMonsterEntity(monsterId, location);
+        return living == null ? null : living.getUniqueId();
+    }
+
+    private LivingEntity spawnConfiguredMonsterEntity(String monsterId, Location location) {
+        if (monsterId == null || location == null || !world.equals(location.getWorld())) {
+            return null;
+        }
+        HallsMonsterType type = monsterTypes.get(normalizeId(monsterId));
+        if (type == null) {
+            return null;
+        }
+        Entity entity = world.spawnEntity(location, type.entityType());
+        if (!(entity instanceof LivingEntity living)) {
+            entity.remove();
+            return null;
+        }
+        configureLivingMonster(living, type);
+        spawnedMonsters.add(living.getUniqueId());
+        spawnedThisFloor++;
+        maxAlive++;
+        return living;
+    }
+
+    private void spawnDeathChildren(LivingEntity entity) {
         String typeId = entity.getPersistentDataContainer().get(monsterTypeKey, PersistentDataType.STRING);
         if (typeId == null) {
             return;
         }
-        String childId = switch (typeId) {
-            case "splinter" -> "splinter_small";
-            case "splinter_small" -> "splinter_baby";
-            default -> "";
-        };
-        if (childId.isBlank()) {
-            return;
-        }
-        HallsMonsterType childType = monsterTypes.get(childId);
-        if (childType == null) {
+        HallsMonsterType type = monsterTypes.get(typeId);
+        if (type == null || type.deathChildren().isEmpty()) {
             return;
         }
         int spawned = 0;
         Location base = entity.getLocation();
-        for (int i = 0; i < 2; i++) {
-            Location spawn = base.clone().add((i == 0 ? -0.35 : 0.35), 0.0, 0.0);
-            Entity child = world.spawnEntity(spawn, childType.entityType());
-            if (child instanceof LivingEntity living) {
-                configureLivingMonster(living, childType);
-                spawnedMonsters.add(living.getUniqueId());
-                spawnedThisFloor++;
-                spawned++;
-            } else {
-                child.remove();
+        for (HallsMonsterType.DeathChild child : type.deathChildren()) {
+            HallsMonsterType childType = monsterTypes.get(child.monsterId());
+            if (childType == null) {
+                continue;
+            }
+            for (int i = 0; i < child.count(); i++) {
+                Entity childEntity = world.spawnEntity(base, childType.entityType());
+                if (childEntity instanceof LivingEntity living) {
+                    configureLivingMonster(living, childType);
+                    spawnedMonsters.add(living.getUniqueId());
+                    spawnedThisFloor++;
+                    spawned++;
+                } else {
+                    childEntity.remove();
+                }
             }
         }
         maxAlive += spawned;
+    }
+
+    private void triggerDeathEffect(LivingEntity entity) {
+        String typeId = entity.getPersistentDataContainer().get(monsterTypeKey, PersistentDataType.STRING);
+        if (typeId == null) {
+            return;
+        }
+        if (typeId.equals("rotting_soldier")) {
+            Location location = entity.getLocation().clone();
+            BlockDisplay tnt = world.spawn(location.clone().add(0.0, 0.1, 0.0), BlockDisplay.class, display -> {
+                display.setBlock(Material.TNT.createBlockData());
+                display.setBillboard(Display.Billboard.FIXED);
+                display.setPersistent(false);
+                display.addScoreboardTag("omgames_hoc_monster");
+                display.setTransformation(new Transformation(
+                        new Vector3f(-0.3f, 0.0f, -0.3f),
+                        new Quaternionf(),
+                        new Vector3f(0.6f, 0.6f, 0.6f),
+                        new Quaternionf()));
+            });
+            new BukkitRunnable() {
+                private int ticks;
+
+                @Override
+                public void run() {
+                    if (!tnt.isValid()) {
+                        cancel();
+                        return;
+                    }
+                    if (ticks < 60) {
+                        if (ticks % 10 == 0) {
+                            float pitch = 0.75f + ticks / 60.0f;
+                            world.playSound(location, org.bukkit.Sound.BLOCK_NOTE_BLOCK_HAT, 0.75f, pitch);
+                            world.spawnParticle(org.bukkit.Particle.SMOKE, location.clone().add(0.0, 0.55, 0.0),
+                                    6, 0.25, 0.15, 0.25, 0.01);
+                        }
+                        ticks++;
+                        return;
+                    }
+                    tnt.remove();
+                    double radius = 4.0;
+                    world.spawnParticle(org.bukkit.Particle.EXPLOSION, location.clone().add(0.0, 0.4, 0.0), 1);
+                    world.spawnParticle(org.bukkit.Particle.SMOKE, location.clone().add(0.0, 0.75, 0.0),
+                            130, radius * 0.45, 0.8, radius * 0.45, 0.07);
+                    world.spawnParticle(org.bukkit.Particle.FLAME, location.clone().add(0.0, 0.55, 0.0),
+                            45, radius * 0.35, 0.45, radius * 0.35, 0.04);
+                    world.playSound(location, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.05f);
+                    for (Entity nearby : world.getNearbyEntities(location, radius, radius, radius)) {
+                        if (nearby instanceof LivingEntity living && living.getLocation().distanceSquared(location) <= radius * radius) {
+                            living.damage(13.0, entity);
+                        }
+                    }
+                    cancel();
+                }
+            }.runTaskTimer(plugin, 1L, 1L);
+        } else if (typeId.equals("dammed_librarian")) {
+            spawnPoisonCloud(entity.getLocation());
+        }
+    }
+
+    void handleMonsterAttack(Entity damager, Player target) {
+        // Librarians deploy their poison bomb only when they die.
+    }
+
+    void spawnPoisonCloud(Location location) {
+        if (location == null || !world.equals(location.getWorld())) {
+            return;
+        }
+        HallsPoisonClouds.spawn(plugin, world, null, location, 2.5, 100, 10,
+                org.bukkit.potion.PotionEffectType.POISON, 100, 0, 0.0,
+                living -> living instanceof Player player
+                        && participants.contains(player.getUniqueId())
+                        && aliveParticipantPredicate.test(player.getUniqueId()));
     }
 
     void alert(Location location) {
@@ -302,7 +449,7 @@ final class HallsSessionMonsterRuntime {
         if (spawnCooldownTicks > 0) {
             return;
         }
-        spawnCooldownTicks = SPAWN_INTERVAL_TICKS;
+        spawnCooldownTicks = spawnIntervalTicks;
         if (spawnedMonsters.size() >= maxAlive) {
             return;
         }
@@ -318,7 +465,7 @@ final class HallsSessionMonsterRuntime {
             spawnedMonsters.add(living.getUniqueId());
             spawnedThisFloor++;
             debugSink.accept("Spawned " + type.id() + " at " + cell.x() + " " + origin.y() + " " + cell.z()
-                    + "; next spawn in " + (SPAWN_INTERVAL_TICKS / 20) + "s; alive "
+                    + "; next spawn in " + (spawnIntervalTicks / 20) + "s; alive "
                     + spawnedMonsters.size() + "/" + maxAlive + ".");
             accelerateCapExtensionIfNeeded();
         } else {
@@ -341,10 +488,11 @@ final class HallsSessionMonsterRuntime {
         }
         living.addScoreboardTag("omgames_hoc_monster");
         living.getPersistentDataContainer().set(monsterTypeKey, PersistentDataType.STRING, type.id());
+        double health = Math.max(1.0, type.health() * monsterHealthMultiplier);
         AttributeInstance maxHealth = living.getAttribute(Attribute.MAX_HEALTH);
         if (maxHealth != null) {
-            maxHealth.setBaseValue(type.health());
-            living.setHealth(type.health());
+            maxHealth.setBaseValue(health);
+            living.setHealth(health);
         }
         applyTypeSpecificAttributes(living, type);
         if (living instanceof Zombie zombie) {
@@ -374,10 +522,10 @@ final class HallsSessionMonsterRuntime {
         if (speed != null && type.movementSpeedMultiplier() != 1.0) {
             speed.setBaseValue(speed.getBaseValue() * type.movementSpeedMultiplier());
         }
-        if (type.id().equals("ravager")) {
+        if (type.attackDamage() >= 0.0) {
             AttributeInstance attackDamage = living.getAttribute(Attribute.ATTACK_DAMAGE);
             if (attackDamage != null) {
-                attackDamage.setBaseValue(4.0);
+                attackDamage.setBaseValue(type.attackDamage());
             }
         }
     }
@@ -465,18 +613,18 @@ final class HallsSessionMonsterRuntime {
 
     private HallsMonsterType rollWarden() {
         int sculk = maxSculkSupplier.getAsInt();
-        if (sculk < 65) {
+        if (sculk < 100) {
             return null;
         }
-        double chance = Math.min(sculk - 55, 35) / 10.0;
-        if (random.nextDouble() * 100.0 >= chance) {
+        if (random.nextDouble() >= 0.20) {
             return null;
         }
         HallsMonsterType configured = monsterTypes.get("warden");
         if (configured != null) {
             return configured;
         }
-        return new HallsMonsterType("warden", "Warden", EntityType.WARDEN, 500.0, false, 0, 1.0, 1.0, Material.AIR, Map.of());
+        return new HallsMonsterType("warden", "Warden", EntityType.WARDEN, 500.0, false, 0,
+                1.0, 1.0, -1.0, Material.AIR, Map.of(), List.of());
     }
 
     private HallsExplorationGenerator.Cell spawnCellAwayFromPlayers(HallsMonsterType type) {
@@ -662,7 +810,7 @@ final class HallsSessionMonsterRuntime {
         if (plan == null) {
             return List.of();
         }
-        return plan.walkableCells().stream()
+        return plan.monsterSpawnCells().stream()
                 .filter(cell -> Math.abs(cell.x() - origin.x()) + Math.abs(cell.z() - origin.z()) > 16)
                 .filter(cell -> world.getBlockAt(cell.x(), origin.y(), cell.z()).getType().isAir())
                 .toList();
@@ -686,5 +834,9 @@ final class HallsSessionMonsterRuntime {
         } catch (NumberFormatException ex) {
             return fallback;
         }
+    }
+
+    private String normalizeId(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
     }
 }

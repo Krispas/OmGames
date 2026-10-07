@@ -9,8 +9,11 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityTransformEvent;
+import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.entity.EntityType;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
@@ -106,7 +109,7 @@ public final class HallsOfCarnageListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onEntityDamage(EntityDamageEvent event) {
         Entity entity = event.getEntity();
-        if (manager.isMenuVillager(entity)
+        if (manager.isMenuInteraction(entity)
                 || (manager.isSessionEntity(entity) && !(event instanceof EntityDamageByEntityEvent))) {
             event.setCancelled(true);
             return;
@@ -118,6 +121,9 @@ public final class HallsOfCarnageListener implements Listener {
     public void onEntityDeath(EntityDeathEvent event) {
         if (manager.isSessionMonster(event.getEntity())) {
             manager.handleSessionMonsterDeath(event.getEntity(), event.getEntity().getKiller());
+            event.getDrops().clear();
+            event.setDroppedExp(0);
+        } else if (manager.handleTrapPufferfishDeath(event.getEntity())) {
             event.getDrops().clear();
             event.setDroppedExp(0);
         }
@@ -142,7 +148,7 @@ public final class HallsOfCarnageListener implements Listener {
         }
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler
     public void onPrePlayerAttackEntity(PrePlayerAttackEntityEvent event) {
         if (manager.isResearchCrateCarrier(event.getPlayer())) {
             event.setCancelled(true);
@@ -158,6 +164,11 @@ public final class HallsOfCarnageListener implements Listener {
     public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
         if (!(event.getDamager() instanceof Player player)) {
             manager.handleSessionFriendlyFire(event);
+            manager.handleSessionMonsterAttack(event);
+            Player shooter = manager.sessionProjectileShooter(event.getDamager());
+            if (shooter != null) {
+                manager.handleSessionWeaponHit(shooter, event.getEntity(), event);
+            }
             return;
         }
         if (manager.handleSessionFriendlyFire(event)) {
@@ -171,6 +182,29 @@ public final class HallsOfCarnageListener implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onEntityShootBow(EntityShootBowEvent event) {
+        if (event.getEntity() instanceof Player player) {
+            manager.handleSessionRangedShot(player, event);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onProjectileHit(ProjectileHitEvent event) {
+        Player shooter = manager.sessionProjectileShooter(event.getEntity());
+        if (shooter != null) {
+            manager.handleSessionProjectileHit(shooter, event);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onProjectileLaunch(ProjectileLaunchEvent event) {
+        Player shooter = manager.sessionProjectileShooter(event.getEntity());
+        if (shooter != null) {
+            manager.handleSessionProjectileLaunch(shooter, event.getEntity());
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onPlayerItemDamage(PlayerItemDamageEvent event) {
         manager.handleSessionItemDamage(event);
     }
@@ -179,6 +213,21 @@ public final class HallsOfCarnageListener implements Listener {
     public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
         if (event.getHand() == EquipmentSlot.HAND
                 && manager.handleResearchCrateInteract(event.getPlayer(), event.getRightClicked())) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getHand() == EquipmentSlot.HAND
+                && manager.handleBlueprintDistilleryInteract(event.getPlayer(), event.getRightClicked())) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getHand() == EquipmentSlot.HAND
+                && manager.handleLibraryVentInteract(event.getPlayer(), event.getRightClicked())) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getHand() == EquipmentSlot.HAND
+                && manager.handleTrapInteract(event.getPlayer(), event.getRightClicked())) {
             event.setCancelled(true);
             return;
         }
@@ -198,7 +247,7 @@ public final class HallsOfCarnageListener implements Listener {
             event.setCancelled(true);
             return;
         }
-        if (!manager.isMenuVillager(event.getRightClicked())) {
+        if (!manager.isMenuInteraction(event.getRightClicked())) {
             if (manager.isSessionEntity(event.getRightClicked())) {
                 event.setCancelled(true);
             }
@@ -234,6 +283,7 @@ public final class HallsOfCarnageListener implements Listener {
             event.getPlayer().sendActionBar(Component.text("Set the research crate down first.", NamedTextColor.LIGHT_PURPLE));
             return;
         }
+        manager.ensureSessionRangedAmmo(event.getPlayer(), event.getItem());
         if ((event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK)
                 && manager.handleUtilityUse(event.getPlayer(), event.getItem())) {
             event.setCancelled(true);
@@ -251,6 +301,12 @@ public final class HallsOfCarnageListener implements Listener {
             return;
         }
         if (event.getClickedBlock().getType() == Material.SMITHING_TABLE) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event.getAction() == Action.RIGHT_CLICK_BLOCK
+                && event.getClickedBlock().getType() == Material.IRON_BARS
+                && manager.handleVentGateInteract(event.getPlayer(), event.getClickedBlock())) {
             event.setCancelled(true);
             return;
         }

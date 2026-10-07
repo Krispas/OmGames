@@ -9,6 +9,6 @@ lore:
 stats:
   melee-damage: 2
   attack-speed: 3.0
-  durability: 40
+  durability: 90
 recipe:
   iron_scrap: 3

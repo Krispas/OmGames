@@ -36,15 +36,17 @@ import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.util.Transformation;
 import org.joml.Quaternionf;
-import org.joml.Vector3f;
 
 public final class HallsCampRuntime {
     public interface ScrapAccount {
         boolean canSpend(Map<String, Integer> cost);
 
         boolean spend(Map<String, Integer> cost);
+
+        void add(String scrapId, int amount);
+
+        int amount(String scrapId);
     }
 
     public interface SculkAccount {
@@ -75,6 +77,10 @@ public final class HallsCampRuntime {
         boolean unlock(String nodeId);
     }
 
+    public interface ShameAccount {
+        void addShame(int amount);
+    }
+
     private final JavaPlugin plugin;
     private final World world;
     private final HallsScenario scenario;
@@ -86,6 +92,8 @@ public final class HallsCampRuntime {
     private final TotemAccount totemAccount;
     private final Function<Integer, List<String>> scanner;
     private final ResearchAccount researchAccount;
+    private final ShameAccount shameAccount;
+    private final HallsCampSpecialBuildingSupport specialBuildings;
     private final Map<UUID, Plot> plotsByEntity = new HashMap<>();
     private final Map<Integer, Plot> plotsById = new HashMap<>();
     private final Map<UUID, Door> doorsByEntity = new HashMap<>();
@@ -108,6 +116,23 @@ public final class HallsCampRuntime {
                             Function<Integer, List<String>> scanner,
                             ResearchAccount researchAccount,
                             KeyAccount keyAccount) {
+        this(plugin, world, scenario, buildingTypes, itemTypes, itemFactory, scrapAccount, sculkAccount,
+                totemAccount, scanner, researchAccount, keyAccount, null);
+    }
+
+    public HallsCampRuntime(JavaPlugin plugin,
+                            World world,
+                            HallsScenario scenario,
+                            Map<String, HallsBuildingType> buildingTypes,
+                            Map<String, HallsItemType> itemTypes,
+                            Function<HallsItemType, ItemStack> itemFactory,
+                            ScrapAccount scrapAccount,
+                            SculkAccount sculkAccount,
+                            TotemAccount totemAccount,
+                            Function<Integer, List<String>> scanner,
+                            ResearchAccount researchAccount,
+                            KeyAccount keyAccount,
+                            ShameAccount shameAccount) {
         this.plugin = plugin;
         this.world = world;
         this.scenario = scenario;
@@ -120,6 +145,9 @@ public final class HallsCampRuntime {
         this.scanner = scanner;
         this.researchAccount = researchAccount;
         this.keyAccount = keyAccount;
+        this.shameAccount = shameAccount;
+        this.specialBuildings = new HallsCampSpecialBuildingSupport(plugin, scenario, this.itemTypes,
+                this.buildingTypes, itemFactory, scrapAccount);
     }
 
     public void clear() {
@@ -145,6 +173,43 @@ public final class HallsCampRuntime {
     public boolean isCampEntity(Entity entity) {
         return entity != null && (plotsByEntity.containsKey(entity.getUniqueId())
                 || doorsByEntity.containsKey(entity.getUniqueId()));
+    }
+
+    public Location ejectDropFromBuildingHitbox(Location location) {
+        if (location == null || !world.equals(location.getWorld())) {
+            return null;
+        }
+        for (Plot plot : plotsById.values()) {
+            double half = plotHalfSize(plot);
+            double minX = plot.x() + 0.5 - half;
+            double maxX = plot.x() + 0.5 + half;
+            double minZ = plot.z() + 0.5 - half;
+            double maxZ = plot.z() + 0.5 + half;
+            if (location.getX() < minX || location.getX() > maxX
+                    || location.getZ() < minZ || location.getZ() > maxZ
+                    || location.getY() < plot.y() - 0.25 || location.getY() > plot.y() + 3.25) {
+                continue;
+            }
+            double left = Math.abs(location.getX() - minX);
+            double right = Math.abs(maxX - location.getX());
+            double north = Math.abs(location.getZ() - minZ);
+            double south = Math.abs(maxZ - location.getZ());
+            double edge = Math.min(Math.min(left, right), Math.min(north, south));
+            Location result = location.clone();
+            double padding = 0.35;
+            if (edge == left) {
+                result.setX(minX - padding);
+            } else if (edge == right) {
+                result.setX(maxX + padding);
+            } else if (edge == north) {
+                result.setZ(minZ - padding);
+            } else {
+                result.setZ(maxZ + padding);
+            }
+            result.setY(Math.max(result.getY(), plot.y() + 0.15));
+            return result;
+        }
+        return null;
     }
 
     public void startLayout(HallsCampLayout layout, int startX, int y, int startZ, Set<Integer> unlockedDoors) {
@@ -242,9 +307,6 @@ public final class HallsCampRuntime {
             setBuilding(plot, building, level);
             plot.setHarvestRemaining(state.harvestRemaining());
             plot.setHarvestUsed(state.harvestUsed());
-            if (state.harvestRemaining() <= 0 && state.harvestUsed() <= 0 && defaultRunUses(building, level) > 0) {
-                plot.setHarvestRemaining(defaultRunUses(building, level));
-            }
             plot.setStorageContents(state.storageContents());
             HallsBuildingType.Level buildingLevel = building.level(level);
             if (plot.harvestRemaining() <= 0 && !buildingLevel.emptyParts().isEmpty()) {
@@ -290,8 +352,8 @@ public final class HallsCampRuntime {
             return buildFromBlueprint(player, plot);
         }
         HallsBuildingType building = buildingTypes.get(plot.buildingId());
-        if (building != null && building.id().equals("mycelia_farm") && plot.harvestRemaining() > 0) {
-            return harvestMycelia(player, plot, building);
+        if (building != null && isHarvestFarm(building) && plot.harvestRemaining() > 0) {
+            return harvestFarm(player, plot, building);
         }
         playBuildingSound(player, building, BuildingSound.OPEN);
         openBuildingMenu(player, plot);
@@ -510,7 +572,14 @@ public final class HallsCampRuntime {
                 String itemId = clicked.getItemMeta().getPersistentDataContainer()
                         .get(new NamespacedKey(plugin, "hoc_camp_item"), PersistentDataType.STRING);
                 craftRecipe(player, plot, building, itemId);
-                openBuildingMenu(player, plot);
+                if (menu.view().equals("craft")) {
+                    openCraftingCategory(player, plot,
+                            menuItem(Material.PAPER, "Category", NamedTextColor.GRAY, List.of(),
+                                    "craft_category", menu.category()),
+                            menu.page());
+                } else {
+                    openBuildingMenu(player, plot);
+                }
             }
             case "station_home" -> openBuildingMenu(player, plot);
             case "craft_category" -> openCraftingCategory(player, plot, clicked, 0);
@@ -522,7 +591,28 @@ public final class HallsCampRuntime {
                 unlockResearch(player, nodeId);
                 openResearchMenu(player, plot);
             }
+            case "blueprint_deposit" -> {
+                specialBuildings.depositBlueprintPoints(player, plot);
+                openBuildingMenu(player, plot);
+            }
+            case "blueprint_fabricate_menu" -> specialBuildings.openBlueprintFabricationMenu(player, plot, RECIPE_SLOTS);
+            case "blueprint_fabricate" -> {
+                String itemId = clicked.getItemMeta().getPersistentDataContainer()
+                        .get(new NamespacedKey(plugin, "hoc_camp_item"), PersistentDataType.STRING);
+                specialBuildings.fabricateBlueprint(player, plot, itemId);
+                specialBuildings.openBlueprintFabricationMenu(player, plot, RECIPE_SLOTS);
+            }
             case "storage" -> openStorage(player, plot, building);
+            case "alchemy_convert" -> {
+                String pair = clicked.getItemMeta().getPersistentDataContainer()
+                        .get(new NamespacedKey(plugin, "hoc_camp_item"), PersistentDataType.STRING);
+                specialBuildings.convertScrap(player, plot, pair);
+                openBuildingMenu(player, plot);
+            }
+            case "deconstruct_held" -> {
+                specialBuildings.deconstructHeldItem(player, plot);
+                openBuildingMenu(player, plot);
+            }
             case "purify" -> {
                 activateSculkPurifier(player, plot, building);
                 openBuildingMenu(player, plot);
@@ -586,6 +676,7 @@ public final class HallsCampRuntime {
     }
 
     private boolean buildFromBlueprint(Player player, Plot plot) {
+        ItemStack heldBlueprint = player.getInventory().getItemInMainHand();
         HallsItemType blueprint = heldItemType(player);
         if (blueprint == null || !blueprint.category().equals("blueprint")) {
             player.sendActionBar(Component.text("Hold a building blueprint for this plot.", NamedTextColor.YELLOW));
@@ -605,10 +696,21 @@ public final class HallsCampRuntime {
         }
         consumeHeld(player);
         setBuilding(plot, building, 1);
-        initializeHarvest(plot, building);
+        restoreBlueprintBuildingState(heldBlueprint, plot, building);
+        refreshDisplayForCurrentState(plot, building);
         player.sendMessage(Component.text("Built " + building.name() + ".", NamedTextColor.GREEN));
         playBuildingSound(player, building, BuildingSound.BUILD);
+        addShame(1);
         return true;
+    }
+
+    private double plotHalfSize(Plot plot) {
+        return switch (plot.size()) {
+            case "station" -> 3.5;
+            case "large" -> 2.5;
+            case "medium" -> 1.5;
+            default -> 0.5;
+        };
     }
 
     private boolean upgrade(Player player, Plot plot) {
@@ -622,7 +724,7 @@ public final class HallsCampRuntime {
         }
         HallsBuildingType.Level next = building.level(plot.level() + 1);
         String blueprintCost = upgradeBlueprintCost(building);
-        if (blueprintCost != null && countHotbarItem(player.getInventory(), blueprintCost) <= 0) {
+        if (blueprintCost != null && HallsInventorySupport.countHotbarItem(plugin, player.getInventory(), blueprintCost) <= 0) {
             player.sendActionBar(Component.text("Missing " + itemName(blueprintCost) + " for this upgrade.",
                     NamedTextColor.RED));
             return true;
@@ -632,13 +734,24 @@ public final class HallsCampRuntime {
             return true;
         }
         if (blueprintCost != null) {
-            consumeItemIngredients(player.getInventory(), Map.of(blueprintCost, 1));
+            HallsInventorySupport.consumeItemIngredients(plugin, player.getInventory(), Map.of(blueprintCost, 1));
         }
+        int preservedBlueprintPoints = building.id().equals("research_table") ? plot.harvestRemaining() : -1;
         setBuilding(plot, building, plot.level() + 1);
         refreshHarvestForLevel(plot, building);
+        if (preservedBlueprintPoints >= 0) {
+            plot.setPoints(preservedBlueprintPoints);
+        }
         player.sendMessage(Component.text("Upgraded " + building.name() + " to level " + plot.level() + ".", NamedTextColor.GREEN));
         playBuildingSound(player, building, BuildingSound.UPGRADE);
+        addShame(1);
         return true;
+    }
+
+    private void addShame(int amount) {
+        if (shameAccount != null && amount > 0) {
+            shameAccount.addShame(amount);
+        }
     }
 
     private void openBuildingMenu(Player player, Plot plot) {
@@ -682,6 +795,21 @@ public final class HallsCampRuntime {
             int slots = storageSlots(building, plot.level());
             inventory.setItem(13, menuItem(Material.CHEST, "Open Storage", NamedTextColor.AQUA,
                     List.of("Slots: " + slots, "Stored items persist with this camp."), "storage", null));
+        } else if (building.id().equals("research_table")) {
+            int price = HallsCampSpecialBuildingSupport.blueprintFabricationCost(plot.level(), false);
+            inventory.setItem(11, menuItem(Material.BLUE_DYE, "Deposit Blueprint", NamedTextColor.AQUA,
+                    List.of("Held normal blueprints give 1 point.", "Rare blueprints give 2 points.",
+                            "Stored points: " + plot.harvestRemaining()), "blueprint_deposit", null));
+            inventory.setItem(15, menuItem(Material.WRITABLE_BOOK, "Fabricate Blueprint", NamedTextColor.YELLOW,
+                    List.of("Normal price: " + price + " points.",
+                            plot.level() >= 3 ? "Rare price: " + (price * 2) + " points." : "Rare blueprints require level 3."),
+                    "blueprint_fabricate_menu", null));
+        } else if (building.id().equals("alchemy_cauldron")) {
+            addAlchemyConversionItems(inventory, plot.level());
+        } else if (building.id().equals("deconstructor")) {
+            inventory.setItem(13, menuItem(Material.GRINDSTONE, "Destroy Held Item", NamedTextColor.RED,
+                    List.of("Randomly returns about " + HallsCampSpecialBuildingSupport.deconstructorRefundPercent(plot.level()) + "% of recipe scrap.",
+                            "The held item is destroyed."), "deconstruct_held", null));
         } else if (isSculkPurifier(building)) {
             inventory.setItem(13, menuItem(Material.CALIBRATED_SCULK_SENSOR, "Purify Sculk", NamedTextColor.AQUA,
                     List.of("Charges this run: " + plot.harvestRemaining(),
@@ -717,7 +845,7 @@ public final class HallsCampRuntime {
                     List.of("Exploration coin quota multiplier: "
                             + formatStatAmount(elevatorDrillQuotaMultiplier(plot.level()) * 100.0) + "%.",
                             "Multiple drills stack multiplicatively."), null, null));
-        } else if (building.id().equals("mycelia_farm")) {
+        } else if (isHarvestFarm(building)) {
             inventory.setItem(13, menuItem(Material.DEAD_BUSH, "Farm Empty", NamedTextColor.GRAY,
                     List.of("Upgrade or revisit after a future refresh."), null, null));
         } else if (!building.implemented()) {
@@ -741,8 +869,10 @@ public final class HallsCampRuntime {
                     List.of("This building is already level 3."), null, null));
         }
         if (!permanent) {
+            int blueprintCount = blueprintReturnCount(building, plot.level());
             inventory.setItem(destroySlot, menuItem(Material.TNT, "Destroy", NamedTextColor.RED,
-                    List.of("Removes the building.", "The blueprint is not returned."), "destroy", null));
+                    List.of("Removes the building.", "Returns " + blueprintCount + " "
+                            + itemName(building.blueprint()) + (blueprintCount == 1 ? "." : "s.")), "destroy", null));
         }
         player.openInventory(inventory);
     }
@@ -816,10 +946,12 @@ public final class HallsCampRuntime {
     private void openResearchMenu(Player player, Plot plot) {
         Inventory inventory = Bukkit.createInventory(new CampMenu(plot.id(), "research", "", 0), 54,
                 Component.text("Camp Station: Research", NamedTextColor.DARK_GREEN));
-        inventory.setItem(4, menuItem(Material.EXPERIENCE_BOTTLE, "Research Points", NamedTextColor.AQUA,
+        inventory.setItem(49, menuItem(Material.EXPERIENCE_BOTTLE, "Research Points", NamedTextColor.AQUA,
                 List.of("Available: " + researchPointsLabel()), null, null));
         List<HallsResearchNode> nodes = scenario == null ? List.of() : scenario.researchNodes().values().stream()
-                .sorted(java.util.Comparator.comparingInt((HallsResearchNode node) -> node.prerequisites().size())
+                .sorted(java.util.Comparator.comparingInt((HallsResearchNode node) -> node.column() <= 0 ? 99 : node.column())
+                        .thenComparingInt(node -> node.row() <= 0 ? 99 : node.row())
+                        .thenComparingInt(node -> node.prerequisites().size())
                         .thenComparing(HallsResearchNode::id))
                 .toList();
         if (nodes.isEmpty()) {
@@ -830,6 +962,21 @@ public final class HallsCampRuntime {
             player.openInventory(inventory);
             return;
         }
+        Set<Integer> usedSlots = new HashSet<>();
+        List<HallsResearchNode> unplacedNodes = new ArrayList<>();
+        for (HallsResearchNode node : nodes) {
+            if (!node.hasGridPosition()) {
+                unplacedNodes.add(node);
+                continue;
+            }
+            int slot = researchGridSlot(node);
+            if (slot < 0 || usedSlots.contains(slot)) {
+                unplacedNodes.add(node);
+                continue;
+            }
+            usedSlots.add(slot);
+            inventory.setItem(slot, researchNodeItem(node));
+        }
         int[][] slotsByDepth = {
                 {10, 19, 28, 37},
                 {12, 21, 30, 39},
@@ -839,16 +986,32 @@ public final class HallsCampRuntime {
         int[] usedByDepth = new int[slotsByDepth.length];
         int overflowIndex = 0;
         int[] overflowSlots = {46, 47, 48, 50, 51, 52};
-        for (HallsResearchNode node : nodes) {
+        for (HallsResearchNode node : unplacedNodes) {
             int depth = Math.min(slotsByDepth.length - 1, researchDepth(node, new HashSet<>()));
+            while (usedByDepth[depth] < slotsByDepth[depth].length
+                    && inventory.getItem(slotsByDepth[depth][usedByDepth[depth]]) != null) {
+                usedByDepth[depth]++;
+            }
             if (usedByDepth[depth] < slotsByDepth[depth].length) {
                 inventory.setItem(slotsByDepth[depth][usedByDepth[depth]++], researchNodeItem(node));
-            } else if (overflowIndex < overflowSlots.length) {
-                inventory.setItem(overflowSlots[overflowIndex++], researchNodeItem(node));
+            } else {
+                while (overflowIndex < overflowSlots.length && inventory.getItem(overflowSlots[overflowIndex]) != null) {
+                    overflowIndex++;
+                }
+                if (overflowIndex < overflowSlots.length) {
+                    inventory.setItem(overflowSlots[overflowIndex++], researchNodeItem(node));
+                }
             }
         }
         inventory.setItem(45, menuItem(Material.ARROW, "Back", NamedTextColor.GRAY, List.of("Return to station."), "station_home", null));
         player.openInventory(inventory);
+    }
+
+    private int researchGridSlot(HallsResearchNode node) {
+        if (node == null || !node.hasGridPosition()) {
+            return -1;
+        }
+        return (node.row() - 1) * 9 + (node.column() - 1);
     }
 
     private int researchDepth(HallsResearchNode node, Set<String> visiting) {
@@ -869,7 +1032,7 @@ public final class HallsCampRuntime {
         List<String> lore = new ArrayList<>();
         lore.add("Cost: " + node.cost() + " research");
         if (!node.prerequisites().isEmpty()) {
-            lore.add("Requires: " + node.prerequisites().stream().map(this::researchName).collect(java.util.stream.Collectors.joining(", ")));
+            lore.add("Requires one: " + node.prerequisites().stream().map(this::researchName).collect(java.util.stream.Collectors.joining(", ")));
         }
         if (!node.unlocks().isEmpty()) {
             lore.add("Unlocks:");
@@ -917,13 +1080,13 @@ public final class HallsCampRuntime {
         }
         ItemStack crafted = itemFactory.apply(itemType);
         boolean willEquipArmor = canEquipEmptyArmorSlot(player.getInventory(), crafted);
-        int outputSlot = willEquipArmor ? -1 : firstAvailableHotbarSlot(player.getInventory());
+        int outputSlot = willEquipArmor ? -1 : HallsInventorySupport.firstAvailableHotbarSlot(player.getInventory());
         if (!willEquipArmor && outputSlot < 0) {
             player.sendActionBar(Component.text("Your hotbar is full.", NamedTextColor.RED));
             return;
         }
         if (!itemCost.isEmpty()) {
-            consumeItemIngredients(player.getInventory(), itemCost);
+            HallsInventorySupport.consumeItemIngredients(plugin, player.getInventory(), itemCost);
         }
         if (scrapAccount != null && !scrapAccount.spend(scrapCost)) {
             player.sendActionBar(Component.text("Not enough stored scrap.", NamedTextColor.RED));
@@ -962,7 +1125,7 @@ public final class HallsCampRuntime {
         }
     }
 
-    private boolean harvestMycelia(Player player, Plot plot, HallsBuildingType building) {
+    private boolean harvestFarm(Player player, Plot plot, HallsBuildingType building) {
         HallsBuildingType.Level level = building.level(plot.level());
         List<String> harvestItems = level.harvestItems().isEmpty() ? level.giveItems() : level.harvestItems();
         int given = 0;
@@ -971,7 +1134,7 @@ public final class HallsCampRuntime {
             if (itemType == null) {
                 continue;
             }
-            int slot = firstAvailableHotbarSlot(player.getInventory());
+            int slot = HallsInventorySupport.firstAvailableHotbarSlot(player.getInventory());
             if (slot < 0) {
                 break;
             }
@@ -988,7 +1151,7 @@ public final class HallsCampRuntime {
             setDisplays(plot, building, level.emptyParts().isEmpty() ? level.parts() : level.emptyParts());
         }
         playBuildingSound(player, building, BuildingSound.USE);
-        player.sendActionBar(Component.text("Harvested " + given + " mycelia.", NamedTextColor.GREEN));
+        player.sendActionBar(Component.text("Harvested " + given + " item" + (given == 1 ? "" : "s") + ".", NamedTextColor.GREEN));
         return true;
     }
 
@@ -1004,16 +1167,13 @@ public final class HallsCampRuntime {
             double[] offset = rotatedOffset(part.offsetX(), part.offsetZ(), plot.facing());
             Location location = new Location(world,
                     plot.x() + 0.5 + offset[0],
-                    plot.y() + part.offsetY(),
+                    plot.y() + part.offsetY() + part.scaleY() * 0.5,
                     plot.z() + 0.5 + offset[1]);
             BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
                 entity.setBlock(blockData(part.material(), part.blockData()));
                 entity.setBillboard(Display.Billboard.FIXED);
-                entity.setTransformation(new Transformation(
-                        centerOnDisplayOrigin(part.scaleX(), part.scaleZ(), plot.facing()),
-                        partRotation(part, plot.facing()),
-                        new Vector3f((float) part.scaleX(), (float) part.scaleY(), (float) part.scaleZ()),
-                        new Quaternionf()));
+                entity.setTransformation(HallsDisplayTransforms.centeredBlock(
+                        part.scaleX(), part.scaleY(), part.scaleZ(), partRotation(part, plot.facing())));
                 entity.setPersistent(false);
                 entity.addScoreboardTag("omgames_hoc_camp_building");
             });
@@ -1027,10 +1187,44 @@ public final class HallsCampRuntime {
             player.sendActionBar(Component.text("Empty this locker before destroying it.", NamedTextColor.RED));
             return;
         }
+        int blueprintCount = blueprintReturnCount(building, plot.level());
+        if (blueprintCount > 0 && HallsInventorySupport.availableHotbarSlots(player.getInventory()) < blueprintCount) {
+            player.sendActionBar(Component.text("Clear " + blueprintCount + " hotbar slot"
+                    + (blueprintCount == 1 ? "" : "s") + " to recover the blueprint.", NamedTextColor.RED));
+            return;
+        }
         removeDisplays(plot);
+        int harvestRemaining = plot.harvestRemaining();
+        int harvestUsed = plot.harvestUsed();
         plot.clearBuilding();
+        returnBlueprints(player, building, blueprintCount, harvestRemaining, harvestUsed);
         playBuildingSound(player, building, BuildingSound.DESTROY);
         player.sendMessage(Component.text("Destroyed " + building.name() + ".", NamedTextColor.RED));
+    }
+
+    private void returnBlueprints(Player player,
+                                  HallsBuildingType building,
+                                  int count,
+                                  int harvestRemaining,
+                                  int harvestUsed) {
+        if (building == null) {
+            return;
+        }
+        HallsItemType blueprint = itemTypes.get(building.blueprint());
+        if (blueprint == null) {
+            return;
+        }
+        for (int i = 0; i < count; i++) {
+            int slot = HallsInventorySupport.firstAvailableHotbarSlot(player.getInventory());
+            if (slot < 0) {
+                return;
+            }
+            ItemStack item = itemFactory.apply(blueprint);
+            if (i == 0) {
+                applyBlueprintBuildingState(item, building, harvestRemaining, harvestUsed);
+            }
+            player.getInventory().setItem(slot, item);
+        }
     }
 
     private void initializeHarvest(Plot plot, HallsBuildingType building) {
@@ -1038,9 +1232,77 @@ public final class HallsCampRuntime {
         plot.setHarvestRemaining(defaultRunUses(building, plot.level()));
     }
 
+    private void restoreBlueprintBuildingState(ItemStack blueprint, Plot plot, HallsBuildingType building) {
+        if (blueprint == null || !blueprint.hasItemMeta()) {
+            initializeHarvest(plot, building);
+            return;
+        }
+        ItemMeta meta = blueprint.getItemMeta();
+        String stateBuildingId = meta.getPersistentDataContainer()
+                .get(new NamespacedKey(plugin, "hoc_blueprint_building_state_id"), PersistentDataType.STRING);
+        if (!building.id().equals(stateBuildingId)) {
+            initializeHarvest(plot, building);
+            return;
+        }
+        int defaultUses = defaultRunUses(building, plot.level());
+        int used = Math.max(0, optionalInt(meta, "hoc_blueprint_harvest_used", 0));
+        int remaining = Math.max(0, optionalInt(meta, "hoc_blueprint_harvest_remaining", defaultUses));
+        if (building.id().equals("research_table")) {
+            plot.setHarvestUsed(0);
+            plot.setHarvestRemaining(remaining);
+            return;
+        }
+        plot.setHarvestUsed(used);
+        plot.setHarvestRemaining(Math.max(0, Math.min(defaultUses, defaultUses - used)));
+    }
+
+    private void applyBlueprintBuildingState(ItemStack blueprint,
+                                             HallsBuildingType building,
+                                             int harvestRemaining,
+                                             int harvestUsed) {
+        if (blueprint == null || !blueprint.hasItemMeta() || building == null) {
+            return;
+        }
+        int defaultUses = defaultRunUses(building, 1);
+        if (defaultUses <= 0 && !building.id().equals("research_table")) {
+            return;
+        }
+        ItemMeta meta = blueprint.getItemMeta();
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_blueprint_building_state_id"),
+                PersistentDataType.STRING, building.id());
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_blueprint_harvest_remaining"),
+                PersistentDataType.INTEGER, Math.max(0, harvestRemaining));
+        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "hoc_blueprint_harvest_used"),
+                PersistentDataType.INTEGER, Math.max(0, harvestUsed));
+        List<Component> lore = new ArrayList<>(meta.lore() == null ? List.of() : meta.lore());
+        if (!lore.isEmpty()) {
+            lore.add(Component.empty());
+        }
+        if (building.id().equals("research_table")) {
+            lore.add(Component.text("Saved blueprint points: " + Math.max(0, harvestRemaining), NamedTextColor.DARK_AQUA));
+        } else {
+            int rebuiltRemaining = Math.max(0, Math.min(defaultUses, defaultUses - Math.max(0, harvestUsed)));
+            lore.add(Component.text("Saved run uses: " + rebuiltRemaining + "/" + defaultUses, NamedTextColor.DARK_AQUA));
+        }
+        meta.lore(lore);
+        blueprint.setItemMeta(meta);
+    }
+
+    private int optionalInt(ItemMeta meta, String key, int fallback) {
+        Integer value = meta.getPersistentDataContainer().get(new NamespacedKey(plugin, key), PersistentDataType.INTEGER);
+        return value == null ? fallback : value;
+    }
+
     private void refreshHarvestForLevel(Plot plot, HallsBuildingType building) {
         HallsBuildingType.Level level = building.level(plot.level());
         plot.setHarvestRemaining(Math.max(0, defaultRunUses(building, plot.level()) - plot.harvestUsed()));
+        if (plot.harvestRemaining() <= 0 && !level.emptyParts().isEmpty()) {
+            setDisplays(plot, building, level.emptyParts());
+        }
+    }
+
+    private void refreshDisplayForCurrentState(Plot plot, HallsBuildingType building) {
+        HallsBuildingType.Level level = building.level(plot.level());
         if (plot.harvestRemaining() <= 0 && !level.emptyParts().isEmpty()) {
             setDisplays(plot, building, level.emptyParts());
         }
@@ -1065,10 +1327,41 @@ public final class HallsCampRuntime {
         if (building == null) {
             return null;
         }
-        if (isCraftingStation(building) || isStorageLocker(building) || isSculkPurifier(building)) {
+        if (isCraftingStation(building) || isStorageLocker(building) || isSculkPurifier(building)
+                || building.id().equals("research_table") || building.id().equals("alchemy_cauldron")
+                || building.id().equals("deconstructor")) {
             return building.blueprint();
         }
         return null;
+    }
+
+    private void addAlchemyConversionItems(Inventory inventory, int level) {
+        int ratio = HallsCampSpecialBuildingSupport.alchemyRatio(level);
+        ScrapDisplay[] scraps = {
+                new ScrapDisplay("wood_scrap", "Wood", Material.OAK_PLANKS),
+                new ScrapDisplay("iron_scrap", "Iron", Material.IRON_INGOT),
+                new ScrapDisplay("diamond_scrap", "Diamond", Material.DIAMOND),
+                new ScrapDisplay("redstone_scrap", "Redstone", Material.REDSTONE)
+        };
+        int[] slots = {9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21};
+        int index = 0;
+        for (ScrapDisplay from : scraps) {
+            for (ScrapDisplay to : scraps) {
+                if (from.id().equals(to.id()) || index >= slots.length) {
+                    continue;
+                }
+                inventory.setItem(slots[index++], menuItem(to.material(), from.name() + " -> " + to.name(),
+                        NamedTextColor.YELLOW, List.of("Cost: " + ratio + " " + from.name().toLowerCase()
+                                + " scrap."), "alchemy_convert", from.id() + ":" + to.id()));
+            }
+        }
+    }
+
+    private int blueprintReturnCount(HallsBuildingType building, int level) {
+        if (building == null || building.blueprint().isBlank()) {
+            return 0;
+        }
+        return 1 + (upgradeBlueprintCost(building) == null ? 0 : Math.max(0, Math.min(3, level) - 1));
     }
 
     private List<String> upgradeLore(HallsBuildingType building, Plot plot) {
@@ -1092,7 +1385,7 @@ public final class HallsCampRuntime {
             } else {
                 lore.add("No new recipes at this level.");
             }
-        } else if (building.id().equals("mycelia_farm")) {
+        } else if (isHarvestFarm(building)) {
             List<String> harvestItems = next.harvestItems().isEmpty() ? next.giveItems() : next.harvestItems();
             lore.add("Harvest uses: " + next.harvestUses());
             if (!harvestItems.isEmpty()) {
@@ -1103,6 +1396,18 @@ public final class HallsCampRuntime {
         } else if (isSculkPurifier(building)) {
             lore.add("Purify amount: " + formatStatAmount(purifyAmount(building, plot.level()))
                     + "% -> " + formatStatAmount(purifyAmount(building, plot.level() + 1)) + "%");
+        } else if (building.id().equals("research_table")) {
+            lore.add("Normal blueprint cost: " + HallsCampSpecialBuildingSupport.blueprintFabricationCost(plot.level(), false)
+                    + " -> " + HallsCampSpecialBuildingSupport.blueprintFabricationCost(plot.level() + 1, false));
+            if (plot.level() + 1 >= 3) {
+                lore.add("Unlocks rare blueprint fabrication.");
+            }
+        } else if (building.id().equals("alchemy_cauldron")) {
+            lore.add("Conversion ratio: " + HallsCampSpecialBuildingSupport.alchemyRatio(plot.level()) + ":1 -> "
+                    + HallsCampSpecialBuildingSupport.alchemyRatio(plot.level() + 1) + ":1");
+        } else if (building.id().equals("deconstructor")) {
+            lore.add("Refund chance: " + HallsCampSpecialBuildingSupport.deconstructorRefundPercent(plot.level())
+                    + "% -> " + HallsCampSpecialBuildingSupport.deconstructorRefundPercent(plot.level() + 1) + "%");
         } else if (building.id().equals("grindstone")) {
             lore.add("Damage bonus: +" + formatStatAmount(grindstoneDamageBonus(plot.level()))
                     + " -> +" + formatStatAmount(grindstoneDamageBonus(plot.level() + 1)));
@@ -1410,6 +1715,12 @@ public final class HallsCampRuntime {
         return buildingId != null && (buildingId.equals("sculk_purifier") || buildingId.startsWith("sculk_purifier_"));
     }
 
+    private boolean isHarvestFarm(HallsBuildingType building) {
+        return building != null && (building.id().equals("mycelia_farm")
+                || building.id().equals("potato_farm")
+                || building.id().equals("carrot_farm"));
+    }
+
     private int storageSlots(HallsBuildingType building, int level) {
         return Math.max(1, Math.min(54, 9 * Math.max(1, Math.min(3, level))));
     }
@@ -1502,8 +1813,10 @@ public final class HallsCampRuntime {
             case UPGRADE -> world.playSound(player.getLocation(), Sound.BLOCK_SMITHING_TABLE_USE, 0.8f, 1.1f);
             case DESTROY -> world.playSound(player.getLocation(), Sound.BLOCK_ANVIL_DESTROY, 0.7f, 1.1f);
             case USE -> {
-                if (id.equals("cooking_pot") || id.equals("mycelia_farm")) {
+                if (id.equals("cooking_pot") || isHarvestFarm(building) || id.equals("research_table")) {
                     world.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7f, 1.35f);
+                } else if (id.equals("alchemy_cauldron")) {
+                    world.playSound(player.getLocation(), Sound.BLOCK_BREWING_STAND_BREW, 0.8f, 1.1f);
                 } else if (id.equals("weapon_bench") || id.equals("armory")) {
                     world.playSound(player.getLocation(), Sound.BLOCK_SMITHING_TABLE_USE, 0.8f, 1.25f);
                 } else if (id.equals("grindstone")) {
@@ -1587,53 +1900,11 @@ public final class HallsCampRuntime {
 
     private boolean hasItemIngredients(PlayerInventory inventory, Map<String, Integer> cost) {
         for (Map.Entry<String, Integer> entry : cost.entrySet()) {
-            if (countHotbarItem(inventory, entry.getKey()) < entry.getValue()) {
+            if (HallsInventorySupport.countHotbarItem(plugin, inventory, entry.getKey()) < entry.getValue()) {
                 return false;
             }
         }
         return true;
-    }
-
-    private int countHotbarItem(PlayerInventory inventory, String itemId) {
-        int count = 0;
-        for (int slot = 0; slot <= 8; slot++) {
-            ItemStack item = inventory.getItem(slot);
-            if (hasHallsItemId(item, itemId)) {
-                count += Math.max(1, item.getAmount());
-            }
-        }
-        return count;
-    }
-
-    private void consumeItemIngredients(PlayerInventory inventory, Map<String, Integer> cost) {
-        for (Map.Entry<String, Integer> entry : cost.entrySet()) {
-            int remaining = entry.getValue();
-            for (int slot = 0; slot <= 8 && remaining > 0; slot++) {
-                ItemStack item = inventory.getItem(slot);
-                if (!hasHallsItemId(item, entry.getKey())) {
-                    continue;
-                }
-                int take = Math.min(remaining, Math.max(1, item.getAmount()));
-                remaining -= take;
-                int newAmount = item.getAmount() - take;
-                if (newAmount <= 0) {
-                    inventory.setItem(slot, null);
-                } else {
-                    ItemStack remainingItem = item.clone();
-                    remainingItem.setAmount(newAmount);
-                    inventory.setItem(slot, remainingItem);
-                }
-            }
-        }
-    }
-
-    private boolean hasHallsItemId(ItemStack item, String itemId) {
-        if (item == null || item.getType().isAir() || !item.hasItemMeta()) {
-            return false;
-        }
-        String actual = item.getItemMeta().getPersistentDataContainer()
-                .get(new NamespacedKey(plugin, "hoc_item_id"), PersistentDataType.STRING);
-        return itemId.equals(actual);
     }
 
     private void markLockedStorageFiller(ItemStack item) {
@@ -1744,15 +2015,6 @@ public final class HallsCampRuntime {
                         (float) Math.toRadians(part.rotationZ()));
     }
 
-    private Vector3f centerOnDisplayOrigin(double scaleX, double scaleZ, BlockFace facing) {
-        return switch (facing) {
-            case EAST -> new Vector3f((float) (-scaleZ * 0.5), 0.0f, (float) (scaleX * 0.5));
-            case SOUTH -> new Vector3f((float) (scaleX * 0.5), 0.0f, (float) (scaleZ * 0.5));
-            case WEST -> new Vector3f((float) (scaleZ * 0.5), 0.0f, (float) (-scaleX * 0.5));
-            default -> new Vector3f((float) (-scaleX * 0.5), 0.0f, (float) (-scaleZ * 0.5));
-        };
-    }
-
     private double[] rotatedOffset(double x, double z, BlockFace facing) {
         return switch (facing) {
             case EAST -> new double[]{-z, x};
@@ -1794,16 +2056,6 @@ public final class HallsCampRuntime {
         player.getInventory().setItemInMainHand(held);
     }
 
-    private int firstAvailableHotbarSlot(PlayerInventory inventory) {
-        for (int slot = 0; slot <= 8; slot++) {
-            ItemStack item = inventory.getItem(slot);
-            if (item == null || item.getType().isAir()) {
-                return slot;
-            }
-        }
-        return -1;
-    }
-
     private void removeEntities(Plot plot) {
         Entity interaction = Bukkit.getEntity(plot.interactionId());
         if (interaction != null) {
@@ -1823,7 +2075,7 @@ public final class HallsCampRuntime {
         plot.displayIds().clear();
     }
 
-    private static final class Plot {
+    private static final class Plot implements HallsCampSpecialBuildingSupport.PlotAccess {
         private final int id;
         private final String size;
         private final double x;
@@ -1848,7 +2100,7 @@ public final class HallsCampRuntime {
             this.interactionId = interactionId;
         }
 
-        private int id() {
+        public int id() {
             return id;
         }
 
@@ -1880,11 +2132,11 @@ public final class HallsCampRuntime {
             return displayIds;
         }
 
-        private String buildingId() {
+        public String buildingId() {
             return buildingId;
         }
 
-        private int level() {
+        public int level() {
             return level;
         }
 
@@ -1905,8 +2157,16 @@ public final class HallsCampRuntime {
             return harvestRemaining;
         }
 
+        public int points() {
+            return harvestRemaining;
+        }
+
         private void setHarvestRemaining(int harvestRemaining) {
             this.harvestRemaining = Math.max(0, harvestRemaining);
+        }
+
+        public void setPoints(int points) {
+            setHarvestRemaining(points);
         }
 
         private int harvestUsed() {
@@ -1937,7 +2197,7 @@ public final class HallsCampRuntime {
 
     private static final int[] RECIPE_SLOTS = {
             10, 11, 12, 13, 14, 15, 16,
-            19, 20, 21, 23, 24, 25,
+            19, 20, 21, 22, 23, 24, 25,
             28, 29, 30, 31, 32, 33, 34,
             37, 38, 39, 40, 41, 42, 43
     };
@@ -1963,7 +2223,10 @@ public final class HallsCampRuntime {
     private record Cell(int x, int z) {
     }
 
-    private record CampMenu(int plotId, String view, String category, int page) implements InventoryHolder {
+    private record ScrapDisplay(String id, String name, Material material) {
+    }
+
+    record CampMenu(int plotId, String view, String category, int page) implements InventoryHolder {
         @Override
         public Inventory getInventory() {
             return null;

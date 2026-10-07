@@ -2,5 +2,6 @@ id: stray
 name: "Stray"
 entity-type: STRAY
 health: 6
+attack-damage: 1.0
 equipment:
   main-hand: BOW

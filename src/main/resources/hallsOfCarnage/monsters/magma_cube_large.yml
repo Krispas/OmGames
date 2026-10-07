@@ -2,4 +2,5 @@ id: magma_cube_large
 name: "Large Magma Cube"
 entity-type: MAGMA_CUBE
 health: 24
+attack-damage: 2.0
 slime-size: 4

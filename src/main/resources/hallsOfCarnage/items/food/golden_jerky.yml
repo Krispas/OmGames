@@ -11,4 +11,7 @@ stats:
   absorption-seconds: 30
   absorption-amplifier: 1
 recipe:
+  potato: 1
+  carrot: 1
+  hearty_mycelia_stew: 1
   wood_scrap: 6

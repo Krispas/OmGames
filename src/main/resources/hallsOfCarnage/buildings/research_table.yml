@@ -1,0 +1,32 @@
+id: research_table
+name: "Research Table"
+size: medium
+blueprint: research_table_blueprint
+implemented: true
+levels:
+  1:
+    parts:
+      - material: LECTERN
+        offset: [0, 0, 0]
+        scale: [1, 1, 1]
+      - material: BOOKSHELF
+        offset: [1, 0, 0]
+        scale: [0.8, 0.8, 0.8]
+  2:
+    upgrade-cost: {diamond: 4}
+    parts:
+      - material: LECTERN
+        offset: [0, 0, 0]
+        scale: [1.05, 1.05, 1.05]
+      - material: CHISELED_BOOKSHELF
+        offset: [1, 0, 0]
+        scale: [0.9, 0.9, 0.9]
+  3:
+    upgrade-cost: {diamond: 8}
+    parts:
+      - material: ENCHANTING_TABLE
+        offset: [0, 0, 0]
+        scale: [1, 1, 1]
+      - material: CHISELED_BOOKSHELF
+        offset: [1, 0, 0]
+        scale: [1, 1, 1]

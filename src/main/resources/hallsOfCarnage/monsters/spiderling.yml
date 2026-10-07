@@ -1,0 +1,7 @@
+id: spiderling
+name: "Spiderling"
+entity-type: SPIDER
+health: 1
+scale: 0.5
+movement-speed-multiplier: 0.6
+attack-damage: 0.5

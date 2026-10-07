@@ -1,0 +1,12 @@
+id: raw_pufferfish
+name: "Raw Pufferfish"
+category: food
+rarity: normal
+material: PUFFERFISH
+max-stack-size: 1
+lore:
+  - "Fresh from a sewer trap. Risky, but edible."
+stats:
+  heal: 1
+  poison-seconds: 5
+  poison-amplifier: 1

@@ -6,7 +6,7 @@ lobby:
     z: 0.5
     yaw: 0.0
     pitch: 0.0
-  menu-villager:
+  menu-interaction:
     enabled: false
     x: 0.5
     y: 70.0
@@ -22,6 +22,9 @@ sessions:
   spacing: 1000
   max-players: 6
   disconnect-grace-seconds: 300
+
+elevator:
+  locator-icon-item-model: "om:hoc_elevator"
 
 leaderboard:
   limit: 10

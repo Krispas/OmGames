@@ -1,5 +1,6 @@
 id: sewer
 name: "Sewer"
+name-color: DARK_GREEN
 corridor-generation: sewer
 materials:
   floor: MUD_BRICKS

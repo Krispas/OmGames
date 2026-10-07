@@ -7,6 +7,8 @@ public record HallsResearchNode(String id,
                                 String name,
                                 Material icon,
                                 int cost,
+                                int row,
+                                int column,
                                 List<String> prerequisites,
                                 List<String> unlocks) {
     public HallsResearchNode {
@@ -14,6 +16,8 @@ public record HallsResearchNode(String id,
         name = name == null || name.isBlank() ? id.replace('_', ' ') : name;
         icon = icon == null ? Material.BOOK : icon;
         cost = Math.max(0, cost);
+        row = Math.max(0, Math.min(5, row));
+        column = Math.max(0, Math.min(9, column));
         prerequisites = prerequisites == null ? List.of() : prerequisites.stream()
                 .map(HallsResearchNode::normalize)
                 .filter(value -> !value.isBlank())
@@ -26,6 +30,10 @@ public record HallsResearchNode(String id,
 
     public boolean root() {
         return prerequisites.isEmpty();
+    }
+
+    public boolean hasGridPosition() {
+        return row > 0 && column > 0;
     }
 
     private static String normalize(String value) {

@@ -27,6 +27,7 @@ public record HallsSaveData(File file,
                             int campBankCoins,
                             int campKeys,
                             int campKeysEarned,
+                            int runShame,
                             int researchPoints,
                             Set<String> unlockedResearch,
                             int explorationFloorsSinceCamp,
@@ -37,7 +38,8 @@ public record HallsSaveData(File file,
                             Map<Integer, List<HallsCampRuntime.PlotState>> camps,
                             Map<Integer, Set<Integer>> campUnlockedDoors,
                             LastCampCheckpoint lastCampCheckpoint,
-                            long savedAt) {
+                            long savedAt,
+                            long endlessRunSeed) {
     public HallsSaveData {
         unlockedResearch = unlockedResearch == null ? Set.of() : Set.copyOf(unlockedResearch);
     }
@@ -72,6 +74,7 @@ public record HallsSaveData(File file,
                 yaml.getInt("camp-bank.coins", 0),
                 yaml.getInt("camp-bank.keys", 0),
                 yaml.getInt("camp-bank.keys-earned", Math.max(0, yaml.getInt("camp-bank.keys", 0))),
+                yaml.getInt("shame.current", 0),
                 yaml.getInt("research.points", 0),
                 normalizedSet(yaml.getStringList("research.unlocked")),
                 yaml.getInt("research.exploration-floors-since-camp", 0),
@@ -82,7 +85,8 @@ public record HallsSaveData(File file,
                 camps(yaml, "camps"),
                 campUnlockedDoors(yaml, "camps"),
                 lastCampCheckpoint(yaml, participants),
-                yaml.getLong("saved-at", file.lastModified()));
+                yaml.getLong("saved-at", file.lastModified()),
+                yaml.getLong("endless.run-seed", 0L));
     }
 
     private static int lastSavedCampFloor(YamlConfiguration yaml) {
@@ -137,6 +141,7 @@ public record HallsSaveData(File file,
             players.put(playerId, new PlayerState(
                     yaml.getString(path + ".name", playerId.toString().substring(0, 8)),
                     yaml.getBoolean(path + ".ghost", false),
+                    yaml.getDouble(path + ".health", -1.0),
                     yaml.getDouble(path + ".sculk", 0.0),
                     Math.max(0, yaml.getInt(path + ".health-totem-level", 0)),
                     Math.max(0, yaml.getInt(path + ".speed-totem-level", 0)),
@@ -258,6 +263,7 @@ public record HallsSaveData(File file,
 
     public record PlayerState(String name,
                               boolean ghost,
+                              double health,
                               double sculk,
                               int healthTotemLevel,
                               int speedTotemLevel,

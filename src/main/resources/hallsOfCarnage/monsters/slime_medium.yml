@@ -2,4 +2,5 @@ id: slime_medium
 name: "Medium Slime"
 entity-type: SLIME
 health: 16
+attack-damage: 1.0
 slime-size: 2

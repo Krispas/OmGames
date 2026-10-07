@@ -5,11 +5,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 
 public record HallsLevelType(
         String id,
         String name,
+        ChatColor nameColor,
         String corridorGeneration,
         Material floor,
         Material ceiling,
@@ -27,6 +29,7 @@ public record HallsLevelType(
     public HallsLevelType {
         commonMonsters = List.copyOf(commonMonsters);
         specialMonsters = List.copyOf(specialMonsters);
+        nameColor = nameColor == null ? ChatColor.WHITE : nameColor;
         vegetationChance = Math.max(0.0, Math.min(1.0, vegetationChance));
         vegetation = List.copyOf(vegetation);
         liquid = liquid == null ? LiquidSettings.none() : liquid;
@@ -38,6 +41,7 @@ public record HallsLevelType(
             return new HallsLevelType(
                     normalizedId,
                     "Frozen Halls",
+                    ChatColor.AQUA,
                     "cave",
                     Material.PACKED_ICE,
                     Material.BLUE_ICE,
@@ -60,6 +64,7 @@ public record HallsLevelType(
             return new HallsLevelType(
                     normalizedId,
                     "Deep Crypt",
+                    ChatColor.GOLD,
                     "maze",
                     Material.SMOOTH_SANDSTONE,
                     Material.CHISELED_SANDSTONE,
@@ -82,6 +87,7 @@ public record HallsLevelType(
             return new HallsLevelType(
                     normalizedId,
                     "Infernal Chambers",
+                    ChatColor.RED,
                     "large_corridors",
                     Material.CRACKED_POLISHED_BLACKSTONE_BRICKS,
                     Material.POLISHED_BLACKSTONE_BRICKS,
@@ -104,6 +110,7 @@ public record HallsLevelType(
             return new HallsLevelType(
                     normalizedId,
                     "Factory",
+                    ChatColor.GRAY,
                     "open_halls",
                     Material.SMOOTH_STONE,
                     Material.IRON_BLOCK,
@@ -126,6 +133,7 @@ public record HallsLevelType(
             return new HallsLevelType(
                     normalizedId,
                     "Backrooms",
+                    ChatColor.YELLOW,
                     "backrooms",
                     Material.YELLOW_TERRACOTTA,
                     Material.SMOOTH_SANDSTONE,
@@ -148,6 +156,7 @@ public record HallsLevelType(
             return new HallsLevelType(
                     normalizedId,
                     "Sewer",
+                    ChatColor.DARK_GREEN,
                     "sewer",
                     Material.MUD_BRICKS,
                     Material.DEEPSLATE_BRICKS,
@@ -166,9 +175,56 @@ public record HallsLevelType(
                     new LiquidSettings(true, Material.WATER, 0.45)
             );
         }
+        if (normalizedId.equals("library")) {
+            return new HallsLevelType(
+                    normalizedId,
+                    "Library",
+                    ChatColor.LIGHT_PURPLE,
+                    "library",
+                    Material.DARK_OAK_PLANKS,
+                    Material.OAK_PLANKS,
+                    Material.DARK_OAK_PLANKS,
+                    Material.OAK_PLANKS,
+                    Material.OCHRE_FROGLIGHT,
+                    List.of(
+                            new BlockPalette(Material.BOOKSHELF, Material.CHISELED_BOOKSHELF, 0.10),
+                            new BlockPalette(Material.SPRUCE_PLANKS, Material.STRIPPED_SPRUCE_WOOD, 0.08)
+                    ),
+                    List.of(new BlockPalette(Material.DARK_OAK_LOG, Material.BOOKSHELF, 0.08)),
+                    List.of("zombie", "skeleton", "silverfish", "witch"),
+                    List.of("vindicator", "breeze", "creaking"),
+                    0.01,
+                    List.of(new VegetationEntry("deadbush", 1)),
+                    LiquidSettings.none()
+            );
+        }
+        if (normalizedId.equals("bunker")) {
+            return new HallsLevelType(
+                    normalizedId,
+                    "Bunker",
+                    ChatColor.DARK_GRAY,
+                    "bunker",
+                    Material.POLISHED_TUFF,
+                    Material.DEEPSLATE_TILES,
+                    Material.POLISHED_ANDESITE,
+                    Material.DEEPSLATE_TILES,
+                    Material.REDSTONE_LAMP,
+                    List.of(
+                            new BlockPalette(Material.TUFF_BRICKS, Material.CRACKED_DEEPSLATE_BRICKS, 0.08),
+                            new BlockPalette(Material.DEEPSLATE_BRICKS, Material.IRON_BLOCK, 0.04)
+                    ),
+                    List.of(new BlockPalette(Material.POLISHED_BASALT, Material.IRON_BLOCK, 0.05)),
+                    List.of("zombie", "pillager", "skeleton", "slime_medium"),
+                    List.of("ravager", "breeze", "zombie_vanguard"),
+                    0.0,
+                    List.of(),
+                    LiquidSettings.none()
+            );
+        }
         return new HallsLevelType(
                 normalizedId,
                 "Howling Corridors",
+                ChatColor.DARK_RED,
                 "normal",
                 Material.PACKED_MUD,
                 Material.TUFF_BRICKS,

@@ -7,8 +7,8 @@ max-stack-size: 1
 lore:
   - "Heavy enough to hurt."
 stats:
-  melee-damage: 4
+  melee-damage: 5
   attack-speed: 1.2
-  durability: 55
+  durability: 80
 recipe:
   iron_scrap: 6

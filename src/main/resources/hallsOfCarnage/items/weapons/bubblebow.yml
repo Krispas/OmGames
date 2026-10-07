@@ -1,0 +1,18 @@
+id: bubblebow
+name: "Bubblebow"
+category: weapon
+rarity: rare
+material: BOW
+max-stack-size: 1
+lore:
+  - "Its arrows burst into clinging foam."
+stats:
+  ranged: 1
+  ranged-damage: 5
+  slowness-seconds: 4
+  slowness-amplifier: 2
+  durability: 110
+recipe:
+  wood_scrap: 10
+  redstone_scrap: 5
+  diamond_scrap: 2

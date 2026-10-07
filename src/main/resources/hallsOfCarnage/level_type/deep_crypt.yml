@@ -1,5 +1,6 @@
 id: deep_crypt
 name: "Deep Crypt"
+name-color: GOLD
 corridor-generation: maze
 materials:
   floor: SMOOTH_SANDSTONE
@@ -39,11 +40,11 @@ monsters:
     - husk
     - breeze
     - pillager
-    - silverfish
+    - dammed_librarian
   special:
     - skeleton
     - parched
-    - wither_skeleton
+    - bedrock_walker
 vegetation:
   chance: 0.035
   types:

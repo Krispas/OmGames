@@ -2,4 +2,5 @@ id: hoglin_slow
 name: "Slow Hoglin"
 entity-type: HOGLIN
 health: 30
+attack-damage: 3.0
 movement-speed-multiplier: 0.55

@@ -1,5 +1,6 @@
 package krispasi.omGames.hallsofcarnage;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -9,7 +10,10 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.IdentityHashMap;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 import java.util.function.DoubleSupplier;
+import java.util.function.ObjDoubleConsumer;
 import java.util.function.Predicate;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -23,9 +27,11 @@ import org.bukkit.World;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
+import org.bukkit.block.data.MultipleFacing;
 import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Interaction;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.PufferFish;
@@ -46,6 +52,8 @@ final class HallsSessionTrapRuntime {
     private static final int ROOM_HEIGHT = 5;
     private static final int ELEVATOR_OUTER_RADIUS = 3;
     private static final double MONSTER_TRAP_PLAYER_RADIUS = 20.0;
+    private static final int HOMING_MINE_DETECTION_PATH_CELLS = 18;
+    private static final int HOMING_MINE_DETONATION_PATH_CELLS = 2;
 
     private final JavaPlugin plugin;
     private final World world;
@@ -55,12 +63,21 @@ final class HallsSessionTrapRuntime {
     private final BlockSetter blockSetter;
     private final Map<String, HallsTrapType> trapTypes;
     private final DoubleSupplier trapDamageMultiplier;
+    private final Consumer<Location> lootDropSink;
+    private final BiPredicate<String, Location> trapMonsterSpawner;
+    private final ObjDoubleConsumer<Player> playerDamageSink;
     private final List<HallsTrap> traps = new ArrayList<>();
     private final Map<UUID, Long> trapDamageCooldowns = new java.util.HashMap<>();
     private final Map<HallsTrap, Long> trapNextTriggerTicks = new IdentityHashMap<>();
+    private final Map<HallsTrap, Long> homingMineDetonateTicks = new IdentityHashMap<>();
+    private final Map<HallsTrap, Integer> trapHitPoints = new IdentityHashMap<>();
+    private final Map<HallsExplorationGenerator.Room, Set<HallsExplorationGenerator.Cell>> roomPitCells = new IdentityHashMap<>();
     private final Set<UUID> transientTrapDisplays = new HashSet<>();
+    private Set<HallsExplorationGenerator.Cell> floorWalkableCells = Set.of();
     private BukkitTask trapTask;
     private long trapRuntimeTick;
+    private GeneratedTrapPlacement generatedTrapPlacement;
+    private boolean paused;
 
     HallsSessionTrapRuntime(JavaPlugin plugin,
                             World world,
@@ -69,7 +86,10 @@ final class HallsSessionTrapRuntime {
                             Predicate<UUID> aliveParticipant,
                             BlockSetter blockSetter,
                             Map<String, HallsTrapType> trapTypes,
-                            DoubleSupplier trapDamageMultiplier) {
+                            DoubleSupplier trapDamageMultiplier,
+                            Consumer<Location> lootDropSink,
+                            BiPredicate<String, Location> trapMonsterSpawner,
+                            ObjDoubleConsumer<Player> playerDamageSink) {
         this.plugin = plugin;
         this.world = world;
         this.origin = origin;
@@ -78,9 +98,17 @@ final class HallsSessionTrapRuntime {
         this.blockSetter = blockSetter;
         this.trapTypes = trapTypes == null ? Map.of() : Map.copyOf(trapTypes);
         this.trapDamageMultiplier = trapDamageMultiplier == null ? () -> 1.0 : trapDamageMultiplier;
+        this.lootDropSink = lootDropSink == null ? ignored -> { } : lootDropSink;
+        this.trapMonsterSpawner = trapMonsterSpawner;
+        this.playerDamageSink = playerDamageSink == null ? Player::damage : playerDamageSink;
     }
 
     void clear() {
+        paused = false;
+        if (generatedTrapPlacement != null) {
+            generatedTrapPlacement.cancel();
+            generatedTrapPlacement = null;
+        }
         for (HallsTrap trap : List.copyOf(traps)) {
             for (UUID displayId : trap.displayIds()) {
                 Entity display = Bukkit.getEntity(displayId);
@@ -96,9 +124,13 @@ final class HallsSessionTrapRuntime {
             }
         }
         traps.clear();
+        roomPitCells.clear();
+        trapHitPoints.clear();
         trapNextTriggerTicks.clear();
+        homingMineDetonateTicks.clear();
         transientTrapDisplays.clear();
         trapDamageCooldowns.clear();
+        floorWalkableCells = Set.of();
         trapRuntimeTick = 0L;
         stopTrapTask();
     }
@@ -107,11 +139,28 @@ final class HallsSessionTrapRuntime {
         return traps.size();
     }
 
+    void pause() {
+        paused = true;
+        stopTrapTask();
+    }
+
+    void resume() {
+        paused = false;
+        startTrapTask();
+    }
+
     boolean handlePlayerMove(Player player, boolean running) {
-        if (player == null || !running || !participants.contains(player.getUniqueId()) || !player.getWorld().equals(world)) {
+        if (paused || generatedTrapPlacement != null || player == null || !running
+                || !participants.contains(player.getUniqueId()) || !player.getWorld().equals(world)) {
             return false;
         }
         if (!isAliveParticipant(player)) {
+            if (player.getLocation().getY() <= origin.y() - 8) {
+                teleportPlayerToElevator(player);
+                player.setFallDistance(0.0f);
+                player.sendActionBar(Component.text("You drift back to the elevator.", NamedTextColor.GRAY));
+                return true;
+            }
             return false;
         }
         checkPlayerTrapContact(player);
@@ -123,102 +172,189 @@ final class HallsSessionTrapRuntime {
         return false;
     }
 
+    boolean handleTrapInteract(Player player, Entity entity) {
+        if (paused || generatedTrapPlacement != null || player == null || entity == null) {
+            return false;
+        }
+        for (HallsTrap trap : List.copyOf(traps)) {
+            if (!trap.displayIds().contains(entity.getUniqueId())) {
+                continue;
+            }
+            if (trap.kind() != TrapKind.ARMY_COFFIN) {
+                return false;
+            }
+            triggerArmyCoffin(trap, player);
+            return true;
+        }
+        return false;
+    }
+
+    boolean handleTrapAttack(Player player, Entity entity) {
+        if (paused || generatedTrapPlacement != null || player == null || entity == null) {
+            return false;
+        }
+        for (HallsTrap trap : List.copyOf(traps)) {
+            if (!trap.displayIds().contains(entity.getUniqueId())) {
+                continue;
+            }
+            if (trap.kind() == TrapKind.ENCHANTED_BOOK) {
+                damageEnchantedBookTrap(trap, player);
+                return true;
+            }
+            if (trap.kind() == TrapKind.ARMY_COFFIN) {
+                triggerArmyCoffin(trap, player);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    boolean disarmProximityMineNear(Location location) {
+        if (location == null || !world.equals(location.getWorld())) {
+            return false;
+        }
+        for (HallsTrap trap : List.copyOf(traps)) {
+            if (trap.kind() != TrapKind.PROXIMITY_MINE && trap.kind() != TrapKind.BEAR_TRAP) {
+                continue;
+            }
+            Location center = new Location(world, trap.x() + 0.5, origin.y() + 0.1, trap.z() + 0.5);
+            if (location.distanceSquared(center) <= 1.35 * 1.35) {
+                world.spawnParticle(Particle.SMOKE, center, 18, 0.35, 0.15, 0.35, 0.02);
+                world.playSound(center, Sound.BLOCK_LEVER_CLICK, 0.75f, 0.55f);
+                removeTrap(trap);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    boolean hasBossTrapAt(Location location) {
+        if (location == null || !world.equals(location.getWorld())) {
+            return false;
+        }
+        int x = location.getBlockX();
+        int z = location.getBlockZ();
+        for (HallsTrap trap : traps) {
+            if ((trap.kind() == TrapKind.BEAR_TRAP || trap.kind() == TrapKind.PROXIMITY_MINE)
+                    && Math.abs(trap.x() - x) <= 1 && Math.abs(trap.z() - z) <= 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    boolean placeBossTrap(Location location, String trapId) {
+        if (paused || generatedTrapPlacement != null || location == null
+                || !world.equals(location.getWorld()) || hasBossTrapAt(location)) {
+            return false;
+        }
+        HallsTrapType type = trapTypes.get(normalizeId(trapId));
+        if (type == null) {
+            return false;
+        }
+        TrapKind kind = trapKind(type.kind());
+        if (kind != TrapKind.BEAR_TRAP && kind != TrapKind.PROXIMITY_MINE) {
+            return false;
+        }
+        HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(location.getBlockX(), location.getBlockZ());
+        if (!isOpenTrapFloor(cell, kind)) {
+            return false;
+        }
+        Set<HallsExplorationGenerator.Cell> footprint = trapFootprint(kind, cell, BlockFace.SELF, 0);
+        for (HallsTrap trap : traps) {
+            if (footprint.contains(new HallsExplorationGenerator.Cell(trap.x(), trap.z()))) {
+                return false;
+            }
+        }
+        List<UUID> displayIds = buildTrap(kind, cell, BlockFace.SELF, type, 0);
+        Random random = new Random();
+        addTrap(new HallsTrap(kind, cell.x(), cell.z(), random.nextInt(80), type,
+                movingDisplayId(kind, displayIds), displayIds, BlockFace.SELF, 0), random);
+        startTrapTask();
+        return true;
+    }
+
+    private boolean isOpenTrapFloor(HallsExplorationGenerator.Cell cell, TrapKind kind) {
+        Set<HallsExplorationGenerator.Cell> footprint = trapFootprint(kind, cell, BlockFace.SELF, 0);
+        for (HallsExplorationGenerator.Cell footprintCell : footprint) {
+            Material floor = world.getBlockAt(footprintCell.x(), origin.y() - 1, footprintCell.z()).getType();
+            Material space = world.getBlockAt(footprintCell.x(), origin.y(), footprintCell.z()).getType();
+            if (!floor.isSolid() || !space.isAir()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     Set<HallsExplorationGenerator.Cell> placeGeneratedTraps(HallsExplorationGenerator.Plan plan,
                                                             Random random,
                                                             HallsScenario.FloorDefinition floorDefinition,
                                                             HallsLevelType levelType,
                                                             HallsFloorModifiers modifiers,
                                                             Set<HallsExplorationGenerator.Cell> liquidCells) {
+        GeneratedTrapPlacement placement = beginGeneratedTraps(plan, random, floorDefinition, levelType, modifiers, liquidCells);
+        while (!placement.tick()) {
+            // Direct debug rebuilds intentionally run the same job synchronously.
+        }
+        return placement.occupiedCells();
+    }
+
+    GeneratedTrapPlacement beginGeneratedTraps(HallsExplorationGenerator.Plan plan,
+                                               Random random,
+                                               HallsScenario.FloorDefinition floorDefinition,
+                                               HallsLevelType levelType,
+                                               HallsFloorModifiers modifiers,
+                                               Set<HallsExplorationGenerator.Cell> liquidCells) {
         clear();
-        Set<HallsExplorationGenerator.Cell> liquidTrapCells = liquidCells == null ? Set.of() : Set.copyOf(liquidCells);
-        List<TrapCandidate> candidates = trapCandidates(plan);
-        List<TrapCandidate> holeCandidates = holeCandidates(plan);
-        if (candidates.isEmpty() && holeCandidates.isEmpty()) {
-            return Set.of();
-        }
-        int targetHoles = Math.min(holeCandidates.size(), Math.max(0, floorDefinition.holes()));
-        int targetTrappedRooms = Math.max(0, floorDefinition.trappedRooms());
-        int minTrapsPerRoom = Math.max(0, floorDefinition.minTrapsPerRoom());
-        int maxTrapsPerRoom = Math.max(minTrapsPerRoom, floorDefinition.maxTrapsPerRoom());
-        List<HallsTrapType> pool = trapPool(levelType.id());
-        HallsTrapType holeType = trapTypes.values().stream()
-                .filter(type -> type.kind().equals("hole") && type.weight() > 0 && type.allowedForLevelType(levelType.id()))
-                .findFirst()
-                .orElse(null);
-        if ((pool.isEmpty() || targetTrappedRooms <= 0 || maxTrapsPerRoom <= 0) && (holeType == null || targetHoles <= 0)) {
-            return Set.of();
-        }
-        boolean globalReachabilityChecks = globalReachabilityChecks(levelType);
-        Collections.shuffle(holeCandidates, random);
-        Set<HallsExplorationGenerator.Cell> occupied = new HashSet<>();
-        int holesPlaced = 0;
-        for (TrapCandidate candidate : holeCandidates) {
-            HallsExplorationGenerator.Cell cell = candidate.cell();
-            if (holesPlaced >= targetHoles) {
-                break;
-            }
-            if (holeType == null) {
-                continue;
-            }
-            if (liquidTrapCells.contains(candidate.cell())) {
-                continue;
-            }
-            if (placeHole(candidate, plan, random, holeType, occupied, globalReachabilityChecks, modifiers, liquidTrapCells)) {
-                holesPlaced++;
-            }
-        }
-        Map<HallsExplorationGenerator.Room, List<TrapCandidate>> candidatesByRoom = candidatesByRoom(candidates);
-        List<HallsExplorationGenerator.Room> trappedRooms = new ArrayList<>(candidatesByRoom.keySet());
-        Collections.shuffle(trappedRooms, random);
-        int roomsPlaced = 0;
-        for (HallsExplorationGenerator.Room room : trappedRooms) {
-            if (roomsPlaced >= targetTrappedRooms || pool.isEmpty()) {
-                break;
-            }
-            List<TrapCandidate> roomCandidates = new ArrayList<>(candidatesByRoom.getOrDefault(room, List.of()));
-            Collections.shuffle(roomCandidates, random);
-            HallsTrapType roomType = weightedTrap(pool, random, modifiers);
-            if (trapKind(roomType.kind()) == TrapKind.SWINGING_BLADE) {
-                roomCandidates.sort((first, second) -> Integer.compare(bestSwingLaneHalfSpan(second), bestSwingLaneHalfSpan(first)));
-            }
-            int targetRoomTraps = minTrapsPerRoom == maxTrapsPerRoom
-                    ? minTrapsPerRoom
-                    : minTrapsPerRoom + random.nextInt(maxTrapsPerRoom - minTrapsPerRoom + 1);
-            int placedInRoom = 0;
-            for (TrapCandidate candidate : roomCandidates) {
-                if (placedInRoom >= targetRoomTraps) {
-                    break;
-                }
-                HallsTrapType type = random.nextInt(100) < 10 ? weightedTrap(pool, random, modifiers) : roomType;
-                if (tryPlaceTrap(candidate, plan, random, type, occupied, globalReachabilityChecks, liquidTrapCells)) {
-                    placedInRoom++;
-                }
-            }
-            if (placedInRoom > 0) {
-                roomsPlaced++;
-            }
-        }
-        startTrapTask();
-        return Set.copyOf(occupied);
+        floorWalkableCells = new HashSet<>(plan.walkableCells());
+        generatedTrapPlacement = new GeneratedTrapPlacement(plan, random, floorDefinition, levelType, modifiers, liquidCells);
+        return generatedTrapPlacement;
     }
 
-    private Map<HallsExplorationGenerator.Room, List<TrapCandidate>> candidatesByRoom(List<TrapCandidate> candidates) {
-        Map<HallsExplorationGenerator.Room, List<TrapCandidate>> byRoom = new IdentityHashMap<>();
-        for (TrapCandidate candidate : candidates) {
-            byRoom.computeIfAbsent(candidate.room(), ignored -> new ArrayList<>()).add(candidate);
+    final class GeneratedTrapPlacement {
+        private final HallsGeneratedTrapPlacement placement;
+
+        private GeneratedTrapPlacement(HallsExplorationGenerator.Plan plan, Random random,
+                                       HallsScenario.FloorDefinition floorDefinition, HallsLevelType levelType,
+                                       HallsFloorModifiers modifiers, Set<HallsExplorationGenerator.Cell> liquidCells) {
+            placement = new HallsGeneratedTrapPlacement(HallsSessionTrapRuntime.this, trapTypes,
+                    plan, random, floorDefinition, levelType, modifiers, liquidCells);
         }
-        return byRoom;
+
+        boolean tick() {
+            if (generatedTrapPlacement != this) {
+                return true;
+            }
+            if (placement.tick()) {
+                generatedTrapPlacement = null;
+                startTrapTask();
+                return true;
+            }
+            return false;
+        }
+
+        double progress() {
+            return placement.progress();
+        }
+
+        Set<HallsExplorationGenerator.Cell> occupiedCells() {
+            return placement.occupiedCells();
+        }
+
+        private void cancel() {
+            placement.cancel();
+        }
     }
 
-    private boolean tryPlaceTrap(TrapCandidate candidate,
-                                 HallsExplorationGenerator.Plan plan,
+    boolean tryPlaceTrap(TrapCandidate candidate,
+                                 HallsTrapPlacementGeometry.FloorConnectivity floorConnectivity,
                                  Random random,
                                  HallsTrapType type,
                                  Set<HallsExplorationGenerator.Cell> occupied,
                                  boolean globalReachabilityChecks,
                                  Set<HallsExplorationGenerator.Cell> liquidCells) {
         HallsExplorationGenerator.Cell cell = candidate.cell();
-        if (isNearExistingTrap(cell, occupied)) {
+        if (HallsTrapPlacementGeometry.isNearOccupied(cell, occupied)) {
             return false;
         }
         TrapKind kind = trapKind(type.kind());
@@ -246,14 +382,14 @@ final class HallsSessionTrapRuntime {
         } else if (!Collections.disjoint(footprint, liquidCells)) {
             return false;
         }
-        if (globalReachabilityChecks && (kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.BUBBLES || requiresWall(kind))
-                && !floorReachableWithout(plan.walkableCells(), footprint)) {
-            return false;
-        }
         for (HallsExplorationGenerator.Cell footprintCell : footprint) {
-            if (isNearExistingTrap(footprintCell, occupied)) {
+            if (HallsTrapPlacementGeometry.isNearOccupied(footprintCell, occupied)) {
                 return false;
             }
+        }
+        if (globalReachabilityChecks && (kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.BUBBLES || requiresWall(kind))
+                && !floorConnectivity.reachableWithout(footprint)) {
+            return false;
         }
         List<UUID> displayIds = buildTrap(kind, cell, face, type, laneSpan);
         addTrap(new HallsTrap(kind, cell.x(), cell.z(), random.nextInt(80), type,
@@ -262,76 +398,57 @@ final class HallsSessionTrapRuntime {
         return true;
     }
 
-    private boolean placeHole(TrapCandidate candidate,
-                              HallsExplorationGenerator.Plan plan,
+    boolean placeHole(TrapCandidate candidate,
+                              HallsTrapPlacementGeometry.FloorConnectivity floorConnectivity,
                               Random random,
                               HallsTrapType type,
                               Set<HallsExplorationGenerator.Cell> occupied,
                               boolean globalReachabilityChecks,
                               HallsFloorModifiers modifiers,
                               Set<HallsExplorationGenerator.Cell> liquidCells) {
-        Set<HallsExplorationGenerator.Cell> pitCells = pitMask(candidate, random, type);
-        if (pitCells.isEmpty()) {
-            return false;
-        }
-        if (!Collections.disjoint(pitCells, liquidCells)) {
-            return false;
-        }
-        Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(candidate, plan.walkableCells(),
-                pitCells, globalReachabilityChecks, modifiers);
-        if (bridgeCells == null) {
-            return false;
-        }
-        buildPit(pitCells, bridgeCells, roomPitCells(candidate), type);
-        TrapKind kind = bridgeCells.isEmpty() ? TrapKind.HOLE : TrapKind.HOLE_BRIDGE;
-        for (HallsExplorationGenerator.Cell pitCell : pitCells) {
-            if (!bridgeCells.contains(pitCell)) {
-                addTrap(new HallsTrap(kind, pitCell.x(), pitCell.z(), random.nextInt(80), type,
-                        null, List.of(), BlockFace.SELF, 0), random);
+        Set<HallsExplorationGenerator.Cell> existingPits = roomPitCells(candidate);
+        boolean enforceRoomReachability = roomEntrancesReachable(candidate, existingPits, Set.of());
+        for (Set<HallsExplorationGenerator.Cell> pitCells : pitMasks(candidate, random, type)) {
+            if (pitCells.isEmpty()
+                    || !Collections.disjoint(pitCells, liquidCells)
+                    || !Collections.disjoint(borderCells(pitCells), liquidCells)
+                    || !Collections.disjoint(pitCells, occupied)) {
+                continue;
             }
+            Set<HallsExplorationGenerator.Cell> bridgeCells = bridgeCellsIfNeeded(candidate, floorConnectivity,
+                    pitCells, existingPits, globalReachabilityChecks, enforceRoomReachability, modifiers);
+            if (bridgeCells == null) {
+                continue;
+            }
+            if (bridgeCells.containsAll(pitCells)) {
+                continue;
+            }
+            buildPit(pitCells, bridgeCells, existingPits, type);
+            Set<HallsExplorationGenerator.Cell> roomPits = new HashSet<>(existingPits);
+            roomPits.addAll(pitCells);
+            roomPitCells.put(candidate.room(), roomPits);
+            floorWalkableCells.removeAll(pitCells);
+            floorWalkableCells.addAll(bridgeCells);
+            TrapKind kind = bridgeCells.isEmpty() ? TrapKind.HOLE : TrapKind.HOLE_BRIDGE;
+            for (HallsExplorationGenerator.Cell pitCell : pitCells) {
+                if (!bridgeCells.contains(pitCell)) {
+                    addTrap(new HallsTrap(kind, pitCell.x(), pitCell.z(), random.nextInt(80), type,
+                            null, List.of(), BlockFace.SELF, 0), random);
+                }
+            }
+            occupied.addAll(pitCells);
+            return true;
         }
-        occupied.addAll(pitCells);
-        return true;
+        return false;
     }
 
-    private boolean globalReachabilityChecks(HallsLevelType levelType) {
+    boolean globalReachabilityChecks(HallsLevelType levelType) {
         if (levelType == null || levelType.corridorGeneration() == null) {
             return true;
         }
         String mode = levelType.corridorGeneration().trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_');
         return !mode.equals("maze") && !mode.equals("backrooms")
                 && !mode.equals("open_halls") && !mode.equals("open_hall");
-    }
-
-    private List<TrapCandidate> trapCandidates(HallsExplorationGenerator.Plan plan) {
-        Set<HallsExplorationGenerator.Cell> walkable = plan.walkableCells();
-        List<TrapCandidate> candidates = new ArrayList<>();
-        for (HallsExplorationGenerator.Room room : plan.rooms()) {
-            Set<HallsExplorationGenerator.Cell> candidateCells = Set.copyOf(roomTrapCandidateCells(room));
-            Set<HallsExplorationGenerator.Cell> openCells = Set.copyOf(roomOpenCells(room));
-            Set<HallsExplorationGenerator.Cell> roomCells = Set.copyOf(roomAllCells(room));
-            for (HallsExplorationGenerator.Cell cell : candidateCells) {
-                if (walkable.contains(cell) && farFromElevator(cell)) {
-                    candidates.add(new TrapCandidate(room, cell, openCells, roomCells));
-                }
-            }
-        }
-        return candidates;
-    }
-
-    private List<TrapCandidate> holeCandidates(HallsExplorationGenerator.Plan plan) {
-        Set<HallsExplorationGenerator.Cell> walkable = plan.walkableCells();
-        List<TrapCandidate> candidates = new ArrayList<>();
-        for (HallsExplorationGenerator.Room room : plan.rooms()) {
-            Set<HallsExplorationGenerator.Cell> openCells = Set.copyOf(roomOpenCells(room));
-            Set<HallsExplorationGenerator.Cell> roomCells = Set.copyOf(roomAllCells(room));
-            for (HallsExplorationGenerator.Cell cell : openCells) {
-                if (walkable.contains(cell) && farFromElevator(cell)) {
-                    candidates.add(new TrapCandidate(room, cell, openCells, roomCells));
-                }
-            }
-        }
-        return candidates;
     }
 
     private HallsTrapType trapTypeForRoom(TrapCandidate candidate,
@@ -345,7 +462,7 @@ final class HallsSessionTrapRuntime {
         return weightedTrap(pool, random, null);
     }
 
-    private List<HallsExplorationGenerator.Cell> roomTrapCandidateCells(HallsExplorationGenerator.Room room) {
+    List<HallsExplorationGenerator.Cell> roomTrapCandidateCells(HallsExplorationGenerator.Room room) {
         List<HallsExplorationGenerator.Cell> cells = new ArrayList<>();
         for (int z = 0; z < room.layout().depth(); z++) {
             for (int x = 0; x < room.layout().width(); x++) {
@@ -362,7 +479,7 @@ final class HallsSessionTrapRuntime {
         return cells;
     }
 
-    private boolean nearRoomOpening(HallsExplorationGenerator.Room room, HallsExplorationGenerator.Cell cell) {
+    boolean nearRoomOpening(HallsExplorationGenerator.Room room, HallsExplorationGenerator.Cell cell) {
         for (Map.Entry<BlockFace, Integer> opening : room.openings().entrySet()) {
             HallsExplorationGenerator.Cell interior = switch (opening.getKey()) {
                 case NORTH -> new HallsExplorationGenerator.Cell(room.startX() + opening.getValue(), room.startZ());
@@ -378,7 +495,7 @@ final class HallsSessionTrapRuntime {
         return false;
     }
 
-    private List<HallsExplorationGenerator.Cell> roomOpenCells(HallsExplorationGenerator.Room room) {
+    List<HallsExplorationGenerator.Cell> roomOpenCells(HallsExplorationGenerator.Room room) {
         List<HallsExplorationGenerator.Cell> cells = new ArrayList<>();
         for (int z = 0; z < room.layout().depth(); z++) {
             for (int x = 0; x < room.layout().width(); x++) {
@@ -390,7 +507,7 @@ final class HallsSessionTrapRuntime {
         return cells;
     }
 
-    private List<HallsExplorationGenerator.Cell> roomAllCells(HallsExplorationGenerator.Room room) {
+    List<HallsExplorationGenerator.Cell> roomAllCells(HallsExplorationGenerator.Room room) {
         List<HallsExplorationGenerator.Cell> cells = new ArrayList<>();
         for (int z = 0; z < room.layout().depth(); z++) {
             for (int x = 0; x < room.layout().width(); x++) {
@@ -400,20 +517,11 @@ final class HallsSessionTrapRuntime {
         return cells;
     }
 
-    private boolean farFromElevator(HallsExplorationGenerator.Cell cell) {
+    boolean farFromElevator(HallsExplorationGenerator.Cell cell) {
         return Math.abs(cell.x() - origin.x()) + Math.abs(cell.z() - origin.z()) > 12;
     }
 
-    private boolean isNearExistingTrap(HallsExplorationGenerator.Cell cell, Set<HallsExplorationGenerator.Cell> occupied) {
-        for (HallsExplorationGenerator.Cell other : occupied) {
-            if (Math.abs(cell.x() - other.x()) + Math.abs(cell.z() - other.z()) <= 4) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private List<HallsTrapType> trapPool(String levelTypeId) {
+    List<HallsTrapType> trapPool(String levelTypeId) {
         List<HallsTrapType> pool = new ArrayList<>();
         for (HallsTrapType type : trapTypes.values()) {
             if (type.weight() <= 0 || !type.allowedForLevelType(levelTypeId)) {
@@ -427,7 +535,7 @@ final class HallsSessionTrapRuntime {
         return pool;
     }
 
-    private HallsTrapType weightedTrap(List<HallsTrapType> pool, Random random, HallsFloorModifiers modifiers) {
+    HallsTrapType weightedTrap(List<HallsTrapType> pool, Random random, HallsFloorModifiers modifiers) {
         List<String> boostedKinds = modifiers == null ? List.of() : modifiers.trapBoostKinds();
         int totalWeight = pool.stream().mapToInt(type -> adjustedTrapWeight(type, boostedKinds)).sum();
         int roll = random.nextInt(Math.max(1, totalWeight));
@@ -448,45 +556,59 @@ final class HallsSessionTrapRuntime {
         return Math.max(0, weight);
     }
 
-    private Set<HallsExplorationGenerator.Cell> pitMask(TrapCandidate candidate, Random random, HallsTrapType type) {
+    private List<Set<HallsExplorationGenerator.Cell>> pitMasks(TrapCandidate candidate, Random random, HallsTrapType type) {
         int minSize = Math.max(5, type.minSize());
         int maxSize = Math.max(minSize, type.maxSize());
         int size = minSize + random.nextInt(maxSize - minSize + 1);
         if (size % 2 == 0) {
             size++;
         }
+        List<Set<HallsExplorationGenerator.Cell>> masks = new ArrayList<>();
         for (int currentSize = size; currentSize >= minSize; currentSize -= 2) {
-            int radius = currentSize / 2;
-            Set<HallsExplorationGenerator.Cell> openPitCells = new HashSet<>();
-            int maskCells = currentSize * currentSize;
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(
-                            candidate.cell().x() + dx,
-                            candidate.cell().z() + dz
-                    );
-                    if (candidate.allRoomCells().contains(cell)) {
-                        openPitCells.add(cell);
-                    }
+            addPitMaskCandidate(masks, candidate, currentSize, Math.max(5, currentSize * currentSize / 3));
+        }
+        for (int currentSize = Math.min(3, minSize - 2); currentSize >= 1; currentSize -= 2) {
+            addPitMaskCandidate(masks, candidate, currentSize, 1);
+        }
+        if (masks.isEmpty()) {
+            masks.add(Set.of(candidate.cell()));
+        }
+        return masks;
+    }
+
+    private void addPitMaskCandidate(List<Set<HallsExplorationGenerator.Cell>> masks,
+                                     TrapCandidate candidate,
+                                     int size,
+                                     int minimumOpenCells) {
+        int radius = size / 2;
+        Set<HallsExplorationGenerator.Cell> openPitCells = new HashSet<>();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                HallsExplorationGenerator.Cell cell = new HallsExplorationGenerator.Cell(
+                        candidate.cell().x() + dx,
+                        candidate.cell().z() + dz
+                );
+                if (candidate.roomCells().contains(cell)) {
+                    openPitCells.add(cell);
                 }
             }
-            if (openPitCells.size() >= Math.max(5, maskCells / 3)) {
-                return openPitCells;
-            }
         }
-        return Set.of();
+        if (openPitCells.size() >= minimumOpenCells) {
+            masks.add(openPitCells);
+        }
     }
 
     private Set<HallsExplorationGenerator.Cell> bridgeCellsIfNeeded(TrapCandidate candidate,
-                                                      Set<HallsExplorationGenerator.Cell> walkable,
-                                                      Set<HallsExplorationGenerator.Cell> pitCells,
-                                                      boolean globalReachabilityChecks,
-                                                      HallsFloorModifiers modifiers) {
-        Set<HallsExplorationGenerator.Cell> existingPits = roomPitCells(candidate);
+                                                       HallsTrapPlacementGeometry.FloorConnectivity floorConnectivity,
+                                                       Set<HallsExplorationGenerator.Cell> pitCells,
+                                                       Set<HallsExplorationGenerator.Cell> existingPits,
+                                                       boolean globalReachabilityChecks,
+                                                       boolean enforceRoomReachability,
+                                                       HallsFloorModifiers modifiers) {
         Set<HallsExplorationGenerator.Cell> allPitCells = new HashSet<>(existingPits);
         allPitCells.addAll(pitCells);
-        if ((!globalReachabilityChecks || floorReachableWithout(walkable, allPitCells))
-                && roomEntrancesReachable(candidate, allPitCells, Set.of())) {
+        if ((!enforceRoomReachability || roomEntrancesReachable(candidate, allPitCells, Set.of()))
+                && (!globalReachabilityChecks || floorConnectivity.reachableWithout(allPitCells))) {
             return Set.of();
         }
         int minX = pitCells.stream().mapToInt(HallsExplorationGenerator.Cell::x).min().orElse(0);
@@ -496,25 +618,25 @@ final class HallsSessionTrapRuntime {
         int centerX = (minX + maxX) / 2;
         int centerZ = (minZ + maxZ) / 2;
         if ((maxX - minX) >= (maxZ - minZ)) {
-            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, walkable, allPitCells, pitCells,
+            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, floorConnectivity, allPitCells,
                     widenBridgeOptions(horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ), pitCells, modifiers),
-                    globalReachabilityChecks);
+                    globalReachabilityChecks, enforceRoomReachability);
             if (bridge != null) {
                 return bridge;
             }
-            return firstReachableBridge(candidate, walkable, allPitCells, pitCells,
+            return firstReachableBridge(candidate, floorConnectivity, allPitCells,
                     widenBridgeOptions(verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX), pitCells, modifiers),
-                    globalReachabilityChecks);
+                    globalReachabilityChecks, enforceRoomReachability);
         } else {
-            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, walkable, allPitCells, pitCells,
+            Set<HallsExplorationGenerator.Cell> bridge = firstReachableBridge(candidate, floorConnectivity, allPitCells,
                     widenBridgeOptions(verticalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerX), pitCells, modifiers),
-                    globalReachabilityChecks);
+                    globalReachabilityChecks, enforceRoomReachability);
             if (bridge != null) {
                 return bridge;
             }
-            return firstReachableBridge(candidate, walkable, allPitCells, pitCells,
+            return firstReachableBridge(candidate, floorConnectivity, allPitCells,
                     widenBridgeOptions(horizontalBridgeOptions(pitCells, minX, maxX, minZ, maxZ, centerZ), pitCells, modifiers),
-                    globalReachabilityChecks);
+                    globalReachabilityChecks, enforceRoomReachability);
         }
     }
 
@@ -550,16 +672,16 @@ final class HallsSessionTrapRuntime {
     }
 
     private Set<HallsExplorationGenerator.Cell> firstReachableBridge(TrapCandidate candidate,
-                                                                     Set<HallsExplorationGenerator.Cell> walkable,
+                                                                     HallsTrapPlacementGeometry.FloorConnectivity floorConnectivity,
                                                                      Set<HallsExplorationGenerator.Cell> allPitCells,
-                                                                     Set<HallsExplorationGenerator.Cell> newPitCells,
                                                                      List<Set<HallsExplorationGenerator.Cell>> bridgeOptions,
-                                                                     boolean globalReachabilityChecks) {
+                                                                     boolean globalReachabilityChecks,
+                                                                     boolean enforceRoomReachability) {
         for (Set<HallsExplorationGenerator.Cell> bridge : bridgeOptions) {
             Set<HallsExplorationGenerator.Cell> passableBridge = intersection(bridge, candidate.roomCells());
             if (!passableBridge.isEmpty()
-                    && (!globalReachabilityChecks || floorReachableWithout(walkable, difference(allPitCells, passableBridge)))
-                    && roomEntrancesReachable(candidate, allPitCells, passableBridge)) {
+                    && (!enforceRoomReachability || roomEntrancesReachable(candidate, allPitCells, passableBridge))
+                    && (!globalReachabilityChecks || floorConnectivity.reachableWithout(difference(allPitCells, passableBridge)))) {
                 return passableBridge;
             }
         }
@@ -567,6 +689,10 @@ final class HallsSessionTrapRuntime {
     }
 
     private Set<HallsExplorationGenerator.Cell> roomPitCells(TrapCandidate candidate) {
+        Set<HallsExplorationGenerator.Cell> cached = roomPitCells.get(candidate.room());
+        if (cached != null) {
+            return cached;
+        }
         Set<HallsExplorationGenerator.Cell> result = new HashSet<>();
         for (HallsTrap trap : traps) {
             if (trap.kind() != TrapKind.HOLE && trap.kind() != TrapKind.HOLE_BRIDGE) {
@@ -577,45 +703,15 @@ final class HallsSessionTrapRuntime {
                 result.add(cell);
             }
         }
+        roomPitCells.put(candidate.room(), result);
         return result;
     }
 
     private boolean roomEntrancesReachable(TrapCandidate candidate,
                                            Set<HallsExplorationGenerator.Cell> pitCells,
                                            Set<HallsExplorationGenerator.Cell> bridgeCells) {
-        Set<HallsExplorationGenerator.Cell> blocked = difference(pitCells, bridgeCells);
-        Set<HallsExplorationGenerator.Cell> target = difference(candidate.roomCells(), blocked);
-        if (target.isEmpty()) {
-            return false;
-        }
-        List<HallsExplorationGenerator.Cell> entrances = roomEntranceCells(candidate.room());
-        if (entrances.isEmpty()) {
-            entrances = List.of(target.iterator().next());
-        }
-        for (HallsExplorationGenerator.Cell entrance : entrances) {
-            if (!target.contains(entrance) || !roomReachableFrom(entrance, target).containsAll(target)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private Set<HallsExplorationGenerator.Cell> roomReachableFrom(HallsExplorationGenerator.Cell start,
-                                                                  Set<HallsExplorationGenerator.Cell> walkable) {
-        Set<HallsExplorationGenerator.Cell> reachable = new HashSet<>();
-        java.util.ArrayDeque<HallsExplorationGenerator.Cell> queue = new java.util.ArrayDeque<>();
-        reachable.add(start);
-        queue.add(start);
-        while (!queue.isEmpty()) {
-            HallsExplorationGenerator.Cell current = queue.remove();
-            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
-                HallsExplorationGenerator.Cell next = step(current, face);
-                if (walkable.contains(next) && reachable.add(next)) {
-                    queue.add(next);
-                }
-            }
-        }
-        return reachable;
+        return HallsTrapPlacementGeometry.roomEntrancesReachable(candidate.roomCells(),
+                roomEntranceCells(candidate.room()), pitCells, bridgeCells);
     }
 
     private List<HallsExplorationGenerator.Cell> roomEntranceCells(HallsExplorationGenerator.Room room) {
@@ -703,37 +799,13 @@ final class HallsSessionTrapRuntime {
         return result;
     }
 
-    private boolean floorReachableWithout(Set<HallsExplorationGenerator.Cell> walkable,
-                                          Set<HallsExplorationGenerator.Cell> blocked) {
-        HallsExplorationGenerator.Cell start = new HallsExplorationGenerator.Cell(origin.x(), origin.z() + ELEVATOR_OUTER_RADIUS + 1);
-        if (!walkable.contains(start) || blocked.contains(start)) {
-            return false;
-        }
-        Set<HallsExplorationGenerator.Cell> reachable = new HashSet<>();
-        java.util.ArrayDeque<HallsExplorationGenerator.Cell> queue = new java.util.ArrayDeque<>();
-        reachable.add(start);
-        queue.add(start);
-        while (!queue.isEmpty()) {
-            HallsExplorationGenerator.Cell current = queue.remove();
-            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
-                HallsExplorationGenerator.Cell next = switch (face) {
-                    case NORTH -> new HallsExplorationGenerator.Cell(current.x(), current.z() - 1);
-                    case SOUTH -> new HallsExplorationGenerator.Cell(current.x(), current.z() + 1);
-                    case EAST -> new HallsExplorationGenerator.Cell(current.x() + 1, current.z());
-                    case WEST -> new HallsExplorationGenerator.Cell(current.x() - 1, current.z());
-                    default -> current;
-                };
-                if (!blocked.contains(next) && walkable.contains(next) && reachable.add(next)) {
-                    queue.add(next);
-                }
-            }
-        }
-        for (HallsExplorationGenerator.Cell cell : walkable) {
-            if (!blocked.contains(cell) && !reachable.contains(cell)) {
-                return false;
-            }
-        }
-        return true;
+    List<HallsExplorationGenerator.Cell> floorReachabilityStarts() {
+        return List.of(
+                new HallsExplorationGenerator.Cell(origin.x(), origin.z() - ELEVATOR_OUTER_RADIUS - 1),
+                new HallsExplorationGenerator.Cell(origin.x(), origin.z() + ELEVATOR_OUTER_RADIUS + 1),
+                new HallsExplorationGenerator.Cell(origin.x() + ELEVATOR_OUTER_RADIUS + 1, origin.z()),
+                new HallsExplorationGenerator.Cell(origin.x() - ELEVATOR_OUTER_RADIUS - 1, origin.z())
+        );
     }
 
     private List<UUID> buildTrap(TrapKind kind, HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type, int laneSpan) {
@@ -749,8 +821,25 @@ final class HallsSessionTrapRuntime {
             case BUBBLES -> buildSewerWaterFixture(cell, type);
             case GEYSER -> buildSewerWaterFixture(cell, type);
             case PUFFERFISH -> List.of(spawnPufferfish(cell));
+            case ARMY_COFFIN -> withInteraction(cell,
+                    spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 90.0), 1.35f, 1.0f);
+            case HOMING_MINE -> buildHomingMine(cell, face, type);
+            case ENCHANTED_BOOK -> withInteraction(cell,
+                    spawnTrapItemDisplay(kind, cell, face, type, type.modelMaterial(), 0.0), 0.8f, 0.9f);
             default -> List.of();
         };
+    }
+
+    private List<UUID> withInteraction(HallsExplorationGenerator.Cell cell, UUID displayId, float width, float height) {
+        Interaction interaction = world.spawn(new Location(world, cell.x() + 0.5, origin.y(), cell.z() + 0.5),
+                Interaction.class, entity -> {
+                    entity.setInteractionWidth(width);
+                    entity.setInteractionHeight(height);
+                    entity.setResponsive(true);
+                    entity.setPersistent(false);
+                    entity.addScoreboardTag("omgames_hoc_trap");
+                });
+        return List.of(displayId, interaction.getUniqueId());
     }
 
     private void buildPit(Set<HallsExplorationGenerator.Cell> pitCells,
@@ -798,6 +887,38 @@ final class HallsSessionTrapRuntime {
         return List.of(spawnWallBlockDisplay(cell, face, type.blockMaterial(), 0.08f, 0.65f, 0.65f));
     }
 
+    private List<UUID> buildHomingMine(HallsExplorationGenerator.Cell cell, BlockFace face, HallsTrapType type) {
+        UUID plate = spawnTrapItemDisplay(TrapKind.HOMING_MINE, cell, face, type, type.modelMaterial(), 0.0);
+        UUID antenna = spawnHomingMineAntenna(cell);
+        return List.of(plate, antenna);
+    }
+
+    private UUID spawnHomingMineAntenna(HallsExplorationGenerator.Cell cell) {
+        Location location = new Location(world, cell.x() + 0.5, origin.y() + 0.10, cell.z() + 0.5);
+        BlockDisplay display = world.spawn(location, BlockDisplay.class, entity -> {
+            entity.setBlock(connectedFenceData());
+            entity.setBillboard(Display.Billboard.FIXED);
+            entity.setInterpolationDelay(1);
+            entity.setTeleportDuration(2);
+            entity.setPersistent(false);
+            entity.addScoreboardTag("omgames_hoc_trap");
+            entity.setTransformation(HallsDisplayTransforms.bottomCenteredBlock(1.0f, 0.75f, 1.0f));
+        });
+        return display.getUniqueId();
+    }
+
+    private BlockData connectedFenceData() {
+        BlockData data = Material.SPRUCE_FENCE.createBlockData();
+        if (data instanceof MultipleFacing multipleFacing) {
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                if (multipleFacing.getAllowedFaces().contains(face)) {
+                    multipleFacing.setFace(face, true);
+                }
+            }
+        }
+        return data;
+    }
+
     private List<UUID> buildSewerWaterFixture(HallsExplorationGenerator.Cell cell, HallsTrapType type) {
         setBlock(cell.x(), origin.y() - 1, cell.z(), Material.WATER);
         setBlock(cell.x(), origin.y() - 2, cell.z(), Material.WATER);
@@ -825,11 +946,7 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(
-                    new Vector3f(-0.18f, -0.55f, -0.18f),
-                    new Quaternionf(),
-                    new Vector3f(0.36f, 1.1f, 0.36f),
-                    new Quaternionf()));
+            entity.setTransformation(HallsDisplayTransforms.centeredBlock(0.36f, 1.1f, 0.36f));
         });
         return display.getUniqueId();
     }
@@ -845,11 +962,8 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(
-                    new Vector3f(-0.4f * normalizedScale, 0.0f, -0.4f * normalizedScale),
-                    new Quaternionf(),
-                    new Vector3f(0.8f * normalizedScale, 0.06f, 0.8f * normalizedScale),
-                    new Quaternionf()));
+            entity.setTransformation(HallsDisplayTransforms.bottomCenteredBlock(
+                    0.8f * normalizedScale, 0.06f, 0.8f * normalizedScale));
         });
         return display.getUniqueId();
     }
@@ -865,11 +979,8 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(
-                    new Vector3f(-0.4f * normalizedScale, 0.0f, -0.4f * normalizedScale),
-                    new Quaternionf(),
-                    new Vector3f(0.8f * normalizedScale, 0.06f, 0.8f * normalizedScale),
-                    new Quaternionf()));
+            entity.setTransformation(HallsDisplayTransforms.bottomCenteredBlock(
+                    0.8f * normalizedScale, 0.06f, 0.8f * normalizedScale));
         });
         return display.getUniqueId();
     }
@@ -885,11 +996,9 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(
-                    eastWest ? new Vector3f(-half, -0.08f, -0.08f) : new Vector3f(-0.08f, -0.08f, -half),
-                    new Quaternionf(),
-                    eastWest ? new Vector3f(length, 0.16f, 0.16f) : new Vector3f(0.16f, 0.16f, length),
-                    new Quaternionf()));
+            entity.setTransformation(eastWest
+                    ? HallsDisplayTransforms.centeredBlock(length, 0.16f, 0.16f)
+                    : HallsDisplayTransforms.centeredBlock(0.16f, 0.16f, length));
         });
         return display.getUniqueId();
     }
@@ -947,6 +1056,9 @@ final class HallsSessionTrapRuntime {
     }
 
     private UUID movingDisplayId(TrapKind kind, List<UUID> displayIds) {
+        if (kind == TrapKind.HOMING_MINE && !displayIds.isEmpty()) {
+            return displayIds.get(0);
+        }
         if ((kind != TrapKind.SWINGING_BLADE && kind != TrapKind.WALL_SPIKES) || displayIds.size() < 2) {
             return null;
         }
@@ -955,13 +1067,14 @@ final class HallsSessionTrapRuntime {
 
     private void startTrapTask() {
         stopTrapTask();
-        if (!traps.isEmpty()) {
+        if (!paused && generatedTrapPlacement == null && !traps.isEmpty()) {
             trapTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickTraps, 1L, 1L);
         }
     }
 
     private void addTrap(HallsTrap trap, Random random) {
         traps.add(trap);
+        trapHitPoints.put(trap, trap.type().hitPoints());
         if (trap.kind() == TrapKind.FALLING_ICE) {
             trapNextTriggerTicks.put(trap, trapRuntimeTick + 25L + random.nextInt(Math.max(1, trap.type().intervalTicks())));
         } else if (trap.kind() == TrapKind.POISON_DARTS) {
@@ -1081,7 +1194,261 @@ final class HallsSessionTrapRuntime {
                     setGeyserLiquidColumn(trap, Material.WATER);
                 }
             }
+            case HOMING_MINE -> tickHomingMine(trap, tick, center);
+            case ENCHANTED_BOOK -> {
+                long activeAge = age % trap.type().intervalTicks();
+                if (activeAge == 0L) {
+                    world.spawnParticle(Particle.ENCHANT, center, 45, trap.type().radius() * 0.35, 0.35, trap.type().radius() * 0.35, 0.05);
+                    world.playSound(center, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 0.45f, 1.55f);
+                    damagePlayersNear(center, trap.type().radius(), trap.type().damage(), "An enchanted book detonates beside you.");
+                    damageMonstersNear(center, trap.type().radius(), trap.type().damage());
+                }
+            }
             default -> {
+            }
+        }
+    }
+
+    private void tickHomingMine(HallsTrap trap, long tick, Location center) {
+        long armedUntil = trapNextTriggerTicks.getOrDefault(trap, 0L);
+        Entity display = trap.movingDisplayId() == null ? null : Bukkit.getEntity(trap.movingDisplayId());
+        Location mineLocation = display == null ? center : display.getLocation();
+        Player target = nearestReachableParticipant(mineLocation, HOMING_MINE_DETECTION_PATH_CELLS);
+        Long detonateAt = homingMineDetonateTicks.get(trap);
+        if (detonateAt != null) {
+            if (target == null || !canHomingMineDetonateAt(mineLocation, target.getLocation())) {
+                homingMineDetonateTicks.remove(trap);
+                return;
+            }
+            if (tick >= detonateAt) {
+                homingMineDetonateTicks.remove(trap);
+                triggerProximityMine(trap, target);
+                return;
+            }
+            if (tick % 5L == 0L) {
+                world.spawnParticle(Particle.ELECTRIC_SPARK, mineLocation.clone().add(0.0, 0.25, 0.0),
+                        8, 0.18, 0.08, 0.18, 0.02);
+                world.playSound(mineLocation, Sound.BLOCK_NOTE_BLOCK_PLING, 0.45f,
+                        tick + 10L >= detonateAt ? 1.85f : 1.35f);
+            }
+            return;
+        }
+        if (armedUntil <= 0L) {
+            if (target == null) {
+                return;
+            }
+            trapNextTriggerTicks.put(trap, tick + Math.max(20L, trap.type().activeTicks()));
+            world.playSound(center, Sound.BLOCK_COPPER_BULB_TURN_ON, 0.75f, 0.7f);
+        } else if (tick >= armedUntil) {
+            if (target == null) {
+                trapNextTriggerTicks.remove(trap);
+                return;
+            }
+            triggerProximityMine(trap, target);
+            return;
+        }
+        if (target != null && display != null) {
+            if (canHomingMineDetonateAt(mineLocation, target.getLocation())) {
+                homingMineDetonateTicks.put(trap, tick + 40L);
+                world.playSound(display.getLocation(), Sound.BLOCK_COPPER_BULB_TURN_OFF, 0.9f, 0.65f);
+                world.spawnParticle(Particle.SMOKE, display.getLocation().clone().add(0.0, 0.25, 0.0),
+                        18, 0.22, 0.08, 0.22, 0.03);
+                return;
+            }
+            Location destination = homingMinePathDestination(mineLocation, target.getLocation());
+            Vector delta = destination.toVector().subtract(mineLocation.toVector());
+            delta.setY(0.0);
+            if (delta.lengthSquared() > 0.04) {
+                Location previous = display.getLocation().clone();
+                Location next = nextHomingMineLocation(previous, destination, delta);
+                next.setY(homingMinePlateY());
+                display.teleport(next);
+                moveHomingMineDisplays(trap, previous, next);
+                world.spawnParticle(Particle.SMOKE, next.clone().add(0.0, 0.2, 0.0), 2, 0.08, 0.04, 0.08, 0.01);
+            }
+        }
+        if (tick % 10L == 0L) {
+            world.playSound(display == null ? center : display.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.35f, 1.8f);
+        }
+    }
+
+    private Location homingMinePathDestination(Location mineLocation, Location targetLocation) {
+        if (floorWalkableCells.isEmpty()) {
+            return targetLocation;
+        }
+        HallsExplorationGenerator.Cell start = nearestWalkableCell(cellAt(mineLocation), 3);
+        HallsExplorationGenerator.Cell goal = nearestWalkableCell(cellAt(targetLocation), 4);
+        if (start == null || goal == null) {
+            return mineLocation;
+        }
+        HallsExplorationGenerator.Cell next = nextPathCell(start, goal);
+        if (next == null) {
+            return mineLocation;
+        }
+        return new Location(world, next.x() + 0.5, homingMinePlateY(), next.z() + 0.5);
+    }
+
+    private Player nearestReachableParticipant(Location mineLocation, int maxPathCells) {
+        Player best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player == null || !player.getWorld().equals(world) || !isAliveParticipant(player)) {
+                continue;
+            }
+            int distance = homingMinePathDistance(mineLocation, player.getLocation(), maxPathCells);
+            if (distance >= 0 && distance < bestDistance) {
+                best = player;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    private boolean canHomingMineDetonateAt(Location mineLocation, Location targetLocation) {
+        Vector targetDelta = targetLocation.toVector().subtract(mineLocation.toVector());
+        targetDelta.setY(0.0);
+        if (targetDelta.lengthSquared() > 1.15 * 1.15) {
+            return false;
+        }
+        int pathDistance = homingMinePathDistance(mineLocation, targetLocation, HOMING_MINE_DETONATION_PATH_CELLS);
+        return pathDistance >= 0 && pathDistance <= HOMING_MINE_DETONATION_PATH_CELLS;
+    }
+
+    private int homingMinePathDistance(Location mineLocation, Location targetLocation, int maxPathCells) {
+        if (floorWalkableCells.isEmpty()) {
+            return -1;
+        }
+        HallsExplorationGenerator.Cell start = nearestWalkableCell(cellAt(mineLocation), 2);
+        HallsExplorationGenerator.Cell goal = nearestWalkableCell(cellAt(targetLocation), 2);
+        if (start == null || goal == null) {
+            return -1;
+        }
+        return pathDistance(start, goal, maxPathCells);
+    }
+
+    private Location nextHomingMineLocation(Location current, Location destination, Vector delta) {
+        Location next = current.clone().add(delta.normalize().multiply(0.22));
+        if (floorWalkableCells.isEmpty()) {
+            return next;
+        }
+        HallsExplorationGenerator.Cell currentCell = nearestWalkableCell(cellAt(current), 1);
+        HallsExplorationGenerator.Cell destinationCell = cellAt(destination);
+        HallsExplorationGenerator.Cell nextCell = cellAt(next);
+        if (currentCell == null || !floorWalkableCells.contains(destinationCell)) {
+            return current;
+        }
+        if (nextCell.equals(currentCell) || nextCell.equals(destinationCell)) {
+            return next;
+        }
+        return new Location(world, destinationCell.x() + 0.5, homingMinePlateY(), destinationCell.z() + 0.5);
+    }
+
+    private HallsExplorationGenerator.Cell cellAt(Location location) {
+        return new HallsExplorationGenerator.Cell(location.getBlockX(), location.getBlockZ());
+    }
+
+    private HallsExplorationGenerator.Cell nearestWalkableCell(HallsExplorationGenerator.Cell originCell, int radius) {
+        if (floorWalkableCells.contains(originCell)) {
+            return originCell;
+        }
+        HallsExplorationGenerator.Cell best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (HallsExplorationGenerator.Cell cell : floorWalkableCells) {
+            int distance = Math.abs(cell.x() - originCell.x()) + Math.abs(cell.z() - originCell.z());
+            if (distance <= radius && distance < bestDistance) {
+                best = cell;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    private HallsExplorationGenerator.Cell nextPathCell(HallsExplorationGenerator.Cell start,
+                                                       HallsExplorationGenerator.Cell goal) {
+        if (start.equals(goal)) {
+            return goal;
+        }
+        Set<HallsExplorationGenerator.Cell> seen = new HashSet<>();
+        java.util.Map<HallsExplorationGenerator.Cell, HallsExplorationGenerator.Cell> previous = new java.util.HashMap<>();
+        ArrayDeque<HallsExplorationGenerator.Cell> queue = new ArrayDeque<>();
+        seen.add(start);
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            HallsExplorationGenerator.Cell current = queue.remove();
+            if (current.equals(goal)) {
+                return firstStepOnPath(start, goal, previous);
+            }
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                HallsExplorationGenerator.Cell next = step(current, face);
+                if (!floorWalkableCells.contains(next) || !seen.add(next)) {
+                    continue;
+                }
+                previous.put(next, current);
+                queue.add(next);
+            }
+        }
+        return null;
+    }
+
+    private int pathDistance(HallsExplorationGenerator.Cell start,
+                             HallsExplorationGenerator.Cell goal,
+                             int maxDistance) {
+        if (start.equals(goal)) {
+            return 0;
+        }
+        Set<HallsExplorationGenerator.Cell> seen = new HashSet<>();
+        java.util.Map<HallsExplorationGenerator.Cell, Integer> distances = new java.util.HashMap<>();
+        ArrayDeque<HallsExplorationGenerator.Cell> queue = new ArrayDeque<>();
+        seen.add(start);
+        distances.put(start, 0);
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            HallsExplorationGenerator.Cell current = queue.remove();
+            int distance = distances.getOrDefault(current, 0);
+            if (distance >= maxDistance) {
+                continue;
+            }
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                HallsExplorationGenerator.Cell next = step(current, face);
+                if (!floorWalkableCells.contains(next) || !seen.add(next)) {
+                    continue;
+                }
+                int nextDistance = distance + 1;
+                if (next.equals(goal)) {
+                    return nextDistance;
+                }
+                distances.put(next, nextDistance);
+                queue.add(next);
+            }
+        }
+        return -1;
+    }
+
+    private HallsExplorationGenerator.Cell firstStepOnPath(HallsExplorationGenerator.Cell start,
+                                                          HallsExplorationGenerator.Cell goal,
+                                                          java.util.Map<HallsExplorationGenerator.Cell, HallsExplorationGenerator.Cell> previous) {
+        HallsExplorationGenerator.Cell current = goal;
+        HallsExplorationGenerator.Cell parent = previous.get(current);
+        while (parent != null && !parent.equals(start)) {
+            current = parent;
+            parent = previous.get(current);
+        }
+        return parent == null ? start : current;
+    }
+
+    private void moveHomingMineDisplays(HallsTrap trap, Location previousAnchor, Location nextAnchor) {
+        Vector movement = nextAnchor.toVector().subtract(previousAnchor.toVector());
+        if (movement.lengthSquared() <= 0.0) {
+            return;
+        }
+        for (UUID displayId : trap.displayIds()) {
+            if (displayId.equals(trap.movingDisplayId())) {
+                continue;
+            }
+            Entity entity = Bukkit.getEntity(displayId);
+            if (entity != null && entity.isValid()) {
+                entity.teleport(entity.getLocation().add(movement));
             }
         }
     }
@@ -1118,6 +1485,12 @@ final class HallsSessionTrapRuntime {
         int x = player.getLocation().getBlockX();
         int z = player.getLocation().getBlockZ();
         for (HallsTrap trap : List.copyOf(traps)) {
+            if (trap.kind() == TrapKind.HOMING_MINE) {
+                if (canHomingMineContact(trap, player.getLocation())) {
+                    triggerProximityMine(trap, player);
+                }
+                continue;
+            }
             if (trap.x() != x || trap.z() != z) {
                 if (!(trap.kind() == TrapKind.PROXIMITY_MINE && Math.abs(trap.x() - x) <= 1 && Math.abs(trap.z() - z) <= 1)) {
                     continue;
@@ -1126,6 +1499,7 @@ final class HallsSessionTrapRuntime {
             switch (trap.kind()) {
                 case BEAR_TRAP -> triggerBearTrap(trap, player);
                 case PROXIMITY_MINE -> triggerProximityMine(trap, player);
+                case HOMING_MINE -> triggerProximityMine(trap, player);
                 case BUBBLES -> damagePlayerFromTrap(player, trap.type().damage(), "Scalding bubbles bite at you.");
                 case HOLE -> {
                     if (player.getLocation().getY() <= origin.y() - Math.max(3, trap.type().depth() - 2)) {
@@ -1143,6 +1517,12 @@ final class HallsSessionTrapRuntime {
         int x = monster.getLocation().getBlockX();
         int z = monster.getLocation().getBlockZ();
         for (HallsTrap trap : List.copyOf(traps)) {
+            if (trap.kind() == TrapKind.HOMING_MINE) {
+                if (canHomingMineContact(trap, monster.getLocation())) {
+                    triggerProximityMine(trap, monster);
+                }
+                continue;
+            }
             if (trap.x() != x || trap.z() != z) {
                 if (!(trap.kind() == TrapKind.PROXIMITY_MINE && Math.abs(trap.x() - x) <= 1 && Math.abs(trap.z() - z) <= 1)) {
                     continue;
@@ -1151,6 +1531,7 @@ final class HallsSessionTrapRuntime {
             switch (trap.kind()) {
                 case BEAR_TRAP -> triggerBearTrap(trap, monster);
                 case PROXIMITY_MINE -> triggerProximityMine(trap, monster);
+                case HOMING_MINE -> triggerProximityMine(trap, monster);
                 case BUBBLES -> damageMonsterFromTrap(monster, trap.type().damage());
                 case HOLE -> {
                     if (monster.getLocation().getY() <= origin.y() - Math.max(3, trap.type().depth() - 2)) {
@@ -1164,13 +1545,32 @@ final class HallsSessionTrapRuntime {
     }
 
     private void triggerProximityMine(HallsTrap trap, LivingEntity trigger) {
-        Location location = new Location(world, trap.x() + 0.5, origin.y(), trap.z() + 0.5);
+        Location location = activeMineLocation(trap);
         world.playSound(location, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.2f);
         world.spawnParticle(Particle.EXPLOSION, location.clone().add(0.0, 0.45, 0.0), 1, 0.0, 0.0, 0.0, 0.0);
         world.spawnParticle(Particle.SMOKE, location.clone().add(0.0, 0.35, 0.0), 30, 0.9, 0.35, 0.9, 0.03);
         damagePlayersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage(), "A proximity mine detonates.");
         damageMonstersNear(location, Math.max(2.5, trap.type().radius()), trap.type().damage());
         removeTrap(trap);
+    }
+
+    private Location activeMineLocation(HallsTrap trap) {
+        Entity display = trap.movingDisplayId() == null ? null : Bukkit.getEntity(trap.movingDisplayId());
+        if (trap.kind() == TrapKind.HOMING_MINE && display != null && display.isValid()) {
+            return display.getLocation().clone();
+        }
+        return new Location(world, trap.x() + 0.5, origin.y(), trap.z() + 0.5);
+    }
+
+    private boolean canHomingMineContact(HallsTrap trap, Location targetLocation) {
+        Location mineLocation = activeMineLocation(trap);
+        double radius = Math.max(1.25, trap.type().radius());
+        if (mineLocation.distanceSquared(targetLocation) > radius * radius) {
+            return false;
+        }
+        int maxPathCells = Math.max(1, (int) Math.ceil(radius));
+        int pathDistance = homingMinePathDistance(mineLocation, targetLocation, maxPathCells);
+        return pathDistance >= 0 && pathDistance <= maxPathCells;
     }
 
     private void triggerBearTrap(HallsTrap trap, LivingEntity trigger) {
@@ -1185,6 +1585,48 @@ final class HallsSessionTrapRuntime {
         removeTrap(trap);
     }
 
+    private void triggerArmyCoffin(HallsTrap trap, Player player) {
+        Location location = new Location(world, trap.x() + 0.5, origin.y() + 0.1, trap.z() + 0.5);
+        int roll = java.util.concurrent.ThreadLocalRandom.current().nextInt(100);
+        world.spawnParticle(Particle.BLOCK, location, 28, 0.75, 0.35, 0.75, Material.OAK_PLANKS.createBlockData());
+        world.playSound(location, Sound.BLOCK_BARREL_OPEN, 0.9f, 0.55f);
+        if (roll < 25) {
+            spawnTrapMonster("old_bones", location);
+            player.sendActionBar(Component.text("Old bones climb out of the coffin.", NamedTextColor.RED));
+        } else if (roll < 50) {
+            spawnTrapMonster("brooding_mother", location);
+            player.sendActionBar(Component.text("Something heavy crawls out of the coffin.", NamedTextColor.RED));
+        } else {
+            lootDropSink.accept(location);
+            player.sendActionBar(Component.text("The coffin breaks open with salvage dust inside.", NamedTextColor.GOLD));
+        }
+        removeTrap(trap);
+    }
+
+    private void damageEnchantedBookTrap(HallsTrap trap, Player player) {
+        int remaining = trapHitPoints.getOrDefault(trap, trap.type().hitPoints()) - 1;
+        if (remaining > 0) {
+            trapHitPoints.put(trap, remaining);
+            Location location = new Location(world, trap.x() + 0.5, origin.y() + 0.6, trap.z() + 0.5);
+            world.spawnParticle(Particle.ENCHANT, location, 8, 0.25, 0.18, 0.25, 0.02);
+            world.playSound(location, Sound.ITEM_BOOK_PAGE_TURN, 0.45f, 1.65f);
+            player.sendActionBar(Component.text("Enchanted book HP: " + remaining + "/" + trap.type().hitPoints() + ".",
+                    NamedTextColor.LIGHT_PURPLE));
+            return;
+        }
+        Location location = new Location(world, trap.x() + 0.5, origin.y() + 0.6, trap.z() + 0.5);
+        world.spawnParticle(Particle.ENCHANT, location, 28, 0.35, 0.25, 0.35, 0.03);
+        world.playSound(location, Sound.ITEM_BOOK_PUT, 0.8f, 0.7f);
+        player.sendActionBar(Component.text("The enchanted book unravels.", NamedTextColor.LIGHT_PURPLE));
+        removeTrap(trap);
+    }
+
+    private void spawnTrapMonster(String monsterId, Location location) {
+        if (trapMonsterSpawner == null || !trapMonsterSpawner.test(monsterId, location)) {
+            lootDropSink.accept(location);
+        }
+    }
+
     private void removeTrap(HallsTrap trap) {
         for (UUID displayId : trap.displayIds()) {
             Entity display = Bukkit.getEntity(displayId);
@@ -1194,6 +1636,8 @@ final class HallsSessionTrapRuntime {
         }
         traps.removeIf(candidate -> candidate == trap);
         trapNextTriggerTicks.remove(trap);
+        homingMineDetonateTicks.remove(trap);
+        trapHitPoints.remove(trap);
     }
 
     private java.util.Optional<Location> moveTrapDisplay(HallsTrap trap, long age) {
@@ -1224,8 +1668,11 @@ final class HallsSessionTrapRuntime {
         double y = origin.y() + 0.08;
         double z = cell.z() + 0.5;
 
-        if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE) {
+        if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.HOMING_MINE) {
             y += 0.4;
+        }
+        if (kind == TrapKind.HOMING_MINE) {
+            y = homingMinePlateY();
         }
 
         if (kind == TrapKind.SWINGING_BLADE) {
@@ -1248,6 +1695,10 @@ final class HallsSessionTrapRuntime {
                 cell.x() + 0.5 + face.getModX() * (0.5 - depth),
                 origin.y() + 1.5,
                 cell.z() + 0.5 + face.getModZ() * (0.5 - depth));
+    }
+
+    private double homingMinePlateY() {
+        return origin.y() + 0.73;
     }
 
     private Vector3f wallDisplayTranslation(BlockFace face, float depth, float width, float height) {
@@ -1293,7 +1744,7 @@ final class HallsSessionTrapRuntime {
             rotation.rotateZ((float) Math.toRadians(180.0));
         } else if (requiresWall(kind)) {
             rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
-        } else if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE) {
+        } else if (kind == TrapKind.BEAR_TRAP || kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.HOMING_MINE) {
             rotation.rotateY((float) Math.toRadians(yawDegrees(face)));
         } else {
             rotation.rotateX((float) Math.toRadians(90.0));
@@ -1340,8 +1791,7 @@ final class HallsSessionTrapRuntime {
             entity.setTeleportDuration(2);
             entity.setPersistent(false);
             entity.addScoreboardTag("omgames_hoc_trap");
-            entity.setTransformation(new Transformation(new Vector3f(-0.25f, -0.25f, -0.25f), new Quaternionf(),
-                    new Vector3f(0.5f, 1.2f, 0.5f), new Quaternionf()));
+            entity.setTransformation(HallsDisplayTransforms.centeredBlock(0.5f, 1.2f, 0.5f));
         });
         transientTrapDisplays.add(display.getUniqueId());
         new BukkitRunnable() {
@@ -1414,12 +1864,18 @@ final class HallsSessionTrapRuntime {
 
     private void damagePlayersInLine(HallsTrap trap, double radius, double width, double damage, String message) {
         for (Player player : participantsInLine(trap, wallTrapReach(trap, radius), width)) {
+            if (trap.kind() == TrapKind.WALL_SPIKES && player.getLocation().getY() < origin.y() - 0.05) {
+                continue;
+            }
             damagePlayerFromTrap(player, damage, message);
         }
     }
 
     private void damageMonstersInLine(HallsTrap trap, double radius, double width, double damage) {
         for (LivingEntity monster : monstersInLine(trap, wallTrapReach(trap, radius), width)) {
+            if (trap.kind() == TrapKind.WALL_SPIKES && monster.getLocation().getY() < origin.y() - 0.05) {
+                continue;
+            }
             damageMonsterFromTrap(monster, damage);
         }
     }
@@ -1430,6 +1886,21 @@ final class HallsSessionTrapRuntime {
         double forward = -(dx * trap.face().getModX() + dz * trap.face().getModZ());
         double lateral = Math.abs(trap.face().getModX() == 0 ? dx : dz);
         return forward >= 0.0 && forward <= radius && lateral <= width;
+    }
+
+    private Set<HallsExplorationGenerator.Cell> borderCells(Set<HallsExplorationGenerator.Cell> cells) {
+        Set<HallsExplorationGenerator.Cell> border = new HashSet<>();
+        for (HallsExplorationGenerator.Cell cell : cells) {
+            for (BlockFace face : List.of(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)) {
+                HallsExplorationGenerator.Cell side = new HallsExplorationGenerator.Cell(
+                        cell.x() + face.getModX(),
+                        cell.z() + face.getModZ());
+                if (!cells.contains(side)) {
+                    border.add(side);
+                }
+            }
+        }
+        return border;
     }
 
     private double wallTrapReach(HallsTrap trap, double configuredReach) {
@@ -1538,6 +2009,19 @@ final class HallsSessionTrapRuntime {
         return players;
     }
 
+    private Player nearestParticipant(Location center, double radius) {
+        Player best = null;
+        double bestDistance = radius * radius;
+        for (Player player : nearbyParticipants(center, radius)) {
+            double distance = player.getLocation().distanceSquared(center);
+            if (distance <= bestDistance) {
+                bestDistance = distance;
+                best = player;
+            }
+        }
+        return best;
+    }
+
     private List<Player> geyserParticipants(HallsTrap trap, double radius) {
         double radiusSquared = radius * radius;
         List<Player> players = new ArrayList<>();
@@ -1572,7 +2056,7 @@ final class HallsSessionTrapRuntime {
         }
         trapDamageCooldowns.put(player.getUniqueId(), now + 900L);
         player.sendActionBar(Component.text(message, NamedTextColor.RED));
-        player.damage(damage * Math.max(0.0, trapDamageMultiplier.getAsDouble()));
+        playerDamageSink.accept(player, damage * Math.max(0.0, trapDamageMultiplier.getAsDouble()));
     }
 
     private void damageMonsterFromTrap(LivingEntity monster, double damage) {
@@ -1596,8 +2080,8 @@ final class HallsSessionTrapRuntime {
         player.teleport(new Location(world, origin.x() + 0.5, origin.y() + 1.0, origin.z() + 0.5, 180.0f, 0.0f));
     }
 
-    private TrapKind trapKind(String kind) {
-        return switch (kind) {
+    TrapKind trapKind(String kind) {
+        return switch (normalizeId(kind)) {
             case "bear_trap" -> TrapKind.BEAR_TRAP;
             case "proximity_mine" -> TrapKind.PROXIMITY_MINE;
             case "swinging_blade" -> TrapKind.SWINGING_BLADE;
@@ -1608,8 +2092,15 @@ final class HallsSessionTrapRuntime {
             case "bubbles" -> TrapKind.BUBBLES;
             case "geyser" -> TrapKind.GEYSER;
             case "pufferfish" -> TrapKind.PUFFERFISH;
+            case "army_coffin" -> TrapKind.ARMY_COFFIN;
+            case "homing_mine" -> TrapKind.HOMING_MINE;
+            case "enchanted_book" -> TrapKind.ENCHANTED_BOOK;
             default -> null;
         };
+    }
+
+    private static String normalizeId(String value) {
+        return value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT).replace('-', '_').replace(' ', '_');
     }
 
     private boolean requiresWall(TrapKind kind) {
@@ -1668,7 +2159,7 @@ final class HallsSessionTrapRuntime {
         return halfSpan;
     }
 
-    private int bestSwingLaneHalfSpan(TrapCandidate candidate) {
+    int bestSwingLaneHalfSpan(TrapCandidate candidate) {
         return Math.max(swingLaneHalfSpan(candidate, BlockFace.EAST), swingLaneHalfSpan(candidate, BlockFace.NORTH));
     }
 
@@ -1678,7 +2169,7 @@ final class HallsSessionTrapRuntime {
 
     private Set<HallsExplorationGenerator.Cell> trapFootprint(TrapKind kind, HallsExplorationGenerator.Cell cell, BlockFace face, int laneSpan) {
         Set<HallsExplorationGenerator.Cell> footprint = new HashSet<>();
-        int radius = kind == TrapKind.PROXIMITY_MINE ? 1 : 0;
+        int radius = kind == TrapKind.PROXIMITY_MINE || kind == TrapKind.HOMING_MINE ? 1 : 0;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 footprint.add(new HallsExplorationGenerator.Cell(cell.x() + dx, cell.z() + dz));
@@ -1757,7 +2248,7 @@ final class HallsSessionTrapRuntime {
         void setBlock(int x, int y, int z, Material material, BlockFace face);
     }
 
-    private record TrapCandidate(HallsExplorationGenerator.Room room,
+    record TrapCandidate(HallsExplorationGenerator.Room room,
                                  HallsExplorationGenerator.Cell cell,
                                  Set<HallsExplorationGenerator.Cell> roomCells,
                                  Set<HallsExplorationGenerator.Cell> allRoomCells) {
@@ -1835,11 +2326,12 @@ final class HallsSessionTrapRuntime {
     private record HallsTrap(TrapKind kind, int x, int z, int phase, HallsTrapType type, UUID movingDisplayId, List<UUID> displayIds, BlockFace face, int laneSpan) {
     }
 
-    private enum TrapKind {
+    enum TrapKind {
         HOLE,
         HOLE_BRIDGE,
         BEAR_TRAP,
         PROXIMITY_MINE,
+        HOMING_MINE,
         SWINGING_BLADE,
         WALL_SPIKES,
         FALLING_ICE,
@@ -1847,6 +2339,8 @@ final class HallsSessionTrapRuntime {
         STEAM_VENT,
         BUBBLES,
         GEYSER,
-        PUFFERFISH
+        PUFFERFISH,
+        ARMY_COFFIN,
+        ENCHANTED_BOOK
     }
 }

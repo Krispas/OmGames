@@ -1,0 +1,8 @@
+modifiers:
+  enchanted_books:
+    type: bad
+    display-name: "Enchanted Books"
+    icon: "B"
+    weight: 7
+    effects:
+      trap: enchanted_book

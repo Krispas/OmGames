@@ -22,7 +22,8 @@ public record HallsTrapType(
         double radius,
         int intervalTicks,
         int activeTicks,
-        float explosionPower
+        float explosionPower,
+        int hitPoints
 ) {
     public HallsTrapType {
         levelTypes = List.copyOf(levelTypes);
@@ -38,6 +39,7 @@ public record HallsTrapType(
         intervalTicks = Math.max(1, intervalTicks);
         activeTicks = Math.max(1, activeTicks);
         explosionPower = Math.max(0.0f, explosionPower);
+        hitPoints = Math.max(1, hitPoints);
     }
 
     public boolean allowedForLevelType(String levelTypeId) {

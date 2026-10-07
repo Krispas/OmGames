@@ -2,5 +2,6 @@ id: pillager
 name: "Pillager"
 entity-type: PILLAGER
 health: 20
+attack-damage: 1.0
 equipment:
   main-hand: CROSSBOW

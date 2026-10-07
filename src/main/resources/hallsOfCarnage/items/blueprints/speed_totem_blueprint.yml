@@ -5,4 +5,5 @@ rarity: normal
 material: PAPER
 max-stack-size: 1
 lore:
+  - "Building size: Small"
   - "Builds a small camp totem that grants temporary speed."

@@ -2,5 +2,6 @@ id: parched
 name: "Parched"
 entity-type: PARCHED
 health: 6
+attack-damage: 1.0
 equipment:
   main-hand: BOW

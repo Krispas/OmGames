@@ -1,5 +1,6 @@
 id: infernal_chambers
 name: "Infernal Chambers"
+name-color: RED
 corridor-generation: large_corridors
 materials:
   floor: CRACKED_POLISHED_BLACKSTONE_BRICKS

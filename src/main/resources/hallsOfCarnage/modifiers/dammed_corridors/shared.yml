@@ -62,13 +62,6 @@ modifiers:
     weight: 5
     effects:
       loot-multiplier: 0.75
-  more_sculk:
-    type: bad
-    display-name: "More Sculk"
-    icon: "☻"
-    weight: 2
-    effects:
-      sculk-multiplier: 3.0
   special_enemy:
     type: bad
     display-name: "Special Enemy"
@@ -92,13 +85,6 @@ modifiers:
     effects:
       corridor-distance-multiplier: 1.35
       maze-corridor-distance-multiplier: 1.12
-  death_fog:
-    type: bad
-    display-name: "Death Fog"
-    icon: "☁"
-    weight: 2
-    effects:
-      wither-after-seconds: 600
   glass_bones:
     type: bad
     display-name: "Glass Bones"
@@ -123,11 +109,17 @@ modifiers:
     effects:
       hole-multiplier: 1.6
       hole-bridge-extra-width: 1
-  rusty_tools:
-    type: bad
-    display-name: "Rusty Tools"
-    icon: "⚒"
-    weight: 2
+  less_enemy_hp:
+    type: good
+    display-name: "Less Enemy HP"
+    icon: "-"
+    weight: 4
     effects:
-      weapon-durability-loss-multiplier: 2.0
-      armor-damage-multiplier: 0.9
+      enemy-health-multiplier: 0.7
+  more_enemy_hp:
+    type: bad
+    display-name: "More Enemy HP"
+    icon: "+"
+    weight: 5
+    effects:
+      enemy-health-multiplier: 1.3

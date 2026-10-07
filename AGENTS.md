@@ -948,9 +948,10 @@ Files:
 - `src/main/java/krispasi/omGames/chess/*`
   - Chess game implementation.
   - Owns `/chess`, saved boards, active match runtimes, item displays, interaction boxes, move validation, undo/redo state, timers, and SQLite match/stat logging.
-  - `ChessManager` is the command/event coordinator.
-  - `ChessMatchRuntime` owns one active match on one board timestamp.
-  - Keep Chess logic inside this package; do not push Chess rules into BedWars or Egg Hunt classes.
+- `ChessManager` is the command/event coordinator.
+- `ChessGuiController` owns the inventory GUI and chess hotbar item actions.
+- `ChessMatchRuntime` owns one active match on one board timestamp.
+- Keep Chess logic inside this package; do not push Chess rules into BedWars or Egg Hunt classes.
 
 ### 4.2 Command Surface
 
@@ -959,11 +960,13 @@ Operator subcommands:
 - `/chess board blocks <b1> <b2> <b3>`
 - `/chess board blocks reset`
 - `/chess board reset`
+- `/chess board reset player <player>`
 - `/chess board remove <timestamp|*>`
 - `/chess match white <player> [player] [player]`
 - `/chess match black <player> [player] [player]`
 - `/chess match start [board_timestamp]`
-- `/chess match test`
+- `/chess match spectate [match|*]`
+- `/chess match test <on|off> [match]`
 - `/chess match cancel <timestamp|*>`
 - `/chess match settings do_movement_check <true|false>`
 - `/chess match settings visualize_movement_check <true|false>`
@@ -975,9 +978,13 @@ Operator subcommands:
 - `/chess log delete <timestamp|*>`
 - `/chess log search <player> [player...]`
 - `/chess timer off`
-- `/chess timer time <duration> [check <duration>]`
+- `/chess timer time <duration> [move <duration>] [check <duration>]`
+- `/chess timer [match|*] move <duration>`
+- `/chess timer [match|*] check <duration>`
 
 Team/player subcommands:
+- `/chess`
+- `/chess menu`
 - `/chess resign`
 - `/chess draw`
 - `/chess undo`
@@ -1010,16 +1017,21 @@ SQLite tables:
 - Piece item displays use `minecraft:iron_nugget` with `ItemMeta#setItemModel()`.
 - Normal models are `om:<piece>` for white and `om:black_<piece>` for black; selected models are `om:selected_<piece>`.
 - Multiple boards and active matches may exist at the same time; each active match is identified by its match timestamp and runs on one board timestamp.
-- `/chess match start` without a board timestamp uses the most recent saved board.
+- `/chess board build <x> <y> <z>` and `/chess board reset [board]` place board blocks only; square interactions and figure displays spawn when `/chess match start` starts a match.
+- `/chess match start` without a board timestamp uses the nearest saved board to the player issuing the command, falling back to the most recent saved board for non-player senders.
 - A player may be assigned to any side in any number of concurrent matches; clicked board entities route moves to the match for that entity timestamp.
+- Player/opponent commands such as pause, undo, redo, rewind, forward, draw, and resign target the nearest active match that includes the player.
 - Each active match board owns 64 square interaction boxes, 32 piece interaction boxes, and 32 item displays.
 - Chess board entities are persistent and can be removed with `/chess board remove <timestamp|*>`.
 - Chess interaction entities use persistent data and scoreboard tags for identity; do not rely on visible custom names.
 - Active non-test matches are saved in `chess_active_match_state` so they can continue after restart until a win, draw, resign, cancel, board reset, or board removal.
+- `/chess match test on` disables logging for the target active/next match; `/chess match test off` reenables logging and creates a log for the active match from that point forward.
 - During an active match, online team players in the board world are put in Adventure mode with flight enabled and 16-block block/entity interaction reach; this must be restored when they leave the board world or the match ends.
+- Chess spectators are put in Adventure mode with flight and no-particle invisibility and receive the spectator exit hotbar item; `/chess board reset player <player>` clears chess reach, glow, flight, and invisibility for an online player.
 - Flat figure style uses `om:<side>_<piece>_icon` item models on `minecraft:iron_nugget`; default style keeps the existing standing figure models.
 - Pawn promotion uses a forced small inventory selection for bishop, horse, queen, or rook, not captured-piece selection.
-- Chess timer durations accept decimal values with optional `s`, `m`, `h`, or `d` units; unqualified match time defaults to minutes and unqualified check bonus defaults to seconds.
+- Chess timer durations accept decimal values with optional `s`, `m`, `h`, or `d` units; unqualified match time defaults to minutes and unqualified move/check bonuses default to seconds.
+- Chess move selection and move notation should be logged to SQLite, not sent as normal chat messages.
 
 ## 5) Bank
 
@@ -1222,11 +1234,14 @@ Behavior notes:
 
 - `src/main/java/krispasi/omGames/hallsofcarnage/*`
   - Initial Halls of Carnage implementation.
-  - Owns `/hoc`, Halls config/resource loading, lobby/menu-villager handling, scenario discovery, and Halls shame persistence.
+  - Owns `/hoc`, Halls config/resource loading, lobby menu interaction handling, scenario discovery, and Halls shame persistence.
   - Keep Halls logic isolated from BedWars, Egg Hunt, Chess, Bank, and Random classes.
 - `HallsSession` owns active session state; `HallsSessionTrapRuntime` is its session-owned trap placement/ticking helper.
+- `HallsSessionFloorBuildJob` owns incremental exploration rebuild cursors; keep it session-owned and do not move build scheduling back into a large nested `HallsSession` class.
+- `HallsGeneratedTrapPlacement` owns resumable generated-trap candidate preparation and placement through `HallsSessionTrapRuntime`; trap runtime activation must wait until floor loading finishes.
 - `HallsSessionMonsterRuntime` is the session-owned first-pass monster flood helper; keep monster spawning/alert cleanup routed through `HallsSession`.
 - `HallsModifierTypeLoader` loads configurable exploration modifiers; `HallsFloorModifiers` owns the active floor's stacked modifier effects.
+- `HallsResourceManager` discovers bundled Halls content recursively and owns missing-file copying and resource reset I/O; do not add per-file content whitelists.
 
 ### 7.2 Command Surface
 
@@ -1250,7 +1265,7 @@ Operator subcommands:
 - `/hoc shame set <player> <amount>`
 - `/hoc shame add <player> <amount>`
 - `/hoc lobby setspawn`
-- `/hoc lobby spawnMenuVillager [rotation]`
+- `/hoc lobby spawnMenuInteraction [rotation]`
 - `/hoc reload`
 
 Permission declared in `plugin.yml`:
@@ -1278,6 +1293,9 @@ Files:
 SQLite tables:
 - `hoc_shame`
 - `hoc_completed_scenarios`
+  - stores `scenario_id`, `player_uuid`, `completed_at`, `difficulty_id`, and `final_shame`
+- `hoc_endless_records`
+  - stores each player's highest reached floor per Endless scenario
 
 ### 7.4 Runtime Notes
 
@@ -1285,13 +1303,20 @@ SQLite tables:
 - The human-built lobby is centered near `0 70 0`; automated session/dungeon placement must stay at least 1000 blocks away.
 - Players in the Halls world are kept in Adventure mode, with full hunger and natural regeneration disabled.
 - Shame leaderboards are ascending because lower shame is better.
+- Endless scenarios use `type: endless`, configurable level-type pools, progression settings, a boss pool, and a fixed boss seed. The bundled Mixed and Base Game scenarios currently contain the same nine level types and inherit Untold Depths items, blueprints, crafting, research, and modifier content.
+- `endless.progression` owns all numeric scaling for Endless floors through decimal starting values and per-module/per-exploration rates. Round each generated floor value to the nearest integer; keep the formula generic so slow rates can hold a value steady across several floors. It also owns the room cap, final-exploration distillery count, and boss cadence. The bundled Endless room cap is 100 base rooms; Untold Depths' More Rooms modifier can add up to 5. If an existing scenario file needs new progression defaults, delete that file and let the plugin copy the bundled version; do not add migration logic.
+- Endless floors use three distinct randomly ordered level types per exploration module, followed by camp; a boss floor and camp follow every configured number of modules. Floor scaling follows the Untold Depths progression curve and has no completion floor.
+- Endless floor selection uses a per-run seed saved as `endless.run-seed`, so a save/load keeps that run's generated theme sequence while fresh runs randomize it.
+- Endless sessions do not accrue or persist shame. Each game-over records the current floor for every participant in `hoc_endless_records`; the lobby leaderboard shows campaign shame and Endless floor records separately.
+- When a party descends after the final configured scenario floor, the session displays completion/shame, records completion, deletes the Halls save file, optionally notifies OmVeins through its Halls completion consumer, and then returns players to the Halls lobby.
+- Halls run shame is saved in active save files as `shame.current`; final completion shame applies difficulty reduction (`normal` unchanged, `hard` 30% less, `extreme` 50% less) before persistence.
 - `/hoc start <scenario> [player...]` allocates a session origin, builds the first start floor/elevator shell, teleports players into it, and tracks changed blocks for cleanup.
 - `/hoc stop <session_id|*>` restores changed blocks and returns online players in that Halls world to the configured lobby spawn.
 - `/hoc floor <session_id> <floor>` is an OP-only development shortcut for rebuilding an active placeholder floor while preserving elevator transfer chest contents.
 - `/hoc scenario <scenario>` is an OP-only debug command that prints the loaded parsed scenario data and the YAML view copied from the active server data folder.
 - `/hoc debug` is an OP-only player command that toggles per-player Halls debug messages for generation timing, breakable/trap counts, and monster spawn/cap timing.
 - `/hoc recipes` is player-only and requires the caller to be in an active Halls session; it opens a read-only recipe book for that session's scenario with building blueprint locations and station recipe unlock levels.
-- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `breakable_loot_pools`, `vegetation`, `traps`, `monsters`, `items`, `buildings`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
+- `/hoc reset confirm` is an OP-only development command that deletes and recopies game resource folders (`scenarios`, `level`, `level_type`, `modifiers`, `breakables`, `breakable_loot_pools`, `vegetation`, `traps`, `bosses`, `monsters`, `items`, `buildings`) from bundled defaults while preserving lobby config in `halls-of-carnage.yml`; active sessions must be stopped first.
 - `HallsExplorationGenerator` owns per-rebuild exploration layout planning.
 - Halls level types are loaded from `plugins/OmGames/HallsOfCarnage/level_type/*.yml`; legacy `.txt` and `.yaml` files are still parsed if present.
 - Level type fields currently parsed are `id`, `name`, `corridor-generation`, `materials.*`, `wall-palettes`, `pillar-palettes`, monster pools, and `vegetation.chance` / weighted `vegetation.types`.
@@ -1302,15 +1327,19 @@ SQLite tables:
 - Generated room and corridor wall columns should use wall material down through their foundation block instead of placing floor material under walls.
 - Room lighting should be embedded directly in generated room ceilings.
 - Halls scenario floor ranges are parsed into runtime floor definitions; exploration generation uses the active floor's configured `rooms` count and spreads breakable props from the configured `breakables` count.
+- Bundled Dammed Corridors (`dammed_corridors`) has 20 consecutive floors: the standard start room, nine exploration/camp pairs, and Archaic Guard. It uses the Bunker-themed `camps/camp_dammed_corridors.txt` camp, one `10000`-coin key, global blueprint pools for its eleven enabled buildings, no blueprint distilleries, and the Untold Depths research tree only through Conduction; later gear remains eligible for drops but is not craftable.
+- Halls exploration floor definitions may set `blueprint-distilleries`; `true` uses the default chain size of `5`, a positive number sets that exact chain size, and missing/false disables distilleries and their HUD line.
+- Scenario combat floors may define `boss: <boss-id>`. Boss definitions are loaded from `plugins/OmGames/HallsOfCarnage/bosses/*.yml`; bundled boss resources are copied on first run/reset like other Halls resources.
 - If a scenario floor is not explicitly configured but a prior exploration floor is configured, runtime reuses that prior exploration floor definition for the requested floor instead of falling back to the generic 8-room placeholder.
 - Exploration floors grow their per-session generation/cleanup radius from the configured room count and retry with larger radii if planning underfills.
 - Exploration corridor routing uses turn-aware cardinal pathing over the baked mask, grows primarily through room-to-room corridor clusters instead of connecting every room into one shared corridor spine, rejects short zigzag paths that read as diagonal, adds direct room-to-room loop corridors, and checks reachability from the elevator before the plan is accepted. Normal corridor generation must not add decorative dead-end branch corridors.
+- Library corridor generation is a dedicated mode: roughly two thirds of rooms are connected by 3-wide corridors, while roughly one third are disconnected vent-only rooms with normal content/traps but no monster spawn cells. Each disconnected Library room should receive a paired wall vent to a connected room, and vent travel grants 3 seconds of Resistance V.
 - The first exploration room connected to the elevator is given extra onward room-to-room exits when enough rooms exist, so the elevator does not feed into a single-path start.
 - Exploration corridor rendering builds a complete shell around the planned path before carving walkable cells so bends keep walls.
 - Generated corridors use ceiling-embedded light blocks so the walkable corridor remains 3 blocks tall, and the elevator has a ceiling light.
 - The elevator exterior vestibule is generated as a sealed mini-tunnel outside the door; opening the door clears only the passage while preserving the vestibule floor, side walls, and ceiling.
 - Halls elevators spawn a hidden waypoint-transmitting marker entity at the elevator spawn so participants see the elevator on the vanilla locator bar; keep this separate from the Compass modifier's item/HUD/trail behavior.
-- Elevator transitions rebuild exploration floors through a staged session-local main-thread build job: plan, clear old columns, elevator shell, room batches, corridor batches, traps, content batches, chest restore, and door opening.
+- Elevator transitions rebuild exploration floors through a staged session-local main-thread build job: plan, clear old columns, elevator shell, room batches, corridor batches, incremental traps, liquid planning/rendering, vegetation, sculk, fixtures, content batches, chest restore, and door opening. Trap/content work must remain spread across ticks rather than restoring a single bulk post-corridor pass. Session participants receive a phase-labelled percentage loading bar above the hotbar during the rebuild; loading state is cleared on cancellation/arrival.
 - Staged Halls floor clears must not clear the protected elevator footprint while players are inside it.
 - Active Halls participants should have their respawn location set to the session elevator; normal session exit should restore their respawn location to the configured Halls lobby spawn.
 - Elevator floor arrival heals living players for `6` health and revives ghost players with `10` health.
@@ -1327,14 +1356,15 @@ SQLite tables:
 - Generic breakable loot entries `scrap` / `random_scrap` choose randomly from that breakable's configured `scrap-drops`.
 - Supported placeholder breakable loot keywords are `wood_scrap`, `iron_scrap`, `diamond_scrap`, `redstone_scrap`, `random_scrap`/`scrap`, `blueprint`/`normal_blueprint`/`rare_blueprint`, and `coin`/`coins`.
 - Exploration floors force exactly one rare breakable prop in a random generated room when a rare breakable archetype is available, and normal generated prop slots should use common breakables.
-- Generated playable floors may place one 2x2x2 magenta research crate. It is carried as session-owned display cargo above a player, blocks normal interactions/inventory opening while carried, drops on sneak, and deposits into the elevator hopper for `+1` team research point.
+- Generated playable floors may place one 2x2x2 magenta research crate. It is carried as one scaled session-owned `BlockDisplay` cargo above a player, blocks normal interactions/inventory opening while carried, applies Slowness II and Resistance III unless stronger Resistance is active, drops on sneak, and deposits into the elevator hopper for `+1` team research point.
 - Halls vegetation archetypes are loaded from `plugins/OmGames/HallsOfCarnage/vegetation/` and seeded from bundled defaults.
 - Vegetation files define `id`, `material`, optional `block-data`, `offset-y`, `scale`, and `random-yaw`.
 - Exploration vegetation is purely decorative `BlockDisplay` clutter. It may generate in rooms and corridors, must not place normal blocks, interaction entities, or hitboxes, and generation must avoid trap-reserved cells such as holes and ground traps.
 - Vegetation yaw must compensate for `BlockDisplay`'s lower-corner origin so random rotation pivots around the cell center.
 - Halls item definitions are loaded recursively from `plugins/OmGames/HallsOfCarnage/items/` and seeded from bundled defaults grouped into category folders.
 - Item files define `id`, `name`, `category`, `rarity`, `material`, optional `item-model`, optional `armor-model`, `max-stack-size`, `lore`, optional `recipe` cost map, and an optional `stats` map.
-- Halls player item defaults do not include ranged gear; do not add bows, crossbows, tridents, arrows, or fireworks as Halls player items unless the design changes again.
+- Bundled Halls armor item resources are organized by equipped slot under `items/armors/helmets/`, `items/armors/chestplates/`, `items/armors/leggings/`, and `items/armors/boots/`.
+- Halls player item defaults include first-pass ranged bows/crossbows/tridents; ranged Halls weapons use `stats.ranged` / `stats.ranged-damage`, keep a marked arrow stack in a blocked inventory row for bows/crossbows, and should not consume arrows on shot.
 - Armor `item-model` controls the item icon/model; armor `armor-model` is written to Paper's equippable component for the worn armor model.
 - Blueprint item files should not define `recipe`; future building and camp systems should own blueprint/building costs separately from blueprint item metadata.
 - Halls scenarios may define top-level `camp.layout`, `camp.team-lives`, and `camp.key-costs`; camp floors use the scenario's shared camp layout instead of separate per-floor camp layouts.
@@ -1356,15 +1386,16 @@ SQLite tables:
 - Speed Totem buildings are small camp buildings with `1` charge per run and increase one player's movement speed by `5% * level` until the next camp arrival. Multiple speed totems may stack on one player when they come from different built plots.
 - Sculk Purifier is a single medium camp building id `sculk_purifier` with blueprint `sculk_purifier_blueprint`; do not reintroduce small/medium/large purifier variants unless the schema changes again.
 - Camp Station crafting is split into weapons, armor, utilities, and food category views. Camp Station recipes are gated by scenario `research.nodes`; roots are unlocked automatically, normal camp arrivals grant one research point per exploration floor cleared since the previous camp, and life-based camp rewinds preserve checkpoint research state without awarding points.
+- Halls research nodes support `row` and `column` coordinates on a fixed 9x5 Camp Station research grid; coordinates are one-based as row/column, and a node with multiple prerequisites requires any one of them, not all of them.
 - Building display parts support optional `block-data` and `rotation`/`euler` `[x, y, z]` degrees; part offsets rotate with the camp plot facing marker and display parts are centered against plot centers/facing, including even-sized future plot footprints and scaled display parts.
 - Built camp plots open a building GUI on right-click; the GUI owns building functionality plus upgrade and destroy actions. Upgrade buttons show the stored-scrap cost plus practical effects such as harvest changes.
 - Halls save snapshots live in `plugins/OmGames/HallsOfCarnage/saves/` as YAML files keyed by scenario id plus sorted participant UUIDs.
 - The current first-pass save schema records scenario, host, current floor, participant UUIDs, player hotbar/armor/offhand contents, ghost flags, per-player sculk pressure, per-player active totem buff levels, elevator chest contents, stored scrap/coins, camp bank/key/team-life counters, research points/unlocked nodes, exploration floors since last camp, and shared camp plot building state including building id, level, harvest counters, and storage locker contents.
 - Save snapshots are created/overwritten when a campaign starts, when the elevator leaves a floor, when arriving at a camp floor, when game-over restarts the run at floor 1, and when the host uses `/hoc leave` from the start floor or a camp floor.
 - `/hoc leave` is player-only, does not require OP, and only the active session host can use it to save and end the session from the start floor or a camp floor.
-- The lobby villager opens a GUI flow for New Campaign, Load Save, scenario selection, difficulty selection, and session settings.
+- The lobby menu interaction entity opens a GUI flow for New Campaign, Load Save, scenario selection, difficulty selection, and session settings.
 - New campaign session settings can toggle online players currently in the Halls lobby, then start the run.
-- Starting/loading a Halls session closes any open Halls lobby villager menu for selected participants before teleporting them into the generated session.
+- Starting/loading a Halls session closes any open Halls lobby menu for selected participants before teleporting them into the generated session.
 - Load Save lists save files containing the clicking player, allows shift-right-click deletion of those saves, and requires every saved participant to be online in the Halls lobby and outside other Halls sessions before restoring the save.
 - Difficulty options are Normal/Hard/Extreme with multipliers `1.0`, `1.5`, and `2.0`; the first-pass implementation scales floor difficulty, coin quota, trapped-room count, holes, and sculk patch count.
 - Camp floors with a bottom-edge `L` marker dock that marker just outside the elevator front and carve a south-side layout opening, so large shared camp layouts do not overlap the elevator shell. Older layouts without a bottom `L` still use the north-edge connector fallback.
@@ -1375,21 +1406,28 @@ SQLite tables:
 - Scenario `allowed-items` is parsed by category, and `blueprint-pools.normal` / `blueprint-pools.rare` control global fallback blueprint keyword drops.
 - Scenario blueprint pools may also be restricted by level type with `blueprint-pools.<level-type>.normal` and `blueprint-pools.<level-type>.rare`; runtime uses the active floor level type first and falls back to the global rarity pool when no level-specific pool exists.
 - If a data-folder scenario predates `research.nodes`, the scenario loader may use bundled research defaults at runtime without rewriting the server file; this is a compatibility fallback, not migration logic.
-- Blueprint defaults currently cover every buildable GDD building family: grindstone, forge, storage locker, mycelia farm, elevator drill, scanner, health totem, speed totem, and sculk purifiers by size. Camp Station is permanent and has no blueprint.
+- Blueprint defaults currently cover every buildable GDD building family: grindstone, forge, storage locker, mycelia farm, potato farm, carrot farm, research table, alchemy cauldron, deconstructor, elevator drill, scanner, health totem, speed totem, and the medium sculk purifier. Camp Station is permanent and has no blueprint.
 - Breakable loot may reference concrete item ids or category keywords such as `weapon`, `armor`, `utility`, `rare_weapon`, `rare_armor`, and `rare_utility`; `ranged` / `rare_ranged` are no longer supported Halls loot keywords.
 - The generic `blueprint` loot keyword rolls the active level type's scenario normal blueprint pool with a small rare-pool chance; `normal_blueprint` and `rare_blueprint` force those pools, falling back to global scenario pools when no level-specific pool exists.
 - `/hoc give <item> [amount]` is an OP-only self-target test command for giving loaded Halls item definitions. If `<item>` is `wood_scrap`, `iron_scrap`, `diamond_scrap`, or `redstone_scrap`, the amount is deposited directly into the caller's active session elevator storage and awards the matching test coins. If `<item>` is `research_points` (aliases: `research_point`, `research`, `rp`), the amount is added to the caller's active session research points.
 - Halls armor items equip into empty matching armor slots from `/hoc give`; right-click physics-drop pickup still inserts into the selected hotbar slot.
 - Halls armor item `stats.armor` maps to real Bukkit `ARMOR` item attributes on the matching armor slot; optional `stats.armor-toughness` / normalized `armor_toughness` maps to `ARMOR_TOUGHNESS`.
+- Halls weapon effects are data-driven through item stats where possible: `poison-seconds`, `slowness-seconds`, `stun-seconds`, `chain-targets`, `chain-radius`, `chain-damage`, `aoe-damage`, `aoe-radius`, and `pushback-strength`.
+- Halls armor supports data-driven bonus stats: `max-health`, `attack-speed-percent`, `movement-speed-percent`, and `swift-sneak`.
 - Halls coin drops use session-owned physics drops but bypass normal inventory pickup; right-clicking the coin adds it directly to the shared session coin counter even when the hotbar is full.
 - Halls physics drops settle once they land on a support surface and stop ticking until a nearby breakable prop is destroyed or a new drop is spawned.
 - Halls physics drops can land on top of current breakable props as temporary support surfaces; if that prop breaks, nearby settled drops are woken and resume falling.
-- Halls food items are catalog items with category `food`; `stats.heal` restores health when consumed while hunger remains locked full. Optional food buff stats use normalized keys such as `speed-seconds`, `resistance-seconds`, `regeneration-seconds`, `absorption-seconds`, and matching `*-amplifier`.
+- Halls food items are catalog items with category `food`; `stats.heal` restores health when consumed while hunger remains locked full, and `stats.sculk-reduction-percent` reduces the eater's personal sculk pressure. Optional food buff stats use normalized keys such as `speed-seconds`, `resistance-seconds`, `regeneration-seconds`, `absorption-seconds`, and matching `*-amplifier`.
 - Halls utility items may define `stats.durability`; successful utility activation consumes one durability, while cooldown-blocked attempts do not. Depleted utilities break instead of being consumed on every right-click.
-- Mycelia Farm harvest counters persist in camp save state during an active run, but game-over run resets should restock saved Mycelia farms to their current level's full harvest uses.
+- Mycelia/Potato/Carrot Farm harvest counters persist in camp save state during an active run, but game-over run resets should restock saved farms to their current level's full harvest uses.
+- Research Table uses its saved plot counter as blueprint points. Normal blueprints deposit for 1 point, rare blueprints deposit for 2, normal blueprint fabrication costs `5/3/3` points by level, and level 3 unlocks rare blueprint fabrication at double cost.
+- Alchemy Cauldron converts any stored scrap type into any other stored scrap type at `4/3/2:1` by level.
+- Deconstructor destroys the held recipe-backed Halls item and returns stored scrap from direct scrap recipe costs at `30/40/50%` by level, with fractional recovery rolled per scrap type.
+- Halls camp building deconstruction returns the original building blueprint plus one matching blueprint for each completed upgrade that consumed a blueprint; do not refund stored scrap or other upgrade resources.
 - Halls utility `smoke_bomb` clears nearby session monster targets, conceals the user from monster target selection for its duration, emits smoke, applies temporary invisibility, refreshes item use-cooldown metadata on use, and uses a per-player cooldown instead of being consumed on right-click.
 - Halls utility `warding_totem` gives nearby alive participants Resistance II for 10 seconds and uses a per-player cooldown instead of being consumed on right-click.
 - Halls utility `mending_salve` heals `4` health on right-click and uses a per-player cooldown instead of being consumed.
+- Halls utilities `lodestone` and `handheld_scanner` are data-driven catalog items using durability/cooldown stats; Lodestone renders a temporary elevator particle trail, and Handheld Scanner reports live monster/debug state, nearby research crate/distillery presence, death fog remaining, and unbroken breakables.
 - Placeholder Halls scrap items are split into single-item drops and use max stack size `1` so they do not stack in player inventories.
 - Elevator scrap deposit consumes only the currently selected hotbar stack, not every scrap item in the player hotbar/offhand.
 - Halls room mask files use `O` for open interior and `X` for internal blocked cells only; do not define outer walls, lights, or prop locations in those room files.
@@ -1397,36 +1435,47 @@ SQLite tables:
 - If every participant in a session disconnects, the session is stopped after `sessions.disconnect-grace-seconds`.
 - Current Halls implementation is still early; full dungeon generation, real floor progression, polished elevator transitions, full item definitions, full camp building behavior, persistent floor sculk patches, polished trap visuals/config, and polished monster AI/combat are pending.
 - Exploration doorway selection must reject side offsets where the room mask has `X` at the edge or first inward cell.
-- Howling Corridors room resources are seeded from all bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`.
-- Frozen Halls and Deep Crypt room resources are also seeded from their bundled `exploration_*.txt` templates listed in `HallsOfCarnageManager`; use `/hoc reset confirm` to copy newly bundled resource files into an existing server data folder.
+- All bundled files under `hallsOfCarnage/` are discovered recursively from the plugin JAR (or exploded development resources) and copied into `HallsOfCarnage/` when missing. Existing server files are never overwritten at startup; adding bundled content requires no Java file-list update.
+- Resource copying excludes the editor-tool filenames `level-maker.jar`, `run.bat`, and `run.vbs` at any nesting depth. Keep server saves and lobby config outside resettable game-content folders; `/hoc reset confirm` deliberately replaces game resources but preserves saved runs and lobby config.
+- Resource reset retains an explicit game-folder deletion boundary rather than deleting every server directory. Bundled resources are read and their paths validated before reset deletes existing content; adding a new disposable top-level content family requires updating that boundary, not a per-file list.
 - Exploration floors have first-pass session-owned trap generation/runtime for holes, bridged holes, model-display bear traps, model-display proximity mines, swinging blades, wall spikes, Frozen Halls falling ice, Deep Crypt poison darts, and Factory steam vents.
 - Trap placement uses the generated walkable mask and BFS reachability before accepting an unbridged pit; pits that would disconnect traversal receive a spruce bridge.
+- Trap-generation optimization must preserve floor and room-entrance connectivity checks. Keep fixed-radius spacing lookups bounded and cache immutable geometry only within the generation job; do not reuse mutable traversal state across sessions or replace the configured floor mask with a different connectivity policy.
 - Halls trap animation/cooldown logic must use `HallsSessionTrapRuntime`'s session-local scheduler tick, not world time, because the Halls dimension may have frozen or nonstandard time progression.
 - Halls traps should damage session monsters as well as players when monsters enter their contact, radius, or lane checks, but only while a participant is within 20 blocks of the trap effect/contact area.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth. Bear traps and proximity mines render through item-display models instead of placed physical floor blocks.
+- Bunker trap kinds include `army_coffin` and `homing_mine`; Library trap kinds include `enchanted_book`.
 - Trap files may define `blacklisted-level-types`; blacklisted level type ids are rejected even when `level-types` is empty. Bundled bear traps and proximity mines are blacklisted from `sewer`.
 - Sewer trap kinds currently include `bubbles`, `geyser`, and `pufferfish`. Bubbles and geysers render squished magma/soul-sand display fixtures at the bottom of two-block-deep puddles without replacing the water blocks; bubbles damage contact, geysers use cooldown bursts, splash/cloud/bubble particles, and large knockback without damage, and pufferfish spawns a killable pufferfish trap entity.
-- Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults. Ravagers are intentionally weaker than vanilla for Halls; bundled health is `10` and runtime attack damage is clamped to `4`. Drowned and 10-HP guardians are bundled for Sewer pools.
-- Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `scale`, optional `movement-speed-multiplier`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
+- Halls boss archetypes currently define `id`, `name`, optional `ai`, `health`, `multiplayer-hp-boost`, `direct-hit-invulnerability-millis`, display material/model/parts, optional `display.hitbox.width` / `height` / `y-offset`, optional display animations, optional animation `apply-base-yaw`, optional animation keyframe sounds (`sound`/`volume`/`pitch` or `sounds` entries), `drops.random-scrap`, and boss-specific sections such as `overdrive` and `archaic-guard`. Boss runtime is session-owned through `HallsSessionBossRuntime`, not normal monster AI. Ranged Halls projectiles are checked during flight against the active boss hitbox because Bukkit does not reliably report projectile hits on boss `Interaction` entities. Overdrive Spawner minions shield the boss while alive; below half health, spawn waves use the full configured minion cap and start their doubled cooldown only after the full wave is cleared. Archaic Guard uses missile, shockwave, radial-wall, spawn, reposition, circle-dash, and boss-placed trap attacks, enrages at its configured phase threshold, spawns unshielded adds, and drops player-targeting poison/wither clouds through the shared Halls poison-cloud helper. Its shockwave and radial-wall reach can be tuned with `archaic-guard.shockwave.max-radius` / `reach` and `archaic-guard.walls.max-radius` / `reach`. Its trap attack reads `archaic-guard.trap.normal` before enrage and `archaic-guard.trap.enraged` after enrage, and places traps through the normal session trap runtime. Boss post-attack cooldowns scale by floor difficulty; the reference table is `Extra Resources/halls_of_carnage/difficulty.md`.
+- Halls poison clouds use `HallsPoisonClouds`; Poison Bomb targets session monsters, while Dammed Librarian and Archaic Guard clouds target alive participants.
+- Halls monster archetypes are loaded from `plugins/OmGames/HallsOfCarnage/monsters/` and seeded from bundled defaults. Parched must resolve to the actual `PARCHED` entity type, not a Husk fallback. Ravagers are intentionally weaker than vanilla for Halls; bundled health is `10` and bundled `attack-damage` is `2.0`. Drowned and 10-HP guardians are bundled for Sewer pools.
+- Monster files define `id`, `name`, `entity-type`, `health`, optional `baby`, optional `slime-size`, optional `scale`, optional `movement-speed-multiplier`, optional `attack-damage`, optional `equipment.main-hand`, and optional `equipment.armor.<helmet|chestplate|leggings|boots>`.
+- Monster files may define `death-children.<monster-id>: <count>` to spawn configured child monsters at the same position when the parent dies; Brooding Mother and the Splinter family use this for splitting.
+- Special Halls monster death/attack behavior currently includes data-driven monster splitting, Dammed Librarian poison clouds on attack/death, and Rotting Soldier delayed non-block-breaking explosion.
 - Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
 - Modifier files define `modifiers.<id>.type`, `display-name`, `icon`, `weight`, and `effects`.
-- Shared modifiers live in `modifiers/shared.yml`; level-specific modifier files such as `frozen_halls.yml` and `deep_crypt.yml` are restricted to that level type by filename.
+- Modifier files are organized under `modifiers/<scenario_id>/`. Files directly inside a scenario folder are scoped to that scenario; `shared.yml` applies across level types, while other filenames restrict modifiers to the matching level type. Dammed Corridors' folder omits Death Fog.
+- Modifier effects include `enemy-health-multiplier`; duplicate modifiers stack multiplicatively.
+- Each scenario owns its modifier pool in `modifiers/<scenario_id>/`. Within that folder, `shared.yml` applies across level types and other filenames restrict modifiers to the matching level type.
 - Exploration floors roll three modifiers. Each slot has `max(0, min(100, 50 - difficulty))%` chance to roll from the good pool; otherwise it rolls from the bad pool.
 - Duplicate modifiers are allowed and their effects stack or multiply.
 - Modifier reveal pacing is intentionally slow enough for players to read each selected modifier during elevator descent.
 - Implemented modifier effects include coin/enemy/trap/loot/sculk multipliers, special enemy pool inclusion, extra rooms, longer corridors, death fog, trap-kind boosts, and Compass.
 - Death Fog warns at 3 minutes, 1 minute, and 30 seconds before the wither timer begins.
-- Compass once grants an elevator compass, twice adds exact elevator block distance to the HUD, and three times emits an elevator trail every 5 seconds. Elevator compasses are removed from player inventories and the elevator transfer chest before each descent chooses the next floor's modifiers.
+- Compass modifier now grants a rendered floor map instead of an elevator compass. One stack shows the generated floor and participants; two or more stacks also render session monsters. The elevator itself is handled by the vanilla locator bar waypoint.
+- `halls-of-carnage.yml -> elevator.locator-icon-item-model` stores the intended resource-pack item-model id for the elevator locator icon placeholder; current runtime keeps the waypoint marker name/range and persists the configured id as plugin metadata until a public API exists for changing the vanilla locator icon.
 - Session monster spawning clears native/random equipment first, then applies only gear explicitly defined in the monster resource file. Session monsters that fall into generated holes are killed.
 - Session monsters are persistent, have far-away removal disabled, and should prioritize alive participants over ghost players as targets.
 - Session monsters normally acquire targets only at close range; breakable destruction and elevator scrap deposits alert nearby spawned monsters at long range. Smoke Bomb concealment clears and suppresses targeting for its duration, and Creative/Spectator participants are ignored by monster target selection.
-- Exploration monster spawning has no finite total spawn budget. It fills to a live cap, extends that cap periodically based on floor difficulty, reduces the cap by one when an alive participant kills a session monster, and adds one cap slot for each session slime created by slime splitting. Direct spawn attempts stay on a fixed 5-second interval. After 3 minutes on a floor, the cap-extension cooldown tightens by 1% of its base length per successful spawn until it reaches the 5-second minimum; after 15 minutes, the level type's full special monster pool may spawn.
-- Each extra participant after the first adds 33% to the exploration monster live cap and cap-extension speed before modifier multipliers apply.
+- Exploration monster spawning has no finite total spawn budget. It fills to a live cap, extends that cap periodically based on floor difficulty, reduces the cap by one when an alive participant kills a session monster, and adds one cap slot for each session slime created by slime splitting. Direct spawn attempts stay on a fixed 5-second interval. Less/more-enemy modifier effects change the cap-extension interval, not the initial live cap. After 3 minutes on a floor, the cap-extension cooldown tightens by 1% of its base length per successful spawn until it reaches the 5-second minimum; after 15 minutes, the level type's full special monster pool may spawn.
+- Easy difficulty uses a 3.0 shame multiplier, 0.85 floor difficulty multiplier, half sculk gain, half initial enemy live cap, 1.5x direct spawn interval, 1.5x cap-extension interval, and 0.75x coin quota before floor modifiers.
+- Each extra participant after the first adds 33% to the exploration monster live cap and cap-extension speed before modifier cap-extension multipliers apply.
 - Level type `monsters.common` and `monsters.special` are parsed into runtime pools; exploration floors spawn a first-pass session-local monster flood from the active level type.
 - Breaking Halls props and depositing elevator scrap alert nearby spawned monsters toward the nearest participant.
 - Exploration monsters avoid first-person-visible spawn cells, drop no loot/XP, and increase their live spawn cap by 5% for every minute spent on the floor.
-- When the alive participant with the highest sculk pressure is at least 65%, each monster spawn has `min(sculk - 55, 35) / 10%` chance to spawn a warden instead.
+- When the alive participant with the highest sculk pressure is at least `100%`, each monster spawn has a flat `20%` chance to spawn a warden instead.
 - Exploration floor scenario field `traps` means the number of rooms that should receive traps, not the raw trap count.
 - Exploration floor scenario field `traps-per-room.min` / `traps-per-room.max` controls how many normal traps Java attempts inside each trapped room.
 - Hole/pit generation is controlled separately by scenario floor field `holes`.

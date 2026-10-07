@@ -1,0 +1,19 @@
+id: explodificator
+name: "Explodificator"
+category: weapon
+rarity: rare
+material: NETHERITE_AXE
+max-stack-size: 1
+lore:
+  - "A recoil-heavy maul that launches anything near the impact."
+stats:
+  melee-damage: 7
+  attack-speed: 0.8
+  aoe-damage: 2
+  aoe-radius: 2.5
+  pushback-strength: 1.15
+  durability: 65
+recipe:
+  iron_scrap: 16
+  redstone_scrap: 10
+  diamond_scrap: 3

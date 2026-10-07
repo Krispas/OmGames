@@ -1,0 +1,9 @@
+id: research_table_blueprint
+name: "Blueprint: Research Table"
+category: blueprint
+rarity: normal
+material: PAPER
+max-stack-size: 1
+lore:
+  - "Building size: Medium"
+  - "Distills blueprints into points and fabricates chosen blueprints."

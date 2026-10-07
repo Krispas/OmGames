@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.nio.file.Path;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -19,17 +20,30 @@ public final class HallsModifierTypeLoader {
         if (folder == null || !folder.exists()) {
             return Map.copyOf(modifiers);
         }
-        File[] files = folder.listFiles((dir, name) -> name.endsWith(".yml") || name.endsWith(".yaml") || name.endsWith(".txt"));
-        if (files == null) {
-            return Map.copyOf(modifiers);
-        }
-        for (File file : java.util.Arrays.stream(files).sorted(Comparator.comparing(File::getName)).toList()) {
-            loadFile(plugin, file, modifiers);
+        try (var paths = java.nio.file.Files.walk(folder.toPath())) {
+            for (Path path : paths.filter(java.nio.file.Files::isRegularFile)
+                    .filter(HallsModifierTypeLoader::isModifierFile)
+                    .sorted(Comparator.comparing(Path::toString)).toList()) {
+                Path relative = folder.toPath().relativize(path);
+                if (relative.getNameCount() != 2) {
+                    plugin.getLogger().warning("Skipping Halls modifier outside a scenario folder: " + path.getFileName());
+                    continue;
+                }
+                loadFile(plugin, path.toFile(), relative.getName(0).toString(), modifiers);
+            }
+        } catch (java.io.IOException ex) {
+            plugin.getLogger().warning("Failed to list Halls modifiers in " + folder + ": " + ex.getMessage());
         }
         return Map.copyOf(modifiers);
     }
 
-    private static void loadFile(JavaPlugin plugin, File file, Map<String, HallsModifierType> modifiers) {
+    private static boolean isModifierFile(Path path) {
+        String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".yml") || name.endsWith(".yaml") || name.endsWith(".txt");
+    }
+
+    private static void loadFile(JavaPlugin plugin, File file, String scenarioId,
+                                 Map<String, HallsModifierType> modifiers) {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
         ConfigurationSection root = config.getConfigurationSection("modifiers");
         if (root == null) {
@@ -42,6 +56,9 @@ public final class HallsModifierTypeLoader {
                 continue;
             }
             String id = normalizeId(key);
+            if (id.equals("more_sculk")) {
+                continue;
+            }
             HallsModifierType.Kind kind = modifierKind(row.getString("type", "bad"));
             Map<String, Object> effects = new LinkedHashMap<>();
             ConfigurationSection effectsSection = row.getConfigurationSection("effects");
@@ -50,6 +67,7 @@ public final class HallsModifierTypeLoader {
                     effects.put(normalizeId(effectKey), effectsSection.get(effectKey));
                 }
             }
+            effects.put("scenario", normalizeId(scenarioId));
             if (!levelType.equals("shared")) {
                 effects.put("level_type", levelType);
             }
@@ -57,7 +75,7 @@ public final class HallsModifierTypeLoader {
                 plugin.getLogger().warning("Skipping invalid Halls modifier in " + file.getName() + ".");
                 continue;
             }
-            modifiers.put(id, new HallsModifierType(
+            modifiers.put(normalizeId(scenarioId) + "/" + id, new HallsModifierType(
                     id,
                     row.getString("display-name", id),
                     row.getString("icon", "?"),

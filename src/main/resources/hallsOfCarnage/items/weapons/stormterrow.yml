@@ -1,0 +1,18 @@
+id: stormterrow
+name: "Stormterrow"
+category: weapon
+rarity: rare
+material: CROSSBOW
+max-stack-size: 1
+lore:
+  - "A charged crossbow that erupts on impact."
+stats:
+  ranged: 1
+  ranged-damage: 6
+  aoe-damage: 3
+  aoe-radius: 2.75
+  durability: 95
+recipe:
+  wood_scrap: 10
+  iron_scrap: 8
+  redstone_scrap: 8

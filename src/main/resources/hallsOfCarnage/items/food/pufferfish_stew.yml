@@ -1,0 +1,16 @@
+id: pufferfish_stew
+name: "Pufferfish Stew"
+category: food
+rarity: normal
+material: SUSPICIOUS_STEW
+max-stack-size: 1
+lore:
+  - "Camp cooking takes the sting out."
+stats:
+  heal: 6
+  resistance-seconds: 12
+  resistance-amplifier: 1
+recipe:
+  raw_pufferfish: 1
+  cooked_mycelia: 1
+  wood_scrap: 2

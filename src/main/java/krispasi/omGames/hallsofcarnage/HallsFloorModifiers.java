@@ -39,6 +39,10 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
         return multipliedEffect("enemy_spawn_multiplier", 1.0);
     }
 
+    public double enemyHealthMultiplier() {
+        return multipliedEffect("enemy_health_multiplier", 1.0);
+    }
+
     public double trapMultiplier() {
         return multipliedEffect("trap_multiplier", 1.0) * Math.pow(1.33, trapBoostKinds().size());
     }
@@ -48,7 +52,7 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
     }
 
     public double sculkMultiplier() {
-        return multipliedEffect("sculk_multiplier", 1.0);
+        return 1.0;
     }
 
     public double coinMultiplier() {
@@ -167,7 +171,9 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
                 holes,
                 sculkPatches,
                 coinQuota,
-                floor.layout()
+                floor.blueprintDistilleries(),
+                floor.layout(),
+                floor.boss()
         );
     }
 
@@ -194,6 +200,16 @@ public record HallsFloorModifiers(List<HallsModifierType> selected) {
                 .map(modifier -> modifier.icon() + " " + modifier.displayName())
                 .reduce((first, second) -> first + " | " + second)
                 .orElse("None");
+    }
+
+    public String iconSummary() {
+        if (selected.isEmpty()) {
+            return "";
+        }
+        return selected.stream()
+                .map(HallsModifierType::icon)
+                .reduce((first, second) -> first + " | " + second)
+                .orElse("");
     }
 
     private int countEffect(String key) {

@@ -1,0 +1,52 @@
+id: endless_mixed
+name: "Endless (Mixed)"
+ordering: 100
+type: endless
+difficulty: "Endless"
+description:
+  - "An unending descent through three randomly themed floors and a camp."
+  - "A boss module follows the configured number of exploration modules."
+players:
+  min: 1
+  max: 6
+content-source: UntoldDepths
+camp:
+  layout: camps/camp_untold_depths.txt
+  team-lives: 3
+  key-costs: [20, 24, 28, 32, 36, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 55, 60, 65, 70]
+endless:
+  level-types:
+    - howling_corridors
+    - frozen_halls
+    - deep_crypt
+    - infernal_chambers
+    - factory
+    - backrooms
+    - sewer
+    - library
+    - bunker
+  boss-seed: 4892371
+  boss-layout: special/untold_depths_overdrive_spawner.txt
+  boss-pool:
+    - level-type: howling_corridors
+      boss: overdrive_spawner
+    - level-type: factory
+      boss: archaic_guard
+  progression:
+    starting-difficulty: 10.0
+    difficulty-per-module: 2.0
+    starting-rooms: 6.0
+    rooms-per-exploration: 0.62
+    max-rooms: 50
+    starting-breakables: 24.0
+    breakables-per-exploration: 2.0
+    starting-traps: 7.0
+    traps-per-exploration: 0.40
+    starting-holes: 5.0
+    holes-per-exploration: 0.62
+    starting-sculk-patches: 1.0
+    sculk-patches-per-exploration: 0.38
+    starting-coin-quota: 16.0
+    quota-per-exploration: 1.23
+    blueprint-distilleries-on-final-exploration: 5
+    boss-every-modules: 4

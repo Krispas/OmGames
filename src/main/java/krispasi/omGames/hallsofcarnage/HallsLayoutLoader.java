@@ -2,7 +2,11 @@ package krispasi.omGames.hallsofcarnage;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class HallsLayoutLoader {
@@ -10,7 +14,32 @@ public final class HallsLayoutLoader {
     }
 
     public static HallsLayout load(File file) throws IOException {
-        List<String> rows = Files.readAllLines(file.toPath()).stream()
+        return loadRows(Files.readAllLines(file.toPath()));
+    }
+
+    public static HallsLayout load(InputStream inputStream) throws IOException {
+        try (InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
+            List<String> rows = new ArrayList<>();
+            StringBuilder current = new StringBuilder();
+            int value;
+            while ((value = reader.read()) != -1) {
+                char character = (char) value;
+                if (character == '\n') {
+                    rows.add(current.toString());
+                    current.setLength(0);
+                } else if (character != '\r') {
+                    current.append(character);
+                }
+            }
+            if (!current.isEmpty()) {
+                rows.add(current.toString());
+            }
+            return loadRows(rows);
+        }
+    }
+
+    private static HallsLayout loadRows(List<String> inputRows) {
+        List<String> rows = inputRows.stream()
                 .map(String::stripTrailing)
                 .filter(line -> !line.isBlank())
                 .toList();

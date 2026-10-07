@@ -118,6 +118,7 @@ public record HallsCampCheckpoint(int floor,
             HallsSaveData.PlayerState state = entry.getValue();
             yaml.set(path + ".name", state.name());
             yaml.set(path + ".ghost", state.ghost());
+            yaml.set(path + ".health", state.health());
             yaml.set(path + ".sculk", state.sculk());
             yaml.set(path + ".health-totem-level", state.healthTotemLevel());
             yaml.set(path + ".speed-totem-level", state.speedTotemLevel());

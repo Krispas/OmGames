@@ -1,0 +1,32 @@
+id: deconstructor
+name: "Deconstructor"
+size: medium
+blueprint: deconstructor_blueprint
+implemented: true
+levels:
+  1:
+    parts:
+      - material: GRINDSTONE
+        offset: [0, 0, 0]
+        scale: [1, 1, 1]
+      - material: CUT_COPPER
+        offset: [0.9, 0, 0]
+        scale: [0.8, 0.8, 0.8]
+  2:
+    upgrade-cost: {diamond: 4}
+    parts:
+      - material: GRINDSTONE
+        offset: [0, 0, 0]
+        scale: [1.05, 1.05, 1.05]
+      - material: CUT_COPPER
+        offset: [0.9, 0, 0]
+        scale: [0.9, 0.9, 0.9]
+  3:
+    upgrade-cost: {diamond: 8}
+    parts:
+      - material: GRINDSTONE
+        offset: [0, 0, 0]
+        scale: [1.1, 1.1, 1.1]
+      - material: LIGHTNING_ROD
+        offset: [0.9, 0.2, 0]
+        scale: [0.9, 0.9, 0.9]

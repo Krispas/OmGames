@@ -27,8 +27,18 @@ public final class HallsShameService {
               scenario_id TEXT NOT NULL,
               player_uuid TEXT NOT NULL,
               completed_at INTEGER NOT NULL,
+              difficulty_id TEXT NOT NULL DEFAULT 'normal',
               final_shame INTEGER NOT NULL,
               PRIMARY KEY (scenario_id, player_uuid, completed_at)
+            )
+            """;
+    private static final String ENDLESS_TABLE_SQL = """
+            CREATE TABLE IF NOT EXISTS hoc_endless_records (
+              scenario_id TEXT NOT NULL,
+              player_uuid TEXT NOT NULL,
+              highest_floor INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL,
+              PRIMARY KEY (scenario_id, player_uuid)
             )
             """;
 
@@ -47,6 +57,8 @@ public final class HallsShameService {
             try (Statement statement = connection.createStatement()) {
                 statement.execute(SHAME_TABLE_SQL);
                 statement.execute(HISTORY_TABLE_SQL);
+                statement.execute(ENDLESS_TABLE_SQL);
+                ensureCompletionDifficultyColumn(statement);
             }
         } catch (SQLException ex) {
             logger.log(Level.SEVERE, "Failed to load Halls of Carnage shame database.", ex);
@@ -126,6 +138,134 @@ public final class HallsShameService {
         return entries;
     }
 
+    public List<ShameEntry> getScenarioLeaderboard(String scenarioId, int limit) {
+        if (connection == null || scenarioId == null || scenarioId.isBlank() || limit <= 0) return List.of();
+        List<ShameEntry> entries = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT player_uuid, MIN(final_shame) AS shame
+                FROM hoc_completed_scenarios
+                WHERE scenario_id = ?
+                GROUP BY player_uuid
+                ORDER BY shame ASC, player_uuid ASC
+                LIMIT ?
+                """)) {
+            statement.setString(1, scenarioId);
+            statement.setInt(2, limit);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) entries.add(new ShameEntry(UUID.fromString(rs.getString("player_uuid")),
+                        Math.max(0, rs.getInt("shame"))));
+            }
+        } catch (IllegalArgumentException | SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load Halls scenario shame leaderboard for " + scenarioId + ".", ex);
+        }
+        return List.copyOf(entries);
+    }
+
+    public void recordEndlessFloor(String scenarioId, UUID playerId, int floor, long updatedAt) {
+        if (connection == null || scenarioId == null || scenarioId.isBlank() || playerId == null) return;
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO hoc_endless_records (scenario_id, player_uuid, highest_floor, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(scenario_id, player_uuid) DO UPDATE SET
+                  highest_floor = MAX(highest_floor, excluded.highest_floor),
+                  updated_at = CASE WHEN excluded.highest_floor > highest_floor THEN excluded.updated_at ELSE updated_at END
+                """)) {
+            statement.setString(1, scenarioId);
+            statement.setString(2, playerId.toString());
+            statement.setInt(3, Math.max(1, floor));
+            statement.setLong(4, updatedAt);
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to save Halls endless record for " + playerId + ".", ex);
+        }
+    }
+
+    public List<EndlessEntry> getEndlessLeaderboard(int limit) {
+        if (connection == null || limit <= 0) return List.of();
+        List<EndlessEntry> entries = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT scenario_id, player_uuid, highest_floor
+                FROM hoc_endless_records
+                ORDER BY highest_floor DESC, updated_at ASC, player_uuid ASC
+                LIMIT ?
+                """)) {
+            statement.setInt(1, limit);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) entries.add(new EndlessEntry(rs.getString("scenario_id"),
+                        UUID.fromString(rs.getString("player_uuid")), rs.getInt("highest_floor")));
+            }
+        } catch (IllegalArgumentException | SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load Halls endless leaderboard.", ex);
+        }
+        return List.copyOf(entries);
+    }
+
+    public void recordCompletion(String scenarioId, String difficultyId, UUID playerId, int finalShame, long completedAt) {
+        if (connection == null || scenarioId == null || scenarioId.isBlank() || playerId == null) {
+            return;
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO hoc_completed_scenarios (scenario_id, player_uuid, completed_at, difficulty_id, final_shame)
+                VALUES (?, ?, ?, ?, ?)
+                """)) {
+            statement.setString(1, scenarioId);
+            statement.setString(2, playerId.toString());
+            statement.setLong(3, completedAt);
+            statement.setString(4, difficultyId == null || difficultyId.isBlank() ? "normal" : difficultyId);
+            statement.setInt(5, Math.max(0, finalShame));
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to record Halls completion for " + playerId + ".", ex);
+        }
+    }
+
+    public String bestCompletedDifficulty(UUID playerId, String scenarioId) {
+        if (connection == null || playerId == null || scenarioId == null || scenarioId.isBlank()) {
+            return "";
+        }
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT difficulty_id
+                FROM hoc_completed_scenarios
+                WHERE player_uuid = ? AND scenario_id = ?
+                """)) {
+            statement.setString(1, playerId.toString());
+            statement.setString(2, scenarioId);
+            String best = "";
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    String difficulty = rs.getString("difficulty_id");
+                    if (difficultyRank(difficulty) > difficultyRank(best)) {
+                        best = difficulty;
+                    }
+                }
+            }
+            return best == null ? "" : best;
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load Halls completion state for " + playerId + ".", ex);
+            return "";
+        }
+    }
+
+    private void ensureCompletionDifficultyColumn(Statement statement) throws SQLException {
+        try (ResultSet rs = statement.executeQuery("PRAGMA table_info(hoc_completed_scenarios)")) {
+            while (rs.next()) {
+                if ("difficulty_id".equalsIgnoreCase(rs.getString("name"))) {
+                    return;
+                }
+            }
+        }
+        statement.execute("ALTER TABLE hoc_completed_scenarios ADD COLUMN difficulty_id TEXT NOT NULL DEFAULT 'normal'");
+    }
+
+    private int difficultyRank(String difficultyId) {
+        return switch (difficultyId == null ? "" : difficultyId.toLowerCase(java.util.Locale.ROOT)) {
+            case "extreme" -> 3;
+            case "hard" -> 2;
+            case "normal" -> 1;
+            default -> 0;
+        };
+    }
+
     private void openConnection() throws SQLException {
         if (connection != null) {
             return;
@@ -142,4 +282,6 @@ public final class HallsShameService {
 
     public record ShameEntry(UUID playerId, int shame) {
     }
+
+    public record EndlessEntry(String scenarioId, UUID playerId, int highestFloor) { }
 }

@@ -1,0 +1,8 @@
+modifiers:
+  falling_ice:
+    type: bad
+    display-name: "Falling Ice"
+    icon: "✦"
+    weight: 7
+    effects:
+      trap: falling_ice

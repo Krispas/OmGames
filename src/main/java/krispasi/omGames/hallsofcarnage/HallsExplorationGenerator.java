@@ -34,6 +34,8 @@ final class HallsExplorationGenerator {
     private final List<Room> rooms = new ArrayList<>();
     private final Set<Cell> corridorCells = new HashSet<>();
     private final Set<Cell> corridorShellCells = new HashSet<>();
+    private final Set<Cell> lowCeilingCorridorCells = new HashSet<>();
+    private final Set<Cell> ventGateCells = new HashSet<>();
     private final Set<Cell> liquidCells = new HashSet<>();
     private final Set<Cell> roomShellCells = new HashSet<>();
     private final Set<Cell> roomInteriorCells = new HashSet<>();
@@ -94,6 +96,14 @@ final class HallsExplorationGenerator {
         }
         int targetRooms = Math.max(1, floorDefinition.rooms());
         seedElevatorNetwork();
+        if (corridorMode == CorridorMode.BUNKER) {
+            generateBunkerLayout(layouts, targetRooms);
+            return;
+        }
+        if (corridorMode == CorridorMode.LIBRARY) {
+            generateLibraryLayout(layouts, targetRooms);
+            return;
+        }
         if (!addFirstRoom(layouts)) {
             return;
         }
@@ -115,7 +125,7 @@ final class HallsExplorationGenerator {
             candidate.room().openings().put(candidate.roomFace(), candidate.roomOffset());
             networkCells.add(anchorDoor);
             addRoom(candidate.room());
-            rememberCorridor(path);
+            rememberCorridor(path, shouldUseLibraryVentConnector(path));
         }
         addFirstRoomOnwardRoutes();
         addRoomToRoomLoops();
@@ -130,6 +140,116 @@ final class HallsExplorationGenerator {
         }
     }
 
+    private void generateLibraryLayout(List<HallsLayout> layouts, int targetRooms) {
+        if (!addFirstRoom(layouts)) {
+            return;
+        }
+        int disconnectedTarget = Math.max(1, (int) Math.round(targetRooms / 3.0));
+        if (targetRooms <= 2) {
+            disconnectedTarget = 0;
+        }
+        int connectedTarget = Math.max(1, targetRooms - disconnectedTarget);
+        int attempts = 0;
+        while (rooms.size() < connectedTarget && attempts++ < roomPlacementAttemptLimit(targetRooms)) {
+            HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
+            RoomConnection candidate = randomRoomConnection(layout);
+            if (candidate == null || !canPlaceRoom(candidate.room())) {
+                continue;
+            }
+            Cell candidateDoor = doorCell(candidate.room(), candidate.roomFace(), candidate.roomOffset());
+            Cell anchorDoor = doorCell(candidate.anchor(), candidate.anchorFace(), candidate.anchorOffset());
+            List<Cell> path = findConnectorPath(candidateDoor, Set.of(anchorDoor),
+                    List.of(Bounds.of(candidate.room()), Bounds.of(candidate.anchor())));
+            if (path.isEmpty()) {
+                continue;
+            }
+            candidate.anchor().openings().put(candidate.anchorFace(), candidate.anchorOffset());
+            candidate.room().openings().put(candidate.roomFace(), candidate.roomOffset());
+            networkCells.add(anchorDoor);
+            addRoom(candidate.room());
+            rememberCorridor(path);
+        }
+        addFirstRoomOnwardRoutes();
+        addRoomToRoomLoops();
+        disconnectedTarget = Math.max(disconnectedTarget, targetRooms - rooms.size());
+        attempts = 0;
+        while (disconnectedTarget > 0 && attempts++ < targetRooms * 160) {
+            HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
+            Room room = randomLibraryDisconnectedRoom(layout);
+            if (!canPlaceRoom(room)) {
+                continue;
+            }
+            if (addLibraryVentOnlyRoom(room)) {
+                disconnectedTarget--;
+            }
+        }
+    }
+
+    private boolean addLibraryVentOnlyRoom(Room room) {
+        if (rooms.stream().noneMatch(anchor -> !anchor.ventOnly())) {
+            return false;
+        }
+        if (!layoutHasLibraryVentCell(room.layout())) {
+            return false;
+        }
+        room.setVentOnly(true);
+        addRoom(room);
+        return true;
+    }
+
+    private boolean layoutHasLibraryVentCell(HallsLayout layout) {
+        for (int z = 0; z < layout.depth(); z++) {
+            for (int x = 0; x < layout.width(); x++) {
+                if (layout.at(x, z) != 'O') {
+                    continue;
+                }
+                for (BlockFace face : CARDINAL_FACES) {
+                    int neighborX = x + face.getModX();
+                    int neighborZ = z + face.getModZ();
+                    if (neighborX < 0 || neighborZ < 0
+                            || neighborX >= layout.width() || neighborZ >= layout.depth()
+                            || layout.at(neighborX, neighborZ) != 'O') {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private Room randomLibraryDisconnectedRoom(HallsLayout layout) {
+        if (rooms.isEmpty()) {
+            return randomRoomAnywhere(layout);
+        }
+        List<Room> anchors = rooms.stream()
+                .filter(room -> !room.ventOnly())
+                .filter(room -> !availableFaces(room).isEmpty())
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        if (anchors.isEmpty()) {
+            return randomRoomAnywhere(layout);
+        }
+        Room anchor = anchors.get(random.nextInt(anchors.size()));
+        List<BlockFace> faces = availableFaces(anchor);
+        Collections.shuffle(faces, random);
+        BlockFace face = faces.getFirst();
+        int gap = 6 + random.nextInt(13);
+        int lateralRange = 6 + Math.max(anchor.layout().width(), anchor.layout().depth()) / 2
+                + Math.max(layout.width(), layout.depth()) / 2;
+        int lateral = random.nextInt(lateralRange * 2 + 1) - lateralRange;
+        return switch (face) {
+            case NORTH -> new Room(layout, anchor.centerX() + lateral - layout.width() / 2,
+                    anchor.startZ() - gap - layout.depth());
+            case SOUTH -> new Room(layout, anchor.centerX() + lateral - layout.width() / 2,
+                    anchor.startZ() + anchor.layout().depth() + gap);
+            case EAST -> new Room(layout, anchor.startX() + anchor.layout().width() + gap,
+                    anchor.centerZ() + lateral - layout.depth() / 2);
+            case WEST -> new Room(layout, anchor.startX() - gap - layout.width(),
+                    anchor.centerZ() + lateral - layout.depth() / 2);
+            default -> new Room(layout, anchor.centerX() - layout.width() / 2,
+                    anchor.centerZ() - layout.depth() / 2);
+        };
+    }
+
     private void seedElevatorNetwork() {
         for (int step = 1; step <= 4; step++) {
             Cell cell = elevatorFrontCell(step);
@@ -139,7 +259,7 @@ final class HallsExplorationGenerator {
     }
 
     private boolean addFirstRoom(List<HallsLayout> layouts) {
-        if (corridorMode == CorridorMode.SEWER) {
+        if (corridorMode == CorridorMode.SEWER || corridorMode == CorridorMode.BUNKER) {
             return addFirstSewerRoom(layouts);
         }
         BlockFace face = elevatorFrontFace.getOppositeFace();
@@ -165,9 +285,10 @@ final class HallsExplorationGenerator {
                 continue;
             }
             int offset = doorOffset(layout, face);
+            int corridorDistance = corridorMode == CorridorMode.BUNKER ? 14 + random.nextInt(7) : 18 + random.nextInt(9);
             int corridorZ = elevatorFrontFace == BlockFace.NORTH
-                    ? originZ - 18 - random.nextInt(9)
-                    : originZ + 18 + random.nextInt(9);
+                    ? originZ - corridorDistance
+                    : originZ + corridorDistance;
             int sideGap = 8 + random.nextInt(7);
             int startX = face == BlockFace.WEST
                     ? originX + sideGap
@@ -226,6 +347,7 @@ final class HallsExplorationGenerator {
 
     private RoomConnection randomRoomConnection(HallsLayout layout) {
         List<Room> anchors = rooms.stream()
+                .filter(room -> !room.ventOnly())
                 .filter(room -> !availableFaces(room).isEmpty())
                 .toList();
         if (anchors.isEmpty()) {
@@ -242,6 +364,9 @@ final class HallsExplorationGenerator {
         Collections.shuffle(faces, random);
         BlockFace face = faces.getFirst();
         int baseGap = corridorMode == CorridorMode.MAZE ? 2 + random.nextInt(5) : 5 + random.nextInt(14);
+        if (corridorMode == CorridorMode.BUNKER) {
+            baseGap = 8 + random.nextInt(16);
+        }
         int gap = Math.max(1, (int) Math.round(baseGap * corridorDistanceMultiplier));
         int lateralBase = Math.max(2, (int) Math.round((corridorMode == CorridorMode.MAZE ? 3 : 10) * corridorDistanceMultiplier));
         int lateralRange = lateralBase + Math.max(anchor.layout().width(), anchor.layout().depth()) / 2
@@ -343,7 +468,7 @@ final class HallsExplorationGenerator {
     }
 
     private int roomSpacing() {
-        return corridorMode == CorridorMode.MAZE ? 0 : 2;
+        return corridorMode == CorridorMode.MAZE || corridorMode == CorridorMode.BUNKER ? 0 : 2;
     }
 
     private int doorOffset(HallsLayout layout, BlockFace face) {
@@ -393,7 +518,9 @@ final class HallsExplorationGenerator {
     }
 
     private boolean wideRoomOpenings() {
-        return corridorMode == CorridorMode.LARGE_CORRIDORS || corridorMode == CorridorMode.OPEN_HALLS;
+        return corridorMode == CorridorMode.LARGE_CORRIDORS
+                || corridorMode == CorridorMode.OPEN_HALLS
+                || corridorMode == CorridorMode.LIBRARY;
     }
 
     private boolean isSingleDoorOffsetOpen(HallsLayout layout, BlockFace face, int offset) {
@@ -443,7 +570,8 @@ final class HallsExplorationGenerator {
     private int connectorCandidateAttempts() {
         return switch (corridorMode) {
             case CAVE -> 44;
-            case LARGE_CORRIDORS -> 2;
+            case LARGE_CORRIDORS, LIBRARY -> 2;
+            case BUNKER -> 18;
             case MAZE, BACKROOMS -> 18;
             default -> CONNECTOR_CANDIDATE_ATTEMPTS;
         };
@@ -463,13 +591,43 @@ final class HallsExplorationGenerator {
         if (corridorMode == CorridorMode.CAVE) {
             return caveCandidatePath(start, target);
         }
+        if (corridorMode == CorridorMode.BUNKER) {
+            return bunkerCandidatePath(start, target, attempt);
+        }
         return orthogonalCandidatePath(start, target, attempt);
+    }
+
+    private List<Cell> bunkerCandidatePath(Cell start, Cell target, int attempt) {
+        List<Cell> waypoints = new ArrayList<>();
+        boolean horizontalFirst = attempt % 2 == 0;
+        int detour = 4 + random.nextInt(13);
+        if (horizontalFirst) {
+            int x = clamp(random.nextBoolean() ? Math.max(start.x(), target.x()) + detour : Math.min(start.x(), target.x()) - detour,
+                    originX - clearRadius + 2, originX + clearRadius - 2);
+            int zJitter = clamp((start.z() + target.z()) / 2 + random.nextInt(13) - 6,
+                    originZ - clearRadius + 2, originZ + clearRadius - 2);
+            waypoints.add(new Cell(x, start.z()));
+            waypoints.add(new Cell(x, zJitter));
+            waypoints.add(new Cell(target.x(), zJitter));
+        } else {
+            int z = clamp(random.nextBoolean() ? Math.max(start.z(), target.z()) + detour : Math.min(start.z(), target.z()) - detour,
+                    originZ - clearRadius + 2, originZ + clearRadius - 2);
+            int xJitter = clamp((start.x() + target.x()) / 2 + random.nextInt(13) - 6,
+                    originX - clearRadius + 2, originX + clearRadius - 2);
+            waypoints.add(new Cell(start.x(), z));
+            waypoints.add(new Cell(xJitter, z));
+            waypoints.add(new Cell(xJitter, target.z()));
+        }
+        waypoints.add(target);
+        return pathThrough(start, waypoints);
     }
 
     private List<Cell> orthogonalCandidatePath(Cell start, Cell target, int attempt) {
         List<Cell> waypoints = new ArrayList<>();
         boolean horizontalFirst = attempt % 2 == 0;
-        int detour = corridorMode == CorridorMode.LARGE_CORRIDORS || attempt < 4 ? 0 : 2 + random.nextInt(9);
+        int detour = corridorMode == CorridorMode.LARGE_CORRIDORS
+                || (corridorMode == CorridorMode.LIBRARY && attempt < 8)
+                || attempt < 4 ? 0 : 2 + random.nextInt(9);
         if (detour == 0) {
             waypoints.add(horizontalFirst ? new Cell(target.x(), start.z()) : new Cell(start.x(), target.z()));
         } else if (horizontalFirst) {
@@ -676,13 +834,19 @@ final class HallsExplorationGenerator {
     }
 
     private void rememberCorridor(List<Cell> path) {
+        rememberCorridor(path, false);
+    }
+
+    private void rememberCorridor(List<Cell> path, boolean forceLibraryVent) {
         if (path.isEmpty()) {
             return;
         }
         Set<Cell> carved = switch (corridorMode) {
             case CAVE -> naturalCaveCorridorCells(path);
             case LARGE_CORRIDORS -> largeCorridorCells(path);
+            case LIBRARY -> largeCorridorCells(path);
             case SEWER -> sewerCorridorCells(path);
+            case BUNKER -> new HashSet<>(path);
             case MAZE, BACKROOMS, OPEN_HALLS -> openHallConnectorCells(path);
             case NORMAL -> new HashSet<>(path);
         };
@@ -712,6 +876,10 @@ final class HallsExplorationGenerator {
             }
         }
         return cells;
+    }
+
+    private boolean shouldUseLibraryVentConnector(List<Cell> path) {
+        return false;
     }
 
     private Set<Cell> sewerCorridorCells(List<Cell> path) {
@@ -809,6 +977,9 @@ final class HallsExplorationGenerator {
         int attempts = 0;
         while (first.openings().size() < wantedOpenings && attempts++ < rooms.size() * 8) {
             Room target = rooms.get(1 + random.nextInt(rooms.size() - 1));
+            if (target.ventOnly()) {
+                continue;
+            }
             if (connectRooms(first, target, true)) {
                 continue;
             }
@@ -817,13 +988,18 @@ final class HallsExplorationGenerator {
     }
 
     private void addRoomToRoomLoops() {
-        int target = corridorMode == CorridorMode.MAZE ? Math.max(rooms.size() / 4, 3) : Math.max(rooms.size() / 2, 5);
+        int target = switch (corridorMode) {
+            case MAZE -> Math.max(rooms.size() / 4, 3);
+            case LIBRARY -> Math.max(rooms.size() / 3, 3);
+            default -> Math.max(rooms.size() / 2, 5);
+        };
         int added = 0;
         int attempts = 0;
         while (added < target && attempts++ < roomLoopAttemptLimit()) {
             Room from = rooms.get(random.nextInt(rooms.size()));
             Room to = rooms.get(random.nextInt(rooms.size()));
-            if (from == to || manhattanDistance(new Cell(from.centerX(), from.centerZ()), new Cell(to.centerX(), to.centerZ())) < 12) {
+            if (from == to || from.ventOnly() || to.ventOnly()
+                    || manhattanDistance(new Cell(from.centerX(), from.centerZ()), new Cell(to.centerX(), to.centerZ())) < 12) {
                 continue;
             }
             if (connectRooms(from, to, false)) {
@@ -851,7 +1027,7 @@ final class HallsExplorationGenerator {
                 to.openings().put(toFace, toOffset);
                 networkCells.add(fromDoor);
                 networkCells.add(toDoor);
-                rememberCorridor(path);
+                rememberCorridor(path, shouldUseLibraryVentConnector(path));
                 return true;
             }
         }
@@ -900,6 +1076,168 @@ final class HallsExplorationGenerator {
             rememberCorridor(branch);
             starts.addAll(branch);
             added++;
+        }
+    }
+
+    private void generateBunkerLayout(List<HallsLayout> layouts, int targetRooms) {
+        int maximumTrunkRadius = Math.max(32, clearRadius - 10);
+        int trunkRadius = Math.min(maximumTrunkRadius,
+                Math.max(32, 24 + (int) Math.ceil(Math.sqrt(targetRooms) * 5.0)));
+        List<Cell> trunk = bunkerTrunkPath(trunkRadius);
+        rememberBunkerMainCorridor(trunk);
+        int attempts = 0;
+        int failedPlacements = 0;
+        int expansionThreshold = Math.max(8, targetRooms / 2);
+        while (rooms.size() < targetRooms && attempts++ < targetRooms * 120) {
+            HallsLayout layout = layouts.get(random.nextInt(layouts.size()));
+            if (placeBunkerRoom(layout, trunk)) {
+                failedPlacements = 0;
+                continue;
+            }
+            trunk = new ArrayList<>(corridorCells);
+            if (++failedPlacements >= expansionThreshold && trunkRadius < maximumTrunkRadius) {
+                int expandedRadius = Math.min(maximumTrunkRadius, trunkRadius + 18);
+                if (expandBunkerMainCorridor(expandedRadius)) {
+                    trunkRadius = expandedRadius;
+                    trunk = new ArrayList<>(corridorCells);
+                    failedPlacements = 0;
+                }
+            }
+        }
+        addRoomToRoomLoops();
+    }
+
+    private boolean expandBunkerMainCorridor(int radius) {
+        for (int attempt = 0; attempt < 8; attempt++) {
+            List<Cell> candidate = bunkerTrunkPath(radius);
+            Set<Cell> widened = largeCorridorCells(candidate);
+            boolean overlapsRoom = widened.stream().anyMatch(cell ->
+                    (roomShellCells.contains(cell) || roomInteriorCells.contains(cell))
+                            && !corridorCells.contains(cell));
+            if (overlapsRoom) {
+                continue;
+            }
+            long newCells = widened.stream().filter(cell -> !corridorCells.contains(cell)).count();
+            if (newCells < 32) {
+                continue;
+            }
+            rememberBunkerMainCorridor(candidate);
+            return true;
+        }
+        return false;
+    }
+
+    private List<Cell> bunkerTrunkPath(int radius) {
+        radius = Math.min(radius, clearRadius - 10);
+        int frontZ = elevatorFrontCell(4).z();
+        int min = originX - clearRadius + 4;
+        int max = originX + clearRadius - 4;
+        int minZ = originZ - clearRadius + 4;
+        int maxZ = originZ + clearRadius - 4;
+        int x1 = randomBunkerCoordinate(originX, radius, min, max);
+        int x2 = randomBunkerCoordinate(originX, radius, min, max);
+        int z1 = randomBunkerCoordinate(originZ, radius, minZ, maxZ);
+        int z2 = randomBunkerCoordinate(originZ, radius, minZ, maxZ);
+        // Keep opposite trunk legs far enough apart to create usable room frontage.
+        while (Math.abs(x1 - x2) < 16) {
+            x2 = randomBunkerCoordinate(originX, radius, min, max);
+        }
+        while (Math.abs(z1 - z2) < 16) {
+            z2 = randomBunkerCoordinate(originZ, radius, minZ, maxZ);
+        }
+        List<Cell> waypoints = new ArrayList<>();
+        waypoints.add(new Cell(originX, clamp(frontZ + (frontZ < originZ ? -3 : 3), minZ, maxZ)));
+        // Vary both the trunk's footprint and its turns; avoid the old fixed mirrored-L loop.
+        int turns = 4 + random.nextInt(4);
+        boolean horizontal = random.nextBoolean();
+        int horizontalLeg = 0;
+        int verticalLeg = 0;
+        for (int turn = 0; turn < turns; turn++) {
+            if (horizontal) {
+                waypoints.add(new Cell((horizontalLeg++ % 2 == 0) ? x1 : x2, waypoints.getLast().z()));
+            } else {
+                waypoints.add(new Cell(waypoints.getLast().x(), (verticalLeg++ % 2 == 0) ? z1 : z2));
+            }
+            horizontal = !horizontal;
+        }
+        waypoints.add(new Cell(originX + random.nextInt(17) - 8, frontZ));
+        return pathThrough(elevatorFrontCell(1), waypoints);
+    }
+
+    private int randomBunkerCoordinate(int center, int radius, int min, int max) {
+        return clamp(center + random.nextInt(radius * 2 + 1) - radius, min, max);
+    }
+
+    private boolean placeBunkerRoom(HallsLayout layout, List<Cell> trunk) {
+        List<Cell> anchors = new ArrayList<>(trunk);
+        Collections.shuffle(anchors, random);
+        for (Cell anchor : anchors) {
+            List<BlockFace> faces = new ArrayList<>(List.of(CARDINAL_FACES));
+            Collections.shuffle(faces, random);
+            for (BlockFace attachFace : faces) {
+                BlockFace roomFace = attachFace.getOppositeFace();
+                if (validDoorOffsets(layout, roomFace).isEmpty()) {
+                    continue;
+                }
+                int offset = doorOffset(layout, roomFace);
+                int gap = 3 + random.nextInt(4);
+                Cell door = anchor;
+                for (int i = 0; i < gap; i++) {
+                    door = step(door, attachFace);
+                }
+                Room room = bunkerRoomFromDoor(layout, roomFace, offset, door);
+                if (!canPlaceRoom(room)) {
+                    continue;
+                }
+                List<Cell> path = pathThrough(anchor, List.of(door));
+                if (!isValidConnectorPath(path, anchor, Set.of(door), List.of(Bounds.of(room)))) {
+                    continue;
+                }
+                room.openings().put(roomFace, offset);
+                addRoom(room);
+                rememberCorridor(path);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Room bunkerRoomFromDoor(HallsLayout layout, BlockFace roomFace, int offset, Cell door) {
+        return switch (roomFace) {
+            case NORTH -> new Room(layout, door.x() - offset, door.z() + 1);
+            case SOUTH -> new Room(layout, door.x() - offset, door.z() - layout.depth());
+            case EAST -> new Room(layout, door.x() - layout.width(), door.z() - offset);
+            case WEST -> new Room(layout, door.x() + 1, door.z() - offset);
+            default -> new Room(layout, door.x() - layout.width() / 2, door.z() - layout.depth() / 2);
+        };
+    }
+
+    private void rememberBunkerMainCorridor(List<Cell> path) {
+        Set<Cell> carved = largeCorridorCells(path);
+        corridorCells.addAll(carved);
+        networkCells.addAll(carved);
+        for (Cell point : carved) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    corridorShellCells.add(new Cell(point.x() + dx, point.z() + dz));
+                }
+            }
+        }
+    }
+
+    private void widenBunkerSpine() {
+        if (rooms.isEmpty()) {
+            return;
+        }
+        Set<Cell> carved = largeCorridorCells(new ArrayList<>(corridorCells));
+        corridorCells.addAll(carved);
+        networkCells.addAll(carved);
+        for (Cell point : carved) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    corridorShellCells.add(new Cell(point.x() + dx, point.z() + dz));
+                }
+            }
         }
     }
 
@@ -1186,12 +1524,15 @@ final class HallsExplorationGenerator {
         if (corridorMode == CorridorMode.BACKROOMS) {
             return targetRooms * 420;
         }
+        if (corridorMode == CorridorMode.LIBRARY) {
+            return targetRooms * 260;
+        }
         return targetRooms * (corridorMode == CorridorMode.MAZE ? 260 : 1000);
     }
 
     private int roomLoopAttemptLimit() {
         int roomCount = Math.max(1, rooms.size());
-        return (corridorMode == CorridorMode.MAZE || corridorMode == CorridorMode.BACKROOMS)
+        return (corridorMode == CorridorMode.MAZE || corridorMode == CorridorMode.BACKROOMS || corridorMode == CorridorMode.LIBRARY)
                 ? roomCount * 18
                 : roomCount * roomCount * 5;
     }
@@ -1308,14 +1649,32 @@ final class HallsExplorationGenerator {
     }
 
     private Plan plan() {
+        Set<Cell> ventOnlyRoomCells = new HashSet<>();
+        for (Room room : rooms) {
+            if (room.ventOnly()) {
+                ventOnlyRoomCells.addAll(openInteriorCells(room));
+            }
+        }
         Set<Cell> walkable = new HashSet<>(corridorCells);
+        walkable.removeAll(lowCeilingCorridorCells);
         walkable.addAll(roomInteriorCells);
+        walkable.removeAll(ventOnlyRoomCells);
+        Set<Cell> monsterSpawnCells = new HashSet<>(corridorCells);
+        monsterSpawnCells.removeAll(lowCeilingCorridorCells);
+        for (Room room : rooms) {
+            if (!room.ventOnly()) {
+                monsterSpawnCells.addAll(openInteriorCells(room));
+            }
+        }
         return new Plan(
                 List.copyOf(rooms),
                 Set.copyOf(corridorCells),
                 Set.copyOf(corridorShellCells),
+                Set.copyOf(lowCeilingCorridorCells),
+                Set.copyOf(ventGateCells),
                 Set.copyOf(liquidCells),
                 Set.copyOf(walkable),
+                Set.copyOf(monsterSpawnCells),
                 allRoomsReachable(walkable)
         );
     }
@@ -1341,6 +1700,9 @@ final class HallsExplorationGenerator {
             }
         }
         for (Room room : rooms) {
+            if (room.ventOnly()) {
+                continue;
+            }
             boolean roomReachable = openInteriorCells(room).stream().anyMatch(reachable::contains);
             if (!roomReachable) {
                 return false;
@@ -1352,8 +1714,11 @@ final class HallsExplorationGenerator {
     record Plan(List<Room> rooms,
                 Set<Cell> corridorCells,
                 Set<Cell> corridorShellCells,
+                Set<Cell> lowCeilingCorridorCells,
+                Set<Cell> ventGateCells,
                 Set<Cell> liquidCells,
                 Set<Cell> walkableCells,
+                Set<Cell> monsterSpawnCells,
                 boolean reachable) {
     }
 
@@ -1362,6 +1727,7 @@ final class HallsExplorationGenerator {
         private final int startX;
         private final int startZ;
         private final Map<BlockFace, Integer> openings = new HashMap<>();
+        private boolean ventOnly;
 
         private Room(HallsLayout layout, int startX, int startZ) {
             this.layout = layout;
@@ -1383,6 +1749,14 @@ final class HallsExplorationGenerator {
 
         Map<BlockFace, Integer> openings() {
             return openings;
+        }
+
+        boolean ventOnly() {
+            return ventOnly;
+        }
+
+        void setVentOnly(boolean ventOnly) {
+            this.ventOnly = ventOnly;
         }
 
         int centerX() {
@@ -1437,7 +1811,9 @@ final class HallsExplorationGenerator {
         MAZE,
         BACKROOMS,
         OPEN_HALLS,
-        SEWER;
+        SEWER,
+        LIBRARY,
+        BUNKER;
 
         private static CorridorMode from(String value) {
             if (value == null) {
@@ -1450,6 +1826,8 @@ final class HallsExplorationGenerator {
                 case "backrooms", "backroom" -> BACKROOMS;
                 case "open_halls", "open_hall", "legacy_maze" -> OPEN_HALLS;
                 case "sewer", "sewers" -> SEWER;
+                case "library", "library_vents", "library_corridors" -> LIBRARY;
+                case "bunker", "bunker_corridors" -> BUNKER;
                 default -> NORMAL;
             };
         }
