@@ -57,7 +57,7 @@ public record HallsScenario(
                                      int blueprintDistilleriesOnFinalExploration, int bossEveryModules) {
         public EndlessProgression { bossEveryModules = Math.max(1, bossEveryModules); }
         public static EndlessProgression defaults() {
-            return new EndlessProgression(10.0, 2.0, 6.0, 0.62, 22, 24.0, 2.0,
+            return new EndlessProgression(10.0, 2.0, 6.0, 0.62, 100, 24.0, 2.0,
                     7.0, 0.40, 5.0, 0.62, 1.0, 0.38, 16.0, 1.23, 5, 4);
         }
     }

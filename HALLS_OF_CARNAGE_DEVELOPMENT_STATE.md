@@ -137,6 +137,7 @@ This is the first implementation slice. It focuses on:
 - Research unlocks continue to be stored by node id in campaign saves, so Endless inherits new research nodes without losing nodes already researched.
 - Extracted Endless floor scaling into scenario `endless.progression` YAML using decimal starting values and per-module/per-exploration rates. Generated values round to the nearest integer, allowing slow-growth stats such as traps to remain unchanged across multiple floors; bundled rates are tuned to better match Untold Depths.
 - Endless floor 1 now has an explicit start-floor definition with a zero coin quota, so parties can always leave the starting elevator.
+- Endless exploration floor room cap is 100; Untold Depths' More Rooms modifier can add up to five additional rooms.
 
 ## Reviewer notes (Delete entries once done, but keep the header)
 
@@ -149,6 +150,8 @@ This is the first implementation slice. It focuses on:
 - Bunker and library rooms
 - Rework descriptions for all items
 - Fixed textures for cooked potato / mycelia and sculk removing foods
-- Building which adds durability
 - Lobby
 - Minigame Machine connection
+
+## DLC ideas
+- Building which adds durability

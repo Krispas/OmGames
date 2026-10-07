@@ -37,7 +37,7 @@ endless:
     difficulty-per-module: 2.0
     starting-rooms: 6.0
     rooms-per-exploration: 0.62
-    max-rooms: 22
+    max-rooms: 100
     starting-breakables: 24.0
     breakables-per-exploration: 2.0
     starting-traps: 7.0
