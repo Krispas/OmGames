@@ -387,14 +387,23 @@ public final class HallsScenarioLoader {
     private static HallsScenario.EndlessProgression loadEndlessProgression(ConfigurationSection section) {
         HallsScenario.EndlessProgression d = HallsScenario.EndlessProgression.defaults();
         if (section == null) return d;
-        return new HallsScenario.EndlessProgression(section.getInt("starting-difficulty", d.startingDifficulty()),
-                section.getInt("difficulty-per-module", d.difficultyPerModule()), section.getInt("starting-rooms", d.startingRooms()),
-                section.getInt("max-rooms", d.maxRooms()), section.getInt("starting-breakables", d.startingBreakables()),
-                section.getInt("breakables-per-exploration", d.breakablesPerExploration()), section.getInt("starting-traps", d.startingTraps()),
-                section.getInt("traps-per-module", d.trapsPerModule()), section.getInt("starting-holes", d.startingHoles()),
-                section.getInt("holes-per-module", d.holesPerModule()), section.getInt("starting-sculk-patches", d.startingSculkPatches()),
-                section.getInt("sculk-patches-per-module", d.sculkPatchesPerModule()), section.getInt("starting-coin-quota", d.startingCoinQuota()),
-                section.getInt("quota-per-module", d.quotaPerModule()), section.getInt("boss-every-modules", d.bossEveryModules()));
+        return new HallsScenario.EndlessProgression(section.getDouble("starting-difficulty", d.startingDifficulty()),
+                section.getDouble("difficulty-per-module", d.difficultyPerModule()),
+                section.getDouble("starting-rooms", d.startingRooms()),
+                section.getDouble("rooms-per-exploration", d.roomsPerExploration()),
+                section.getInt("max-rooms", d.maxRooms()),
+                section.getDouble("starting-breakables", d.startingBreakables()),
+                section.getDouble("breakables-per-exploration", d.breakablesPerExploration()),
+                section.getDouble("starting-traps", d.startingTraps()),
+                section.getDouble("traps-per-exploration", d.trapsPerExploration()),
+                section.getDouble("starting-holes", d.startingHoles()),
+                section.getDouble("holes-per-exploration", d.holesPerExploration()),
+                section.getDouble("starting-sculk-patches", d.startingSculkPatches()),
+                section.getDouble("sculk-patches-per-exploration", d.sculkPatchesPerExploration()),
+                section.getDouble("starting-coin-quota", d.startingCoinQuota()),
+                section.getDouble("quota-per-exploration", d.quotaPerExploration()),
+                section.getInt("blueprint-distilleries-on-final-exploration", d.blueprintDistilleriesOnFinalExploration()),
+                section.getInt("boss-every-modules", d.bossEveryModules()));
     }
 
     private static int blueprintDistilleryCount(Object value) {

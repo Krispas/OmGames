@@ -47,15 +47,18 @@ public record HallsScenario(
         public BossChoice { levelType = normalize(levelType); boss = normalize(boss); }
     }
 
-    public record EndlessProgression(int startingDifficulty, int difficultyPerModule,
-                                     int startingRooms, int maxRooms, int startingBreakables,
-                                     int breakablesPerExploration, int startingTraps, int trapsPerModule,
-                                     int startingHoles, int holesPerModule, int startingSculkPatches,
-                                     int sculkPatchesPerModule, int startingCoinQuota, int quotaPerModule,
-                                     int bossEveryModules) {
+    public record EndlessProgression(double startingDifficulty, double difficultyPerModule,
+                                     double startingRooms, double roomsPerExploration, int maxRooms,
+                                     double startingBreakables, double breakablesPerExploration,
+                                     double startingTraps, double trapsPerExploration,
+                                     double startingHoles, double holesPerExploration,
+                                     double startingSculkPatches, double sculkPatchesPerExploration,
+                                     double startingCoinQuota, double quotaPerExploration,
+                                     int blueprintDistilleriesOnFinalExploration, int bossEveryModules) {
         public EndlessProgression { bossEveryModules = Math.max(1, bossEveryModules); }
         public static EndlessProgression defaults() {
-            return new EndlessProgression(10, 2, 6, 22, 24, 2, 7, 1, 5, 1, 1, 1, 16, 2, 4);
+            return new EndlessProgression(10.0, 2.0, 6.0, 0.62, 22, 24.0, 2.0,
+                    7.0, 0.40, 5.0, 0.62, 1.0, 0.38, 16.0, 1.23, 5, 4);
         }
     }
 
@@ -179,15 +182,20 @@ public record HallsScenario(
         java.util.Collections.shuffle(shuffled, new java.util.Random(runSeed ^ (long) module * 0x9E3779B97F4A7C15L));
         String levelType = shuffled.get(moduleFloor % shuffled.size());
         int explorationIndex = module * 3 + moduleFloor;
-        int difficulty = p.startingDifficulty() + module * p.difficultyPerModule();
-        int rooms = Math.min(p.maxRooms(), p.startingRooms() + explorationIndex);
-        int breakables = p.startingBreakables() + explorationIndex * p.breakablesPerExploration();
-        int traps = p.startingTraps() + module * p.trapsPerModule();
-        int holes = p.startingHoles() + module * p.holesPerModule() + (moduleFloor == 2 ? 1 : 0);
-        int sculk = p.startingSculkPatches() + module * p.sculkPatchesPerModule() + moduleFloor;
-        int quota = p.startingCoinQuota() + module * p.quotaPerModule() + moduleFloor;
+        int difficulty = roundedProgression(p.startingDifficulty(), p.difficultyPerModule(), module);
+        int rooms = Math.min(p.maxRooms(), roundedProgression(p.startingRooms(), p.roomsPerExploration(), explorationIndex));
+        int breakables = roundedProgression(p.startingBreakables(), p.breakablesPerExploration(), explorationIndex);
+        int traps = roundedProgression(p.startingTraps(), p.trapsPerExploration(), explorationIndex);
+        int holes = roundedProgression(p.startingHoles(), p.holesPerExploration(), explorationIndex);
+        int sculk = roundedProgression(p.startingSculkPatches(), p.sculkPatchesPerExploration(), explorationIndex);
+        int quota = roundedProgression(p.startingCoinQuota(), p.quotaPerExploration(), explorationIndex);
         return new FloorDefinition(floor, floor, "exploration", levelType, Integer.toString(difficulty), rooms,
-                0, breakables, traps, 1, 7, holes, sculk, quota, moduleFloor == 2 ? 5 : 0, "", "");
+                0, breakables, traps, 1, 7, holes, sculk, quota,
+                moduleFloor == 2 ? p.blueprintDistilleriesOnFinalExploration() : 0, "", "");
+    }
+
+    private static int roundedProgression(double startingValue, double perFloor, int floorIndex) {
+        return Math.max(0, (int) Math.round(startingValue + perFloor * floorIndex));
     }
 
     public record FloorDefinition(

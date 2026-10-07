@@ -54,7 +54,6 @@ public final class HallsMainMenu {
         Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.SCENARIOS, null), 54,
                 Component.text("Choose Scenario", NamedTextColor.DARK_RED));
         inventory.setItem(4, item(plugin, Material.MAP, "Campaign Scenarios", NamedTextColor.GOLD, List.of(), null, null));
-        inventory.setItem(36, item(plugin, Material.ANCIENT_DEBRIS, "Endless Modes", NamedTextColor.LIGHT_PURPLE, List.of(), null, null));
         int normalSlot = 10;
         int endlessSlot = 37;
         for (HallsScenario scenario : scenarios) {

@@ -135,6 +135,7 @@ This is the first implementation slice. It focuses on:
 - Endless progression generates three distinct randomized exploration themes and then a camp per module. Every fourth exploration module is followed by a seeded boss floor and camp; progression settings follow the Untold Depths curve and continue without a completion floor.
 - Endless sessions suppress shame accrual and save each participant's highest floor reached at game over in `hoc_endless_records`. The scenario picker separates Endless scenarios visually, and the lobby Leaderboards window displays both campaign shame and Endless floor results.
 - Research unlocks continue to be stored by node id in campaign saves, so Endless inherits new research nodes without losing nodes already researched.
+- Extracted Endless floor scaling into scenario `endless.progression` YAML using decimal starting values and per-module/per-exploration rates. Generated values round to the nearest integer, allowing slow-growth stats such as traps to remain unchanged across multiple floors; bundled rates are tuned to better match Untold Depths.
 
 ## Reviewer notes (Delete entries once done, but keep the header)
 
