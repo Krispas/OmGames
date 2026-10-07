@@ -224,7 +224,7 @@ All buildings have 3 levels.
 - Size: Station (7x7 reserved camp plot)
 
 Each camp has one permanent Camp Station. It is always present, has no blueprint, has no levels, cannot be deconstructed, and provides all food, weapon, utility, and armor recipes that were previously split across Cooking Pot, Weapon Bench, and Armory.
-Camp Station crafting is split into food, weapon, utility, and armor views. Recipes are locked behind a scenario-defined research tree. Root research nodes are available at campaign start; every normal camp arrival grants one research point for each exploration floor cleared since the previous camp, and researched nodes persist in the team save.
+Camp Station crafting is split into food, weapon, utility, and armor views. Recipes are locked behind a scenario-defined research tree. Root research nodes are available at campaign start; research points come only from depositing research crates into the elevator chute, and researched nodes persist in the team save.
 ### Grindstone
 - Size: Large
 

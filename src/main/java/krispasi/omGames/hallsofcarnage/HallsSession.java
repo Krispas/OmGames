@@ -2046,7 +2046,6 @@ public final class HallsSession {
         int connectorTargetZ = southDock ? roomStartZ + linkZ + 1 : roomStartZ + linkZ - 1;
         buildCampConnector(roomStartX + linkX, origin.y(), connectorTargetZ, levelType);
         depositCampBankCoins();
-        awardResearchForCampArrival(refreshRunUses);
         clearAllTotemBuffs();
         restoreElevatorChestContents();
         closeElevatorDoors();
@@ -6611,23 +6610,6 @@ public final class HallsSession {
             if (player != null && player.getWorld().equals(world)) {
                 player.sendMessage(Component.text("Camp bank produced " + earned + " key"
                         + (earned == 1 ? "." : "s."), NamedTextColor.GOLD));
-            }
-        }
-    }
-
-    private void awardResearchForCampArrival(boolean normalArrival) {
-        if (!normalArrival || explorationFloorsSinceCamp <= 0) {
-            return;
-        }
-        int awarded = explorationFloorsSinceCamp;
-        researchPoints += awarded;
-        addRunShame(awarded);
-        explorationFloorsSinceCamp = 0;
-        for (UUID playerId : participants) {
-            Player player = Bukkit.getPlayer(playerId);
-            if (player != null && player.getWorld().equals(world)) {
-                player.sendMessage(Component.text("Camp research gained " + awarded + " point"
-                        + (awarded == 1 ? "." : "s."), NamedTextColor.AQUA));
             }
         }
     }
