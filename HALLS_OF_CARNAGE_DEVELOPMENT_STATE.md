@@ -121,28 +121,29 @@ This is the first implementation slice. It focuses on:
 
 ## Latest Slice Notes
 
-## Reviewer note (Delete entries once done, but keep the header)
-Do all following for the next slice (and keep this line):
-Future slices (dont do yet):
-- TBD
+## Reviewer notes (Delete entries once done, but keep the header)
+## Do all following for the next slice (and keep this line):
+- Improve performance for the lodestone, instead of recalculating the path each time its displayed, just calculate it on start and cache it for the next displayes within the same activation (support multiple players doing this). 
+- Remove the rusty tools modifier from the game
+- Blueprint distilleries seem to give extra random blueprint right now, they should just give player 1 of each blueprint available on the level type
+- Make it so blueprint distilleries dont generate in disconnected library rooms
+- Make it so when arriving at a level which contains a blueprint distillery, the blueprints given as reward will be announced into the chat.
+- When player becomes a ghost, print it into chat. Aqua text, "<playername (colored)> succumbed to the halls."
+- Librarian enemy change: make it so the poison bomb only gets deployed when they die, removing its spawning each time they hit someone
 
-For reviewer to figure out:
+## Future slices (dont do yet):
+- Make modifiers scenario dependend, make it so dammed corridors has all modifiers except the death fog
+- Right now, the big corridor in bunker level type always has the same shape, looking like big mirrored L. Fix that and make it more random.
+- Add easy difficulty: it has 3.0 shame multiplier, sculk accumulates 2 times slower, there is 50% less enemies, overall enemy spawning is 33% slower, quota is 25% smaller and difficulty is multiplied by 0.85 (all of these apply before any other modifiers)
+- Add a new scenario type called endless, its details are in a file called ENDLESS_MODE.md
+
+## For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
 - Texture all items
 - Bunker and library palletes
 - Bunker and library rooms
 - Rework descriptions for all items
 - Fixed textures for cooked potato / mycelia and sculk removing foods
-- Lodestone performance
-- REmove big durability debuff
 - Building which adds durability
-- Easy mode
-- Distillery gives an extra blueprint
-- Distellery bluepritn announcent
-- Distilleries shouldnt generate in disconnected library rooms
-- Better bunker generation
-- Endless mode
 - Lobby
 - Minigame Machine connection
-- Nerf librarians
-- Make modifiers scenario dependent and remove death fog from Dammed Corridors
