@@ -101,6 +101,7 @@ Last updated: 2026-10-07
 - Blueprint distillery rewards now use the unique blueprint set available to the active level type, distilleries skip vent-only disconnected library rooms, and floor arrival announces the available rewards in chat.
 - Ghost announcements use the player's colored display name followed by aqua text: "succumbed to the halls."
 - Dammed Librarians deploy their poison cloud only on death; hitting a player no longer creates one.
+- The lobby Leaderboards menu now lets players open a separate campaign shame board for each non-Endless scenario; each board ranks players by their lowest recorded completion shame for that scenario. Endless scenarios have their own highest-floor boards, while the previous cross-scenario Endless view remains available.
 
 ## Current Scope
 
@@ -140,7 +141,6 @@ This is the first implementation slice. It focuses on:
 - Endless exploration floor room cap is 100; Untold Depths' More Rooms modifier can add up to five additional rooms.
 
 ## Reviewer notes (Delete entries once done, but keep the header)
-- There should be a separate leaderboard for each scenario
 - Bunker level type seems to not generate properly, as most of the times less than half of the intended rooms generate, my hunch is that the main corridor may be too small, but there could be other causes
 ## Future slices (dont do yet):
 -TBD

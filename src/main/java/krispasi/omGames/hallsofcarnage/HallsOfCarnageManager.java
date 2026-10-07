@@ -354,8 +354,21 @@ public final class HallsOfCarnageManager {
                     HallsMainMenu.openDifficulty(plugin, player, value);
                 }
             }
-            case HallsMainMenu.ACTION_LEADERBOARDS -> HallsMainMenu.openLeaderboards(plugin, player,
-                    shameService.getLeaderboard(10), shameService.getEndlessLeaderboard(10), scenarios);
+            case HallsMainMenu.ACTION_LEADERBOARDS -> HallsMainMenu.openLeaderboards(plugin, player, scenarios);
+            case HallsMainMenu.ACTION_LEADERBOARD_SCENARIO -> {
+                HallsScenario scenario = getScenario(value);
+                if (scenario != null) {
+                    if (scenario.endless()) {
+                        HallsMainMenu.openScenarioEndlessLeaderboard(plugin, player, scenario,
+                                shameService.getEndlessLeaderboard(1000));
+                    } else {
+                        HallsMainMenu.openScenarioLeaderboard(plugin, player, scenario,
+                                shameService.getScenarioLeaderboard(scenario.id(), 10));
+                    }
+                }
+            }
+            case "leaderboard_endless" -> HallsMainMenu.openEndlessLeaderboard(plugin, player,
+                    shameService.getEndlessLeaderboard(10), scenarios);
             case HallsMainMenu.ACTION_DIFFICULTY -> {
                 DifficultyOption difficulty = DIFFICULTIES.getOrDefault(normalizeId(value), NORMAL_DIFFICULTY);
                 PendingSession pending = new PendingSession(holder.context(), difficulty, null,
@@ -413,6 +426,7 @@ public final class HallsOfCarnageManager {
     private void openBack(Player player, HallsMainMenu.MenuHolder holder) {
         switch (holder.type()) {
             case SCENARIOS, SAVES, LEADERBOARDS -> openMainMenu(player);
+            case LEADERBOARD_DETAIL, LEADERBOARD_ENDLESS -> HallsMainMenu.openLeaderboards(plugin, player, scenarios);
             case DIFFICULTY -> openScenariosMenu(player);
             case SETTINGS -> {
                 PendingSession pending = pendingSessions.get(player.getUniqueId());

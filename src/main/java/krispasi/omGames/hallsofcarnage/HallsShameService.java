@@ -138,6 +138,29 @@ public final class HallsShameService {
         return entries;
     }
 
+    public List<ShameEntry> getScenarioLeaderboard(String scenarioId, int limit) {
+        if (connection == null || scenarioId == null || scenarioId.isBlank() || limit <= 0) return List.of();
+        List<ShameEntry> entries = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT player_uuid, MIN(final_shame) AS shame
+                FROM hoc_completed_scenarios
+                WHERE scenario_id = ?
+                GROUP BY player_uuid
+                ORDER BY shame ASC, player_uuid ASC
+                LIMIT ?
+                """)) {
+            statement.setString(1, scenarioId);
+            statement.setInt(2, limit);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) entries.add(new ShameEntry(UUID.fromString(rs.getString("player_uuid")),
+                        Math.max(0, rs.getInt("shame"))));
+            }
+        } catch (IllegalArgumentException | SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load Halls scenario shame leaderboard for " + scenarioId + ".", ex);
+        }
+        return List.copyOf(entries);
+    }
+
     public void recordEndlessFloor(String scenarioId, UUID playerId, int floor, long updatedAt) {
         if (connection == null || scenarioId == null || scenarioId.isBlank() || playerId == null) return;
         try (PreparedStatement statement = connection.prepareStatement("""

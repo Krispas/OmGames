@@ -30,6 +30,7 @@ public final class HallsMainMenu {
     public static final String ACTION_TOGGLE_PLAYER = "toggle_player";
     public static final String ACTION_PLAY = "play";
     public static final String ACTION_LEADERBOARDS = "leaderboards";
+    public static final String ACTION_LEADERBOARD_SCENARIO = "leaderboard_scenario";
 
     private HallsMainMenu() {
     }
@@ -98,32 +99,74 @@ public final class HallsMainMenu {
         player.openInventory(inventory);
     }
 
-    public static void openLeaderboards(JavaPlugin plugin, Player player,
-                                        List<HallsShameService.ShameEntry> shame,
-                                        List<HallsShameService.EndlessEntry> endless,
-                                        List<HallsScenario> scenarios) {
+    public static void openLeaderboards(JavaPlugin plugin, Player player, List<HallsScenario> scenarios) {
         Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.LEADERBOARDS, null), 54,
-                Component.text("Halls Leaderboards", NamedTextColor.DARK_RED));
-        inventory.setItem(4, item(plugin, Material.SOUL_LANTERN, "Lowest Shame", NamedTextColor.AQUA,
-                List.of("Campaign scenarios"), null, null));
+                Component.text("Choose Leaderboard", NamedTextColor.DARK_RED));
+        inventory.setItem(4, item(plugin, Material.SOUL_LANTERN, "Campaign Shame", NamedTextColor.AQUA,
+                List.of("Choose a scenario to view its lowest shame."), null, null));
         int slot = 10;
-        for (int i = 0; i < Math.min(10, shame.size()); i++) {
-            HallsShameService.ShameEntry entry = shame.get(i);
-            inventory.setItem(slot++, item(plugin, Material.PAPER,
-                    (i + 1) + ". " + playerName(entry.playerId()), NamedTextColor.GRAY,
-                    List.of("Shame: " + entry.shame()), null, null));
+        for (HallsScenario scenario : scenarios) {
+            if (slot >= 44) continue;
+            inventory.setItem(slot, item(plugin, scenario.endless() ? Material.ANCIENT_DEBRIS : Material.PAPER,
+                    scenario.name(), scenario.endless() ? NamedTextColor.LIGHT_PURPLE : NamedTextColor.GOLD,
+                    List.of(scenario.endless() ? "View highest floor reached" : "View this scenario's lowest shame"),
+                    ACTION_LEADERBOARD_SCENARIO, scenario.id()));
+            slot = nextContentSlot(slot);
         }
         inventory.setItem(31, item(plugin, Material.ANCIENT_DEBRIS, "Endless: Highest Floor", NamedTextColor.LIGHT_PURPLE,
-                List.of("Best floor reached before game over"), null, null));
+                List.of("Best floor reached before game over"), "leaderboard_endless", null));
+        inventory.setItem(49, item(plugin, Material.ARROW, "Back", NamedTextColor.GRAY, List.of(), ACTION_BACK, null));
+        player.openInventory(inventory);
+    }
+
+    public static void openScenarioLeaderboard(JavaPlugin plugin, Player player, HallsScenario scenario,
+                                               List<HallsShameService.ShameEntry> shame) {
+        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.LEADERBOARD_DETAIL, scenario.id()), 54,
+                Component.text(scenario.name() + " Shame", NamedTextColor.DARK_RED));
+        inventory.setItem(4, item(plugin, Material.SOUL_LANTERN, "Lowest Shame", NamedTextColor.AQUA,
+                List.of("Best completed run for each player"), null, null));
+        for (int i = 0; i < Math.min(10, shame.size()); i++) {
+            HallsShameService.ShameEntry entry = shame.get(i);
+            inventory.setItem(10 + i, item(plugin, Material.PAPER, (i + 1) + ". " + playerName(entry.playerId()),
+                    NamedTextColor.GRAY, List.of("Shame: " + entry.shame()), null, null));
+        }
+        if (shame.isEmpty()) inventory.setItem(22, item(plugin, Material.BARRIER, "No completions yet", NamedTextColor.GRAY,
+                List.of(), null, null));
+        inventory.setItem(49, item(plugin, Material.ARROW, "Back", NamedTextColor.GRAY, List.of(), ACTION_BACK, null));
+        player.openInventory(inventory);
+    }
+
+    public static void openEndlessLeaderboard(JavaPlugin plugin, Player player,
+                                               List<HallsShameService.EndlessEntry> endless,
+                                               List<HallsScenario> scenarios) {
+        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.LEADERBOARD_ENDLESS, null), 54,
+                Component.text("Endless: Highest Floor", NamedTextColor.DARK_RED));
         Map<String, String> names = new java.util.HashMap<>();
         for (HallsScenario scenario : scenarios) names.put(scenario.id(), scenario.name());
-        slot = 37;
         for (int i = 0; i < Math.min(10, endless.size()); i++) {
             HallsShameService.EndlessEntry entry = endless.get(i);
-            inventory.setItem(slot++, item(plugin, Material.PAPER,
-                    (i + 1) + ". " + playerName(entry.playerId()), NamedTextColor.GRAY,
-                    List.of(names.getOrDefault(entry.scenarioId(), entry.scenarioId()), "Floor " + entry.highestFloor()), null, null));
+            inventory.setItem(10 + i, item(plugin, Material.PAPER, (i + 1) + ". " + playerName(entry.playerId()),
+                    NamedTextColor.GRAY, List.of(names.getOrDefault(entry.scenarioId(), entry.scenarioId()),
+                            "Floor " + entry.highestFloor()), null, null));
         }
+        inventory.setItem(49, item(plugin, Material.ARROW, "Back", NamedTextColor.GRAY, List.of(), ACTION_BACK, null));
+        player.openInventory(inventory);
+    }
+
+    public static void openScenarioEndlessLeaderboard(JavaPlugin plugin, Player player, HallsScenario scenario,
+                                                       List<HallsShameService.EndlessEntry> entries) {
+        Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.LEADERBOARD_DETAIL, scenario.id()), 54,
+                Component.text(scenario.name() + " Floors", NamedTextColor.DARK_RED));
+        inventory.setItem(4, item(plugin, Material.ANCIENT_DEBRIS, "Highest Floor", NamedTextColor.LIGHT_PURPLE,
+                List.of("Best result for each player"), null, null));
+        int rank = 0;
+        for (HallsShameService.EndlessEntry entry : entries) {
+            if (!scenario.id().equals(entry.scenarioId()) || rank >= 10) continue;
+            inventory.setItem(10 + rank, item(plugin, Material.PAPER, (++rank) + ". " + playerName(entry.playerId()),
+                    NamedTextColor.GRAY, List.of("Floor " + entry.highestFloor()), null, null));
+        }
+        if (rank == 0) inventory.setItem(22, item(plugin, Material.BARRIER, "No records yet", NamedTextColor.GRAY,
+                List.of(), null, null));
         inventory.setItem(49, item(plugin, Material.ARROW, "Back", NamedTextColor.GRAY, List.of(), ACTION_BACK, null));
         player.openInventory(inventory);
     }
@@ -303,6 +346,8 @@ public final class HallsMainMenu {
         MAIN,
         SCENARIOS,
         LEADERBOARDS,
+        LEADERBOARD_DETAIL,
+        LEADERBOARD_ENDLESS,
         DIFFICULTY,
         SAVES,
         SETTINGS
