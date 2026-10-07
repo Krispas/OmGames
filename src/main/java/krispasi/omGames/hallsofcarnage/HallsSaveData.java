@@ -38,7 +38,8 @@ public record HallsSaveData(File file,
                             Map<Integer, List<HallsCampRuntime.PlotState>> camps,
                             Map<Integer, Set<Integer>> campUnlockedDoors,
                             LastCampCheckpoint lastCampCheckpoint,
-                            long savedAt) {
+                            long savedAt,
+                            long endlessRunSeed) {
     public HallsSaveData {
         unlockedResearch = unlockedResearch == null ? Set.of() : Set.copyOf(unlockedResearch);
     }
@@ -84,7 +85,8 @@ public record HallsSaveData(File file,
                 camps(yaml, "camps"),
                 campUnlockedDoors(yaml, "camps"),
                 lastCampCheckpoint(yaml, participants),
-                yaml.getLong("saved-at", file.lastModified()));
+                yaml.getLong("saved-at", file.lastModified()),
+                yaml.getLong("endless.run-seed", 0L));
     }
 
     private static int lastSavedCampFloor(YamlConfiguration yaml) {

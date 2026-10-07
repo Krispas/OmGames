@@ -130,10 +130,13 @@ This is the first implementation slice. It focuses on:
 - Reworked the bunker main trunk to use a randomized footprint and turn sequence instead of the repeated mirrored-L route.
 - Added Easy difficulty with a 3.0 shame multiplier, 0.85 floor difficulty scaling, half-rate sculk gain, half-size initial enemy cap, 1.5x spawn and cap-extension intervals, and 25% lower coin quota. These baseline adjustments are applied before floor modifiers.
 - Removed the automatic research-point award for each exploration floor cleared at camp arrival. Depositing a research crate into the elevator chute is now the only gameplay source of research points; the legacy saved exploration-floor counter remains readable for save compatibility.
+- Added the configurable `endless` scenario type and bundled `Endless (Mixed)` / `Endless (Base Game)` scenarios. Both currently draw from all nine existing level types and inherit Untold Depths item, blueprint, crafting, research, and modifier pools.
+- Endless floor-theme randomness is stored as `endless.run-seed` in campaign saves, preserving generated sequence across save/load while fresh runs receive a new sequence.
+- Endless progression generates three distinct randomized exploration themes and then a camp per module. Every fourth exploration module is followed by a seeded boss floor and camp; progression settings follow the Untold Depths curve and continue without a completion floor.
+- Endless sessions suppress shame accrual and save each participant's highest floor reached at game over in `hoc_endless_records`. The scenario picker separates Endless scenarios visually, and the lobby Leaderboards window displays both campaign shame and Endless floor results.
+- Research unlocks continue to be stored by node id in campaign saves, so Endless inherits new research nodes without losing nodes already researched.
 
 ## Reviewer notes (Delete entries once done, but keep the header)
-## Do all following for the next slice (and keep this line):
-- Add a new scenario type called endless, its details are in a file called ENDLESS_MODE.md
 
 ## Future slices (dont do yet):
 -TBD

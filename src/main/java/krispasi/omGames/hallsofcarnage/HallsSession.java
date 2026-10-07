@@ -137,6 +137,7 @@ public final class HallsSession {
     private final java.util.function.Predicate<UUID> debugEnabled;
     private final java.util.function.Consumer<CompletedRun> completionHandler;
     private final String elevatorLocatorIconItemModel;
+    private long endlessRunSeed;
     private final Set<UUID> ghostPlayers = new HashSet<>();
     private final Map<UUID, Map<Integer, Integer>> healthTotemLevels = new HashMap<>();
     private final Map<UUID, Map<Integer, Integer>> speedTotemLevels = new HashMap<>();
@@ -234,6 +235,8 @@ public final class HallsSession {
         for (Player player : players) {
             participants.add(player.getUniqueId());
         }
+        this.endlessRunSeed = initialSave != null && initialSave.endlessRunSeed() != 0L
+                ? initialSave.endlessRunSeed() : java.util.concurrent.ThreadLocalRandom.current().nextLong();
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
                 playerId -> !transitioning && isAliveParticipant(playerId),
                 this.difficultyId.equals("easy") ? 0.5 : 1.0);
@@ -759,7 +762,7 @@ public final class HallsSession {
         }
         if (completionHandler != null) {
             completionHandler.accept(new CompletedRun(id, scenario.id(), difficultyId, Math.max(0, runShame),
-                    Set.copyOf(participants), saveFile()));
+                    Set.copyOf(participants), saveFile(), false, currentFloor));
         }
     }
 
@@ -1684,7 +1687,7 @@ public final class HallsSession {
         researchCrateDepositedThisFloor = false;
         activeFloorModifiers = HallsFloorModifiers.none();
         floorStartedAtMillis = System.currentTimeMillis();
-        HallsScenario.FloorDefinition floorDefinition = scenario.floor(1);
+        HallsScenario.FloorDefinition floorDefinition = floorDefinition(1);
         HallsLevelType levelType = levelTypeFor(floorDefinition);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = 1;
@@ -1748,7 +1751,7 @@ public final class HallsSession {
     }
 
     private void buildFloor(int floor) {
-        HallsScenario.FloorDefinition definition = scenario.floor(floor);
+        HallsScenario.FloorDefinition definition = floorDefinition(floor);
         if ("camp".equalsIgnoreCase(definition.kind())) {
             buildCampFloor(floor);
             return;
@@ -1764,7 +1767,7 @@ public final class HallsSession {
         captureCurrentCampState();
         captureElevatorChestContents();
         removeSessionEntities();
-        activeClearRadius = clearRadiusFor(scenario.floor(floor));
+        activeClearRadius = clearRadiusFor(floorDefinition(floor));
         ExplorationBuild build = planExplorationBuild(floor);
         clearBuildVolume();
         buildElevator();
@@ -1801,7 +1804,7 @@ public final class HallsSession {
         captureCurrentCampState();
         captureElevatorChestContents();
         removeSessionEntities();
-        HallsScenario.FloorDefinition floorDefinition = adjustedDifficulty(scenario.floor(floor));
+        HallsScenario.FloorDefinition floorDefinition = adjustedDifficulty(floorDefinition(floor));
         HallsLevelType levelType = levelTypeFor(floorDefinition);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = 1;
@@ -1842,6 +1845,10 @@ public final class HallsSession {
         bossRuntime.prepare(floorDefinition.boss(), bossLocation, seal, bossArenaCells,
                 parseDifficulty(floorDefinition.difficulty(), floorDefinition.firstFloor()));
         teleportParticipantsToElevator("Floor " + floor, "Boss: " + bossName(floorDefinition.boss()));
+    }
+
+    private HallsScenario.FloorDefinition floorDefinition(int floor) {
+        return scenario.endless() ? scenario.endlessFloor(floor, endlessRunSeed) : scenario.floor(floor);
     }
 
     private Set<HallsExplorationGenerator.Cell> bossArenaCells(HallsLayout layout, int roomStartX, int roomStartZ) {
@@ -1968,7 +1975,7 @@ public final class HallsSession {
     }
 
     private boolean isCurrentFloorBoss() {
-        HallsScenario.FloorDefinition definition = scenario.floor(currentFloor);
+        HallsScenario.FloorDefinition definition = floorDefinition(currentFloor);
         return "combat".equalsIgnoreCase(definition.kind()) && !definition.boss().isBlank();
     }
 
@@ -1987,7 +1994,7 @@ public final class HallsSession {
         captureCurrentCampState();
         captureElevatorChestContents();
         removeSessionEntities();
-        HallsScenario.FloorDefinition floorDefinition = scenario.floor(floor);
+        HallsScenario.FloorDefinition floorDefinition = floorDefinition(floor);
         HallsLevelType levelType = levelTypeFor(floorDefinition);
         activeLevelTypeId = levelType.id();
         activeTargetRooms = 1;
@@ -2085,7 +2092,7 @@ public final class HallsSession {
 
     private void startStagedFloorBuild(int floor) {
         cancelFloorBuildTask();
-        HallsScenario.FloorDefinition definition = scenario.floor(floor);
+        HallsScenario.FloorDefinition definition = floorDefinition(floor);
         if ("camp".equalsIgnoreCase(definition.kind())) {
             buildCampFloor(floor);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -2113,7 +2120,7 @@ public final class HallsSession {
             return;
         }
         int oldClearRadius = activeClearRadius;
-        activeClearRadius = clearRadiusFor(scenario.floor(floor));
+        activeClearRadius = clearRadiusFor(floorDefinition(floor));
         HallsSessionFloorBuildJob job = new HallsSessionFloorBuildJob(this, floor,
                 Math.max(oldClearRadius, activeClearRadius), origin.x());
         updateFloorBuildProgress(0.0, "Planning");
@@ -2247,7 +2254,7 @@ public final class HallsSession {
 
     private ExplorationBuild planExplorationBuild(int floor) {
         long started = System.nanoTime();
-        HallsScenario.FloorDefinition rawFloorDefinition = adjustedDifficulty(scenario.floor(floor));
+        HallsScenario.FloorDefinition rawFloorDefinition = adjustedDifficulty(floorDefinition(floor));
         HallsLevelType levelType = levelTypeFor(rawFloorDefinition);
         Random random = floorRandom();
         activeFloorModifiers = scannedFloorModifiers.remove(floor);
@@ -3475,8 +3482,9 @@ public final class HallsSession {
         }
         int difficulty = parseDifficulty(floorDefinition.difficulty(), floorDefinition.firstFloor());
         int goodChance = Math.max(0, Math.min(100, 50 - difficulty));
-        List<HallsModifierType> good = applicableModifiers(levelType, true, scenario.id());
-        List<HallsModifierType> bad = applicableModifiers(levelType, false, scenario.id());
+        String modifierScenario = scenario.endless() ? "untold_depths" : scenario.id();
+        List<HallsModifierType> good = applicableModifiers(levelType, true, modifierScenario);
+        List<HallsModifierType> bad = applicableModifiers(levelType, false, modifierScenario);
         List<HallsModifierType> selected = new ArrayList<>();
         for (int slot = 0; slot < 3; slot++) {
             boolean wantGood = random.nextInt(100) < goodChance;
@@ -3502,7 +3510,7 @@ public final class HallsSession {
         int remaining = Math.max(1, Math.min(3, scannerLevel));
         List<String> lines = new ArrayList<>();
         for (int floor = currentFloor + 1; floor <= scenario.floorCount() && lines.size() < remaining; floor++) {
-            HallsScenario.FloorDefinition raw = adjustedDifficulty(scenario.floor(floor));
+            HallsScenario.FloorDefinition raw = adjustedDifficulty(floorDefinition(floor));
             if (raw == null || !"exploration".equalsIgnoreCase(raw.kind())) {
                 continue;
             }
@@ -4533,7 +4541,7 @@ public final class HallsSession {
     }
 
     private int currentCoinQuota() {
-        HallsScenario.FloorDefinition floor = adjustedDifficulty(scenario.floor(currentFloor));
+        HallsScenario.FloorDefinition floor = adjustedDifficulty(floorDefinition(currentFloor));
         int quota = floor.coinQuota();
         if ("exploration".equalsIgnoreCase(floor.kind()) && !activeFloorModifiers.empty()) {
             quota = Math.max(0, (int) Math.round(quota * activeFloorModifiers.coinQuotaMultiplier())
@@ -4607,7 +4615,7 @@ public final class HallsSession {
     }
 
     private void addRunShame(int amount) {
-        if (amount <= 0) {
+        if (amount <= 0 || scenario.endless()) {
             return;
         }
         runShame = Math.max(0, runShame + amount);
@@ -6159,6 +6167,10 @@ public final class HallsSession {
         if (gameOverTask != null) {
             return;
         }
+        if (scenario.endless() && completionHandler != null) {
+            completionHandler.accept(new CompletedRun(id, scenario.id(), difficultyId, 0,
+                    Set.copyOf(participants), saveFile(), true, currentFloor));
+        }
         addRunShame(50);
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
@@ -6348,6 +6360,7 @@ public final class HallsSession {
             yaml.set("schema-version", 1);
             yaml.set("reason", reason);
             yaml.set("scenario", scenario.id());
+            yaml.set("endless.run-seed", endlessRunSeed);
             yaml.set("host", hostId.toString());
             yaml.set("difficulty.id", difficultyId);
             yaml.set("difficulty.multiplier", difficultyMultiplier);
@@ -6661,7 +6674,7 @@ public final class HallsSession {
         if (currentFloor < 1 || currentFloor > scenario.floorCount()) {
             return false;
         }
-        return "camp".equalsIgnoreCase(scenario.floor(currentFloor).kind());
+        return "camp".equalsIgnoreCase(floorDefinition(currentFloor).kind());
     }
 
     private void resetRunState(boolean resetCampProgress) {
@@ -7345,7 +7358,7 @@ public final class HallsSession {
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     if (running && floorPlanningStarted && planningFloor == floor) {
                         pendingFloorBuild = planned;
-                        HallsScenario.FloorDefinition definition = adjustedDifficulty(scenario.floor(floor));
+                        HallsScenario.FloorDefinition definition = adjustedDifficulty(floorDefinition(floor));
                         debugModifierAdjustments(definition, planned.floorDefinition(), activeFloorModifiers, planned.levelType());
                         revealFloorModifiers(activeFloorModifiers);
                     }
@@ -7613,7 +7626,9 @@ public final class HallsSession {
                                String difficultyId,
                                int rawShame,
                                Set<UUID> participants,
-                               File saveFile) {
+                               File saveFile,
+                               boolean endless,
+                               int floorReached) {
         public CompletedRun {
             participants = participants == null ? Set.of() : Set.copyOf(participants);
         }

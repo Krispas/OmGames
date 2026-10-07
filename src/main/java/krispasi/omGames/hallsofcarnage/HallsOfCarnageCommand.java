@@ -255,7 +255,7 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
         sender.sendMessage(Component.text("Halls scenarios:", NamedTextColor.GOLD));
         for (HallsScenario scenario : scenarios) {
             sender.sendMessage(Component.text("- " + scenario.id() + " (" + scenario.name() + ", "
-                    + scenario.floorCount() + " floors, " + scenario.minPlayers() + "-" + scenario.maxPlayers()
+                    + (scenario.endless() ? "endless" : scenario.floorCount() + " floors") + ", " + scenario.minPlayers() + "-" + scenario.maxPlayers()
                     + " players)", NamedTextColor.YELLOW));
             for (HallsScenario.FloorDefinition floor : scenario.floors()) {
                 sender.sendMessage(Component.text("  " + floorLabel(floor) + ": " + floor.kind()
@@ -398,7 +398,10 @@ public final class HallsOfCarnageCommand implements CommandExecutor, TabComplete
                 return List.of();
             }
             List<String> floors = new ArrayList<>();
-            for (int floor = 1; floor <= session.scenario().floorCount(); floor++) {
+            int lastFloor = session.scenario().endless()
+                    ? Math.min(Integer.MAX_VALUE - 1, session.currentFloor() + 50)
+                    : session.scenario().floorCount();
+            for (int floor = 1; floor <= lastFloor; floor++) {
                 floors.add(Integer.toString(floor));
             }
             return filter(args[2], floors.toArray(String[]::new));

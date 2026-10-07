@@ -1294,6 +1294,8 @@ SQLite tables:
 - `hoc_shame`
 - `hoc_completed_scenarios`
   - stores `scenario_id`, `player_uuid`, `completed_at`, `difficulty_id`, and `final_shame`
+- `hoc_endless_records`
+  - stores each player's highest reached floor per Endless scenario
 
 ### 7.4 Runtime Notes
 
@@ -1301,6 +1303,10 @@ SQLite tables:
 - The human-built lobby is centered near `0 70 0`; automated session/dungeon placement must stay at least 1000 blocks away.
 - Players in the Halls world are kept in Adventure mode, with full hunger and natural regeneration disabled.
 - Shame leaderboards are ascending because lower shame is better.
+- Endless scenarios use `type: endless`, configurable level-type pools, progression settings, a boss pool, and a fixed boss seed. The bundled Mixed and Base Game scenarios currently contain the same nine level types and inherit Untold Depths items, blueprints, crafting, research, and modifier content.
+- Endless floors use three distinct randomly ordered level types per exploration module, followed by camp; a boss floor and camp follow every four modules. Floor scaling follows the Untold Depths progression curve and has no completion floor.
+- Endless floor selection uses a per-run seed saved as `endless.run-seed`, so a save/load keeps that run's generated theme sequence while fresh runs randomize it.
+- Endless sessions do not accrue or persist shame. Each game-over records the current floor for every participant in `hoc_endless_records`; the lobby leaderboard shows campaign shame and Endless floor records separately.
 - When a party descends after the final configured scenario floor, the session displays completion/shame, records completion, deletes the Halls save file, optionally notifies OmVeins through its Halls completion consumer, and then returns players to the Halls lobby.
 - Halls run shame is saved in active save files as `shame.current`; final completion shame applies difficulty reduction (`normal` unchanged, `hard` 30% less, `extreme` 50% less) before persistence.
 - `/hoc start <scenario> [player...]` allocates a session origin, builds the first start floor/elevator shell, teleports players into it, and tracks changed blocks for cleanup.

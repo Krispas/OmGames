@@ -39,11 +39,30 @@ public final class HallsScenarioLoader {
 
     private static HallsScenario loadScenario(JavaPlugin plugin, File file) {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
+        String contentSource = config.getString("content-source", "");
+        if (contentSource != null && !contentSource.isBlank()) {
+            File sourceFile = findScenarioFile(file.getParentFile(), contentSource);
+            if (sourceFile != null && sourceFile.isFile()) {
+                YamlConfiguration source = YamlConfiguration.loadConfiguration(sourceFile);
+                for (String key : List.of("allowed-items", "blueprint-pools", "crafting-stations", "research.nodes")) {
+                    if (!config.contains(key)) config.set(key, source.get(key));
+                }
+            } else {
+                plugin.getLogger().warning("Scenario " + file.getName() + " references missing content source " + contentSource + ".");
+            }
+        }
         String fallbackId = file.getName().replaceFirst("\\.[^.]+$", "");
         String id = normalizeId(config.getString("id", fallbackId));
         String name = config.getString("name", fallbackId);
         int ordering = config.getInt("ordering", 1000);
         String difficulty = config.getString("difficulty", "Unknown");
+        String type = normalizeId(config.getString("type", "campaign"));
+        List<String> endlessLevelTypes = config.getStringList("endless.level-types").stream()
+                .map(HallsScenarioLoader::normalizeId).filter(value -> !value.isBlank()).distinct().toList();
+        List<HallsScenario.BossChoice> endlessBossPool = loadEndlessBossPool(config.getMapList("endless.boss-pool"));
+        long endlessBossSeed = config.getLong("endless.boss-seed", 1L);
+        String endlessBossLayout = config.getString("endless.boss-layout", "special/untold_depths_overdrive_spawner.txt");
+        HallsScenario.EndlessProgression endlessProgression = loadEndlessProgression(config.getConfigurationSection("endless.progression"));
         List<String> description = config.getStringList("description");
         if (description.isEmpty()) {
             String singleLine = config.getString("description");
@@ -69,12 +88,14 @@ public final class HallsScenarioLoader {
         }
         HallsScenario.CampSettings camp = loadCampSettings(config.getConfigurationSection("camp"));
         List<HallsScenario.FloorDefinition> floors = loadFloors(config);
-        int floorCount = floors.stream().mapToInt(HallsScenario.FloorDefinition::lastFloor).max().orElse(0);
+        int floorCount = "endless".equals(type) ? Integer.MAX_VALUE - 1
+                : floors.stream().mapToInt(HallsScenario.FloorDefinition::lastFloor).max().orElse(0);
         if (id.isBlank() || name == null || name.isBlank()) {
             plugin.getLogger().warning("Skipping invalid Halls scenario file " + file.getName() + ".");
             return null;
         }
-        return new HallsScenario(id, name, ordering, difficulty, List.copyOf(description), minPlayers, maxPlayers,
+        return new HallsScenario(id, name, ordering, difficulty, type, endlessLevelTypes, endlessBossPool,
+                endlessBossSeed, endlessBossLayout, endlessProgression, List.copyOf(description), minPlayers, maxPlayers,
                 floorCount, camp, allowedItems, blueprintPools, levelTypeBlueprintPools,
                 craftingStations, researchNodes, List.copyOf(floors), debugLines(file, config, floors, researchNodes.size()));
     }
@@ -338,6 +359,42 @@ public final class HallsScenarioLoader {
             return new TrapRange(amount, amount);
         }
         return new TrapRange(1, 2);
+    }
+
+    private static List<HallsScenario.BossChoice> loadEndlessBossPool(List<Map<?, ?>> rows) {
+        List<HallsScenario.BossChoice> choices = new ArrayList<>();
+        for (Map<?, ?> row : rows) {
+            Object rawLevelType = row.containsKey("level-type") ? row.get("level-type") : "howling_corridors";
+            Object rawBoss = row.containsKey("boss") ? row.get("boss") : "";
+            String levelType = normalizeId(String.valueOf(rawLevelType));
+            String boss = normalizeId(String.valueOf(rawBoss));
+            if (!levelType.isBlank() && !boss.isBlank()) choices.add(new HallsScenario.BossChoice(levelType, boss));
+        }
+        return List.copyOf(choices);
+    }
+
+    private static File findScenarioFile(File folder, String id) {
+        String normalized = normalizeId(id).replace(".yml", "").replace(".yaml", "");
+        File[] candidates = folder.listFiles((dir, name) -> name.endsWith(".yml") || name.endsWith(".yaml"));
+        if (candidates == null) return null;
+        for (File candidate : candidates) {
+            String candidateId = normalizeId(candidate.getName().replaceFirst("\\.[^.]+$", ""));
+            if (candidateId.equals(normalized)) return candidate;
+        }
+        return null;
+    }
+
+    private static HallsScenario.EndlessProgression loadEndlessProgression(ConfigurationSection section) {
+        HallsScenario.EndlessProgression d = HallsScenario.EndlessProgression.defaults();
+        if (section == null) return d;
+        return new HallsScenario.EndlessProgression(section.getInt("starting-difficulty", d.startingDifficulty()),
+                section.getInt("difficulty-per-module", d.difficultyPerModule()), section.getInt("starting-rooms", d.startingRooms()),
+                section.getInt("max-rooms", d.maxRooms()), section.getInt("starting-breakables", d.startingBreakables()),
+                section.getInt("breakables-per-exploration", d.breakablesPerExploration()), section.getInt("starting-traps", d.startingTraps()),
+                section.getInt("traps-per-module", d.trapsPerModule()), section.getInt("starting-holes", d.startingHoles()),
+                section.getInt("holes-per-module", d.holesPerModule()), section.getInt("starting-sculk-patches", d.startingSculkPatches()),
+                section.getInt("sculk-patches-per-module", d.sculkPatchesPerModule()), section.getInt("starting-coin-quota", d.startingCoinQuota()),
+                section.getInt("quota-per-module", d.quotaPerModule()), section.getInt("boss-every-modules", d.bossEveryModules()));
     }
 
     private static int blueprintDistilleryCount(Object value) {

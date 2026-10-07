@@ -32,6 +32,15 @@ public final class HallsShameService {
               PRIMARY KEY (scenario_id, player_uuid, completed_at)
             )
             """;
+    private static final String ENDLESS_TABLE_SQL = """
+            CREATE TABLE IF NOT EXISTS hoc_endless_records (
+              scenario_id TEXT NOT NULL,
+              player_uuid TEXT NOT NULL,
+              highest_floor INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL,
+              PRIMARY KEY (scenario_id, player_uuid)
+            )
+            """;
 
     private final File databaseFile;
     private final Logger logger;
@@ -48,6 +57,7 @@ public final class HallsShameService {
             try (Statement statement = connection.createStatement()) {
                 statement.execute(SHAME_TABLE_SQL);
                 statement.execute(HISTORY_TABLE_SQL);
+                statement.execute(ENDLESS_TABLE_SQL);
                 ensureCompletionDifficultyColumn(statement);
             }
         } catch (SQLException ex) {
@@ -126,6 +136,45 @@ public final class HallsShameService {
             logger.log(Level.WARNING, "Failed to load Halls shame leaderboard.", ex);
         }
         return entries;
+    }
+
+    public void recordEndlessFloor(String scenarioId, UUID playerId, int floor, long updatedAt) {
+        if (connection == null || scenarioId == null || scenarioId.isBlank() || playerId == null) return;
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO hoc_endless_records (scenario_id, player_uuid, highest_floor, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(scenario_id, player_uuid) DO UPDATE SET
+                  highest_floor = MAX(highest_floor, excluded.highest_floor),
+                  updated_at = CASE WHEN excluded.highest_floor > highest_floor THEN excluded.updated_at ELSE updated_at END
+                """)) {
+            statement.setString(1, scenarioId);
+            statement.setString(2, playerId.toString());
+            statement.setInt(3, Math.max(1, floor));
+            statement.setLong(4, updatedAt);
+            statement.executeUpdate();
+        } catch (SQLException ex) {
+            logger.log(Level.WARNING, "Failed to save Halls endless record for " + playerId + ".", ex);
+        }
+    }
+
+    public List<EndlessEntry> getEndlessLeaderboard(int limit) {
+        if (connection == null || limit <= 0) return List.of();
+        List<EndlessEntry> entries = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT scenario_id, player_uuid, highest_floor
+                FROM hoc_endless_records
+                ORDER BY highest_floor DESC, updated_at ASC, player_uuid ASC
+                LIMIT ?
+                """)) {
+            statement.setInt(1, limit);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) entries.add(new EndlessEntry(rs.getString("scenario_id"),
+                        UUID.fromString(rs.getString("player_uuid")), rs.getInt("highest_floor")));
+            }
+        } catch (IllegalArgumentException | SQLException ex) {
+            logger.log(Level.WARNING, "Failed to load Halls endless leaderboard.", ex);
+        }
+        return List.copyOf(entries);
     }
 
     public void recordCompletion(String scenarioId, String difficultyId, UUID playerId, int finalShame, long completedAt) {
@@ -210,4 +259,6 @@ public final class HallsShameService {
 
     public record ShameEntry(UUID playerId, int shame) {
     }
+
+    public record EndlessEntry(String scenarioId, UUID playerId, int highestFloor) { }
 }
