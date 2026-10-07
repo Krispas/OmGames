@@ -225,7 +225,7 @@ public final class HallsSession {
         this.buildingTypes = buildingTypes == null ? Map.of() : Map.copyOf(buildingTypes);
         this.hostId = hostId;
         this.difficultyId = normalizeId(difficultyId == null || difficultyId.isBlank() ? "normal" : difficultyId);
-        this.difficultyMultiplier = Math.max(1.0, difficultyMultiplier);
+        this.difficultyMultiplier = Math.max(0.1, difficultyMultiplier);
         this.elevatorLocatorIconItemModel = elevatorLocatorIconItemModel == null ? "" : elevatorLocatorIconItemModel.trim();
         this.initialSave = initialSave;
         this.completionHandler = completionHandler;
@@ -235,7 +235,8 @@ public final class HallsSession {
             participants.add(player.getUniqueId());
         }
         this.sculkRuntime = new HallsSessionSculkRuntime(plugin, world, origin, participants, this::setBlock,
-                playerId -> !transitioning && isAliveParticipant(playerId));
+                playerId -> !transitioning && isAliveParticipant(playerId),
+                this.difficultyId.equals("easy") ? 0.5 : 1.0);
         this.monsterRuntime = new HallsSessionMonsterRuntime(plugin, world, origin, participants, this.monsterTypes,
                 this::maxAliveSculkPercent, this::isAliveParticipant,
                 location -> dropSessionItem(location, coinItem(1)), this::debug);
@@ -2135,6 +2136,29 @@ public final class HallsSession {
                 player.sendTitle(title, subtitle, 10, 45, 15);
             }
         }
+        announceBlueprintDistilleryRewards();
+    }
+
+    private void announceBlueprintDistilleryRewards() {
+        if (blueprintDistilleries.isEmpty()) {
+            return;
+        }
+        List<ItemStack> rewards = currentLevelBlueprintSet();
+        if (rewards.isEmpty()) {
+            return;
+        }
+        String names = rewards.stream()
+                .map(ItemStack::getItemMeta)
+                .filter(java.util.Objects::nonNull)
+                .map(meta -> meta.hasDisplayName() ? net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(meta.displayName()) : "Blueprint")
+                .collect(java.util.stream.Collectors.joining(", "));
+        Component message = Component.text("Blueprint distillery rewards on this level: " + names + ".", NamedTextColor.AQUA);
+        for (UUID playerId : participants) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && player.getWorld().equals(world)) {
+                player.sendMessage(message);
+            }
+        }
     }
 
     private String explorationFloorSubtitle(HallsLevelType levelType) {
@@ -2398,6 +2422,9 @@ public final class HallsSession {
         }
         java.util.Collections.shuffle(rooms, build.random());
         for (HallsExplorationGenerator.Room room : rooms) {
+            if (room.ventOnly()) {
+                continue;
+            }
             List<Cell> cells = openInteriorCells(room);
             java.util.Collections.shuffle(cells, build.random());
             for (Cell cell : cells) {
@@ -3420,7 +3447,8 @@ public final class HallsSession {
             return;
         }
         debug("Starting monster runtime on floor " + build.floor() + ": " + build.levelType().id() + ".");
-        monsterRuntime.startExplorationFloor(build.plan(), build.floorDefinition(), build.levelType(), activeFloorModifiers, build.random());
+        monsterRuntime.startExplorationFloor(build.plan(), build.floorDefinition(), build.levelType(), activeFloorModifiers,
+                build.random(), difficultyId.equals("easy"));
     }
 
     private void renderExplorationSculk(ExplorationBuild build, Set<HallsExplorationGenerator.Cell> reservedCells) {
@@ -3448,8 +3476,8 @@ public final class HallsSession {
         }
         int difficulty = parseDifficulty(floorDefinition.difficulty(), floorDefinition.firstFloor());
         int goodChance = Math.max(0, Math.min(100, 50 - difficulty));
-        List<HallsModifierType> good = applicableModifiers(levelType, true);
-        List<HallsModifierType> bad = applicableModifiers(levelType, false);
+        List<HallsModifierType> good = applicableModifiers(levelType, true, scenario.id());
+        List<HallsModifierType> bad = applicableModifiers(levelType, false, scenario.id());
         List<HallsModifierType> selected = new ArrayList<>();
         for (int slot = 0; slot < 3; slot++) {
             boolean wantGood = random.nextInt(100) < goodChance;
@@ -3487,11 +3515,14 @@ public final class HallsSession {
         return lines.isEmpty() ? List.of("No upcoming exploration floors found.") : lines;
     }
 
-    private List<HallsModifierType> applicableModifiers(HallsLevelType levelType, boolean good) {
+    private List<HallsModifierType> applicableModifiers(HallsLevelType levelType, boolean good, String scenarioId) {
         String levelTypeId = levelType == null ? "" : levelType.id();
         return modifierTypes.values().stream()
                 .filter(modifier -> modifier.weight() > 0 && modifier.good() == good)
                 .filter(modifier -> {
+                    Object scopedScenario = modifier.effects().get("scenario");
+                    if (scopedScenario == null || !normalizeId(String.valueOf(scopedScenario))
+                            .equals(normalizeId(scenarioId))) return false;
                     Object restricted = modifier.effects().get("level_type");
                     return restricted == null || normalizeId(String.valueOf(restricted)).equals(levelTypeId);
                 })
@@ -4543,14 +4574,15 @@ public final class HallsSession {
     }
 
     private HallsScenario.FloorDefinition adjustedDifficulty(HallsScenario.FloorDefinition floor) {
-        if (floor == null || difficultyMultiplier <= 1.0) {
+        if (floor == null || Math.abs(difficultyMultiplier - 1.0) < 0.0001) {
             return floor;
         }
         int difficulty = Math.max(0, (int) Math.round(parseDifficulty(floor.difficulty(), floor.firstFloor()) * difficultyMultiplier));
-        int trappedRooms = Math.max(0, (int) Math.round(floor.trappedRooms() * difficultyMultiplier));
-        int holes = Math.max(0, (int) Math.round(floor.holes() * difficultyMultiplier));
-        int sculkPatches = Math.max(0, (int) Math.round(floor.sculkPatches() * difficultyMultiplier));
-        int coinQuota = Math.max(0, (int) Math.round(floor.coinQuota() * difficultyMultiplier));
+        boolean easy = difficultyId.equals("easy");
+        int trappedRooms = Math.max(0, (int) Math.round(floor.trappedRooms() * (easy ? 1.0 : difficultyMultiplier)));
+        int holes = Math.max(0, (int) Math.round(floor.holes() * (easy ? 1.0 : difficultyMultiplier)));
+        int sculkPatches = Math.max(0, (int) Math.round(floor.sculkPatches() * (easy ? 1.0 : difficultyMultiplier)));
+        int coinQuota = Math.max(0, (int) Math.round(floor.coinQuota() * (easy ? 0.75 : difficultyMultiplier)));
         return new HallsScenario.FloorDefinition(
                 floor.firstFloor(),
                 floor.lastFloor(),
@@ -4584,6 +4616,7 @@ public final class HallsSession {
 
     private int adjustedCompletionShame() {
         double factor = switch (difficultyId) {
+            case "easy" -> 3.0;
             case "hard" -> 0.7;
             case "extreme" -> 0.5;
             default -> 1.0;
@@ -4593,6 +4626,7 @@ public final class HallsSession {
 
     private String displayDifficulty(String difficultyId) {
         return switch (difficultyId) {
+            case "easy" -> "Easy";
             case "hard" -> "Hard";
             case "extreme" -> "Extreme";
             default -> "Normal";
@@ -5357,14 +5391,16 @@ public final class HallsSession {
 
     private boolean activateLodestone(Player player, HallsItemType type) {
         int durationTicks = Math.max(20, (int) Math.round(type.stats().getOrDefault("duration_seconds", 20.0) * 20.0));
+        List<HallsExplorationGenerator.Cell> path = List.copyOf(pathToElevator(player.getLocation()));
+        if (path.isEmpty()) {
+            player.sendActionBar(Component.text("The lodestone cannot find a route to the elevator.", NamedTextColor.RED));
+            return true;
+        }
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!running || !player.isOnline() || !player.getWorld().equals(world) || ghostPlayers.contains(player.getUniqueId())) {
                 return;
             }
-            List<HallsExplorationGenerator.Cell> path = pathToElevator(player.getLocation());
-            if (!path.isEmpty()) {
-                renderCellPathParticles(path, Particle.ELECTRIC_SPARK);
-            }
+            renderCellPathParticles(path, Particle.ELECTRIC_SPARK);
         }, 1L, 10L);
         Bukkit.getScheduler().runTaskLater(plugin, task::cancel, durationTicks);
         world.playSound(player.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8f, 1.2f);
@@ -6037,7 +6073,8 @@ public final class HallsSession {
         if (ghost == null) {
             return;
         }
-        Component message = Component.text(ghost.getName() + " became a ghost.", NamedTextColor.DARK_RED);
+        Component message = Component.text().append(ghost.displayName())
+                .append(Component.text(" succumbed to the halls.", NamedTextColor.AQUA)).build();
         for (UUID playerId : participants) {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null && player.getWorld().equals(world)) {

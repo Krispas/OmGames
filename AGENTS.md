@@ -1449,8 +1449,9 @@ SQLite tables:
 - Special Halls monster death/attack behavior currently includes data-driven monster splitting, Dammed Librarian poison clouds on attack/death, and Rotting Soldier delayed non-block-breaking explosion.
 - Halls modifier archetypes are loaded from `plugins/OmGames/HallsOfCarnage/modifiers/` and seeded from bundled defaults.
 - Modifier files define `modifiers.<id>.type`, `display-name`, `icon`, `weight`, and `effects`.
+- Modifier files are organized under `modifiers/<scenario_id>/`. Files directly inside a scenario folder are scoped to that scenario; `shared.yml` applies across level types, while other filenames restrict modifiers to the matching level type. Dammed Corridors' folder omits Death Fog.
 - Modifier effects include `enemy-health-multiplier`; duplicate modifiers stack multiplicatively.
-- Shared modifiers live in `modifiers/shared.yml`; level-specific modifier files such as `frozen_halls.yml` and `deep_crypt.yml` are restricted to that level type by filename.
+- Each scenario owns its modifier pool in `modifiers/<scenario_id>/`. Within that folder, `shared.yml` applies across level types and other filenames restrict modifiers to the matching level type.
 - Exploration floors roll three modifiers. Each slot has `max(0, min(100, 50 - difficulty))%` chance to roll from the good pool; otherwise it rolls from the bad pool.
 - Duplicate modifiers are allowed and their effects stack or multiply.
 - Modifier reveal pacing is intentionally slow enough for players to read each selected modifier during elevator descent.
@@ -1462,6 +1463,7 @@ SQLite tables:
 - Session monsters are persistent, have far-away removal disabled, and should prioritize alive participants over ghost players as targets.
 - Session monsters normally acquire targets only at close range; breakable destruction and elevator scrap deposits alert nearby spawned monsters at long range. Smoke Bomb concealment clears and suppresses targeting for its duration, and Creative/Spectator participants are ignored by monster target selection.
 - Exploration monster spawning has no finite total spawn budget. It fills to a live cap, extends that cap periodically based on floor difficulty, reduces the cap by one when an alive participant kills a session monster, and adds one cap slot for each session slime created by slime splitting. Direct spawn attempts stay on a fixed 5-second interval. Less/more-enemy modifier effects change the cap-extension interval, not the initial live cap. After 3 minutes on a floor, the cap-extension cooldown tightens by 1% of its base length per successful spawn until it reaches the 5-second minimum; after 15 minutes, the level type's full special monster pool may spawn.
+- Easy difficulty uses a 3.0 shame multiplier, 0.85 floor difficulty multiplier, half sculk gain, half initial enemy live cap, 1.5x direct spawn interval, 1.5x cap-extension interval, and 0.75x coin quota before floor modifiers.
 - Each extra participant after the first adds 33% to the exploration monster live cap and cap-extension speed before modifier cap-extension multipliers apply.
 - Level type `monsters.common` and `monsters.special` are parsed into runtime pools; exploration floors spawn a first-pass session-local monster flood from the active level type.
 - Breaking Halls props and depositing elevator scrap alert nearby spawned monsters toward the nearest participant.

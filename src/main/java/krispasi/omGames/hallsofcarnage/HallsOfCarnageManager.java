@@ -82,6 +82,7 @@ public final class HallsOfCarnageManager {
     private static final DifficultyOption NORMAL_DIFFICULTY = new DifficultyOption("normal", "Normal", 1.0);
     private static final Map<String, DifficultyOption> DIFFICULTIES = Map.of(
             "normal", NORMAL_DIFFICULTY,
+            "easy", new DifficultyOption("easy", "Easy", 0.85),
             "hard", new DifficultyOption("hard", "Hard", 1.5),
             "extreme", new DifficultyOption("extreme", "Extreme", 2.0)
     );
@@ -1279,6 +1280,7 @@ public final class HallsOfCarnageManager {
 
     private int adjustedCompletionShame(int rawShame, String difficultyId) {
         double factor = switch (normalizeId(difficultyId)) {
+            case "easy" -> 3.0;
             case "hard" -> 0.7;
             case "extreme" -> 0.5;
             default -> 1.0;

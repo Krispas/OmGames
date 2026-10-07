@@ -67,9 +67,10 @@ public final class HallsMainMenu {
     public static void openDifficulty(JavaPlugin plugin, Player player, String scenarioId) {
         Inventory inventory = Bukkit.createInventory(new MenuHolder(MenuType.DIFFICULTY, scenarioId), 27,
                 Component.text("Choose Difficulty", NamedTextColor.DARK_RED));
-        inventory.setItem(11, difficultyItem(plugin, "normal", "Normal", Material.IRON_SWORD, 1.0));
-        inventory.setItem(13, difficultyItem(plugin, "hard", "Hard", Material.DIAMOND_SWORD, 1.5));
-        inventory.setItem(15, difficultyItem(plugin, "extreme", "Extreme", Material.NETHERITE_SWORD, 2.0));
+        inventory.setItem(10, difficultyItem(plugin, "easy", "Easy", Material.WOODEN_SWORD, 0.85));
+        inventory.setItem(12, difficultyItem(plugin, "normal", "Normal", Material.IRON_SWORD, 1.0));
+        inventory.setItem(14, difficultyItem(plugin, "hard", "Hard", Material.DIAMOND_SWORD, 1.5));
+        inventory.setItem(16, difficultyItem(plugin, "extreme", "Extreme", Material.NETHERITE_SWORD, 2.0));
         inventory.setItem(22, item(plugin, Material.ARROW, "Back", NamedTextColor.GRAY, List.of(), ACTION_BACK, null));
         player.openInventory(inventory);
     }

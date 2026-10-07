@@ -1096,18 +1096,31 @@ final class HallsExplorationGenerator {
     private List<Cell> bunkerTrunkPath() {
         int radius = Math.min(clearRadius - 10, Math.max(32, 38 + rooms.size() * 2));
         int frontZ = elevatorFrontCell(4).z();
-        int northZ = clamp(originZ - radius, originZ - clearRadius + 3, originZ + clearRadius - 3);
-        int southZ = clamp(originZ + radius / 2, originZ - clearRadius + 3, originZ + clearRadius - 3);
-        int eastX = clamp(originX + radius, originX - clearRadius + 3, originX + clearRadius - 3);
-        int westX = clamp(originX - radius, originX - clearRadius + 3, originX + clearRadius - 3);
-        List<Cell> waypoints = List.of(
-                new Cell(originX, northZ),
-                new Cell(eastX, northZ),
-                new Cell(eastX, southZ),
-                new Cell(westX, southZ),
-                new Cell(westX, frontZ),
-                new Cell(originX, frontZ)
-        );
+        int min = originX - clearRadius + 4;
+        int max = originX + clearRadius - 4;
+        int minZ = originZ - clearRadius + 4;
+        int maxZ = originZ + clearRadius - 4;
+        int x1 = clamp(originX + random.nextInt(radius * 2 + 1) - radius, min, max);
+        int x2 = clamp(originX + random.nextInt(radius * 2 + 1) - radius, min, max);
+        int z1 = clamp(originZ + random.nextInt(radius * 2 + 1) - radius, minZ, maxZ);
+        int z2 = clamp(originZ + random.nextInt(radius * 2 + 1) - radius, minZ, maxZ);
+        List<Cell> waypoints = new ArrayList<>();
+        waypoints.add(new Cell(originX, clamp(frontZ + (frontZ < originZ ? -3 : 3), minZ, maxZ)));
+        // Vary both the trunk's footprint and its turns; avoid the old fixed mirrored-L loop.
+        int turns = 4 + random.nextInt(4);
+        boolean horizontal = random.nextBoolean();
+        int x = x1;
+        int z = z1;
+        for (int turn = 0; turn < turns; turn++) {
+            if (horizontal) {
+                x = turn % 2 == 0 ? x1 : x2;
+            } else {
+                z = turn % 2 == 0 ? z1 : z2;
+            }
+            waypoints.add(new Cell(x, z));
+            horizontal = !horizontal;
+        }
+        waypoints.add(new Cell(originX + random.nextInt(17) - 8, frontZ));
         return pathThrough(elevatorFrontCell(1), waypoints);
     }
 

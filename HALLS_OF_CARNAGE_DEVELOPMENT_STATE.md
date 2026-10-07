@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-10-03
+Last updated: 2026-10-07
 
 ## Implemented
 
@@ -96,6 +96,11 @@ Last updated: 2026-10-03
 - Exploration layout planning now runs off the main thread and hands the completed pure-Java plan back to the main-thread build job, so large room/path planning is included in the visible Planning loading phase instead of blocking before progress appears.
 - Trap placement now evaluates up to 32 atomic candidate units per tick within an 8 ms budget, retaining cached connectivity and reservation safety while reducing long trap-generation tails.
 - Scenario resources support an `ordering` field; scenario lists sort by ordering, name, and id, with Untold Depths explicitly first.
+- Lodestone activations calculate and cache their elevator path once per activation, so repeated particle displays do not rerun pathfinding and simultaneous players keep independent routes.
+- Removed the Rusty Tools floor modifier from the shared modifier pool.
+- Blueprint distillery rewards now use the unique blueprint set available to the active level type, distilleries skip vent-only disconnected library rooms, and floor arrival announces the available rewards in chat.
+- Ghost announcements use the player's colored display name followed by aqua text: "succumbed to the halls."
+- Dammed Librarians deploy their poison cloud only on death; hitting a player no longer creates one.
 
 ## Current Scope
 
@@ -121,22 +126,16 @@ This is the first implementation slice. It focuses on:
 
 ## Latest Slice Notes
 
+- Organized modifier pools under `modifiers/<scenario_id>/`. Dammed Corridors' bundled pool omits Death Fog; Untold Depths retains it. Modifier pools are loaded and selected by scenario folder.
+- Reworked the bunker main trunk to use a randomized footprint and turn sequence instead of the repeated mirrored-L route.
+- Added Easy difficulty with a 3.0 shame multiplier, 0.85 floor difficulty scaling, half-rate sculk gain, half-size initial enemy cap, 1.5x spawn and cap-extension intervals, and 25% lower coin quota. These baseline adjustments are applied before floor modifiers.
+
 ## Reviewer notes (Delete entries once done, but keep the header)
 ## Do all following for the next slice (and keep this line):
-- Improve performance for the lodestone, instead of recalculating the path each time its displayed, just calculate it on start and cache it for the next displayes within the same activation (support multiple players doing this). 
-- Remove the rusty tools modifier from the game
-- Blueprint distilleries seem to give extra random blueprint right now, they should just give player 1 of each blueprint available on the level type
-- Make it so blueprint distilleries dont generate in disconnected library rooms
-- Make it so when arriving at a level which contains a blueprint distillery, the blueprints given as reward will be announced into the chat.
-- When player becomes a ghost, print it into chat. Aqua text, "<playername (colored)> succumbed to the halls."
-- Librarian enemy change: make it so the poison bomb only gets deployed when they die, removing its spawning each time they hit someone
+- Remove the mechanic which adds a research point each floor, research points should be only avialable by depositing research crates.
 
 ## Future slices (dont do yet):
-- Make modifiers scenario dependend, make it so dammed corridors has all modifiers except the death fog
-- Right now, the big corridor in bunker level type always has the same shape, looking like big mirrored L. Fix that and make it more random.
-- Add easy difficulty: it has 3.0 shame multiplier, sculk accumulates 2 times slower, there is 50% less enemies, overall enemy spawning is 33% slower, quota is 25% smaller and difficulty is multiplied by 0.85 (all of these apply before any other modifiers)
 - Add a new scenario type called endless, its details are in a file called ENDLESS_MODE.md
-
 ## For reviewer to figure out:
 - New models: alchemy cauldron, camp station, carrot farm, deconstructor, elevator drill, forge, grindstone, health_totem, research_table, scanner, sculk purifier, speed totem, storage locker.
 - Texture all items

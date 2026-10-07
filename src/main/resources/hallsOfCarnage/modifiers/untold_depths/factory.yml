@@ -1,0 +1,8 @@
+modifiers:
+  steam_vents:
+    type: bad
+    display-name: "Steam Vents"
+    icon: "!"
+    weight: 7
+    effects:
+      trap: steam_vent

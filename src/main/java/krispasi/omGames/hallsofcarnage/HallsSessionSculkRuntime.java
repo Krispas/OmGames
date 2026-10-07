@@ -32,6 +32,7 @@ final class HallsSessionSculkRuntime {
     private final List<Patch> patches = new java.util.ArrayList<>();
     private final Map<UUID, Double> playerSculk = new HashMap<>();
     private final Predicate<UUID> canGainSculk;
+    private final double gainMultiplier;
     private BukkitTask tickTask;
     private PatchPlacement pendingPlacement;
 
@@ -40,13 +41,15 @@ final class HallsSessionSculkRuntime {
                              HallsConfig.BlockPoint origin,
                              Set<UUID> participants,
                              BlockSetter blockSetter,
-                             Predicate<UUID> canGainSculk) {
+                             Predicate<UUID> canGainSculk,
+                             double gainMultiplier) {
         this.plugin = plugin;
         this.world = world;
         this.origin = origin;
         this.participants = participants;
         this.blockSetter = blockSetter;
         this.canGainSculk = canGainSculk == null ? (playerId -> true) : canGainSculk;
+        this.gainMultiplier = Math.max(0.0, gainMultiplier);
     }
 
     Set<HallsExplorationGenerator.Cell> placePatches(HallsExplorationGenerator.Plan plan,
@@ -276,7 +279,7 @@ final class HallsSessionSculkRuntime {
             }
             boolean inSculk = isInSculk(player.getLocation());
             double current = playerSculk.getOrDefault(playerId, 0.0);
-            double next = inSculk ? Math.min(100.0, current + SCULK_GAIN_PER_SECOND) : current;
+            double next = inSculk ? Math.min(100.0, current + SCULK_GAIN_PER_SECOND * gainMultiplier) : current;
             playerSculk.put(playerId, next);
             playSculkFeedback(player, inSculk);
         }
