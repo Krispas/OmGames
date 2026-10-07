@@ -154,6 +154,7 @@ This is the first implementation slice. It focuses on:
 - Fixed textures for cooked potato / mycelia and sculk removing foods
 - Lobby
 - Minigame Machine connection
+- Achievements
 
 ## DLC ideas
 - Building which adds durability
