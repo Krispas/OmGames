@@ -1,6 +1,6 @@
 # Halls of Carnage Development State
 
-Last updated: 2026-10-07
+Last updated: 2026-10-09
 
 ## Implemented
 
@@ -141,9 +141,10 @@ This is the first implementation slice. It focuses on:
 - Extracted Endless floor scaling into scenario `endless.progression` YAML using decimal starting values and per-module/per-exploration rates. Generated values round to the nearest integer, allowing slow-growth stats such as traps to remain unchanged across multiple floors; bundled rates are tuned to better match Untold Depths.
 - Endless floor 1 now has an explicit start-floor definition with a zero coin quota, so parties can always leave the starting elevator.
 - Endless exploration floor room cap is 100; Untold Depths' More Rooms modifier can add up to five additional rooms.
+- Endless scenarios now store their own copies of allowed items, blueprint pools, crafting stations, and research nodes in their scenario YAML. Runtime no longer reads `content-source` or fills missing scenario content from Untold Depths.
+- Endless Mixed and Endless Base Game each have an independent modifier directory seeded from the prior Untold Depths defaults; modifier selection uses the active scenario id, so each pool can be tuned separately.
 
 ## Reviewer notes (Delete entries once done, but keep the header)
-- Endless mode works perfectly, but there is a problem. In previous prompt I said to base some stuff based on UntoldDepths scenario, so there now exists content-source: UntoldDepths variable. That is wrong, I meant that you should copy the data from the scenario, so I can still adjust it for the endless mode specifically.
 ## Future slices (dont do yet):
 -TBD
 ## For reviewer to figure out:

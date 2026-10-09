@@ -3482,7 +3482,7 @@ public final class HallsSession {
         }
         int difficulty = parseDifficulty(floorDefinition.difficulty(), floorDefinition.firstFloor());
         int goodChance = Math.max(0, Math.min(100, 50 - difficulty));
-        String modifierScenario = scenario.endless() ? "untold_depths" : scenario.id();
+        String modifierScenario = scenario.id();
         List<HallsModifierType> good = applicableModifiers(levelType, true, modifierScenario);
         List<HallsModifierType> bad = applicableModifiers(levelType, false, modifierScenario);
         List<HallsModifierType> selected = new ArrayList<>();

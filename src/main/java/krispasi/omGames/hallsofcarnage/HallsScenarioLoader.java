@@ -39,18 +39,6 @@ public final class HallsScenarioLoader {
 
     private static HallsScenario loadScenario(JavaPlugin plugin, File file) {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(file);
-        String contentSource = config.getString("content-source", "");
-        if (contentSource != null && !contentSource.isBlank()) {
-            File sourceFile = findScenarioFile(file.getParentFile(), contentSource);
-            if (sourceFile != null && sourceFile.isFile()) {
-                YamlConfiguration source = YamlConfiguration.loadConfiguration(sourceFile);
-                for (String key : List.of("allowed-items", "blueprint-pools", "crafting-stations", "research.nodes")) {
-                    if (!config.contains(key)) config.set(key, source.get(key));
-                }
-            } else {
-                plugin.getLogger().warning("Scenario " + file.getName() + " references missing content source " + contentSource + ".");
-            }
-        }
         String fallbackId = file.getName().replaceFirst("\\.[^.]+$", "");
         String id = normalizeId(config.getString("id", fallbackId));
         String name = config.getString("name", fallbackId);
@@ -371,17 +359,6 @@ public final class HallsScenarioLoader {
             if (!levelType.isBlank() && !boss.isBlank()) choices.add(new HallsScenario.BossChoice(levelType, boss));
         }
         return List.copyOf(choices);
-    }
-
-    private static File findScenarioFile(File folder, String id) {
-        String normalized = normalizeId(id).replace(".yml", "").replace(".yaml", "");
-        File[] candidates = folder.listFiles((dir, name) -> name.endsWith(".yml") || name.endsWith(".yaml"));
-        if (candidates == null) return null;
-        for (File candidate : candidates) {
-            String candidateId = normalizeId(candidate.getName().replaceFirst("\\.[^.]+$", ""));
-            if (candidateId.equals(normalized)) return candidate;
-        }
-        return null;
     }
 
     private static HallsScenario.EndlessProgression loadEndlessProgression(ConfigurationSection section) {
