@@ -72,8 +72,8 @@ public final class ChessMatchRuntime {
     );
     private static final Transformation FLAT_WHITE_TRANSFORMATION = new Transformation(
             new Vector3f(),
-            new Quaternionf(0.0f, 0.7071068f, -0.7071068f, 0.0f),
-            new Vector3f(1.8750004f, 1.875f, 1.8749976f),
+            new Quaternionf(0.7069991f, 0.012340578f, -0.012340578f, 0.7069991f),
+            new Vector3f(1.875f, 1.875f, 1.875f),
             new Quaternionf()
     );
     private static final Transformation FLAT_BLACK_TRANSFORMATION = new Transformation(
@@ -84,6 +84,7 @@ public final class ChessMatchRuntime {
     );
 
     private final JavaPlugin plugin;
+    private ChessGuiController guiController;
     private final ChessDatabaseService databaseService;
     private final NamespacedKey entityTypeKey;
     private final NamespacedKey pieceIdKey;
@@ -146,6 +147,10 @@ public final class ChessMatchRuntime {
         this.pieceIdKey = new NamespacedKey(plugin, "chess_piece_id");
         this.squareKey = new NamespacedKey(plugin, "chess_square");
         this.timestampKey = new NamespacedKey(plugin, "chess_timestamp");
+    }
+
+    void setGuiController(ChessGuiController guiController) {
+        this.guiController = guiController;
     }
 
     public void load() {
@@ -428,6 +433,12 @@ public final class ChessMatchRuntime {
         initializeMoveTimeline();
         teleportTeamsToBoard();
         applyPlayerRuntimeEffects();
+        if (guiController != null) {
+            for (UUID playerId : allTeamPlayerIds()) {
+                Player player = Bukkit.getPlayer(playerId);
+                if (player != null) guiController.giveInGameHotbar(player, settings.allowUndo());
+            }
+        }
         applyTurnGlow();
         turnStartedMillis = System.currentTimeMillis();
         if (timerEnabled && !paused) {
@@ -1377,6 +1388,7 @@ public final class ChessMatchRuntime {
             Player player = Bukkit.getPlayer(playerId);
             if (player != null) {
                 player.sendMessage(Component.text(result, winner == null ? NamedTextColor.YELLOW : NamedTextColor.GREEN));
+                if (guiController != null) guiController.giveEndGameHotbar(player);
             }
         }
         clearMatchRuntime();
@@ -1397,6 +1409,10 @@ public final class ChessMatchRuntime {
         clearPlayerRuntimeEffects();
         clearSpectatorRuntimeEffects();
         stopTimerTask();
+        for (UUID playerId : allTeamPlayerIds()) {
+            Player player = Bukkit.getPlayer(playerId);
+            if (player != null && guiController != null) guiController.giveEndGameHotbar(player);
+        }
         clearMatchRuntime();
     }
 

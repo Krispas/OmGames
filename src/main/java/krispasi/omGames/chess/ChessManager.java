@@ -28,6 +28,7 @@ public final class ChessManager {
         this.timestampKey = new org.bukkit.NamespacedKey(plugin, "chess_timestamp");
         this.setupRuntime = new ChessMatchRuntime(plugin);
         this.guiController = new ChessGuiController(plugin, this);
+        this.setupRuntime.setGuiController(guiController);
     }
 
     public void load() {
@@ -35,6 +36,7 @@ public final class ChessManager {
         setupRuntime.openStorage();
         for (ChessDatabaseService.ActiveMatchState state : databaseService.loadActiveMatchStates()) {
             ChessMatchRuntime runtime = new ChessMatchRuntime(plugin);
+            runtime.setGuiController(guiController);
             runtime.openStorage();
             runtime.restoreActiveMatchState(state);
             if (runtime.isMatchActive()) {
@@ -166,6 +168,7 @@ public final class ChessManager {
                     + activeOnBoard.activeMatchStartedAt() + ".");
         }
         ChessMatchRuntime runtime = new ChessMatchRuntime(plugin);
+        runtime.setGuiController(guiController);
         runtime.openStorage();
         copyPendingSetupTo(runtime);
         Result result = runtime.startMatch(resolvedBoardTimestamp);
@@ -296,10 +299,6 @@ public final class ChessManager {
             return blackResult;
         }
         Result startResult = startMatch(challenger, null);
-        if (startResult.success()) {
-            guiController.giveInGameHotbar(challenger, options.allowUndo());
-            guiController.giveInGameHotbar(target, options.allowUndo());
-        }
         return startResult;
     }
 

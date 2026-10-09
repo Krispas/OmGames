@@ -25,6 +25,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
             if (sender instanceof Player player) {
+                if (!canOpenMenu(player)) return true;
                 chessManager.openMenu(player);
                 return true;
             }
@@ -51,6 +52,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(Component.text("Only players can open the chess menu.", NamedTextColor.RED));
                     return true;
                 }
+                if (!canOpenMenu(player)) return true;
                 chessManager.openMenu(player);
                 return true;
             }
@@ -146,6 +148,18 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
             }
         }
         sender.sendMessage(Component.text(result.message(), result.success() ? NamedTextColor.GREEN : NamedTextColor.RED));
+        return true;
+    }
+
+    private boolean canOpenMenu(Player player) {
+        if (chessManager.isOpponent(player)) {
+            player.sendMessage(Component.text("You cannot open the chess menu while playing a match.", NamedTextColor.RED));
+            return false;
+        }
+        if (player.getWorld() == null || !"bedwars_lobby".equals(player.getWorld().getName())) {
+            player.sendMessage(Component.text("The chess menu is only available in minecraft:bedwars_lobby.", NamedTextColor.RED));
+            return false;
+        }
         return true;
     }
 

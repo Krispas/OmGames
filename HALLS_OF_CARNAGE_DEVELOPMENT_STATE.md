@@ -143,6 +143,7 @@ This is the first implementation slice. It focuses on:
 - Endless exploration floor room cap is 100; Untold Depths' More Rooms modifier can add up to five additional rooms.
 
 ## Reviewer notes (Delete entries once done, but keep the header)
+- Endless mode works perfectly, but there is a problem. In previous prompt I said to base some stuff based on UntoldDepths scenario, so there now exists content-source: UntoldDepths variable. That is wrong, I meant that you should copy the data from the scenario, so I can still adjust it for the endless mode specifically.
 ## Future slices (dont do yet):
 -TBD
 ## For reviewer to figure out:
