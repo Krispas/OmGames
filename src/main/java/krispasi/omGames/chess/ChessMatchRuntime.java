@@ -72,7 +72,7 @@ public final class ChessMatchRuntime {
     );
     private static final Transformation FLAT_WHITE_TRANSFORMATION = new Transformation(
             new Vector3f(),
-            new Quaternionf(0.7069991f, 0.012340578f, -0.012340578f, 0.7069991f),
+            new Quaternionf(0.7071068f, 0.0f, 0.0f, 0.7071068f),
             new Vector3f(1.875f, 1.875f, 1.875f),
             new Quaternionf()
     );
@@ -368,12 +368,21 @@ public final class ChessMatchRuntime {
         if (lightBlock == null || darkBlock == null || highlightBlock == null) {
             return Result.fail("All three chess board blocks must be valid blocks.");
         }
-        palette = new ChessBoardPalette(lightBlock, darkBlock, highlightBlock);
+        palette = new ChessBoardPalette(lightBlock, darkBlock, highlightBlock, palette.selectionBlock());
         if (boardContext != null) {
             refreshHighlights();
         }
         return Result.ok("Chess board palette set to " + lightBlock.getKey() + ", " + darkBlock.getKey()
                 + ", " + highlightBlock.getKey() + ".");
+    }
+
+    public Result setSelectionBlock(Material selectionBlock) {
+        if (selectionBlock == null || !selectionBlock.isBlock()) {
+            return Result.fail("The selected-figure highlight must be a valid block.");
+        }
+        palette = new ChessBoardPalette(palette.lightBlock(), palette.darkBlock(), palette.highlightBlock(), selectionBlock);
+        refreshHighlights();
+        return Result.ok("Chess selected-figure block set to " + selectionBlock.getKey() + ".");
     }
 
     public Result resetPalette() {
@@ -1763,7 +1772,10 @@ public final class ChessMatchRuntime {
         for (int file = 0; file < BOARD_SIZE; file++) {
             for (int rank = 0; rank < BOARD_SIZE; rank++) {
                 ChessSquare square = new ChessSquare(file, rank);
-                Material material = highlights.contains(square)
+                ChessPiece selectedPiece = getPieceById(selectedPieceId);
+                boolean selectedFlatSquare = settings.figureStyle() == ChessSettings.FigureStyle.FLAT
+                        && selectedPiece != null && selectedPiece.square().equals(square);
+                Material material = selectedFlatSquare ? palette.selectionBlock() : highlights.contains(square)
                         ? palette.highlightBlock()
                         : (square.isLightSquare() ? palette.lightBlock() : palette.darkBlock());
                 setSquareBlocks(world, square, material);
@@ -1830,6 +1842,13 @@ public final class ChessMatchRuntime {
         if (boardContext == null) {
             return;
         }
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (boardContext == null) return;
+            refreshHighlightsNow();
+        });
+    }
+
+    private void refreshHighlightsNow() {
         ChessPiece selected = getPieceById(selectedPieceId);
         if (settings.visualizeMovementCheck() && selected != null && !selected.captured()) {
             placeCheckerboard(ChessRules.getCandidateMoves(this, selected, true));
@@ -2746,7 +2765,12 @@ public final class ChessMatchRuntime {
             boolean canMoveForTurn = turn == ChessSide.WHITE
                     ? whitePlayers.containsKey(playerId)
                     : blackPlayers.containsKey(playerId);
-            player.setGlowing(canMoveForTurn);
+            player.setGlowing(false);
+            if (canMoveForTurn) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 40, 0, false, false, true));
+            } else if (!previousGlowing.getOrDefault(playerId, false)) {
+                player.removePotionEffect(PotionEffectType.GLOWING);
+            }
         }
     }
 
@@ -2754,7 +2778,8 @@ public final class ChessMatchRuntime {
         for (Map.Entry<UUID, Boolean> entry : new ArrayList<>(previousGlowing.entrySet())) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player != null) {
-                player.setGlowing(false);
+                if (!entry.getValue()) player.removePotionEffect(PotionEffectType.GLOWING);
+                player.setGlowing(entry.getValue());
             }
         }
         previousGlowing.clear();

@@ -99,6 +99,14 @@ public final class ChessManager {
                 + ", " + highlightBlock.getKey() + ".");
     }
 
+    public Result setSelectionBlock(Material selectionBlock) {
+        setupRuntime.setSelectionBlock(selectionBlock);
+        for (ChessMatchRuntime runtime : activeMatches.values()) {
+            runtime.setSelectionBlock(selectionBlock);
+        }
+        return Result.ok("Chess selected-figure block set to " + selectionBlock.getKey() + ".");
+    }
+
     public Result resetPalette() {
         setupRuntime.resetPalette();
         for (ChessMatchRuntime runtime : activeMatches.values()) {
@@ -266,6 +274,10 @@ public final class ChessManager {
 
     public boolean handleGuiInventoryClose(Player player, org.bukkit.inventory.Inventory inventory) {
         return guiController.handleInventoryClose(player, inventory);
+    }
+
+    public boolean isChessToolbarItem(org.bukkit.inventory.ItemStack item) {
+        return guiController.isToolbarItem(item);
     }
 
     public boolean handleGuiHotbarInteract(Player player, org.bukkit.inventory.ItemStack item) {

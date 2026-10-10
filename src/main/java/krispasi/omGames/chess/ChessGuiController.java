@@ -75,6 +75,10 @@ final class ChessGuiController {
             PendingChallenge challenge = pendingByTarget.remove(player.getUniqueId());
             if (challenge != null) {
                 pendingTargetByChallenger.remove(challenge.challengerId());
+                Player challenger = Bukkit.getPlayer(challenge.challengerId());
+                if (challenger != null) {
+                    challenger.sendMessage(Component.text(player.getName() + " cancelled the chess match request.", NamedTextColor.YELLOW));
+                }
             }
         }
         return true;
@@ -88,10 +92,12 @@ final class ChessGuiController {
         switch (action) {
             case "settings" -> openChangeSettings(player);
             case "pause" -> send(player, manager.togglePause(player, null));
-            case "undo", "backward" -> send(player, manager.undo(player, player.isOp()));
+            case "undo" -> send(player, manager.undo(player, player.isOp()));
+            case "backward" -> send(player, manager.backward(player));
             case "redo" -> send(player, manager.redo(player, player.isOp()));
             case "forward" -> send(player, manager.forward(player));
             case "review_backward" -> send(player, manager.backward(player));
+            case "next_settings" -> openNextMatch(player);
             case "confirm" -> openConfirm(player);
             case "rematch" -> openNextMatch(player);
             case "exit" -> {
@@ -110,6 +116,10 @@ final class ChessGuiController {
         return true;
     }
 
+    boolean isToolbarItem(ItemStack item) {
+        return action(item) != null;
+    }
+
     void giveInGameHotbar(Player player, boolean allowUndo) {
         player.getInventory().clear();
         player.getInventory().setItem(0, hotbar("Settings", "om:settings_icon", "settings"));
@@ -126,7 +136,7 @@ final class ChessGuiController {
 
     void giveEndGameHotbar(Player player) {
         player.getInventory().clear();
-        player.getInventory().setItem(0, hotbar("Settings", "om:settings_icon", "settings"));
+        player.getInventory().setItem(0, hotbar("Settings", "om:settings_icon", "next_settings"));
         player.getInventory().setItem(1, hotbar("Rematch", "om:reroll_icon", "rematch"));
         player.getInventory().setItem(4, hotbar("Backward", "om:left_arrow", "review_backward"));
         player.getInventory().setItem(5, hotbar("Forward", "om:right_arrow", "forward"));
@@ -146,35 +156,26 @@ final class ChessGuiController {
     }
 
     private void handleSettingsClick(Player player, int slot, PlayerOptions options) {
-        if (slot == 21) {
-            options.setStartingSide(ChessSide.WHITE);
-            openSettings(player);
-        } else if (slot == 22) {
-            options.setStartingSide(null);
-            openSettings(player);
-        } else if (slot == 23) {
-            options.setStartingSide(ChessSide.BLACK);
-            openSettings(player);
-        } else if (slot == 27 || slot == 29) {
-            options.setTimerPreset(nextTimerPreset(options.timerPreset(), slot == 29 ? 1 : -1));
+        if (slot == 1 || slot == 3) {
+            options.setTimerPreset(nextTimerPreset(options.timerPreset(), slot == 3 ? 1 : -1));
             applyTimerPreset(options);
             openSettings(player);
-        } else if (slot == 28) {
+        } else if (slot == 2) {
             openSetTimer(player);
-        } else if (slot == 32) {
+        } else if (slot == 5) {
             options.setShowMovementHints(!options.showMovementHints());
             openSettings(player);
-        } else if (slot == 33) {
+        } else if (slot == 6) {
             options.setFigureStyle(options.figureStyle() == ChessSettings.FigureStyle.DEFAULT
                     ? ChessSettings.FigureStyle.FLAT : ChessSettings.FigureStyle.DEFAULT);
             openSettings(player);
-        } else if (slot == 34) {
+        } else if (slot == 7) {
             options.setAllowUndo(!options.allowUndo());
             openSettings(player);
-        } else if (slot == 48) {
+        } else if (slot == 21) {
             optionsByPlayer.put(player.getUniqueId(), new PlayerOptions());
             openSettings(player);
-        } else if (slot == 50) {
+        } else if (slot == 23) {
             openMenu(player);
         }
     }
@@ -223,6 +224,7 @@ final class ChessGuiController {
         PlayerOptions snapshot = options(player).copy();
         pendingByTarget.put(target.getUniqueId(), new PendingChallenge(player.getUniqueId(), snapshot));
         pendingTargetByChallenger.put(player.getUniqueId(), target.getUniqueId());
+        player.closeInventory();
         openChallenge(target, player);
         player.sendMessage(Component.text("Chess offer sent to " + target.getName() + ".", NamedTextColor.GREEN));
     }
@@ -310,19 +312,16 @@ final class ChessGuiController {
 
     private void openSettings(Player player) {
         PlayerOptions options = options(player);
-        Inventory inventory = inventory(GuiType.SETTINGS, player.getUniqueId(), 54, "Settings");
+        Inventory inventory = inventory(GuiType.SETTINGS, player.getUniqueId(), 27, "Settings");
         fill(inventory);
-        inventory.setItem(21, colorItem("Starting color", "om:white_pawn_icon", options.startingSide() == ChessSide.WHITE, "White"));
-        inventory.setItem(22, colorItem("Starting color", "om:selected_pawn_icon", options.startingSide() == null, "Random"));
-        inventory.setItem(23, colorItem("Starting color", "om:black_pawn_icon", options.startingSide() == ChessSide.BLACK, "Black"));
-        inventory.setItem(27, item("Previous preset", NamedTextColor.WHITE, "om:left_arrow"));
-        inventory.setItem(28, timerPresetItem(options.timerPreset()));
-        inventory.setItem(29, item("Next preset", NamedTextColor.WHITE, "om:right_arrow"));
-        inventory.setItem(32, toggleItem("Show movement hints", options.showMovementHints(), "om:hint1", "om:hint0"));
-        inventory.setItem(33, styleItem(options.figureStyle()));
-        inventory.setItem(34, toggleItem("Allow undo", options.allowUndo(), "om:undo_icon", "om:no_undo_icon"));
-        inventory.setItem(48, item("Reset settings", NamedTextColor.DARK_RED, "om:filled_reroll"));
-        inventory.setItem(50, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
+        inventory.setItem(1, item("Previous preset", NamedTextColor.WHITE, "om:left_arrow"));
+        inventory.setItem(2, timerPresetItem(options.timerPreset()));
+        inventory.setItem(3, item("Next preset", NamedTextColor.WHITE, "om:right_arrow"));
+        inventory.setItem(5, toggleItem("Show movement hints", options.showMovementHints(), "om:hint1", "om:hint0"));
+        inventory.setItem(6, styleItem(options.figureStyle()));
+        inventory.setItem(7, toggleItem("Allow undo", options.allowUndo(), "om:undo_icon", "om:no_undo_icon"));
+        inventory.setItem(21, item("Reset settings", NamedTextColor.DARK_RED, "om:filled_reroll"));
+        inventory.setItem(23, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
         player.openInventory(inventory);
     }
 
@@ -353,7 +352,7 @@ final class ChessGuiController {
         if (lobby == null) {
             lobby = Bukkit.getWorld(LOBBY_WORLD);
         }
-        int[] slots = {1, 2, 3, 4};
+        int[] slots = {1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24};
         int slotIndex = 0;
         for (Player online : Bukkit.getOnlinePlayers()) {
             if (online.equals(player) || lobby == null || !online.getWorld().equals(lobby)) {
@@ -386,14 +385,13 @@ final class ChessGuiController {
     private void openSelectGame(Player player) {
         Inventory inventory = inventory(GuiType.SELECT_GAME, player.getUniqueId(), 27, "Select game");
         fill(inventory);
-        int slot = 1;
+        int[] slots = {1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 15, 19, 20, 21, 22, 23, 24};
+        int slotIndex = 0;
         for (String match : manager.getActiveMatchTimestamps()) {
+            if (slotIndex >= slots.length) break;
             ItemStack item = item("Game: " + match, NamedTextColor.WHITE, "om:white_pawn_icon");
             setAction(item, "spectate:" + match);
-            inventory.setItem(slot++, item);
-            if (slot >= 26) {
-                break;
-            }
+            inventory.setItem(slots[slotIndex++], item);
         }
         inventory.setItem(26, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
         player.openInventory(inventory);

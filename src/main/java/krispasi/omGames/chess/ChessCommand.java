@@ -180,16 +180,18 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
             if (args.length == 3 && args[2].equalsIgnoreCase("reset")) {
                 return chessManager.resetPalette();
             }
-            if (args.length != 5) {
-                return ChessManager.Result.fail("Usage: /chess board blocks <b1> <b2> <b3> | /chess board blocks reset");
+            if (args.length != 5 && args.length != 6) {
+                return ChessManager.Result.fail("Usage: /chess board blocks <b1> <b2> <b3> [b4] | /chess board blocks reset");
             }
             Material b1 = parseBlock(args[2]);
             Material b2 = parseBlock(args[3]);
             Material b3 = parseBlock(args[4]);
-            if (b1 == null || b2 == null || b3 == null) {
+            Material b4 = args.length == 6 ? parseBlock(args[5]) : null;
+            if (b1 == null || b2 == null || b3 == null || args.length == 6 && b4 == null) {
                 return ChessManager.Result.fail("Each board palette entry must be a valid block.");
             }
-            return chessManager.setPalette(b1, b2, b3);
+            ChessManager.Result result = chessManager.setPalette(b1, b2, b3);
+            return !result.success() || args.length != 6 ? result : chessManager.setSelectionBlock(b4);
         }
         if (args.length == 4 && args[1].equalsIgnoreCase("reset") && args[2].equalsIgnoreCase("player")) {
             Player target = Bukkit.getPlayerExact(args[3]);
