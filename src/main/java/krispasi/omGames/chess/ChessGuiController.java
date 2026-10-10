@@ -156,26 +156,26 @@ final class ChessGuiController {
     }
 
     private void handleSettingsClick(Player player, int slot, PlayerOptions options) {
-        if (slot == 1 || slot == 3) {
-            options.setTimerPreset(nextTimerPreset(options.timerPreset(), slot == 3 ? 1 : -1));
+        if (slot == 28 || slot == 30) {
+            options.setTimerPreset(nextTimerPreset(options.timerPreset(), slot == 3 ? 1 : -1));     //DH was here too
             applyTimerPreset(options);
             openSettings(player);
-        } else if (slot == 2) {
+        } else if (slot == 29) {
             openSetTimer(player);
-        } else if (slot == 5) {
+        } else if (slot == 32) {
             options.setShowMovementHints(!options.showMovementHints());
             openSettings(player);
-        } else if (slot == 6) {
+        } else if (slot == 33) {
             options.setFigureStyle(options.figureStyle() == ChessSettings.FigureStyle.DEFAULT
                     ? ChessSettings.FigureStyle.FLAT : ChessSettings.FigureStyle.DEFAULT);
             openSettings(player);
-        } else if (slot == 7) {
+        } else if (slot == 34) {
             options.setAllowUndo(!options.allowUndo());
             openSettings(player);
-        } else if (slot == 21) {
+        } else if (slot == 48) {
             optionsByPlayer.put(player.getUniqueId(), new PlayerOptions());
             openSettings(player);
-        } else if (slot == 23) {
+        } else if (slot == 50) {
             openMenu(player);
         }
     }
@@ -237,11 +237,11 @@ final class ChessGuiController {
         }
         pendingTargetByChallenger.remove(challenge.challengerId());
         Player challenger = Bukkit.getPlayer(challenge.challengerId());
-        if (slot == 1 && challenger != null) {
+        if (slot == 3 && challenger != null) {
             send(player, manager.startGuiMatch(challenger, player, challenge.options()));
             player.closeInventory();
             challenger.closeInventory();
-        } else if (slot == 3 && challenger != null) {
+        } else if (slot == 5 && challenger != null) {
             challenger.sendMessage(Component.text(player.getName() + " declined the chess match.", NamedTextColor.YELLOW));
             player.closeInventory();
         }
@@ -262,13 +262,13 @@ final class ChessGuiController {
 
     private void handleChangeSettingsClick(Player player, int slot) {
         PlayerOptions options = options(player);
-        if (slot == 0) {
+        if (slot == 2) {
             options.setShowMovementHints(!options.showMovementHints());
             manager.setSetting(player, null, "visualize_movement_check", options.showMovementHints());
             openChangeSettings(player);
-        } else if (slot == 2) {
-            player.closeInventory();
         } else if (slot == 4) {
+            player.closeInventory();
+        } else if (slot == 6) {
             options.setFigureStyle(options.figureStyle() == ChessSettings.FigureStyle.DEFAULT
                     ? ChessSettings.FigureStyle.FLAT : ChessSettings.FigureStyle.DEFAULT);
             manager.setFigureStyle(player, null, options.figureStyle() == ChessSettings.FigureStyle.FLAT ? "flat" : "default");
@@ -277,12 +277,12 @@ final class ChessGuiController {
     }
 
     private void handleConfirmClick(Player player, int slot) {
-        if (slot == 0) {
+        if (slot == 2) {
             send(player, manager.voteDraw(player));
             player.closeInventory();
-        } else if (slot == 2) {
-            player.closeInventory();
         } else if (slot == 4) {
+            player.closeInventory();
+        } else if (slot == 6) {
             send(player, manager.resign(player));
             player.closeInventory();
         }
@@ -291,11 +291,11 @@ final class ChessGuiController {
     private void handleNextMatchClick(Player player, int slot, PlayerOptions options) {
         if (slot == 22) {
             player.closeInventory();
-        } else if (slot == 1 || slot == 3) {
-            options.setTimerPreset(nextTimerPreset(options.timerPreset(), slot == 3 ? 1 : -1));
+        } else if (slot == 3 || slot == 5) {
+            options.setTimerPreset(nextTimerPreset(options.timerPreset(), slot == 5 ? 3 : -1));             //wtf DH Dont know what he is doing    slot == 3 ? 1 : -1));
             applyTimerPreset(options);
             openNextMatch(player);
-        } else if (slot == 2) {
+        } else if (slot == 4) {
             openSetTimer(player);
         } else if (slot == 12) {
             options.setShowMovementHints(!options.showMovementHints());
@@ -312,16 +312,16 @@ final class ChessGuiController {
 
     private void openSettings(Player player) {
         PlayerOptions options = options(player);
-        Inventory inventory = inventory(GuiType.SETTINGS, player.getUniqueId(), 54, "Settings");
+        Inventory inventory = inventory(GuiType.SETTINGS, player.getUniqueId(), 54, "Settings");            //DH again cooked added 27 to every slot number to move it down
         fill(inventory);
-        inventory.setItem(1, item("Previous preset", NamedTextColor.WHITE, "om:left_arrow"));
-        inventory.setItem(2, timerPresetItem(options.timerPreset()));
-        inventory.setItem(3, item("Next preset", NamedTextColor.WHITE, "om:right_arrow"));
-        inventory.setItem(5, toggleItem("Show movement hints", options.showMovementHints(), "om:hint1", "om:hint0"));
-        inventory.setItem(6, styleItem(options.figureStyle()));
-        inventory.setItem(7, toggleItem("Allow undo", options.allowUndo(), "om:undo_icon", "om:no_undo_icon"));
-        inventory.setItem(21, item("Reset settings", NamedTextColor.DARK_RED, "om:filled_reroll"));
-        inventory.setItem(23, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
+        inventory.setItem(28, item("Previous preset", NamedTextColor.WHITE, "om:left_arrow"));
+        inventory.setItem(29, timerPresetItem(options.timerPreset()));
+        inventory.setItem(30, item("Next preset", NamedTextColor.WHITE, "om:right_arrow"));
+        inventory.setItem(32, toggleItem("Show movement hints", options.showMovementHints(), "om:hint1", "om:hint0"));
+        inventory.setItem(33, styleItem(options.figureStyle()));
+        inventory.setItem(34, toggleItem("Allow undo", options.allowUndo(), "om:undo_icon", "om:no_undo_icon"));
+        inventory.setItem(48, item("Reset settings", NamedTextColor.DARK_RED, "om:filled_reroll"));
+        inventory.setItem(50, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
         player.openInventory(inventory);
     }
 
@@ -379,8 +379,8 @@ final class ChessGuiController {
     private void openChallenge(Player target, Player challenger) {
         Inventory inventory = inventory(GuiType.CHALLENGE, target.getUniqueId(), 9, "Player wants a match");
         fill(inventory);
-        inventory.setItem(1, item("Start", NamedTextColor.GREEN, "om:filled_checkmark"));
-        inventory.setItem(3, item("Cancel", NamedTextColor.RED, "om:filled_x"));
+        inventory.setItem(3, item("Start", NamedTextColor.GREEN, "om:filled_checkmark"));
+        inventory.setItem(5, item("Cancel", NamedTextColor.RED, "om:filled_x"));
         target.openInventory(inventory);
         target.sendMessage(Component.text(challenger.getName() + " wants a chess match.", NamedTextColor.YELLOW));
     }
@@ -416,9 +416,9 @@ final class ChessGuiController {
     private void openConfirm(Player player) {
         Inventory inventory = inventory(GuiType.CONFIRM, player.getUniqueId(), 9, "Confirm");
         fill(inventory);
-        inventory.setItem(0, item("Offer draw", NamedTextColor.WHITE, "minecraft:white_banner"));
-        inventory.setItem(2, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
-        inventory.setItem(4, item("Resign", NamedTextColor.WHITE, "minecraft:lime_banner"));
+        inventory.setItem(2, item("Offer draw", NamedTextColor.WHITE, "minecraft:white_banner"));
+        inventory.setItem(4, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
+        inventory.setItem(6, item("Resign", NamedTextColor.WHITE, "minecraft:lime_banner"));
         player.openInventory(inventory);
     }
 

@@ -99,7 +99,7 @@ public final class ChessManager {
                 + ", " + highlightBlock.getKey() + ".");
     }
 
-    public Result setSelectionBlock(Material selectionBlock) {
+    public Result setSelectionBlock(Material selectionBlock) {                              //why isnt this merged with setPalette thing merge it, it should work like the highlight block
         setupRuntime.setSelectionBlock(selectionBlock);
         for (ChessMatchRuntime runtime : activeMatches.values()) {
             runtime.setSelectionBlock(selectionBlock);
@@ -436,7 +436,7 @@ public final class ChessManager {
     }
 
     public Result backward(Player player) {
-        ChessMatchRuntime runtime = activeMatchByTarget(player, null);
+        ChessMatchRuntime runtime = activeMatchByTarget(player, null);      //backward and forward commands should be usable by players in that match any time even after a win/draw (that match does not need to be active)
         return runtime == null ? Result.fail("No chess match is active for you.") : runtime.backward(player);
     }
 
