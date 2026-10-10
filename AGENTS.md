@@ -958,7 +958,7 @@ Files:
 
 Operator subcommands:
 - `/chess board build <x> <y> <z>`
-- `/chess board blocks <b1> <b2> <b3>`
+- `/chess board blocks <b1> <b2> <b3> <b4>`
 - `/chess board blocks reset`
 - `/chess board reset`
 - `/chess board reset player <player>`

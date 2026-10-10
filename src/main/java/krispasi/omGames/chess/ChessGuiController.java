@@ -312,7 +312,7 @@ final class ChessGuiController {
 
     private void openSettings(Player player) {
         PlayerOptions options = options(player);
-        Inventory inventory = inventory(GuiType.SETTINGS, player.getUniqueId(), 27, "Settings");
+        Inventory inventory = inventory(GuiType.SETTINGS, player.getUniqueId(), 54, "Settings");
         fill(inventory);
         inventory.setItem(1, item("Previous preset", NamedTextColor.WHITE, "om:left_arrow"));
         inventory.setItem(2, timerPresetItem(options.timerPreset()));
@@ -327,7 +327,7 @@ final class ChessGuiController {
 
     private void openSetTimer(Player player) {
         PlayerOptions options = options(player);
-        Inventory inventory = inventory(GuiType.SET_TIMER, player.getUniqueId(), 27, "Set timer");
+        Inventory inventory = inventory(GuiType.SET_TIMER, player.getUniqueId(), 54, "Set timer");
         fill(inventory);
         String[] labels = {"-1m", "-10s", "-1s", "+1s", "+10s", "+1m"};
         int[] firstRow = {1, 2, 3, 5, 6, 7};
@@ -368,6 +368,9 @@ final class ChessGuiController {
             head.setItemMeta(meta);
             inventory.setItem(slots[slotIndex++], head);
         }
+        while(slotIndex < slots.length){
+            inventory.setItem(slots[slotIndex++], new ItemStack(Material.AIR));
+        }
         inventory.setItem(8, item("Spectate game", NamedTextColor.WHITE, "minecraft:ender_eye"));
         inventory.setItem(26, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
         player.openInventory(inventory);
@@ -376,8 +379,8 @@ final class ChessGuiController {
     private void openChallenge(Player target, Player challenger) {
         Inventory inventory = inventory(GuiType.CHALLENGE, target.getUniqueId(), 9, "Player wants a match");
         fill(inventory);
-        inventory.setItem(1, item("Start", NamedTextColor.GREEN, "minecraft:lime_wool"));
-        inventory.setItem(3, item("Cancel", NamedTextColor.RED, "minecraft:red_wool"));
+        inventory.setItem(1, item("Start", NamedTextColor.GREEN, "om:filled_checkmark"));
+        inventory.setItem(3, item("Cancel", NamedTextColor.RED, "om:filled_x"));
         target.openInventory(inventory);
         target.sendMessage(Component.text(challenger.getName() + " wants a chess match.", NamedTextColor.YELLOW));
     }
@@ -393,6 +396,9 @@ final class ChessGuiController {
             setAction(item, "spectate:" + match);
             inventory.setItem(slots[slotIndex++], item);
         }
+        while(slotIndex < slots.length){
+            inventory.setItem(slots[slotIndex++], new ItemStack(Material.AIR));
+        }
         inventory.setItem(26, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
         player.openInventory(inventory);
     }
@@ -401,9 +407,9 @@ final class ChessGuiController {
         PlayerOptions options = options(player);
         Inventory inventory = inventory(GuiType.CHANGE_SETTINGS, player.getUniqueId(), 9, "Change settings");
         fill(inventory);
-        inventory.setItem(0, toggleItem("Show movement hints", options.showMovementHints(), "om:hint1", "om:hint0"));
-        inventory.setItem(2, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
-        inventory.setItem(4, styleItem(options.figureStyle()));
+        inventory.setItem(2, toggleItem("Show movement hints", options.showMovementHints(), "om:hint1", "om:hint0"));
+        inventory.setItem(4, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
+        inventory.setItem(6, styleItem(options.figureStyle()));
         player.openInventory(inventory);
     }
 
@@ -420,9 +426,9 @@ final class ChessGuiController {
         Inventory inventory = inventory(GuiType.NEXT_MATCH, player.getUniqueId(), 27, "Set up next match");
         fill(inventory);
         PlayerOptions options = options(player);
-        inventory.setItem(1, item("Previous preset", NamedTextColor.WHITE, "om:left_arrow"));
-        inventory.setItem(2, timerPresetItem(options.timerPreset()));
-        inventory.setItem(3, item("Next preset", NamedTextColor.WHITE, "om:right_arrow"));
+        inventory.setItem(3, item("Previous preset", NamedTextColor.WHITE, "om:left_arrow"));
+        inventory.setItem(4, timerPresetItem(options.timerPreset()));
+        inventory.setItem(5, item("Next preset", NamedTextColor.WHITE, "om:right_arrow"));
         inventory.setItem(12, toggleItem("Show movement hints", options.showMovementHints(), "om:hint1", "om:hint0"));
         inventory.setItem(13, styleItem(options.figureStyle()));
         inventory.setItem(14, toggleItem("Allow undo", options.allowUndo(), "om:undo_icon", "om:no_undo_icon"));

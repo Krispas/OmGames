@@ -49,7 +49,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
             }
             case "menu" -> {
                 if (!(sender instanceof Player player)) {
-                    sender.sendMessage(Component.text("Only players can open the chess menu.", NamedTextColor.RED));
+                    sender.sendMessage(Component.text("Only players can use this chess command.", NamedTextColor.RED));
                     return true;
                 }
                 if (!canOpenMenu(player)) return true;
@@ -153,11 +153,11 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
 
     private boolean canOpenMenu(Player player) {
         if (chessManager.isOpponent(player)) {
-            player.sendMessage(Component.text("You cannot open the chess menu while playing a match.", NamedTextColor.RED));
+            player.sendMessage(Component.text("You cannot open the chess menu while being in a match.", NamedTextColor.RED));
             return false;
         }
         if (player.getWorld() == null || !"bedwars_lobby".equals(player.getWorld().getName())) {
-            player.sendMessage(Component.text("The chess menu is only available in minecraft:bedwars_lobby.", NamedTextColor.RED));
+            player.sendMessage(Component.text("You can only open chess menu while being in bedwars lobby dimension.", NamedTextColor.RED));
             return false;
         }
         return true;
@@ -181,14 +181,14 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                 return chessManager.resetPalette();
             }
             if (args.length != 5 && args.length != 6) {
-                return ChessManager.Result.fail("Usage: /chess board blocks <b1> <b2> <b3> [b4] | /chess board blocks reset");
+                return ChessManager.Result.fail("Usage: /chess board blocks <b1> <b2> <b3> <b4> | /chess board blocks reset");
             }
             Material b1 = parseBlock(args[2]);
             Material b2 = parseBlock(args[3]);
             Material b3 = parseBlock(args[4]);
             Material b4 = args.length == 6 ? parseBlock(args[5]) : null;
             if (b1 == null || b2 == null || b3 == null || args.length == 6 && b4 == null) {
-                return ChessManager.Result.fail("Each board palette entry must be a valid block.");
+                return ChessManager.Result.fail("Each board palette entry must be a valid block. (namespace:block)");
             }
             ChessManager.Result result = chessManager.setPalette(b1, b2, b3);
             return !result.success() || args.length != 6 ? result : chessManager.setSelectionBlock(b4);
@@ -206,7 +206,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
         if (args.length == 3 && args[1].equalsIgnoreCase("remove")) {
             return chessManager.removeBoard(args[2]);
         }
-        return ChessManager.Result.fail("Usage: /chess board build <x> <y> <z> | /chess board blocks <b1> <b2> <b3> | /chess board blocks reset | /chess board reset [board|*] | /chess board reset player <player> | /chess board remove <board|*>");
+        return ChessManager.Result.fail("Usage: /chess board build <x> <y> <z> | /chess board blocks <b1> <b2> <b3> <b4>| /chess board blocks reset | /chess board reset [board|*] | /chess board reset player <player> | /chess board remove <board|*>");
     }
 
     private ChessManager.Result handleMatch(CommandSender sender, String[] args) {
@@ -215,7 +215,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
         }
         if ((args.length == 2 || args.length == 3) && args[1].equalsIgnoreCase("cancel")) {
             if (!sender.isOp()) {
-                return ChessManager.Result.fail("This command requires admin permission.");
+                return ChessManager.Result.fail("This command requires admin permissions.");
             }
             return chessManager.cancelMatch(sender, args.length == 3 ? args[2] : null);
         }
@@ -248,7 +248,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length >= 2 && args[1].equalsIgnoreCase("test")) {
             if (!sender.isOp()) {
-                return ChessManager.Result.fail("This command requires admin permission.");
+                return ChessManager.Result.fail("This command requires admin permissions.");
             }
             if (args.length < 3 || !(args[2].equalsIgnoreCase("on") || args[2].equalsIgnoreCase("off"))) {
                 return ChessManager.Result.fail("Usage: /chess match test <on|off> [match]");
@@ -262,21 +262,21 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                 && args[3].equalsIgnoreCase(";")) {
             String target = args.length == 6 && sender.isOp() ? args[5] : null;
             if (args.length == 6 && !sender.isOp()) {
-                return ChessManager.Result.fail("This command requires admin permission.");
+                return ChessManager.Result.fail("This command requires admin permissions.");
             }
             return chessManager.setFigureStyle(sender, target, args[4]);
         }
         if ((args.length == 4 || args.length == 5) && args[1].equalsIgnoreCase("settings") && args[2].equalsIgnoreCase("figure_style")) {
             String target = args.length == 5 && sender.isOp() ? args[4] : null;
             if (args.length == 5 && !sender.isOp()) {
-                return ChessManager.Result.fail("This command requires admin permission.");
+                return ChessManager.Result.fail("This command requires admin permissions.");
             }
             return chessManager.setFigureStyle(sender, target, args[3]);
         }
         if ((args.length == 4 || args.length == 5) && args[1].equalsIgnoreCase("settings")) {
             String setting = args[2].toLowerCase(Locale.ROOT);
             if (isAdminOnlySetting(setting) && !sender.isOp()) {
-                return ChessManager.Result.fail("This command requires admin permission.");
+                return ChessManager.Result.fail("This command requires admin permissions.");
             }
             String target = args.length == 5 && sender.isOp() ? args[4] : null;
             boolean value;
@@ -450,7 +450,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
         if (sender.isOp()) {
             return true;
         }
-        sender.sendMessage(Component.text("This command requires admin permission.", NamedTextColor.RED));
+        sender.sendMessage(Component.text("This command requires admin permissions.", NamedTextColor.RED));
         return false;
     }
 
@@ -461,7 +461,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
         if (sender instanceof Player player && chessManager.isOpponent(player)) {
             return true;
         }
-        sender.sendMessage(Component.text("This command requires opponent permission.", NamedTextColor.RED));
+        sender.sendMessage(Component.text("This command requires opponent permissions.", NamedTextColor.RED));
         return false;
     }
 
@@ -518,7 +518,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
                     .toList();
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("board") && args[1].equalsIgnoreCase("blocks")) {
-            return filter(args[2], "reset", "minecraft:smooth_quartz", "minecraft:coal_block", "minecraft:smooth_basalt");
+            return filter(args[2], "reset", "minecraft:smooth_quartz", "minecraft:coal_block", "minecraft:smooth_basalt", "minecraft:sulfur");
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("board") && args[1].equalsIgnoreCase("remove")) {
             List<String> options = new ArrayList<>();
@@ -575,7 +575,7 @@ public final class ChessCommand implements CommandExecutor, TabCompleter {
             return filter(args[3], "true", "false");
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("log")) {
-            return filter(args[1], "print", "delete", "search");
+            return filter(args[1], "print","load", "delete", "search");
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("log")
                 && (args[1].equalsIgnoreCase("print") || args[1].equalsIgnoreCase("delete"))) {
