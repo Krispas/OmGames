@@ -374,7 +374,7 @@ final class ChessGuiController {
     }
 
     private void openChallenge(Player target, Player challenger) {
-        Inventory inventory = inventory(GuiType.CHALLENGE, target.getUniqueId(), 5, "Player wants a match");
+        Inventory inventory = inventory(GuiType.CHALLENGE, target.getUniqueId(), 9, "Player wants a match");
         fill(inventory);
         inventory.setItem(1, item("Start", NamedTextColor.GREEN, "minecraft:lime_wool"));
         inventory.setItem(3, item("Cancel", NamedTextColor.RED, "minecraft:red_wool"));
@@ -399,7 +399,7 @@ final class ChessGuiController {
 
     private void openChangeSettings(Player player) {
         PlayerOptions options = options(player);
-        Inventory inventory = inventory(GuiType.CHANGE_SETTINGS, player.getUniqueId(), 5, "Change settings");
+        Inventory inventory = inventory(GuiType.CHANGE_SETTINGS, player.getUniqueId(), 9, "Change settings");
         fill(inventory);
         inventory.setItem(0, toggleItem("Show movement hints", options.showMovementHints(), "om:hint1", "om:hint0"));
         inventory.setItem(2, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
@@ -408,7 +408,7 @@ final class ChessGuiController {
     }
 
     private void openConfirm(Player player) {
-        Inventory inventory = inventory(GuiType.CONFIRM, player.getUniqueId(), 5, "Confirm");
+        Inventory inventory = inventory(GuiType.CONFIRM, player.getUniqueId(), 9, "Confirm");
         fill(inventory);
         inventory.setItem(0, item("Offer draw", NamedTextColor.WHITE, "minecraft:white_banner"));
         inventory.setItem(2, item("Go back", NamedTextColor.WHITE, "om:filled_home"));
