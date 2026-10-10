@@ -72,7 +72,7 @@ public final class ChessMatchRuntime {
     );
     private static final Transformation FLAT_WHITE_TRANSFORMATION = new Transformation(
             new Vector3f(),
-            new Quaternionf(0.7071068f, 0.0f, 0.0f, 0.7071068f),
+            new Quaternionf(0.7069991f, 0.012340578f, -0.012340578f, 0.7069991f),
             new Vector3f(1.875f, 1.875f, 1.875f),
             new Quaternionf()
     );
@@ -1763,11 +1763,7 @@ public final class ChessMatchRuntime {
         for (int file = 0; file < BOARD_SIZE; file++) {
             for (int rank = 0; rank < BOARD_SIZE; rank++) {
                 ChessSquare square = new ChessSquare(file, rank);
-                ChessPiece selected = getPieceById(selectedPieceId);
-                boolean selectedFlatSquare = settings.figureStyle() == ChessSettings.FigureStyle.FLAT
-                        && selected != null && !selected.captured() && selected.square().equals(square);
-                Material material = selectedFlatSquare ? Material.SULFUR
-                        : highlights.contains(square)
+                Material material = highlights.contains(square)
                         ? palette.highlightBlock()
                         : (square.isLightSquare() ? palette.lightBlock() : palette.darkBlock());
                 setSquareBlocks(world, square, material);
