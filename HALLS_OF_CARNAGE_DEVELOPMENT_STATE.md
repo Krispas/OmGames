@@ -102,6 +102,7 @@ Last updated: 2026-10-09
 - Ghost announcements use the player's colored display name followed by aqua text: "succumbed to the halls."
 - Dammed Librarians deploy their poison cloud only on death; hitting a player no longer creates one.
 - The lobby Leaderboards menu now lets players open a separate campaign shame board for each non-Endless scenario; each board ranks players by their lowest recorded completion shame for that scenario. Endless scenarios have their own highest-floor boards, while the previous cross-scenario Endless view remains available.
+- Custom boss melee hit damage now reads the weapon's saved `hoc_stat_melee_damage` value, so grindstone upgrades apply to bosses as well as ordinary monster damage.
 
 ## Current Scope
 
@@ -145,7 +146,6 @@ This is the first implementation slice. It focuses on:
 - Endless Mixed and Endless Base Game each have an independent modifier directory seeded from the prior Untold Depths defaults; modifier selection uses the active scenario id, so each pool can be tuned separately.
 
 ## Reviewer notes (Delete entries once done, but keep the header, treat stuff under here as next development slice)
-- The bosses don't take the extra damage granted by using grindstone on weapons.
 ## Future slices (dont do yet):
 -TBD
 ## For reviewer to figure out:

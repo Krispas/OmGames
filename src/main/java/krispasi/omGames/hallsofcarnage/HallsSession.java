@@ -1001,7 +1001,14 @@ public final class HallsSession {
         }
         HallsItemType type = itemType(player.getInventory().getItemInMainHand());
         if (type != null) {
-            return Math.max(1.0, type.stats().getOrDefault("melee_damage", 1.0));
+            ItemStack weapon = player.getInventory().getItemInMainHand();
+            ItemMeta meta = weapon.getItemMeta();
+            Double itemDamage = meta == null ? null : meta.getPersistentDataContainer().get(
+                    new NamespacedKey(plugin, "hoc_stat_melee_damage"), PersistentDataType.DOUBLE);
+            double damage = itemDamage == null
+                    ? type.stats().getOrDefault("melee_damage", 1.0)
+                    : itemDamage;
+            return Math.max(1.0, damage);
         }
         return 1.0;
     }

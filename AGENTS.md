@@ -1443,6 +1443,7 @@ SQLite tables:
 - Trap placement uses the generated walkable mask and BFS reachability before accepting an unbridged pit; pits that would disconnect traversal receive a spruce bridge.
 - Trap-generation optimization must preserve floor and room-entrance connectivity checks. Keep fixed-radius spacing lookups bounded and cache immutable geometry only within the generation job; do not reuse mutable traversal state across sessions or replace the configured floor mask with a different connectivity policy.
 - Halls trap animation/cooldown logic must use `HallsSessionTrapRuntime`'s session-local scheduler tick, not world time, because the Halls dimension may have frozen or nonstandard time progression.
+- Halls boss melee damage must read the weapon's `hoc_stat_melee_damage` PDC value when present, so grindstone upgrades affect the custom boss hitbox path as well as normal weapon damage.
 - Halls traps should damage session monsters as well as players when monsters enter their contact, radius, or lane checks, but only while a participant is within 20 blocks of the trap effect/contact area.
 - Halls trap archetypes are loaded from `plugins/OmGames/HallsOfCarnage/traps/` and seeded from bundled defaults.
 - Trap files define `id`, `kind`, `weight`, optional `level-types`, `block-material`, optional `model-material`, optional `item-model`, `model-scale`, timing, damage/radius, explosion power, and hole size/depth. Bear traps and proximity mines render through item-display models instead of placed physical floor blocks.
