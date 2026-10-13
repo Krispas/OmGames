@@ -144,7 +144,7 @@ This is the first implementation slice. It focuses on:
 - Endless scenarios now store their own copies of allowed items, blueprint pools, crafting stations, and research nodes in their scenario YAML. Runtime no longer reads `content-source` or fills missing scenario content from Untold Depths.
 - Endless Mixed and Endless Base Game each have an independent modifier directory seeded from the prior Untold Depths defaults; modifier selection uses the active scenario id, so each pool can be tuned separately.
 
-## Reviewer notes (Delete entries once done, but keep the header)
+## Reviewer notes (Delete entries once done, but keep the header, treat stuff under here as next development slice)
 - The bosses don't take the extra damage granted by using grindstone on weapons.
 ## Future slices (dont do yet):
 -TBD
